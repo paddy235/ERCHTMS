@@ -1,0 +1,500 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var currDeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var currUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var useraccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+    var pageType = 0; //0-起重吊装作业 1-准吊证
+    var ViewRange = request('ViewRange');
+    var isldap = '@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("IsOpenPassword"))';
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        ////起重吊装作业
+        //$("#tab0").click(function () {
+        //    pageType = 0;
+        //    ChangeTab();
+        //});
+        ////准吊证
+        //$("#tab1").click(function () {
+        //    pageType = 1;
+        //    ChangeTab();
+        //});
+        if (ViewRange) {
+            $("#ViewRange").val(ViewRange);
+        }
+        $("#btn_Search").click(function () {
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                //隐藏搜索框
+                var title = $(".ui-filter-text");
+                title.trigger("click");
+            }
+            $('#gridTable').jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //切换选项卡调用
+    function ChangeTab() {
+        //清空当前条件
+        ResetCondition();
+
+        var $gridTable = $('#gridTable');
+        //页面初始时，隐藏起吊质量描述
+        if (pageType == 1) {
+            $("#add").hide();
+            $gridTable.hideCol(['Oper1', 'qualitytype']);
+        } else {
+            $gridTable.showCol(['Oper1', 'qualitytype']);
+            $("#add").show();
+        }
+        $gridTable.setGridWidth(($('.gridPanel').width()));
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: getQueryJson() }, page: 1
+        }).trigger('reloadGrid');
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../HighRiskWork/Lifthoist/GetListJson",
+            datatype: "json",
+            postData: { queryJson: getQueryJson() },
+            colModel: [
+                 { label: 'id', name: 'id', hidden: true },
+                 { label: 'certstate', name: 'certstate', hidden: true },
+                 { label: 'certid', name: 'certid', hidden: true },
+                 {
+                     label: '操作', name: 'Oper', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:btn_view()  title='查看'><i class='fa fa-eye'></i></a>";
+
+                         if (rowObject.auditstate == 1) {
+                             if (!!rowObject.approveuseraccount) {
+                                 if (parseStrEmpty(rowObject.outtransferuseraccount).indexOf(useraccount + ',') < 0 && (rowObject.approveuseraccount.indexOf(useraccount + ',') >= 0 || parseStrEmpty(rowObject.intransferuseraccount).indexOf(useraccount + ',') >= 0)) {
+                                     html += "<a href=javascript:btn_audit()  title='审核'><i class='fa fa-check'></i></a>";
+                                 }
+                             }
+                         }
+
+                         if (rowObject.auditstate == 0 && rowObject.applyuserid == currUserId) {
+                             html += '<a href="javascript:btn_edit()" title="编辑"><i class="fa fa-pencil-square-o"></i></a>';
+                             html += "<a href=javascript:btn_delete()  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         }
+                         return html;
+                     }
+                 },
+                 //{
+                 //    label: '准吊证申请', name: 'Oper1', align: 'center', width: 80, sortable: false, formatter: function (cellvalue, options, rowObject) {
+                 //        if (rowObject.auditstate == 2 && rowObject.certstate == -1) {
+                 //            var zyid = rowObject.constructionunitid;
+                 //            var zycode = rowObject.constructionunitcode;
+                 //            var zyname = encodeURIComponent(rowObject.constructionunitname);
+                 //            var workstartdate = rowObject.workstartdate;
+                 //            var workenddate = rowObject.workenddate;
+                 //            var toolvalue = rowObject.toolvalue;
+                 //            var address = encodeURIComponent(rowObject.constructionaddress);
+                 //            return '<a href="javascript:btn_certapply(\'' + rowObject.id + '\',\'' + zyid + '\',\'' + zycode + '\',\'' + zyname + '\',\'' + toolvalue + '\',\'' + address + '\',\'' + workstartdate + '\',\'' + workenddate + '\')" title="准吊证申请" style="color:blue; text-decoration:underline;">准吊证申请</a>';
+                 //        }
+                 //        if (rowObject.certstate == 0) {
+                 //            return '<a href="javascript:btn_certview(\'' + rowObject.certid + '\')" title="已申请" style="color:blue; text-decoration:underline;">已申请</a>';
+                 //        }
+                 //        if (rowObject.certstate == 1) {
+                 //            return '<a href="javascript:btn_certview(\'' + rowObject.certid + '\')" title="审核/批中" style="color:blue; text-decoration:underline;">审核/批中</a>';
+                 //        }
+                 //        if (rowObject.certstate == 2) {
+                 //            return '<a href="javascript:btn_certview(\'' + rowObject.certid + '\')" title="已完结" style="color:blue; text-decoration:underline;">已完结</a>';
+                 //        }
+                 //        return '<a href="javascript:void(0)" title="准吊证申请" style="color:#aaa; text-decoration:none;">准吊证申请</a>';
+                 //    }
+                 //},
+                 {
+                     label: '作业许可状态', name: 'auditstate', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                         var linkstyle = "style=\"color:blue; text-decoration:underline;\"";
+                         if (rowObject.auditstate == 0) {
+                             linkstyle = "${0}";
+                         }
+                         else {
+                             linkstyle = '<a href="javascript:btn_viewflow(\'' + rowObject.id + '\')" ' + linkstyle + '>${0}</a>';
+                         }
+                         if (rowObject.auditstate == 0) {
+                             return linkstyle.replace('${0}', '申请中');
+                         }
+                         if (rowObject.auditstate == 1) {
+                             return linkstyle.replace('${0}', '审核(批)中');
+                         }
+                         if (rowObject.auditstate == 2) {
+                             return linkstyle.replace('${0}', '审核(批)通过');
+                         }
+                     }
+                 },
+                 { label: '申请编号', name: 'applycodestr', width: 260, align: 'center', sortable: true },
+                  {
+                      label: '起吊质量描述', name: 'qualitytypename', width: 100, align: 'center', sortable: false
+                  },
+                 { label: '吊装工具名称', name: 'toolname', width: 80, align: 'center', sortable: false },
+                 {
+                     label: isldap == "true" ? '作业时间' : '计划作业时间', name: 'workdate', width: 260, sortable: false, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                         return formatDate(rowObject.workstartdate, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.workenddate, 'yyyy-MM-dd hh:mm');
+                     }
+                 },
+                 { label: '作业单位', name: 'constructionunitname', width: 100, sortable: false, align: 'center' },
+                 { label: '申请人', name: 'applyusername', width: 110, sortable: false, align: 'center' },
+                 { label: '申请时间', name: 'applydate', width: 110, align: 'center', formatter: "date", formatoptions: { srcformat: 'Y-m-d H:i', newformat: 'Y-m-d H:i' } },
+                 { label: '审核/批部门', name: 'flowdeptname', width: 100, sortable: false, align: 'center' },
+                 {
+                     label: '审核/批流程', name: 'flowname', width: 100, sortable: false, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                         if (cellvalue) {
+                             if (cellvalue.length > 16) {
+                                 return '<div title=' + cellvalue + '>' + cellvalue.substring(0, 15) + "..." + '</div>'
+                             }
+                             return cellvalue;
+                         }
+                         return "";
+                     }
+                 },
+                 { label: '作业单位ID', name: 'constructionunitid', hidden: true, sortable: false, align: 'center' },
+                 { label: '作业单位CODE', name: 'constructionunitcode', hidden: true, sortable: false, align: 'center' },
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'applydate desc,applycode desc',
+            sortorder: '',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        $gridTable.setGridWidth(($('.gridPanel').width()));
+    }
+
+    //流程
+    function btn_viewflow(id) {
+        if (id) {
+            var title = "起重吊装作业流程图";
+            if (pageType == 1) {
+                title = "准吊证流程图";
+            }
+            var rqUrl = "/HighRiskWork/Lifthoist/Flow?keyValue=" + id + "&pagetype=" + pageType;
+            dialogOpen({
+                id: 'FlowForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null
+            });
+        } else {
+            dialogMsg('请选择查看行！', 0);
+        }
+    }
+
+    //审核
+    function btn_audit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            var title = "审核起重吊装作业申请";
+            var url = '/HighRiskWork/Lifthoist/Form?mode=audit&keyValue=' + keyValue;
+            if (pageType == 1) {
+                var title = "审核准吊证申请";
+                var url = '/HighRiskWork/Lifthoist/CertForm?mode=audit&keyValue=' + keyValue;
+            }
+            dialogOpen({
+                id: 'ViewForm',
+                title: title,
+                url: url,
+                width: ($(window).width() - 400) + "px",
+                height: ($(window).height() - 200) + 'px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        } else {
+            dialogMsg('请选择需要操作的行！', 0);
+        }
+    }
+    //查看
+    function btn_view() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            var title = "查看起重吊装作业申请";
+            var url = '/HighRiskWork/Lifthoist/Form?mode=view&keyValue=' + keyValue;
+            if (pageType == 1) {
+                var title = "查看准吊证申请";
+                var url = '/HighRiskWork/Lifthoist/CertForm?mode=view&keyValue=' + keyValue;
+            }
+            dialogOpen({
+                id: 'ViewForm',
+                title: title,
+                url: url,
+                width: ($(window).width() - 400) + "px",
+                height: ($(window).height() - 200) + 'px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        } else {
+            dialogMsg('请选择需要查看行！', 0);
+        }
+    }
+    function btn_certview(certid) {
+        if (certid) {
+            var title = "查看准吊证申请";
+            var url = '/HighRiskWork/Lifthoist/CertForm?mode=view&keyValue=' + certid;
+            dialogOpen({
+                id: 'ViewCertForm',
+                title: title,
+                url: url,
+                width: ($(window).width() - 400) + "px",
+                height: ($(window).height() - 200) + 'px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        } else {
+            dialogMsg('请选择需要查看行！', 0);
+        }
+    }
+
+    //准吊证申请
+    function btn_certapply(id, zyid, zycode, zyname, toolvalue, address, sdate, edate) {
+        dialogOpen({
+            id: 'AddCertForm',
+            title: "准吊证申请",
+            url: "/HighRiskWork/Lifthoist/CertForm?jobid=" + id + "&zyid=" + zyid + "&zycode=" + zycode + "&zyname=" + zyname + "&toolvalue=" + toolvalue + "&address=" + address + "&sdate=" + sdate + "&edate=" + edate,
+            width: ($(window).width() - 400) + "px",
+            height: ($(window).height() - 200) + 'px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //新增
+    function btn_add() {
+        var title = "添加起重吊装作业申请";
+        var url = '/HighRiskWork/Lifthoist/Form?mode=add';
+        if (pageType == 1) {
+            var title = "添加准吊证申请";
+            var url = '/HighRiskWork/Lifthoist/CertForm';
+        }
+        dialogOpen({
+            id: 'Form',
+            title: title,
+            url: url,
+            width: ($(window).width() - 400) + "px",
+            height: ($(window).height() - 200) + 'px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            var title = "编辑起重吊装作业申请";
+            var url = '/HighRiskWork/Lifthoist/Form?mode=edit&keyValue=' + keyValue;
+            if (pageType == 1) {
+                var title = "编辑准吊证申请";
+                var url = '/HighRiskWork/Lifthoist/CertForm?keyValue=' + keyValue;
+            }
+            dialogOpen({
+                id: 'Form',
+                title: title,
+                url: url,
+                width: ($(window).width() - 400) + "px",
+                height: ($(window).height() - 200) + 'px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        } else {
+            dialogMsg('请选择需要编辑的起吊作业！', 0);
+        }
+    }
+    //删除
+    function btn_delete() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            var url = '../..//HighRiskWork/Lifthoist/RemoveForm';
+            if (pageType == 1) {
+                var url = '../..//HighRiskWork/Lifthoist/RemoveCertForm';
+            }
+            $.RemoveForm({
+                url: url,
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的起吊作业！', 0);
+        }
+    }
+    //导出
+    function exportResult() {
+        var queryJson = getQueryJson();
+        location.href = "../../HighRiskWork/Lifthoist/ExportData?queryJson=" + queryJson;
+    }
+
+    //重置所有查询条件
+    function ResetCondition() {
+        $("#filter-form").find(":input").val("");
+    }
+    function getQueryJson() {
+        var query = {
+            PageType: pageType,
+            AuditState: $("#AuditState").val(),
+            CONSTRUCTIONUNITNAME: $("#CONSTRUCTIONUNITNAME").val(),
+            CONSTRUCTIONUNITCODE: $("#CONSTRUCTIONUNITCODE").val(),
+            CONSTRUCTIONUNITID: $("#CONSTRUCTIONUNITID").val(),
+            WorkEndDate: $("#WorkEndDate").val(),
+            WorkEndDate: $("#WorkEndDate").val(),
+            ApplyCode: $("#ApplyCode").val(),
+            ViewRange: $("#ViewRange").val()
+        }
+        return JSON.stringify(query);
+    }
+    function reload_current() {
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: getQueryJson() }, page: 1
+        }).trigger('reloadGrid');
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title">起重吊装作业</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 520px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle">作业状态：</td>
+                                                <td class="formValue">
+                                                    <select id="AuditState" name="AuditState" class="form-control">
+                                                        <option value="">===请选择===</option>
+                                                        <option value="0">申请中</option>
+                                                        <option value="1">审核(批)中</option>
+                                                        <option value="2">审核(批)通过</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" id="td_setupdate">作业时间：</td>
+                                                <td class="formValue">
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="WorkStartDate" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'WorkEndDate\')}' })">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="WorkEndDate" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'WorkStartDate\')}' })">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" id="td_setupcompany">作业单位：</td>
+                                                <td class="formValue">
+                                                    <input id="CONSTRUCTIONUNITNAME" name="CONSTRUCTIONUNITNAME" type="text" class="form-control" placeholder="请选择单位" readonly onclick="selectDept('', 0, 2, '选择作业单位', document.body, 'CONSTRUCTIONUNITNAME,CONSTRUCTIONUNITCODE,CONSTRUCTIONUNITID');" />
+                                                    <input id="CONSTRUCTIONUNITCODE" name="CONSTRUCTIONUNITCODE" type="hidden" />
+                                                    <input id="CONSTRUCTIONUNITID" name="CONSTRUCTIONUNITID" type="hidden" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">查看范围：</td>
+                                                <td class="formValue">
+                                                    <select id="ViewRange" name="ViewRange" class=" show-menu-arrow form-control">
+                                                        <option value="">===请选择===</option>
+                                                        <option value="all">全部</option>
+                                                        <option value="self">本人申请</option>
+                                                        <option value="selfaudit">本人待审核(批)</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">申请编号：</td>
+                                                <td class="formValue">
+                                                    <input type="text" class="form-control" id="ApplyCode" name="ApplyCode" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-primary" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download"></i>&nbsp;导出</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div id="gridPanel" class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+            
+

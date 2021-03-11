@@ -1,0 +1,249 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script>    ;
+    var ids = "";
+    var names ="";
+    var types = "";
+    var depts = "";
+    var cards = "";
+    $(function () {
+        InitialPage();
+        $('#btn_Search').trigger("click");
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() -250);
+            }, 200);
+            e.stopPropagation();
+        });
+        ids = $.currentIframe().$("#gridTable").jqGridRowValue("userid").split(',');
+        names = $.currentIframe().$("#gridTable").jqGridRowValue("username").split(',');
+        types = $.currentIframe().$("#gridTable").jqGridRowValue("usertype").split(',');
+        depts = $.currentIframe().$("#gridTable").jqGridRowValue("deptname").split(',');
+        cards = $.currentIframe().$("#gridTable").jqGridRowValue("identifyid").split(',');
+        var html = "";
+        for (var j = 0; j < ids.length; j++) {
+            html += "<option value='" + ids[j] + "'>" + names[j] + "</option>";
+        }
+        $("#UserId").html(html);
+        $("#UserType").val(types[0]); $("#DeptName").val(depts[0]); $("#IdCard").val(cards[0]);
+        $.post("GetScoreInfo", { userId: ids[0] }, function (data) {
+            var json = eval("(" + data + ")");
+            $("#currScore").val(json.currScore);
+            $("#sumScore").val(json.sumScore);
+           
+        });
+        GetGrid(ids[0]);
+    }
+    
+    
+    //加载表格
+    function GetGrid(userId) {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            autowidth: true,
+            height: $(window).height() - 250,
+            url: "../../PersonManage/UserScore/GetPageListJson",
+            postData: { queryJson: JSON.stringify({ userId: userId,itemType:$("#ItemType").val(),startDate:$("#StartDate").val(),endDate:$("#EndDate").val() }) },
+            datatype: "json",
+            colModel: [
+                 { label: 'id', name: 'id', hidden: true }, { label: 'OrganizeCode', name: 'organizecode', hidden: true }, { label: 'departmentcode', name: 'departmentcode', hidden: true }, { label: 'userid', name: 'userid', hidden: true },
+                  {
+                      label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false
+                  },
+                //{ label: '姓名', name: 'realname',  width: 80, align: 'center', sortable: true },
+                //{ label: '性别', name: 'gender', width: 60, align: 'center', sortable: true },
+                //{ label: '身份证号', name: 'identifyid', width: 150, align: 'center', sortable: true },
+                //{ label: '单位/部门', name: 'deptname', width: 150, align: 'center', sortable: true },
+                { label: '积分项目', name: 'itemname', width: 300, align: 'center', sortable: true },
+                { label: '积分值', name: 'score', width: 80, align: 'center', sortable: true },
+                { label: '积分类型', name: 'itemtype', width: 100, align: 'center', sortable: true },
+                { label: '考核时间', name: 'createdate', width: 100, align: 'center', sortable: true },
+                { label: '考核人员', name: 'createusername', width: 100, align: 'center', sortable: true },
+                { label: '备注', name: 'isauto',align: 'center', sortable: true }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rownumWidth:60,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'itemtype',
+            sortorder: 'asc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true 
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+           
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ userId: userId, itemType: $("#ItemType").val(), startDate: $("#StartDate").val(), endDate: $("#EndDate").val() }) },
+                page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#UserId").change(function () {
+            var idx = this.selectedIndex;
+            var uId = $(this).val();
+            $("#UserType").val(types[idx]); $("#DeptName").val(depts[idx]); $("#IdCard").val(cards[idx]);
+            var queryJson = {
+                userId: uId
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) },
+                page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#StartDate").val('');
+            $("#EndDate").val('');
+            $("#txt_Keyword").val('');
+            var queryJson = {
+                keyword: "",
+                userId: userId
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) },
+                page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加人员积分',
+            url: '/PersonManage/UserScore/Edit',
+            width: '1000px',
+            height: '500px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //查看
+    function show(id) {
+        var keyValue = !!id ? id : $('#gridTable').jqGridRowValue('id');
+            var idx=dialogOpen({
+                id: 'Form',
+                title: '查看详情',
+                url: '/PersonManage/UserScore/Edit?mode=Show&keyValue=' + keyValue,
+                width: '1000px',
+                height: '500px',
+                btn:["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(idx);
+                }
+            })
+    }
+    //编辑
+    function edit(id) {
+        var keyValue = !!id ? id : $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑人员积分',
+                url: '/PersonManage/UserScore/Edit?keyValue=' + keyValue,
+                width: '1000px',
+                height: '500px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function del(id) {
+        var keyValue =!!id?id: $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../PersonManage/UserScore/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的人员积分！', 0);
+        }
+    }
+</script>
+ 
+<div class="gridPanel">
+    <table class="form">
+        <tr>
+            <td class="formTitle" style="width:150px;">姓名</td>
+            <td class="formValue">
+                <select id="UserId">
+
+                </select>
+            </td>
+            <td class="formTitle" style="width:150px;">人员类型</td>
+            <td class="formValue">
+                <input id="UserType" type="text" class="form-control" readonly="readonly" />
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle" style="width:150px;">单位/部门</td>
+            <td class="formValue">
+                <input id="DeptName" type="text" class="form-control" readonly="readonly" />
+            </td>
+            <td class="formTitle" style="width:150px;">身份证号</td>
+            <td class="formValue">
+                <input id="IdCard" type="text" class="form-control" readonly="readonly" />
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle" >历年累计安全积分</td>
+            <td class="formValue">
+                <input id="sumScore" type="text" class="form-control" readonly="readonly" />
+            </td>
+            <td class="formTitle">本年度安全积分</td>
+            <td class="formValue">
+                <input id="currScore" type="text" class="form-control" readonly="readonly" />
+            </td>
+        </tr>
+    </table>
+    <table>
+        <tr>
+            <td style="width:150px; text-align:right;">考核时间：</td>
+            <td>
+                <input id="StartDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" value="@DateTime.Now.ToString("yyyy-01-01")" />
+            </td>
+            <td>至</td>
+            <td>
+                <input id="EndDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" value="@DateTime.Now.ToString("yyyy-MM-dd")" />
+            </td>
+            <td style="width:90px; text-align:right;">积分类型：</td>
+            <td>
+                <select id="ItemType" class="form-control">
+                    <option value=""></option>
+                    <option value="加分">加分</option>
+                    <option value="减分">减分</option>
+                </select>
+            </td>
+            <td style="padding-left: 5px;">
+                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+            </td>
+            
+        </tr>
+    </table>
+    <br />
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

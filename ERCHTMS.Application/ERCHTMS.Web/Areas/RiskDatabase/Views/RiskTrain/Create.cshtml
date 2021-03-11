@@ -1,0 +1,356 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js"></script>
+<link href="~/Content/styles/framework-flowall.css" rel="stylesheet" />
+
+<script>
+    var trainType = "1";//1代表 风险措施库 2 代表 危险预知训练库
+    var keyValue = request('keyValue');
+    var mode = false;
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+       
+        //加载岗位
+        var orgCode = top.currUserDeptCode;
+        var isOrg = orgCode.length > 3 ? orgCode : "true";
+        //orgCode = orgCode.substring(0, 3);
+        $("#PostId").html("");
+        ////绑定岗位
+        //$("#PostId").ComboBox({
+        //    url: top.contentPath + "/BaseManage/Post/GetPostListJson?orgCode=" + orgCode + "&isOrg=" + isOrg,
+        //    id: "RoleId",
+        //    height: "300px",
+        //    text: "FullName",
+        //    allowSearch: true,
+        //    description: "==请选择=="
+        //});
+        $("#AreaId").ComboBoxTree({
+            url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + top.currUserOrgId,
+            height: "300px",
+            description: "请选择",
+            allowSearch: true
+        })
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../RiskDatabase/Risktrain/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    trainType = data.TrainType;
+                  
+                    //$("#PostId").attr("data-text", data.PostName);
+                    //$("#PostId").find(".ui-select-text").text(data.PostName);
+                    //if (data.Status==1) {
+                    //    $("#divAdd").remove();
+                    //}
+                    //if (data.CreateUserId!=top.currUserId) {
+                    //    $("#form").find("input:text").attr("readonly", "readonly"); $("#form").find("input:text").attr("disabled", "disabled");
+                    //    $("#form").find("textarea").attr("disabled", "disabled"); $("#form").find("select").attr("disabled", "disabled");
+                    //    $("#PostId").hide(); $("#PostName").show(); $("#AreaId").hide(); $("#AreaName").show();
+                    //}
+                    mode = true;
+                }
+            })
+        } else {
+            keyValue = "@Guid.NewGuid().ToString()";
+        }
+      
+        GetGrid();
+    }
+    //保存表单
+    function AcceptClick(IsCommit) {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["Status"] = 0;
+        postData["AreaCode"] = $("#AreaId").attr("data-code");
+        postData["AreaName"] = $("#AreaId").attr("data-text");
+        //postData["PostName"] = $("#PostId").attr("data-text");
+        postData["IsCommit"] = IsCommit;
+        postData["trainType"] = trainType;
+
+        var measures = $("#gridTable").jqGrid('getRowData');
+        if (measures.length > 0) {
+            var arr = [];
+            var flag = false;
+            $(measures).each(function (i, dom) {
+                if ($("#gridTable").find("textarea[name='riskcontent']").eq(i).length>0) {
+                    if($.trim($("#gridTable").find("textarea[name='riskcontent']").eq(i).val()).length == 0 && !flag){
+                        flag = true;
+                    } else {
+                        //var status = $("#gridTable").find("input:checkbox").eq(i).get(0).checked ? 1 : 0;
+                        arr.push({ RiskContent: $("#gridTable").find("textarea[name='riskcontent']").eq(i).val(), Measure: $("#gridTable").find("textarea[name='measure']").eq(i).val(), Status: 0, WorkId: keyValue, Id: newGuid(), CreateDate: formatDate(new Date(), "yyyy-MM-dd hh:mm:ss") });
+                    }
+                } else {
+                    //var status = $("#gridTable").find("input:checkbox").eq(i).get(0).checked ? 1 : 0;
+                    arr.push({ RiskContent: $("#gridTable").find("textarea[name='riskcontent']").eq(i).val(), Measure: $("#gridTable").find("textarea[name='measure']").eq(i).val(), Status: 0, WorkId: keyValue, Id: newGuid(), CreateDate: formatDate(new Date(), "yyyy-MM-dd hh:mm:ss") });
+                }
+            });
+            if (flag) {
+                dialogMsg("请填写风险控制措施！", 2);
+                return false;
+            }
+            json = JSON.stringify(arr);
+            postData["measuresJson"] = json;
+        } else {
+                dialogMsg("请填写风险及管控措施！", 2);
+                return false;
+        }
+        //if ($("#gridTable").find("input:checkbox").length == $("#gridTable").find("input:checked").length) {
+        //    postData["Status"]=1;
+        //}
+        $.SaveForm({
+            url: "../../RiskDatabase/Risktrain/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //加载表格
+    function GetGrid() {
+        var $gridTable = $('#gridTable');
+        var height = $(top.window).height() - 520;
+        height = height < 200 ? 200 : height;
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/Risktrain/GetMeasures",
+            postData: { workId: keyValue },
+            datatype: "json",
+            height: height + "px",
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        //if (rowObject.Status == 1) {
+                        //    html = "已确认,无法修改";
+                          
+                        //} else {
+                            //html += "<a onclick=selRisk(this,1)  title='从风险库中选择' style='cursor:pointer;'><i class='fa fa-check'></i></a>";
+                            html += "&nbsp;&nbsp;<a href=javascript:del('" + rowObject.Id + "',this)  title='删除'><i class='fa fa-trash-o'></i></a>";
+                       // }
+                        return html;
+                    }
+                },
+                {
+                    label: '存在风险', name: 'RiskContent', width: 400, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var html = '<textarea type="text"  name="riskcontent" role="textbox" style="width: 100%;height:50px;" class="form-control" ';
+                        //if (rowObject.Status == 1) {
+                        //    html += 'readonly="readonly"';
+                        //}
+                        html += '>' + cellvalue + '</textarea>';
+                        return html;
+                    }
+                },
+                {
+                    label: '管控措施', name: 'Measure', width: 400, align: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = '<textarea type="text"  name="measure" role="textbox" style="width: 100%;height:50px;" class="form-control" ';
+                        //if (rowObject.Status ==1) {
+                        //    html += 'readonly="readonly"';
+                        //} 
+                        html += '>' + cellvalue + '</textarea>';
+                        return html;
+                    }
+                }
+                //{
+                //    label: '措施是否落实', name: 'Status', align: 'center'
+                //    , formatter: function (cellvalue, options, rowObject) {
+                       
+                //        var html = '<div ><input type="checkbox" value="0" >';
+                //        //if (cellvalue==1) {
+                //        //    html = '<div ><input type="checkbox" value="0"  checked="true" disabled="true">';
+                //        //}
+                //        html += '</div>';
+                //        return html;
+                //    }
+
+                //}
+            ],
+            gridComplete: function () {
+                if(mode){
+                    keyValue = newGuid();
+                }
+            },
+            viewrecords: true,
+            rowNum: 30,
+            //rowList: [30, 50, 100],
+            //pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+
+        });
+    }
+    //动态新增风险及措施
+    var node = null;
+    function addMeasure(obj) {
+        tCode = ""; tName = ""; tContent = "";
+        areaId = $("#DistrictId").attr("data-value");
+        var areaCode = $("#DistrictId").attr("data-code");
+        var rowId = $("#gridTable").jqGrid('getRowData').length;
+
+        $("#gridTable").addRowData(rowId, { id: newGuid(), RiskContent: "", Measure: '', Status: 0 });
+    }
+    //从风险库中选择数据
+    function selRisk(obj, mode) {
+        trainType = "1";
+        node =obj;
+        mode == mode == 1 ? $(obj).parent().parent().children().eq(0).text() : 0;
+        dialogOpen({
+            id: 'SelectRisk',
+            title: '选择工作任务',
+            url: '/RiskDatabase/DangerSource/SelectNew',
+            width: ($(window).width() - 200) + 'px',
+            height: ($(window).height() - 20) + 'px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+    //删除数据行
+    function del(id, obj) {
+        var jqTable = $("#gridTable");
+        var idx = dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                jqTable.delRowData(jqTable.getGridParam('selrow'));
+                top.layer.close(idx);
+            } else {
+                top.layer.close(idx);
+            }
+        });
+    }
+    function selTrainLib() {
+        trainType = "2";
+        dialogOpen({
+            id: 'RiskTrianLib',
+            title: '选择工作任务',
+            url: '/RiskDatabase/Risktrainlib/SelectTrianLib',
+            width: ($(top.window).width() - 250) + 'px',
+            height: ($(top.window).height() - 50) + 'px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px; padding-top: 50px; ">
+    <table class="form" id="form">
+        <tr>
+            <td class="formTitle">工作任务<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="TaskName" style="width:75%;float:left;" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                <input type="button" class="btn btn-primary" onclick="selRisk(this, 0)" title="从风险库中选择工作任务" value="风险措施库" />
+                <input type="button" class="btn btn-primary" onclick="selTrainLib()" value="危险预知训练库" />
+            </td>
+            <td class="formTitle">工作票号</td>
+            <td class="formValue">
+                <input id="WorkNum" type="text" class="form-control" />
+            </td>
+            @*<td class="formTitle">作业类别<font face="宋体">*</font></td>
+            <td class="formValue">
+                <select id="WorkType" class="form-control">
+                    <option value="检修">检修</option>
+                    <option value="维护">维护</option>
+                    <option value="常规检查">常规检查</option>
+                    <option value="大修">大修</option>
+                </select>
+            </td>*@
+        </tr>
+        <tr>
+            <td class="formTitle">作业开始时间</td>
+            <td class="formValue">
+                <input id="WorkStartTime" type="text" class="form-control input-datepicker fxtime" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm', maxDate: '#F{$dp.$D(\'WorkEndTime\')}' })" />
+            </td>
+            <td class="formTitle">作业结束时间</td>
+            <td class="formValue">
+                <input id="WorkEndTime" type="text" class="form-control input-datepicker fxtime" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm', minDate: '#F{$dp.$D(\'WorkStartTime\')}' })" />
+            </td>
+
+        </tr>
+        <tr>
+            @*<td class="formTitle">作业岗位<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="PostId" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                <input id="PostName" type="text" class="form-control" style="display:none;" />
+            </td>*@
+            <td class="formTitle">作业区域<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="AreaId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                <input id="AreaName" type="text" class="form-control" style="display:none;" /><input id="AreaICode" type="hidden" class="form-control" />
+            </td>
+            <td class="formTitle">作业地点</td>
+            <td class="formValue">
+                <input id="WorkPlace" type="text" class="form-control" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业单位</td>
+            <td class="formValue">
+                <input type="hidden" id="WorkUnitCode" />
+                <input type="hidden" id="WorkUnitId" />
+                <input id="WorkUnit" type="text" class="form-control" placeholder="请选择单位" readonly onclick="selectDept('', 0, 2, '选择单位', window.document.body, 'WorkUnit,WorkUnitCode,WorkUnitId');" />
+            </td>
+        </tr>
+        @*<tr>
+            <td class="formTitle">工器具准备</td>
+            <td class="formValue" colspan="3">
+                <input id="ToolsPrepare" type="text" class="form-control" />
+            </td>
+        </tr>*@
+
+        <tr>
+            <td class="formTitle">作业负责人<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="WorkFzr" type="text" class="form-control" readonly onclick="selectUser({ deptId: '', deptCode: '', checkMode: 0, mode: 2, winObject: this.parentNode, domId: 'WorkFzr,WorkFzrId,' });" isvalid="yes" checkexpession="NotNull" />
+                <input type="hidden" id="WorkFzrId" />
+            </td>
+            <td class="formTitle">作业人员<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="WorkUsers" type="text" class="form-control" readonly onclick="selectUser({ deptId: $('#DeptId').val(), deptCode: $('#DeptCode').val(), checkMode: 1, mode: 2, winObject: this.parentNode, domId: 'WorkUsers,UserIds', userIds: 'UserIds' });" isvalid="yes" checkexpession="NotNull" />
+                <input type="hidden" id="UserIds" />
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle">作业任务描述</td>
+            <td class="formValue" colspan="3">
+                <textarea id="TaskContent" class="form-control" rows="3" maxlength="500" ></textarea>
+                <input type="hidden" id="TrainlibWorkId" />
+            </td>
+        </tr>
+    </table>
+    <div class="ibox">
+        <div class="ibox-title">
+            <h5>存在风险及管控措施</h5>
+            <div class="ibox-tools">
+
+            </div>
+        </div>
+        <div class="ibox-content">
+            <div style="margin-bottom:10px;" id="divAdd"><a href="javascript:addMeasure(this)" class="btn btn-primary">新增</a></div>
+            <table id="gridTable"></table>
+            <div id="gridPager"></div>
+        </div>
+    </div>
+   
+    <div id="btngroup" class="form-button" style=" top:40px;  text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+        <a onclick="AcceptClick('0')" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+        &nbsp;&nbsp;
+        <a onclick="AcceptClick('1')" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp;&nbsp;
+    </div>
+
+</div>

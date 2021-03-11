@@ -1,0 +1,415 @@
+﻿@{
+    ViewBag.Title = "部门管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+       
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 120);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    var selectedRowIndex = 0;
+    function GetGrid() {
+
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../BaseManage/Department/GetTreeListJson",
+            datatype: "json",
+            height: $(window).height() - 120,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'DepartmentId', hidden: true },
+                { label: '公司Id', name: 'OrganizeId', hidden: true },
+                { label: 'Sort', name: 'Sort', hidden: true },
+                { label: 'HasChild', name: 'HasChild', hidden: true },
+                { label: "单位名称", name: "FullName", width: 500, align: "center", sortable: false },
+                { label: "单位编号", name: "EnCode", width: 150, align: "left", sortable: false },
+                { label: "新编号", name: "DeptCode", width: 150, align: "left", sortable: false },
+                { label: "单位简称", name: "ShortName", width: 100, align: "center", sortable: false },
+                { label: "单位性质", name: "Nature", width: 100, align: "center", sortable: false },
+                { label: "负责人", name: "Manager", width: 100, align: "center", sortable: false },
+                { label: "电话号", name: "OuterPhone", width: 100, align: "center", sortable: false },
+                //{ label: "备注", name: "Description", width: 200, align: "center", sortable: false },
+                { label: 'SortCode', name: 'Description', hidden: true }
+            ],
+            treeGrid: true,
+            treeGridModel: "nested",
+            ExpandColumn: "EnCode",
+            rowNum: "all",
+            rownumbers: true,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询条件设置
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btnSearch").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: {
+                    condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                    keyword: $("#txt_Keyword").val()
+                }
+            }).trigger('reloadGrid');
+        });
+        //查询回车事件
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btnSearch').trigger("click");
+            }
+        });
+    }
+    //新增
+    function add() {
+        var keyValue = $("#gridTable").jqGridRowValue("DepartmentId");
+        var organizeId ="";
+        var parentId = "";
+        var sort = "Organize";
+        var deptType = "";
+        if (!IsAdmin()) {
+            if (checkedRow(keyValue)) {
+                var nature = $("#gridTable").jqGridRowValue("Nature");
+                if (nature == "班组" || nature == "分包商") {
+                    dialogMsg("当前节点下不能新增部门！", 2);
+                    return false;
+                }
+                organizeId = $("#gridTable").jqGridRowValue("OrganizeId");
+                parentId = $("#gridTable").jqGridRowValue("DepartmentId");
+                sort = $("#gridTable").jqGridRowValue("Sort");
+
+                $.ajax({
+                    dataType: "json",
+                    type: "get",
+                    url: "GetWBDeptId?orgId=" + organizeId,
+                    success: function (json) {
+                        if (json.type == 1) {
+                            if (keyValue == "cx100") {
+                                deptType = "长协";
+                            }
+                            if (keyValue == "ls100") {
+                                deptType = "临时";
+                            }
+                            if (keyValue == "cx100" || keyValue == "ls100") {
+                                keyValue = json.resultdata;
+                                parentId = json.resultdata;
+                                
+                            }
+                           
+                            dialogOpen({
+                                id: "Form",
+                                title: '添加单位',
+                                url: '/BaseManage/Department/Form?deptType=' + deptType + '&departmentId=' + keyValue + "&organizeId=" + organizeId + "&parentId=" + parentId + "&action=add",
+                                width: ($(top.window).width() - 100) + "px",
+                                height: ($(top.window).height() - 100) + "px",
+                                callBack: function (iframeId) {
+                                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                                }
+                            });
+                        } else {
+                            dialogOpen({
+                                id: "Form",
+                                title: '添加单位',
+                                url: '/BaseManage/Department/Form?deptType=&departmentId=' + keyValue + "&organizeId=" + organizeId + "&parentId=" + parentId + "&action=add",
+                                width: ($(top.window).width() - 100) + "px",
+                                height: ($(top.window).height() - 100) + "px",
+                                callBack: function (iframeId) {
+                                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+        } else {
+            var nature = $("#gridTable").jqGridRowValue("Nature");
+            if (nature == "班组" || nature == "分包商") {
+                dialogMsg("当前节点下不能新增部门！", 2);
+                return false;
+            }
+            organizeId = $("#gridTable").jqGridRowValue("OrganizeId");
+            parentId = $("#gridTable").jqGridRowValue("DepartmentId");
+            sort = $("#gridTable").jqGridRowValue("Sort");
+
+            $.ajax({
+                dataType: "json",
+                type: "get",
+                url: "GetWBDeptId?orgId=" + organizeId,
+                success: function (json) {
+                    if (json.type == 1) {
+                        if (keyValue == "cx100") {
+                            deptType = "长协";
+                        }
+                        if (keyValue == "ls100") {
+                            deptType = "临时";
+                        }
+                        if (keyValue == "cx100" || keyValue == "ls100") {
+                            keyValue = json.resultdata;
+                            parentId = json.resultdata;
+                        }
+                       
+                        dialogOpen({
+                            id: "Form",
+                            title: '添加单位',
+                            url: '/BaseManage/Department/Form?deptType=' + deptType + '&departmentId=' + keyValue + "&organizeId=" + organizeId + "&parentId=" + parentId + "&action=add",
+                            width: ($(top.window).width() - 100) + "px",
+                            height: ($(top.window).height() - 100) + "px",
+                            callBack: function (iframeId) {
+                                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                            }
+                        });
+                    }
+                    else {
+                        dialogOpen({
+                            id: "Form",
+                            title: '添加单位',
+                            url: '/BaseManage/Department/Form?deptType=&departmentId=' + keyValue + "&organizeId=" + organizeId + "&parentId=" + parentId + "&action=add",
+                            width: ($(top.window).width() - 100) + "px",
+                            height: ($(top.window).height() - 100) + "px",
+                            callBack: function (iframeId) {
+                                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                            }
+                        });
+                    }
+                }
+            });
+        }
+    };
+    //编辑
+    function edit() {
+        var keyValue = $("#gridTable").jqGridRowValue("DepartmentId");
+        if (keyValue == "cx100" || keyValue == "ls100") {
+                dialogMsg("当前节点不能编辑！", 2);
+                return false;
+        }
+
+        if (checkedRow(keyValue)) {
+            var sort = $("#gridTable").jqGridRowValue("Sort");
+            var sortCode = $("#gridTable").jqGridRowValue("Description");
+            //if (sort == 'Organize') {
+            //    dialogMsg("当前节点不能编辑！", 2);
+            //    return false;
+            //}
+            var typeArg = "";
+            if (sort == "Department" && sortCode == "外包工程承包商") {
+                typeArg = "1";
+            }
+            dialogOpen({
+                id: "Form",
+                title: '编辑部门',
+                url: '/BaseManage/Department/Form?keyValue=' + keyValue + "&typeArg=" + typeArg,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $("#gridTable").jqGridRowValue("DepartmentId");
+        if (keyValue) {
+            var sort = $("#gridTable").jqGridRowValue("Sort");
+            var desc = $("#gridTable").jqGridRowValue("Description");
+            if (!IsAdmin()) {
+                if (sort == 'Organize' || desc == "外包工程承包商" || desc == "区域子公司" || desc == "各电厂") {
+                    dialogMsg('当前节点不可删除！', 2);
+                    return false;
+                }
+            }
+            var HasChild = $("#gridTable").jqGridRowValue("HasChild");
+            if (HasChild == "True") {
+                dialogMsg('当前所选数据有下级部门数据，无法删除！', 0);
+                return false;
+            }
+            $.SetForm({
+                url: "../../BaseManage/Department/IsExistEngineer",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $.RemoveForm({
+                        msg: "注：删除部门会删除部门下的所有人员,操作将无法恢复，是否确定？",
+                        url: "../../BaseManage/Department/RemoveForm",
+                        param: { keyValue: keyValue },
+                        success: function (data) {
+                            $("#gridTable").resetSelection();
+                            $("#gridTable").trigger("reloadGrid");
+                        }
+                    })
+                }
+            })
+
+        } else {
+            dialogMsg('请选择需要删除的部门！', 0);
+        }
+    }
+    //配置关系
+    function config() {
+        var keyValue = $("#gridTable").jqGridRowValue("DepartmentId");
+
+        if (checkedRow(keyValue)) {
+            var orgId = $("#gridTable").jqGridRowValue("OrganizeId");
+            dialogOpen({
+                id: "Form",
+                title: '配置关系',
+                url: '/BaseManage/Department/Config?keyValue=' + keyValue + "&organizeId=" + orgId,
+                width: "750px",
+                height: "550px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+        }
+    }
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入部门',
+            url: '/BaseManage/Department/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    $("#gridTable").jqGrid('setGridParam', {
+                        postData: { keyWord: "" }
+                    }).trigger('reloadGrid');
+                }
+
+            }
+        });
+    }
+
+    function initDepts() {
+        var keyValue = $("#gridTable").jqGridRowValue("DepartmentId");
+        if (keyValue) {
+            Loading(true, "正在同步信息到培训平台,请稍候……");
+            $.post("../../BaseManage/Department/InitDepts", { keyValue: keyValue }, function (data) {
+                Loading(false);
+                var json = eval("(" + data + ")");
+                dialogAlert(json.message);
+            });
+
+        } else {
+            dialogMsg('请选择单位！', 0);
+        }
+    }
+    //同步指定部门下面所有的用户到班组
+    function pushUsersToBZ() {
+        var keyValue = $("#gridTable").jqGridRowValue("DepartmentId");
+        if (keyValue) {
+            Loading(true, "正在同步信息到班组,请稍候……");
+            $.SaveForm({
+                url: "../../BaseManage/Department/SyncUsersToBZ",
+                param: { deptId: keyValue },
+                loading: "正在同步...",
+                success: function () {
+                     
+                }
+            })
+
+        } else {
+            dialogMsg('请选择部门！', 0);
+        }
+    }
+    //将部门数据同步到海康平台
+    function initHikDepts() {
+        Loading(true, "正在同步信息到培训平台,请稍候……");
+        $.post("../../BaseManage/Department/InitHikDepts",  function (data) {
+            Loading(false);
+            var json = eval("(" + data + ")");
+            dialogAlert(json.message);
+        });
+    }
+    //function btn_search() {
+    //    var condition= $("#queryCondition").find('.dropdown-text').attr('data-value');
+    //    var keyword = $.trim($("#txt_Keyword").val());
+    //    $("td[aria-describedby='gridTable_FullName']").find("span").removeAttr("style");
+    //    $("td[aria-describedby='gridTable_FullName']").find("span").removeAttr("iscolor");
+    //    if (condition != undefined && keyword.length > 0) {
+    //        if (condition == "name") {
+    //            $("td[aria-describedby='gridTable_FullName']").find("span").each(function (i,item) {
+    //                if ($(item).text().indexOf(keyword)>=0) {
+    //                    $(item).css({ "background-color": "yellow" });
+    //                    $(item).attr("iscolor","1");
+    //                }
+    //            });
+    //            if($("td[aria-describedby='gridTable_FullName']").find("span[iscolor='1']").length>0){
+    //                $("td[aria-describedby='gridTable_FullName']").find("span[iscolor='1']").eq(0).css({ color: "red" });
+    //               // alert($("td[aria-describedby='gridTable_FullName']").find("span[iscolor='1']").eq(0).offset().top);
+    //                $(".ui-jqgrid-bdiv").get(0).scrollTop = "100px";
+
+    //            }
+    //        }
+    //    }
+    //}
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a data-value="FullName">名称</a></li>
+                                        <li><a data-value="EnCode">编码</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btnSearch" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+            </div>
+        </div>
+    </div>
+</div>

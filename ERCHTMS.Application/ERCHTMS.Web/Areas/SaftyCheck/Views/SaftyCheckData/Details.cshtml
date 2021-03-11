@@ -1,0 +1,625 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+@*<style>
+    .ui-jqgrid tr.jqgrow td {
+    white-space:normal !important;
+    height:auto;
+    vertical-align:text-top;
+    padding-top:2px;
+    word-break:break-all;
+    }
+    </style>*@
+<link href="~/Content/scripts/plugins/uploadify/uploadify.css" rel="stylesheet" />
+<link href="~/Content/scripts/plugins/uploadify/uploadify.extension.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/uploadify/jquery.uploadify.min.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var recid = request('recid');
+    var rqaction = request('action');
+    var belongdeptid = request('belongdeptid');
+    var actiontype = request("actiontype");
+    var selectedRowIndex = 0;
+    var dataRows = [];//返回的所有的选中风险点的IDs
+    var objthis = null;
+    var dictrictid = "";
+    var search = 0;
+    var risk = "";
+    var objnum = 0;//检查对象索引
+    $(function () {
+        //安全检查类型
+        $("#CheckDataType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "SaftyCheckType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+        var lis = $("#CheckDataType-option").find("li");
+        if (roleName.indexOf("集团用户") >= 0 || roleName.indexOf("省级用户") >= 0 || roleName.indexOf("省级用户") >= 0)
+        {         
+            lis.each(function (i) {
+                var it = $(this);
+                if (it.text() == "日常安全检查") {
+                    it.remove();
+                    return false;
+                }
+            })
+        }
+        else {
+            lis.each(function (i) {
+                var it = $(this);
+                if (it.text() == "其他安全检查") {
+                    it.remove();
+                    return false;
+                }
+            })
+        }
+        //上级区域
+        var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+        if (isSystem == "False") {
+            var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+            $("#ParentID").ComboBoxTree({
+                url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + orgId,
+                description: "==请选择==",
+                height: "180px"
+            });
+        };
+        initControl();
+        GetGrid1();
+      
+    });
+
+    //初始化控件
+    function initControl() {
+        $.SetForm({
+            url: "../../PublicInfoManage/Package/GetInitDataJson",
+            success: function (data) {
+                $("#FileName").val(data.FileName);
+            }
+        });
+        //复制人和时间
+
+        //获取表单
+        if (!!recid) {
+            $.SetForm({
+                url: "../../SaftyCheck/SaftyCheckData/GetFormJson",
+                param: { keyValue: recid },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            });
+
+        } else {
+            $("#CreateDate").val("@DateTime.Now.ToString()");
+            $("#CreateUserName").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName");
+            recid = newGuid();
+        }
+        if (rqaction == "view") {
+            $("#btns").hide();
+            $("#choose,#choose1").attr("disabled", "disabled");
+            $("#remove").attr("disabled", "disabled");
+
+        }
+        
+    }
+
+    function objNext() {
+        objnum++;
+    }
+    var nodeSB = null;
+    var arrNodeSB = null;
+    function selEquipment(obj) {
+        var span = $(obj).parent().find("input").eq(0);
+        nodeSB = span.get(0);
+        arrNodeSB = $("#gridTable1").find("input[title='" + span.attr("title") + "']");
+        selectEquipment(window, 'deviceid', "0&from=0");
+    }
+    var nodeDS = null;
+    var arrNodeDS = null;
+    function selDangerSource(obj) {
+        var span = $(obj).parent().find("input").eq(0);
+        nodeDS = span.get(0);
+        arrNodeDS = $("#gridTable1").find("input[title='" + span.attr("title") + "']");
+        selectHisrelationhd_qd(window, 'deviceid', "0&from=0");
+    }
+    //删除检查对象
+    function delRow(obj) {
+        var idx=dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                var grid = $("#gridTable1");
+                var val = $(obj).parent().children().eq(0).val();
+                grid.find("input:text[title='" + val + "']").each(function (j, dom) {
+                    grid.delRowData($(dom).parent().parent().attr("id"));
+                });
+                //$(obj).parent().parent().remove();
+                top.layer.close(idx);
+            }
+        });
+    }
+    function GetGrid1() {
+        var chargedeptcode = "";
+        var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+        if (isSystem == "False") {
+            chargedeptcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+        }
+        var queryJson = {
+            recid: recid,
+            firstNull: 1,
+            chargedeptcode: chargedeptcode
+        }
+        var $gridTable = $("#gridTable1");
+        $gridTable.jqGrid({
+            url: "../../SaftyCheck/SaftyCheckDataDetail/GetTableListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },//绑定grid加参数
+            datatype: "json",
+            height: $(top.window).height()-400,
+            emptyrecords: true,
+            autowidth: true,
+            rowNum: 100000000,
+            //pager: "#gridPager1",
+            emptyrecords: "没有检索到数据",
+            colModel: [
+                { label: 'CheckDataId', name: 'rid', hidden: true },
+                { label: '主键', name: 'pkid', hidden: true }, { label: 'name', name: 'name', hidden: true },
+                { label: '检查对象id', name: 'stid',  hidden: true },
+                { label: '检查对象type', name: 'checkobjecttype', hidden: true },
+                { label: '事故隐患描述(简题)', name: 'content',  hidden: true },
+                {
+                    label: '检查对象', name: 'name1',width: 450, align: 'left', sortable: false, headerAlign: 'center',classes:"name1"
+                    ,formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.name) {
+                            var innerText = "";
+                            var type = rowObject.checkobjecttype == null || rowObject.checkobjecttype == undefined || rowObject.checkobjecttype == "undefined" || rowObject.checkobjecttype == "null" ? "3" : rowObject.checkobjecttype;
+                            innerText += "<input  style='border: none;width:350px;height:30px;' readonly='readonly' type='text' title='" + rowObject.name + "' value='" + rowObject.name + "' ctype='" + type + "' />";
+                            if (rqaction != "view") {
+                                innerText += "<a onclick=\"addCheckContent(this,'"+rowObject.stid+"')\" title='新增检查内容'><i class='fa fa-plus-circle'></i></a>";
+                                innerText += "<a onclick=\"delRow(this)\" title='删除'><i class='fa fa-minus-circle'></i></a>";
+                                innerText += "<a onclick=\"selEquipment(this)\" title='选择设备'><i class='fa fa-gavel'></i></a>";
+                                innerText += "<a onclick=\"selDangerSource(this)\" title='选择危险源'><i class='fa fa-mixcloud'></i></a>";
+                            }
+                           
+                            return innerText;
+                        }
+                    }
+                },
+                {
+                    label: '检查内容', name: 'require', width: 400, align: 'left', sortable: false, headerAlign: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.require) {
+                            if (rowObject.require.indexOf("<ul") < 0) {
+                                var innerText = "<ul style='list - style:none; '>";
+                                cellvalue = rowObject.require.split('|');
+                                $(cellvalue).each(function (i, dom) {
+                                   
+                                    if (rqaction != "view") {
+                                        innerText += "<li oname='" + rowObject.name + "' stid='" + rowObject.stid + "'><input style='border: none;width:90%;height:30px;' type='text' title='" + dom + "' value='" + dom + "' onchange='setValue(this)' class='ckcontent' rowid='" + options.rowId + "' /><a onclick=\"removeCheckContent(this,'" + rowObject.name + "')\"   title='删除检查内容'><i class='fa fa-minus-circle'></i></a></li>";
+                                    } else {
+                                        innerText += "<li oname='" + rowObject.name + "' stid='" + rowObject.stid + "'><input style='border: none;width:90%;height:30px;' type='text' title='" + dom + "' value='" + dom + "' onchange='setValue(this)' class='ckcontent' rowid='" + options.rowId + "' /></li>";
+                                    }
+                                });
+                                innerText += "</ul>";
+                                return innerText;
+                            } else {
+                                var content = $.parseHTML(cellvalue);
+                                var li = $(content).find("li");
+                                
+                                var innerText = "<ul style='list - style:none; '>";
+                                $(li).each(function (i, dom) {
+                                    if (!!$(dom).text()) {
+                                        if (rqaction != "view") {
+                                            innerText += "<li oname='" + rowObject.name + "' stid='" + rowObject.stid + "'><input style='border: none;width:90%;height:30px;' type='text' title='" + $(dom).text() + "' value='" + $(dom).text() + "' onchange='setValue(this)' class='ckcontent' rowid='" + options.rowId + "'/><a onclick=\"removeCheckContent(this,'" + rowObject.name + "')\"   title='删除检查内容'><i class='fa fa-minus-circle'></i></a></li>";
+                                        } else {
+                                            innerText += "<li oname='" + rowObject.name + "' stid='" + rowObject.stid + "'><input style='border: none;width:90%;height:30px;' type='text' title='" + $(dom).text() + "' value='" + $(dom).text() + "' onchange='setValue(this)' class='ckcontent' rowid='" + options.rowId + "'/></li>";
+                                        }
+                                    }
+                                });
+                                innerText += "</ul>";
+                                return innerText;
+
+                            }
+                        } else {
+                            var cellvalue = "<ul style='list - style:none; '></ul>";
+                            return cellvalue;
+                        }
+                    }
+                }
+
+            ],
+            viewrecords: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $(".unwritten").text("");
+                Merger('gridTable1', new Array('name1'));
+                getSelIds();
+                setInfo();
+             
+            }
+            //,afterInsertRow: function (rid, row) {
+            //    if (selIds.indexOf(row.rid)< 0) {
+            //        //$gridTable.delRowData(rid);
+            //    }
+            //}
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var check
+            = 0;
+        var checkobjctname = 0;
+        var checkobjctid = 0;
+        var checkobjcttype = 0;
+        var projectItem = $("#gridTable1").jqGrid('getRowData');
+        if (projectItem.length == 0) {
+            dialogMsg('检查项目不能为空！', 0);
+            return false;
+        }
+        var json = "";
+        var postData = $("#form1").formSerialize(recid);
+        postData["CheckDataTypeName"] = $("#CheckDataType").attr('data-text');
+        postData["BelongDeptID"] = belongdeptid;
+        if (!!recid == false) postData["UseTime"] = 0;
+        var checkContent = 0;
+        if (projectItem.length > 0) {
+            var arr = [];
+            //$(projectItem).each(function (i, dom) {
+                //检查内容
+                var domCheckContent = $("#gridTable1").find("li");
+                var checkContentValue = "";
+                if (domCheckContent.length > 0) {
+                    $(domCheckContent).each(function (m, res) {
+                        var content = $(res).find("input[type='text']").eq(0).val();
+                        if ($.trim(content).length==0) {
+                            checkContent = 1;
+                        }
+                        arr.push({
+                            AutoId: m,
+                            ID: newGuid(),
+                            RecID:recid,
+                            RiskName: $.trim($(res).parent().parent().prev().prev().text()),
+                            CheckContent: content,
+                            CheckObject: $(res).parent().parent().prev().find("input").eq(0).val(),
+                            CheckObjectType: $(res).parent().parent().prev().find("input").eq(0).attr("ctype"),
+                            CheckObjectId: $(res).attr("stid"),
+                            CheckDataId: $(res).parent().parent().prev().prev().prev().prev().prev().prev().text()
+                        });
+                    });
+                } else {
+                    checkContent = 1;
+                }
+            json = JSON.stringify(arr);
+        }
+        if (checkContent == 1) {
+            dialogMsg('检查内容存在空！', 0);
+            return false;
+        }
+        postData["projectItem"] = encodeURIComponent(json);
+        $.SaveForm({
+            url: "../../SaftyCheck/SaftyCheckData/SaveForm?keyValue=" + recid,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+         
+    //新增检查项目
+    function addCheckContent(obj,stid) {
+        var title = $(obj).prev().attr("title");
+        var li = $("#gridTable1").find("li[oname='" + title + "']:last");
+        var rowid = 0;
+        if (li != undefined) {
+            rowid = li.find("input:last").attr("rowid");
+            rowid++;
+            li.parent().append("<li style='border-bottom:1px solid #ccc' oname='" + title + "' stid='" + li.attr("stid") + "'><input style='border: none;width:90%;height:30px;'  type='text' class='ckcontent' rowid='" + rowid + "' onchange='setValue(this)' /><a onclick=\"removeCheckContent(this)\" title='删除检查内容'><i class='fa fa-minus-circle'></i></a></li>");
+            objNext();
+        } else {
+            rowid = $(obj).parent().next().next().find("ul").find("input:last").attr("rowid");
+            rowid++;
+            $(obj).parent().next().find("ul").append("<li style='border-bottom:1px solid #ccc' oname='" + title + "'><input style='border: none;width:90%;height:30px;' class='ckcontent' type='text' rowid='" + rowid + "' onchange='setValue(this)' /><a onclick=\"removeCheckContent(this)\" title='删除检查内容'><i class='fa fa-minus-circle'></i></a></li>");
+            objNext();
+        }
+        setInfo();
+    }
+    //标记有更改过的检查内容的文本框并属性标记
+    function setChange(obj) {
+        $(obj).attr("ischange", "1");
+    }
+    //删除检查内容
+    function removeCheckContent(obj,title) {
+
+        var dlg=dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                if ($(obj).parent().parent().find("li").length > 1) {
+                    $(obj).parent().remove();
+                } else {
+                    var node = $(obj).parent().parent().parent().prev();
+                    if (node.attr("rowspan") != undefined) {
+                        var node1 = node.parent().next().find(".name1");
+                        node1.attr("rowspan", parseInt(node.attr("rowspan")) - 1);
+                        node1.show();
+                        $(obj).parent().parent().parent().parent().remove();
+                    } else {
+                        node=$("#gridTable1").find(".name1:visible>input:text[title='" + title + "']").eq(0);
+                        if (node != undefined) {
+                            node = node.parent();
+                            if (node.attr("rowspan") != undefined) {
+                                var rowspanCount = node.attr("rowspan");
+                                node.attr("rowspan", parseInt(rowspanCount) - 1);
+                            }
+                        }
+                        $(obj).parent().parent().parent().parent().remove();
+                    }
+                }
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //新增安全检查项目
+    var dofrom = null;
+    function addItems(bid) {
+        pfrom = 0;
+        dofrom = dialogOpen({
+            id: "PrjectItem",
+            title: "新增检查项目",
+            url: '/SaftyCheck/SaftyCheckDataDetail/Form?ctype=1&bid=' + bid,
+            width: "800px",
+            height: "400px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    };
+    //选择检查标准
+    function select() {
+        pfrom = 0;
+        dofromList = dialogOpen({
+            id: "Items",
+            title: "选择检查项目",
+            url: '/RiskDatabase/HtStandard/selectitems?pType=0',
+            width: (top.window.$(window).width()-100)+"px",
+            height: ($(top.window).height()-100)+"px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    };
+    //选择现有检查表
+    var dofromList = null;
+    var pfrom = 0;
+    function addProject(obj) {
+       
+        dofromList = dialogOpen({
+            id: "Prject",
+            title: "新增检查项目",
+            url: '/SaftyCheck/SaftyCheckData/Index?isAdd=Add',
+            width: (top.window.$(window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                pfrom = 1;
+            }
+        });
+    };
+   
+    function serProject() {
+
+    }
+    //清空所有记录
+    function removeItem() {
+        var dlg = dialogConfirm("确定清空吗？", function (isSure) {
+            if (isSure) {
+                data = new Array();
+                selIds ="";
+                $("#gridTable1").clearGridData();
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //导入检查项目
+    function importData() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入',
+            url: '/SaftyCheck/SaftyCheckData/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                $.ajax({
+                    url: top.contentPath + "/SaftyCheck/SaftyCheckData/GetObj",
+                    type: "Get",
+                    async: false,
+                    dataType: "Json",
+                    success: function (data) {
+                        if (data != null && data.length > 0) {
+                            var arr = [];
+                            for (var i = 0; i < data.length; i++) {
+                                arr.push({rid:newGuid(),pkid:newGuid(),stid: data[i].CheckObjectId, content: data[i].RiskName, require: data[i].CheckContent, name: data[i].CheckObject, checkobjecttype: data[i].CheckObjectType });
+                            }
+                            //动态填充表格
+                            fillItems(arr);
+                        }
+
+                    }
+                });
+            }
+        });
+    }
+    var selIds ="";
+    var data = new Array();//存储选择的检查项目
+    //选择检查项目,新增项目或选择检查表后动态填充表格
+    function fillItems(items,ids) {
+        var $gridTable = $("#gridTable1");
+        //if (pfrom== 1) {
+        //    data = new Array();
+        //}
+        //data = $.merge(data, items);
+        //if (data.length > 0) {
+        //    //重新获取检查内容有修改过的数据
+        //    $gridTable.find("input:text[ischange='1']").each(function (j,dom) {
+        //        var idx = $(dom).attr("rowid");
+        //        data[idx - 1].require = $(dom).val();
+        //    });
+        //}
+        //为了考虑性能此处根据新增的数据行记录数做简单处理
+        //小于10条则采用逐行新增的方式，其他则采用批量添加的方式
+       // if (items.length < 10) {
+            var len = $gridTable.find(".ckcontent").length;
+            var idx = len == 0 ? 0 : len;
+            $(items).each(function (j, item) {
+                $gridTable.addRowData(parseInt(idx)+j + 1, item);
+            });
+        //}
+        //else {
+        //    //注意此方法会覆盖现有记录，不是追加行
+        //    $gridTable[0].addJSONData(data);
+        //}
+        //设置当前记录总数
+        setInfo();
+        //获取本次操作选择的检查对象（含上级分类）
+        if (ids != undefined) {
+            selIds += "," + ids;
+        }
+       
+    }
+    //设置列表当前总记录数
+    function setInfo() {
+        var $gridTable = $("#gridTable1");
+        $("#gridPager1").html("<b>当前共有&nbsp;" + $gridTable.find(".ckcontent").length + "&nbsp;条记录</b>");
+    }
+    //标记有更改过的检查内容的文本框并属性标记
+    function setValue(obj) {
+        $(obj).attr("ischange","1");
+    }
+    //查看时获取已选择的检查对象
+    function getSelIds() {
+        $("#gridTable1").find("td[aria-describedby='gridTable1_stid']").each(function (j, dom) {
+            if(selIds.indexOf($(dom).text())<0){
+                selIds+=$(dom).text()+",";
+            }
+        });
+
+    }
+</script>
+<div style="margin: 10px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;检查表信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">检查表名称<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CheckDataName" type="text" class="form-control" placeholder="检查表名称" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                    <td class="formTitle">检查表类型<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="CheckDataType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">操作人</td>
+                    <td class="formValue">
+                        <input id="CreateUserName" type="text" class="form-control" readonly="readonly" />
+                    </td>
+                    <td class="formTitle">操作时间</td>
+                    <td class="formValue">
+                        <input id="CreateDate" type="text" class="form-control" readonly="readonly" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel panel-default" style="display:none;">
+        <div class="panel-heading" style="vertical-align:central;">
+            <strong>&nbsp;&nbsp;检索检查项目</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div class="center-Panel" style="margin-right: 0px;">
+
+                <div class="titlePanel">
+                    <div class="title-search">
+                        <table>
+                            <tr>
+                                <td>所属区域：</td>
+                                <td>
+                                    <div id="queryCondition" class="btn-group" style="width:250px;">
+                                        <div id="ParentID" type="selectTree" class="ui-select"></div>
+                                    </div>
+                                </td>
+                                <td style="padding-left: 10px;"> 风险描述：</td>
+                                <td>
+                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                </td>
+                                <td style="padding-left: 5px;">
+                                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                </td>
+                                <td style="padding-left: 5px;">
+                                    <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;选择查询后所有结果</a>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                </div>
+                <div class="gridPanel">
+                    <table id="gridTableRisk"></table>
+                    <div id="gridPagerRisk"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading" id="btns">
+            <strong>&nbsp;&nbsp;选择检查项目</strong>
+            <span class="tools pull-right">
+                <a href="javascript:select()" id="select" class="btn btn-primary btn-xs">选择检查项目</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="javascript:importData()" id="remove" class="btn btn-primary btn-xs">导入</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="javascript:addProject(this)" id="choose" class="btn btn-primary btn-xs">选择现有检查表</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="javascript:addItems()" id="choose1" class="btn btn-primary btn-xs">新增项目</a>&nbsp;&nbsp;&nbsp;&nbsp; 
+                <a href="javascript:removeItem(this)" id="remove" class="btn btn-primary btn-xs">清空已选项目</a>&nbsp;&nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        @*<div class="panel-body" style="display:none;">
+            <table id="gridTable"></table>
+            <div id="gridPager"></div>
+        </div>*@
+        <div class="panel-body">
+            <table id="gridTable1"></table>
+            <div id="gridPager1"></div>
+        </div>
+    </div>
+    <div class="panel panel-default" style="display:none;">
+
+        <div class="panel-body">
+            <div>
+                <input id="FileName" type="hidden" />
+                <input id="uploadify" name="uploadify" type="file" />
+                <table id="wjgridTable"></table>
+            </div>
+
+        </div>
+    </div>
+</div>

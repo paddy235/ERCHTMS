@@ -1,0 +1,153 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var ehsDeptCode = "@ViewBag.ehsDepartCode";//EHS部门编码
+    //页面请求
+    var dutyUserId = request("dutyUserId");
+    //页面代理
+    var lagc = null;
+    $(function () {
+        //
+        //创建页面代理
+        //
+        lagc = new listAgency({
+            hasPowerOper: false,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            },
+            gridId: "gridTable",
+            gridJustHeight: 136,
+            gridOptions: {
+                height: $(window).height() - 136,
+                url: "../../NosaManage/Nosaele/GetListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'no',
+                sortorder: 'asc'
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: 'dutydepartid', name: 'dutydepartid', hidden: true },
+                { label: 'dutyuserid', name: 'dutyuserid', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                { label: '要素编号', name: 'no', index: 'no', width: 200, align: 'center', sortable: true },
+                { label: '要素名称', name: 'name', index: 'name', width: 240, align: 'center', sortable: true },
+                { label: '要素责任部门', name: 'dutydepartname', index: 'dutydepartname', width: 300, align: 'center', sortable: true },
+                { label: '要素负责人', name: 'dutyusername', index: 'dutyusername', width: 120, align: 'center', sortable: true }
+            ]
+        });
+        //
+        //绑定页面控件
+        //
+        lagc.bindPageControls({
+            searchId: "btn_Search",
+            refreshId: "refresh"
+        });
+        //
+        //绑定页面事件
+        //
+        lagc.addPageEvents({ onReset: reset });
+        //
+        //初始化
+        //
+        lagc.initialPage([{ conditionData: { DutyUserId: /*(rolename.indexOf("公司级用户")>=0 || ehsDeptCode == deptCode) ? "" :*/ dutyUserId } }]);
+    });
+    //
+    //重置
+    //
+    function reset() {
+        $("#No,#Name").val("");
+    }
+    //
+    //选择标准并返回
+    //
+    function AcceptClick(options) {
+        var winObject = options.winObject;
+        var domId = options.domId;
+        if (winObject != undefined && domId != undefined) {
+            var eleid = "", elename = "", eleno = "", dutydepartid = "", dutydepartname="", dutyuserid = "", dutyusername = "";
+            if (domId.length > 0) {
+                if (selectedRowIndex <= 0) {
+                    dialogAlert("请选择要素！", 2);
+                    return;
+                }
+                else {
+                    var rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                    eleid = rowObject.id;
+                    elename = rowObject.name;
+                    eleno = rowObject.no;
+                    dutydepartid = rowObject.dutydepartid;
+                    dutydepartname = rowObject.dutydepartname;
+                    dutyuserid = rowObject.dutyuserid;
+                    dutyusername = rowObject.dutyusername;
+                }
+            }
+            var ids = domId.split(',');
+            var selVal = new Array(eleid, elename, eleno, dutydepartid, dutydepartname, dutyuserid, dutyusername);
+            for (var j = 0; j < ids.length; j++) {
+                if (ids[j].length >= 0) {
+                    if (!!ids[j]) {
+                        var dom = $(winObject).find("#" + ids[j]).eq(0);
+                        if (dom != undefined) {
+                            dom.val(selVal[j]);
+                        }
+                    }
+                }
+            }
+        }
+        if (options != undefined) {
+            if (options.callBack) {
+                options.callBack();
+            }
+        }
+        dialogClose();
+    }
+</script>
+<div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+    <div class="panel-Title" style="height:10px;"></div>
+    <div class="titlePanel">
+        <div class="title-search">
+            <table class="queryform" id="queryArea">
+                <tr>
+                    <td class="formTitle">&nbsp;要素编号：</td>
+                    <td class="formValue">
+                        <input id="No" type="text" class="form-control" queryPro="no" style="width: 120px;" />
+                    </td>
+                    <td class="formTitle">&nbsp;要素名称：</td>
+                    <td class="formValue">
+                        <input id="Name" type="text" class="form-control" queryPro="name" style="width: 120px;" />
+                        <input id="DutyUserId" type="hidden" queryPro="dutyuserid" />
+                    </td>
+                    <td style="padding-left: 5px;">
+                        <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>    
+                        <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>                    
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <a id="refresh" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+            </div>
+        </div>
+    </div>
+    <div class="gridPanel">
+        <table id="gridTable"></table>
+        <div id="gridPager"></div>
+    </div>
+</div>

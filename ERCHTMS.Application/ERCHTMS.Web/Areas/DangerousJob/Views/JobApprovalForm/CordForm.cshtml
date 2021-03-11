@@ -1,0 +1,270 @@
+﻿@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script>
+    @*;
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    var belongD = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var belongCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var parentid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().ParentId";
+    var _deptCode = "";
+    var _isOrg = "";
+    var mode = request('mode');
+    var dbtype = request('dbtype');//1标识待反馈,2待督办确认
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户ID
+    var dept = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";*@
+    var key = request('key');
+    var queryJson;
+    $(function () {
+        InitialPage();
+        //GetTree();
+        GetGrid();
+    });
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+
+
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 80,
+            //postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../DangerousJob/JobApprovalForm/GetCardPageListJson?key=" + key,
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "','" + rowObject.jobtype + "','" + rowObject.jobtypename + "') title='查看' ><i class='fa fa-eye'></i></a>";
+
+                        return html;
+                    }
+                },
+                {
+                    label: '作业许可证状态', name: 'jobstate', index: 'jobstate', width: 120, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var status;
+                        switch (rowObject.jobstate) {
+                            case 0:
+                                status = "申请中";
+                                break;
+                            case 1:
+                                status = "审批中";
+                                break;
+                            case 2:
+                                status = "审核不通过";
+                                break;
+                            case 3:
+                                status = "措施确认中";
+                                break;
+                            case 4:
+                                status = "停电中";
+                                break;
+                            case 5:
+                                status = "备案中";
+                                break;
+                            case 6:
+                                status = "验收中";
+                                break;
+                            case 7:
+                                status = "送电中";
+                                break;
+                            case 8:
+                                status = "即将作业";
+                                break;
+                            case 9:
+                                status = "作业暂停";
+                                break;
+                            case 10:
+                                status = "作业中";
+                                break;
+                            case 11:
+                                status = "流程结束";
+                                break;
+                            default:
+                        }
+                        var html = "<a  href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>" + status + "</a>";
+                        return html;
+                    }
+                },
+                {
+                    label: '编号', name: 'applyno', index: 'applyno', width: 150, align: 'center', sortable: true
+                },
+                { label: '作业类型', name: 'jobtypename', index: 'jobtypename', width: 150, align: 'center', sortable: true },
+                {
+                    label: '作业单位', name: 'jobdeptname', index: 'jobdeptname', width: 200, align: 'center', sortable: false
+                }, {
+                    label: '作业地点', name: 'jobplace', index: 'jobplace', width: 120, align: 'center', sortable: false
+                }, {
+                    label: '计划作业时间', name: 'jobstarttime', index: 'jobstarttime', align: 'center', width: 200, sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + "~" + formatDate(rowObject.jobendtime, 'yyyy-MM-dd hh:mm');
+                    }
+                }, {
+                    label: '实际作业时间', name: 'realityjobstarttime', index: 'realityjobstarttime', align: 'center', width: 200, sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + "~" + formatDate(rowObject.realityjobendtime, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                {
+                    label: '作业申请人', name: 'applyusername', index: 'applyusername', width: 150, align: 'center', sortable: true
+                }, {
+                    label: '申请时间', name: 'applytime', index: 'applytime', align: 'center', width: 120, sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                }
+            ],
+            viewrecords: false,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 't.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+
+            }
+        });
+
+    }
+    //function OpenViewFlow(keyValue) {
+    //    var title = "详情";
+    //    var rqUrl = "/DangerousJob/JobSafetyCardApply/Flow?keyValue=" + keyValue;
+    //    dialogOpen({
+    //        id: 'WorkFlowForm',
+    //        title: title,
+    //        url: rqUrl,
+    //        width: ($(top.window).width() - 200) + "px",
+    //        height: ($(top.window).height() - 150) + "px",
+    //        btn: null
+    //    });
+    //}
+    function show(id, jobtype, jobtypename) {
+        var title = jobtypename + "安全证详情";//【作业类型】+安全证详情
+
+        if (id) {
+            var dlg = dialogOpen({
+                id: "WorkFlowForm",
+                title: title,
+                url: '/DangerousJob/JobSafetyCardApply/' + jobtype + 'Detail?keyValue=' + id + "&action=view&JobType=" + jobtype + "&JobTypeName=" + jobtypename,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 80) + "px",
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                },
+                btn: null
+            });
+        } else {
+            dialogMsg('请选择数据！', 0);
+        }
+    }
+    //查看流程图
+    function OpenViewFlow(keyValue) {
+        var title = "作业许可证流程图";
+        var rqUrl = "/DangerousJob/JobSafetyCardApply/Flow?keyValue=" + keyValue;
+        dialogOpen({
+            id: 'WorkFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null
+        });
+    }
+    function openRecord(keyValue) {
+
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '关联的作业安全证',
+            url: '/DangerousJob/JobApprovalForm/Form?key=' + keyValue,
+            width: "1700px",
+            height: "800px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    @*<div class="ui-layout-west" id="divTree">
+            <div class="west-Panel">
+                <div class="panel-Title">
+                    <div class="col-md-10">
+                        组织机构
+                    </div>
+                    <div class="g" style="padding-right:8px;">
+                        <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                    </div>
+                </div>
+                <div id="itemTree"></div>
+            </div>
+        </div>*@
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="CancelModal">
+    <div class="modal-dialog" style="width:610px;height:600px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header" style="text-align:left;background-color:#2e99d4;color:#fff;padding:9px;">
+                <h5>作废</h5>
+            </div>
+            <div class="modal-body" id="modalBody" style="height:180px;">
+                <table style="border-collapse:separate;border-spacing:53px 9px;">
+                    <tr>
+                        <td colspan="2">
+                            <span style="font-size:16px;">提示：确定要作废该作业安全证吗？作废后，不可撤销!</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">作废原因<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <textarea id="CancelReason" class="form-control" style="height: 80px;width:363px;" isvalid="yes" checkexpession="NotNull"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <input id="CancelId" type="hidden" />
+            <div class="modal-footer" style="padding:5px;">
+                <button id="btnTJ" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal">提交</button>
+                <button id="btnQX" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal">取消</button>
+            </div>
+        </div>
+    </div>
+</div>

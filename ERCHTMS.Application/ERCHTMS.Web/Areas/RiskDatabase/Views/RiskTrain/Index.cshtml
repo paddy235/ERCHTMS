@@ -1,0 +1,237 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js"></script>
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+<script>
+     var currUserAccout = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 145);
+            }, 200);
+            e.stopPropagation();
+        });
+        $('.icheck input').iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%'
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 145,
+            url: "../../RiskDatabase/Risktrain/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                  { label: 'ID', name: 'id', hidden: true }, { label: 'ID', name: 'createuserid', hidden: true }, { label: 'ID', name: 'userids', hidden: true },
+                   {
+                       label: '操作', name: 'Oper', width: 120, align: 'center',
+                       formatter: function (cellvalue, options, rowObject) {
+                           var html = "";
+                           html += "<a onclick=show('" + rowObject.id + "','" + rowObject.status + "')  title='查看信息' style='cursor:pointer;'><i class='fa fa-eye'></i></a>";
+                           html += "&nbsp;&nbsp;<a onclick=create('" + rowObject.id + "')  title='快速新建' style='cursor:pointer;'><i class='fa fa-file-text-o'></i></a>";
+                           if (rowObject.createuserid == top.currUserId && rowObject.iscommit != "1") {
+                               html += "&nbsp;&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                               html += "&nbsp;&nbsp;<a onclick=edit('" + rowObject.id + "','"+rowObject.iscommit+"','edit')  title='编辑' style='cursor:pointer;'><i class='fa fa-pencil-square-o'></i></a>";
+                           }
+                           else if (rowObject.status == 0) {
+                               if (rowObject.userids.indexOf(top.currUserAccount) >= 0 || rowObject.workfzrid == currUserAccout) {
+                                   html += "&nbsp;&nbsp;<a onclick=edit('" + rowObject.id + "','" + rowObject.iscommit + "','train')  title='开展预知训练' style='cursor:pointer;'><i class='fa fa-mortar-board'></i></a>";
+                               }
+                           }
+                           return html;
+                       }
+                   },
+                { label: '工作任务', name: 'taskname', width: 200, align: 'center', sortable: true },
+                { label: '作业单位', name: 'workunit', width: 120, align: 'center', sortable: false },
+                { label: '作业负责人', name: 'workfzr', width: 120, align: 'center', sortable: false },
+                //{ label: '作业类别', name: 'worktype', width: 80, align: 'center', sortable: true },
+                { label: '作业人员', name: 'workusers', width: 360, align: 'center', sortable: true },
+                {
+                    label: '作业开始时间', name: 'workstarttime', width: 100, align: 'center', sortable: true
+                },
+                {
+                    label: '作业结束时间', name: 'workendtime', width: 100, align: 'center', sortable: true
+                },
+                { label: '作业任务描述', name: 'taskcontent', width: 200, align: 'center', sortable: true },
+                {
+                    label: '状态', name: 'status', align: 'center', sortable: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        return cellvalue == 0 ? "未完成" : "已完成";
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: {
+                    queryJson: JSON.stringify({
+                        keyWord: $("#txt_Keyword").val(),
+                        deptName: $("#txtDeptName").val(),
+                        status: $(".icheck").find(":checked").val(),
+                        WorkStartTime: $("#WorkStartTime").val(),
+                        WorkEndTime: $("#WorkEndTime").val()
+
+                    })
+                }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询全部事件
+        $("#btn_SearchAll").click(function () {
+            $('#all').iCheck('check');
+            $("#txtDeptName").val('');
+            $("#WorkStartTime").val('');
+            $("#WorkEndTime").val('');
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: "", deptName: "", status: "",WorkStartTime:"",WorkEndTime:"" }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //新增
+    function add() {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '添加风险预知训练',
+            url: '/RiskDatabase/Risktrain/AddForm',
+            width: ($(top.window).width() - 200) + 'px',
+            height: ($(top.window).height() - 20) + 'px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //查看
+    function show(id, State) {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '查看风险预知训练',
+            url: '/RiskDatabase/Risktrain/Show?keyValue=' + id + "&State=" + State,
+            width: ($(top.window).width() - 200) + 'px',
+            height: ($(top.window).height() - 20) + 'px',
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        })
+    }
+    //编辑
+    function edit(id,iscommit,type) {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '编辑风险预知训练',
+            url: '/RiskDatabase/Risktrain/Form?keyValue=' + id + '&iscommit='+iscommit+'&type='+type,
+            width: ($(top.window).width() - 200) + 'px',
+            height: ($(top.window).height() - 20) + 'px',
+            btn:null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        })
+    }
+    //快速新建
+    function create(id) {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '快速新建风险预知训练',
+            url: '/RiskDatabase/Risktrain/Create?keyValue=' + id,
+            width: ($(top.window).width() - 200) + 'px',
+            height: ($(top.window).height() - 20) + 'px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        })
+    }
+    //删除
+    function del(id) {
+        $.RemoveForm({
+            url: '../../RiskDatabase/Risktrain/RemoveForm',
+            param: { keyValue: id },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        });
+    }
+    //导出到excel
+    function exportExcel() {
+        var queryJson = JSON.stringify({
+            keyWord: $("#txt_Keyword").val(),
+            deptName: $("#txtDeptName").val(),
+            status: $(".icheck").find(":checked").val(),
+            WorkStartTime: $("#WorkStartTime").val(),
+            WorkEndTime: $("#WorkEndTime").val()
+        });
+        window.location.href = "../../RiskDatabase/RiskTrain/ExportExcel?queryJson=" + queryJson + "&fileName=风险预知训练";
+    }
+</script>
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            <tr>
+                @*<td>组织单位：</td>
+            <td class="input-group" style="margin-top:15px;"><input type="text" class="form-control" id="txtDeptName" /><span class="input-group-addon" onclick="selectDept('', 0, 2, '选择部门', document.body, 'txtDeptName');" title="选择单位">...</span></td>*@
+                <td>&nbsp;&nbsp;工作任务：</td>
+                <td>
+                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入工作任务" style="width: 280px;" />
+                </td>
+           
+                <td class="formTitle">&nbsp;&nbsp;作业时间：</td>
+                <td class="formValue">
+                    <input id="WorkStartTime" type="text" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'WorkEndTime\')}' })" />
+                </td>
+                <td class="formTitle">&nbsp;至：</td>
+                <td class="formValue">
+                    <input id="WorkEndTime" type="text" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'WorkStartTime\')}' })" />
+                </td>
+                <td>&nbsp;&nbsp;状态：</td>
+                <td class="icheck">
+                    <input type="radio" value="" id="all" name="status" checked="checked" />&nbsp;<label for="all">全部</label>&nbsp;&nbsp;&nbsp;
+                    <input type="radio" value="1" id="over" name="status" />&nbsp;<label for="over">已完成</label>&nbsp;&nbsp;&nbsp;
+                    <input type="radio" value="0" id="noover" name="status" />&nbsp;<label for="noover">未完成</label>
+                </td>
+                <td style="padding-left: 10px;">
+                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                    <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="toolbar">
+        <div class="btn-group">
+            <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+            <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>新增</a>
+        </div>
+        <script>$('.toolbar').authorizeButton();</script>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

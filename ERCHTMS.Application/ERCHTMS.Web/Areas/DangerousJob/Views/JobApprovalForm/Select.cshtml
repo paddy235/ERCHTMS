@@ -1,0 +1,855 @@
+﻿@{
+    ViewBag.Title = "对应作业安全证";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var _parentId = "";
+    var _isOrg = "Organize";
+    var deptId = request('deptId');
+    var deptCode = request('deptCode');
+    var departmentCode = request('departmentCode');
+    var checkMode = request('checkMode');
+    var mode = request('mode');
+    var userIds = request('userIds');
+    var userKind = request('userKind');
+    var eliminateUserIds = request('eliminateUserIds');
+    var special = request('special');
+    var side = request('side');
+    var projectid = request('projectid');
+
+    var istree = request('istree');
+    var deptIds = request('deptIds');
+    var pType = request('pType');
+    var controlObj = request("controlObj");
+    var clearObj = request("clearObj");//清除对象
+    var state = 0;
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var chooseDiff = request("chooseDiff");
+    var pfrom = request("pfrom");
+
+    var jobtype = request("jobtype");
+    var selDeptIds = "";
+    var code = request('code');
+    var keyValue = request('keyValue');
+    var source;
+    $(function () {
+        
+        if (pfrom==100) {
+            selDeptIds = request("deptId");
+        }
+        $.ajaxSetup({ async: false });
+        if (!!top.Form) {
+            if (!!top.Form.$("#" + userIds) && top.Form.$("#" + userIds).val() != undefined) {
+                userIds = top.Form.$("#" + userIds).val();
+            }
+        }
+        if (checkMode == 0) {
+            $(".ui-layout-east").remove();
+            $("#btnAll").remove();
+            $("#btnClear").remove();
+        }
+        if (mode == 10) {
+            $(".ui-layout-west").remove();
+            $(".titlePanel").remove();
+            var openwin = top.document.getElementById('obsForm').contentWindow;
+            if (openwin != null && openwin.getUserList != null) {
+                source = openwin.getUserList();
+            }
+        }
+        InitialPage();
+
+        if (pfrom == 1) {
+            $(".con1").hide();
+        }
+
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 141.5);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+
+            }, 200);
+            e.stopPropagation();
+        });
+        $("#users").height($(window).height() - 50);
+        //编辑进来默认赋值之前已选择的人员(针对于人员多选)
+        if (checkMode == 1) {
+
+            var arr = [];
+            if (!!userIds) {
+                $.ajax({
+                    url: "../../DangerousJob/JobApprovalForm/GetSafetyCardJson",
+                    data: { UserIDs: userIds },
+                    type: "post",
+                    dataType: "JSON",
+                    async: false,
+                    success: function (result) {
+                        if (result.length > 0) {
+                            $.each(result, function (i, dom) {
+                                if (document.getElementById("div" + dom.id) == null) {
+                                    var status;
+
+                                    switch (dom.jobstate) {
+                                        case 0:
+                                            status = "申请中";
+                                            break;
+                                        case 1:
+                                            status = "审批中";
+                                            break;
+                                        case 2:
+                                            status = "审核不通过";
+                                            break;
+                                        case 3:
+                                            status = "措施确认中";
+                                            break;
+                                        case 4:
+                                            status = "停电中";
+                                            break;
+                                        case 5:
+                                            status = "备案中";
+                                            break;
+                                        case 6:
+                                            status = "验收中";
+                                            break;
+                                        case 7:
+                                            status = "送电中";
+                                            break;
+                                        case 8:
+                                            status = "即将作业";
+                                            break;
+                                        case 9:
+                                            status = "作业暂停";
+                                            break;
+                                        case 10:
+                                            status = "作业中";
+                                            break;
+                                        case 11:
+                                            status = "已结束";
+                                            break;
+                                    }
+                                    $("#users").append("<div id='div" + dom.id + "'  data-value='user'><input type='checkbox' value='" + decodeURIComponent(dom.jobtypename) + "' id='" + dom.id + "' JobState='" + status + "' checked='checked' title='" + decodeURIComponent(dom.jobtypename) + "(" + decodeURIComponent(status) + ")" + "' ><label for='" + dom.id + "'>" + decodeURIComponent(dom.jobtypename) + "(" + decodeURIComponent(status) + ")</label></div>");
+
+                                    //$("#users").append("<div id='div" + dom.account + "'  data-value='user'><input type='checkbox' value='" + dom.account + "' id='" + dom.userid + "' checked='checked' title='" + decodeURIComponent(dom.realname) + "' deptId='" + dom.departmentid + "' deptCode='" + dom.departmentcode + "' deptName='" + decodeURIComponent(dom.deptname) + "'  signimg='" + dom.signimg + "'  ><label for='" + dom.userid + "'>" + decodeURIComponent(dom.realname) + "</label></div>");
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            $("#lblselect").html("已选中作业安全证申请(" + $("#users").find("input:checked").length + "人)");
+        }
+
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+           {
+               Ids: deptId,
+               SelectMode: checkMode,
+               Mode: mode,
+               DepartmentCode: departmentCode
+           }
+         );
+
+        var item = {
+            height: $(window).height() - 60,
+            url: "",
+            //url: "../../BaseManage/Department/GetDeptTreeJson?Ids=" + deptId + "&checkMode=" + checkMode + "&mode=" + mode,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = item.Sort;
+                deptId = item.id;
+                state = 0;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        if ($("#itemTree").size() == 0) return;
+        $("#itemTree").treeview(item);
+        if (deptId.length == 0) {
+            _parentId = $(".bbit-tree-node-text").eq(0).attr("data-code");
+        }
+        //加载用户组
+        var o = {
+            height: $(window).height() - 30,
+            url: "../../RoutineSafetyWork/UserGroupManage/GetTreeListJson",
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                state = 1;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#UserGroup").treeview(o);
+    }
+    function selRow(obj, id, JobType, JobTypeName,JobState) {
+
+        if (obj.checked) {
+            if (document.getElementById("div" + id) == null) {
+                $("#users").append("<div id='div" + id + "'  data-value='user'><input type='checkbox' value='" + decodeURIComponent(JobTypeName) + "' id='" + id + "' JobState='" + JobState + "' checked='checked' title='" + decodeURIComponent(JobTypeName) + "("+decodeURIComponent(JobState) + ")"+"' ><label for='" + id + "'>" + decodeURIComponent(JobTypeName) + "("+decodeURIComponent(JobState) + ")</label></div>");
+            }
+        } else {
+            if (document.getElementById("div" + id) != null) {
+                $("#div" + id).remove();
+            }
+        }
+    }
+    var selectedRowIndex = -1;
+    //加载表格
+    function GetGrid() {
+
+        var queryJson = {
+            condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+            keyword: $("#txt_Keyword").val(),
+            code: _parentId,
+            departmentId: deptId,
+            state: 0,
+            mode:mode,
+            containchild: jQuery("#chkdept").attr('checked') ? 1 : 0,
+            selDeptIds: selDeptIds,
+            jobtype: jobtype,
+            keyvalue: keyValue
+            //jobstate:"0,9,10,11"
+        }
+        if (mode == 10) {
+            queryJson = { source: source };
+        }
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1,
+            url: "../../DangerousJob/JobApprovalForm/GetSafetyCardListJson",
+            datatype: "json",
+            height: $(window).height() - 110,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '作业许可证状态', name: 'JobState', index: 'JobState', width: 120, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var status;
+
+                        switch (rowObject.JobState) {
+                            case 0:
+                                status = "申请中";
+                                break;
+                            case 1:
+                                status = "审批中";
+                                break;
+                            case 2:
+                                status = "审核不通过";
+                                break;
+                            case 3:
+                                status = "措施确认中";
+                                break;
+                            case 4:
+                                status = "停电中";
+                                break;
+                            case 5:
+                                status = "备案中";
+                                break;
+                            case 6:
+                                status = "验收中";
+                                break;
+                            case 7:
+                                status = "送电中";
+                                break;
+                            case 8:
+                                status = "即将作业";
+                                break;
+                            case 9:
+                                status = "作业暂停";
+                                break;
+                            case 10:
+                                status = "作业中";
+                                break;
+                            case 11:
+                                status = "已结束";
+                                break;
+                            default:
+                        }
+                        //var html = "<a  href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>" + status + "</a>";
+                        return status;
+                    }
+                },
+                { label: '编号', name: 'ApplyNo', index: 'ApplyNo', width: 150, align: 'center', sortable: true },
+
+                { label: '作业类型', name: 'JobTypeName', index: 'JobTypeName', width: 150, align: 'center', sortable: true },
+                {
+                    label: '作业单位', name: 'JobDeptName', index: 'JobDeptName', width: 200, align: 'center', sortable: false
+                }, {
+                    label: '作业地点', name: 'JobPlace', index: 'JobPlace', width: 120, align: 'center', sortable: false
+                }, {
+                    label: '计划作业时间', name: 'JobStartTime', index: 'JobStartTime', align: 'center', width: 200, sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + "~" + formatDate(rowObject.JobEndTime, 'yyyy-MM-dd hh:mm');
+                    }
+                }, {
+                    label: '实际作业时间', name: 'RealityJobStartTime', index: 'RealityJobStartTime', align: 'center', width: 200, sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + "~" + formatDate(rowObject.RealityJobEndTime, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                {
+                    label: '作业申请人', name: 'ApplyUserName', index: 'ApplyUserName', width: 150, align: 'center', sortable: true
+                }, {
+                    label: '申请时间', name: 'ApplyTime', index: 'ApplyTime', align: 'center', width: 120, sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                }
+
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [10, 20, 30],
+            pager: "#gridPager",
+            //sortname: 'deptsort asc,sortcode asc,userid',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            multiselect: checkMode == 0 ? false : true,
+            gridview: true,
+            onSelectRow: function (rowid, status) {
+
+                if (checkMode == 0) {
+                    selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                    // alert($gridTable.jqGrid("getRowData", selectedRowIndex).Account);
+                } else {
+
+                    var rowObject = $gridTable.jqGrid('getRowData', rowid);
+                    //var mobile = rowObject.Mobile == undefined || rowObject.Mobile == null ? "" : rowObject.Mobile;
+                    selRow($gridTable.find(".jqgrow").eq(rowid - 1).find("input:checkbox").eq(0).get(0), rowObject.Id, encodeURIComponent(rowObject.JobType),rowObject.JobTypeName, rowObject.JobState);
+                    $("#lblselect").html("已选中作业安全证申请(" + $("#users").find("input:checked").length + ")");
+                }
+            },
+            onSelectAll: function (aRowids, status) {
+                $(aRowids).each(function (i, item) {
+                    var rowObject = $gridTable.jqGrid('getRowData', item);
+                    var mobile = rowObject.Mobile == undefined || rowObject.Mobile == null ? "" : rowObject.Mobile;
+                    selRow($gridTable.find(".jqgrow").eq(i).find("input:checkbox").eq(0).get(0), rowObject.Id, encodeURIComponent(rowObject.JobType), rowObject.JobTypeName, rowObject.JobState);
+                    //selRow($gridTable.find(".jqgrow").eq(i).find("input:checkbox").eq(0).get(0), rowObject.Account, encodeURIComponent(rowObject.RealName), rowObject.UserId, rowObject.DepartmentId, rowObject.DepartmentCode, encodeURIComponent(rowObject.DeptName), mobile, rowObject.SignImg);
+                });
+                $("#lblselect").html("已选中作业安全证申请(" + $("#users").find("input:checked").length + "人)");
+            },
+
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                if (($("#itemTree").size() && $("#itemTree").html().length == 0 && checkMode == 0) || istree == "0") {
+                    $(".ui-layout-west").hide(); $(".ui-layout-pane-center").css({ left: "10px", width: "100%" }); $(".ui-jqgrid-view").css({ width: "100%" });
+                    $("#gbox_gridTable").css({ width: "100%" }); $("#gridPager").css({ width: "100%" }); $(".ui-jqgrid-hdiv").css({ width: "100%" });
+                    $(".ui-jqgrid-bdiv").css({ width: "100%" });
+                    //$(".con1").hide();
+
+                }
+                if (mode == 2) {
+                   // $(".con1").hide();
+                }
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            containchild = $("#chkdept").is(":checked") ? 1 : 0;
+            state = $("#lidept").hasClass("active") ? 0 : 1;
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword").val()),
+                code: _parentId,
+                state: state,
+                containchild: containchild,
+                departmentId: deptId,
+                mode: mode,
+                selDeptIds: selDeptIds
+            }
+            if (!!userKind) {
+                queryJson["userKind"] = userKind;
+            }
+            if (!!eliminateUserIds) {
+                queryJson["eliminateUserIds"] = eliminateUserIds;
+            }
+            if (!!special) {
+                queryJson["special"] = special;
+            }
+            if (!!side) {
+                queryJson["side"] = side;
+            }
+            if (!!projectid) {
+                queryJson["projectid"] = projectid;
+            }
+            if (!!pType) {
+                queryJson["pType"] = pType;
+            }
+            if (!!threeperson) {
+                queryJson["threeperson"] = threeperson;
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询事件
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val("");
+            containchild = $("#chkdept").is(":checked") ? 1 : 0;
+            state = $("#lidept").hasClass("active") ? 0 : 1;
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: "",
+                code: _parentId,
+                state: state,
+                containchild: containchild,
+                departmentId: deptId,
+                mode: mode,
+                selDeptIds: selDeptIds
+            }
+
+            if (!!userKind) {
+                queryJson["userKind"] = userKind;
+            }
+            if (!!eliminateUserIds) {
+                queryJson["eliminateUserIds"] = eliminateUserIds;
+            }
+            if (!!special) {
+                queryJson["special"] = special;
+            }
+            if (!!side) {
+                queryJson["side"] = side;
+            }
+            if (!!projectid) {
+                queryJson["projectid"] = projectid;
+            }
+            if (!!pType) {
+                queryJson["pType"] = pType;
+            }
+            if (!!threeperson) {
+                queryJson["threeperson"] = threeperson;
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btnAll").click(function () {
+            containchild = $("#chkdept").is(":checked") ? 1 : 0;
+            state = $("#lidept").hasClass("active") ? 0 : 1;
+
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword").val()),
+                code: _parentId,
+                state: state,
+                containchild: containchild,
+                mode: mode,
+                selDeptIds: selDeptIds
+            }
+            $.ajax({
+                url: "../../BaseManage/User/GetUserListJson?rows=1000000&page=1&queryJson=" + JSON.stringify(queryJson),
+                type: "Get",
+                async: false,
+                dataType: "json",
+                success: function (data) {
+                    $("#users").html("");
+                    if (data.rows.length > 0) {
+                        $.each(data.rows, function (i, dom) {
+                            if (document.getElementById("div" + dom.Account) == null) {
+                                $("#users").append("<div id='div" + dom.Account + "' data-value='user'><input type='checkbox' value='" + dom.Account + "' id='" + dom.UserId + "' checked='checked' title='" + decodeURIComponent(dom.RealName) + "' deptId='" + dom.DepartmentId + "' deptCode='" + dom.DepartmentCode + "' deptName='" + decodeURIComponent(dom.DeptName) + "' mobile='" + dom.Mobile + "' signimg='" + dom.SignImg + "' ><label for='" + dom.UserId + "'>" + decodeURIComponent(dom.RealName) + "</label></div>");
+                            }
+                        });
+                    }
+                },
+                error: function (result) {
+                    dialogMsg("请先选择数据.", 0);
+                }
+            });
+            $("#lblselect").html("已选中作业安全证申请(" + $("#users").find("input:checked").length + "人)");
+
+        })
+        $("#btnClear").click(function () {
+            $("#users").find("div[data-value='user']").remove();
+            $("#lblselect").html("已选中作业安全证申请(0人)");
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    //返回选择后的结果并赋值到dom控件,多个值用逗号分隔
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序必须依次为用户名称,用户账号，用户Id,部门Id,部门Code,部门名称,手机号（多选用逗号分隔）
+    function AcceptClick(options) {
+
+        var winObject = options.winObject;
+        var domId = options.domId;
+        var selVal = new Array();
+        var title = ""; var Id = ""; var JobType = ""; var JobState = ""; var JobTypeName = "";
+
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+
+                if (checkMode == 1) {
+                    var arr = $("#users").find("input:checked");
+                    if (arr.length == 0) {
+                        dialogAlert("请选择作业安全申请！", 2);
+                        return;
+                    } else {
+                        arr.each(function (i, dom) {
+                            title +=dom.title + ",";
+                            JobType += dom.value + ",";
+                            Id += dom.id + ",";
+                            JobState += $(dom).attr("JobState") + ",";
+                            JobTypeName += $(dom).attr("JobTypeName") + ",";
+                        });
+                        title = title.substring(0, title.length - 1);
+                        JobType = JobType.substring(0, JobType.length - 1);
+                        JobState = JobState.substring(0, JobState.length - 1);
+                        Id = Id.substring(0, Id.length - 1);
+                        JobTypeName = JobTypeName.substring(0, Id.length - 1);
+                    }
+                } else {
+                    if (selectedRowIndex <= 0) {
+                        dialogAlert("请选择作业安全申请！", 2);
+                        return;
+                    } else {
+                        var rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                        title = rowObject.JobType;
+                        JobType = rowObject.JobType;
+                        JobState = rowObject.JobState;
+                        Id = rowObject.Id;
+                        JobTypeName = rowObject.JobTypeName;
+                    }
+
+                }
+                var ids = domId.split(',');
+                var selVal = new Array(title, Id, JobType, JobState);
+                for (var j = 0; j < ids.length; j++) {
+                    if (ids[j].length >= 0) {
+                        if (ids[j] != "") {
+                            var dom = $(winObject).find("#" + ids[j]).eq(0);
+                            var domlbl = $(winObject).find("#lbl" + ids[j]).eq(0);
+                            if (dom != undefined) {
+                                dom.val(selVal[j]);
+                            }
+                            if (domlbl != undefined) {
+                                domlbl.html(selVal[j]);
+                            }
+                        }
+                    }
+                }
+            }
+            if (options.callBack) {
+                options.callBack(JobTypeName, Id);
+            }
+            dialogClose();
+        }
+
+    }
+
+
+    function AcceptDifferentClick(winObject, domId, dfferentID, describe) {
+        var selVal = new Array();
+
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var userNames = ""; var userAccounts = ""; var userIds = ""; var deptIds = ""; var deptCodes = ""; var deptNames = ""; var mobiles = "";
+                if (checkMode == 1) {
+                    var arr = $("#users").find("input:checked");
+                    if (arr.length == 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+                        arr.each(function (i, dom) {
+                            userNames += dom.title + ",";
+                            userAccounts += dom.value + ",";
+                            userIds += dom.id + ",";
+                            if (!!chooseDiff) {
+                                if (deptIds.indexOf($(dom).attr("deptId")) < 0) {
+                                    deptIds += $(dom).attr("deptId") + ",";
+                                    deptCodes += $(dom).attr("deptCode") + ",";
+                                    deptNames += $(dom).attr("deptName") + ",";
+                                }
+                            }
+                            else {
+                                deptIds += $(dom).attr("deptId") + ",";
+                                deptCodes += $(dom).attr("deptCode") + ",";
+                                deptNames += $(dom).attr("deptName") + ",";
+                            }
+                            if (!!$(dom).attr("mobile")) {
+                                mobiles += $(dom).attr("mobile") + ",";
+                            }
+                        });
+                        userNames = userNames.substring(0, userNames.length - 1);
+                        userAccounts = userAccounts.substring(0, userAccounts.length - 1);
+                        userIds = userIds.substring(0, userIds.length - 1);
+                        deptIds = deptIds.substring(0, deptIds.length - 1);
+                        deptCodes = deptCodes.substring(0, deptCodes.length - 1);
+                        deptNames = deptNames.substring(0, deptNames.length - 1);
+                        mobiles = mobiles.length > 0 ? mobiles.substring(0, mobiles.length - 1) : "";
+
+                        if (!!chooseDiff && chooseDiff == 1) {
+                            var deptsplit = deptIds.split(',').length;
+                            if (deptsplit > 1) {
+                                dialogAlert("仅能选择一个部门下的用户！", 2);
+                                return;
+                            }
+                        }
+                    }
+                } else {
+                    if (selectedRowIndex <= 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+                        var rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                        userNames = rowObject.RealName;
+                        userAccounts = rowObject.Account;
+                        userIds = rowObject.UserId;
+                        deptIds = rowObject.DepartmentId;
+                        deptCodes = !!rowObject.DepartmentCode ? rowObject.DepartmentCode : rowObject.OrganizeCode; //如果当前部门编码为空则采用组织机构编码
+                        deptNames = !!rowObject.DeptName ? rowObject.DeptName : rowObject.OrganizeName;//同上
+                        mobiles = rowObject.Mobile == undefined ? "" : rowObject.Mobile;
+                    }
+
+                }
+                var ids = domId.split(',');
+
+                var selVal = new Array(userNames, userAccounts, userIds, deptIds, deptCodes, deptNames, mobiles);
+
+
+                var differentObj = null;
+                if (!!dfferentID) {
+                    differentObj = $(winObject).find("#" + dfferentID);
+                }
+                var issetValue = true; //是否赋值
+                //判断
+                if (!!chooseDiff && chooseDiff == 1 && !!differentObj) {
+                    if (selVal[2].indexOf(!!differentObj.val() ? differentObj.val() : "NO") >= 0 || differentObj.val().indexOf(selVal[2]) >= 0) {
+                        dialogAlert("当前选择的人员不能存在或与" + describe + "相同", 2);
+                        issetValue = false;
+                    }
+                }
+                //判断
+                if (!!chooseDiff && chooseDiff == 2 && !!differentObj) {
+                    var havecount = 0;
+                    var differentVal = differentObj.val();
+                    var curSelVal = selVal[1];
+                    if (!!differentVal) {
+                        var newdifferentVal = "," + differentVal + ",";
+                        var curSelVal = !!curSelVal ? curSelVal.split(',') : [];
+                        $(curSelVal).each(function (index, sval) {
+                            if (!!sval) {
+                                var cursval = "," + sval + ",";
+                                if (newdifferentVal.indexOf(sval) >= 0) {
+                                    havecount += 1;
+                                }
+                            }
+                        });
+                    }
+                    if (havecount > 0) {
+                        dialogAlert("当前选择的人员不能存在或与" + describe + "相同", 2);
+                        issetValue = false;
+                    }
+                }
+
+                if (issetValue) {
+                    for (var j = 0; j < ids.length; j++) {
+                        if (ids[j].length >= 0) {
+                            if (ids[j] != "") {
+                                var dom = $(winObject).find("#" + ids[j]).eq(0);
+                                if (dom != undefined) {
+                                    //当目标对象和当前值相同的时候
+                                    dom.val(selVal[j]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            dialogClose();
+        }
+    }
+
+
+    //对多个dom进行赋值
+
+    //返回选择后的结果并赋值到dom控件,多个值用逗号分隔
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序必须依次为用户名称,用户账号，用户Id,部门Id,部门Code,部门名称,手机号（多选用逗号分隔）
+    function AcceptMuchClick(options) {
+        var winObject = options.winObject;
+        var domId = options.domId;
+        var selVal = new Array();
+
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var userNames = ""; var userAccounts = ""; var userIds = ""; var deptIds = ""; var deptCodes = ""; var deptNames = ""; var mobiles = ""; var sex = ""; var idcard = "";
+                //多选
+                if (checkMode == 1) {
+                    var arr = $("#users").find("input:checked");
+                    if (arr.length == 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+                        arr.each(function (i, dom) {
+                            userNames += dom.title + ",";
+                            userAccounts += dom.value + ",";
+                            userIds += dom.id + ",";
+                            if (deptIds.indexOf($(dom).attr("deptId")) < 0) {
+                                deptIds += $(dom).attr("deptId") + ",";
+                                deptCodes += $(dom).attr("deptCode") + ",";
+                                deptNames += $(dom).attr("deptName") + ",";
+                            }
+                            mobiles += $(dom).attr("mobile") + ",";
+                            sex += $(dom).attr("sex") + ",";
+                            idcard += $(dom).attr("idcard") + ",";
+                        });
+                        userNames = userNames.substring(0, userNames.length - 1);
+                        userAccounts = userAccounts.substring(0, userAccounts.length - 1);
+                        userIds = userIds.substring(0, userIds.length - 1);
+                        deptIds = deptIds.substring(0, deptIds.length - 1);
+                        deptCodes = deptCodes.substring(0, deptCodes.length - 1);
+                        deptNames = deptNames.substring(0, deptNames.length - 1);
+                        mobiles = mobiles.length > 0 ? mobiles.substring(0, mobiles.length - 1) : "";
+                        sex = sex.substring(0, sex.length - 1);
+                        idcard = idcard.substring(0, idcard.length - 1);
+                    }
+                } else {
+                    if (selectedRowIndex <= 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+                        var rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                        userNames = rowObject.RealName;
+                        userAccounts = rowObject.Account;
+                        userIds = rowObject.UserId;
+                        deptIds = rowObject.DepartmentId;
+                        deptCodes = rowObject.DepartmentCode;
+                        deptNames = rowObject.DeptName;
+                        mobiles = rowObject.Mobile == undefined ? "" : rowObject.Mobile;
+                        sex = rowObject.Gender;
+                        idcard = rowObject.IdentifyID;
+                    }
+
+                }
+                var ids = domId.split(',');
+
+                //ids : field1|1,field2|0...(field1表示要赋值的字段，1表示selVal的索引值)
+                //用户姓名、用户账号、用户id、部门id、部门code、部门名称、电话、性别、身份证号
+                var selVal = new Array(userNames, userAccounts, userIds, deptIds, deptCodes, deptNames, mobiles, sex, idcard);
+
+                if (!!clearObj) {
+                    var clearDom = clearObj.split('|');
+                    var differentObj = $(winObject).find("#" + clearDom[0]);
+                    //判断
+                    if (selVal[2] == differentObj.val()) {
+                        dialogAlert("当前选择的人员不能与" + clearDom[1] + "相同", 2);
+                    } else {
+                        for (var j = 0; j < ids.length; j++) {
+                            if (ids[j].length >= 0) {
+                                var objKeyName = ids[j].split('|')[0];
+                                var objIndex = ids[j].split('|')[1];
+                                var objValue = selVal[objIndex];
+                                var dom = $(winObject).find("#" + objKeyName).eq(0);
+                                if (dom != undefined) {
+
+                                    dom.val(objValue);
+
+                                    if (!!controlObj) {
+                                        var tempControl = controlObj.split(',');
+                                        for (var m = 0; m < tempControl.length; m++) {
+                                            if (!!tempControl[m] && objKeyName == tempControl[m]) {
+                                                dom.attr("disabled", "disabled");
+                                            }
+                                        }
+                                    }
+                                }
+                                var domlbl = $(winObject).find("#lbl" + objKeyName).eq(0);
+                                if (domlbl != undefined) {
+                                    domlbl.html(objValue);
+                                }
+                            }
+                        }
+                    }
+                }
+                else {
+                    for (var j = 0; j < ids.length; j++) {
+                        if (ids[j].length >= 0) {
+                            var objKeyName = ids[j].split('|')[0];
+                            var objIndex = ids[j].split('|')[1];
+                            var objValue = selVal[objIndex];
+                            var dom = $(winObject).find("#" + objKeyName).eq(0);
+                            if (dom != undefined) {
+
+                                dom.val(objValue);
+
+                                if (!!controlObj) {
+                                    var tempControl = controlObj.split(',');
+                                    for (var m = 0; m < tempControl.length; m++) {
+                                        if (!!tempControl[m] && objKeyName == tempControl[m]) {
+                                            dom.attr("disabled", "disabled");
+                                        }
+                                    }
+                                }
+                            }
+                            var domlbl = $(winObject).find("#lbl" + objKeyName).eq(0);
+                            if (domlbl != undefined) {
+                                domlbl.html(objValue);
+                            }
+                        }
+                    }
+                }
+            }
+            if (options.callBack) {
+                options.callBack();
+            }
+            dialogClose();
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-right: 0px;">
+            <div class="panel-Title">作业安全证申请列表</div>
+
+
+            <div class="gridPanel">
+                @*<div class="alert alert-danger" style="text-align: left; margin-bottom: 3px; padding: 5px;">
+                        <i class="fa fa-question-circle alert-dismissible" style="position: relative; top: 1px; font-size: 15px;"></i>
+                        注：请点击要选择的数据行，然后再点击“确认”按钮
+                    </div>
+                *@
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-east" style="margin-left: 0px;width:200px;">
+        <div class="west-Panel" style="margin-left: 0px; width: 200px;">
+            <div class="panel-Title">
+                <lable id="lblselect">已选中作业安全证申请</lable>
+            </div>
+            <div id="users" style="overflow: auto; height: 450px; margin-left: 5px;">
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+

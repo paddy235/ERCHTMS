@@ -1,0 +1,515 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var currDeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var OutProjectId = request('OutProjectId');
+    var orgCode = request('orgCode') == "" ? "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode" : request('orgCode');//省级统计页面跳转-厂级Code 为空代表统计全部
+    var proName = request('proName');
+    var year = request('year');
+    var OutEngType = request('OutEngType');
+    var englevel = request('englevel');
+    var EngState = request('EngState');//省级统计页面跳转页面：参数 -工程状态 002 在建|| 厂级统计页面跳转
+    var fullName = request('fullName');//省级统计跳转:fullname =全部时查看所有电厂数据
+    var Time = request('Time');;//省级统计跳转
+    var englevelname = request('englevelname');
+    var hidModultId = ""; //当前模块
+
+    $(function () {
+        InitialPage();
+        //if (roleNames.indexOf("公司级") >= 0 || roleNames.indexOf("厂级部门") >= 0 || (roleNames.indexOf("部门级用户") >= 0 && roleNames.indexOf("负责人") >= 0)
+        //    || ((roleNames.indexOf("部门级用户") >= 0 && roleNames.indexOf("安全管理员") >= 0)) || ((roleNames.indexOf("部门级用户") >= 0 && roleNames.indexOf("专工") >= 0)))
+        //    $("#add").show()
+        //else $("#add").hide();
+
+        if (proName != "" && proName != undefined && proName != null)
+            $("#txt_Keyword").val(proName);
+        if (OutEngType != "" && OutEngType != undefined && OutEngType != null)
+            $("#engineertype").ComboBoxSetValue(OutEngType);
+        if (EngState != "" && EngState != undefined && EngState != null)
+            $("#engineerstate").ComboBoxSetValue(EngState);
+        if (!!englevelname) {
+            $("#engineerlevel").ComboBoxSetText(englevelname);
+            englevel = $("#engineerlevel").ComboBoxGetValue();
+        }
+        if (!!englevel) {
+            $("#engineerlevel").ComboBoxSetValue(englevel);
+        }
+        if (year != "" && year != undefined && year != null) {
+            var stime = year + '-01-01';
+            var etime = year + '-12-31';
+            $("#sTime").val(stime);
+            $("#eTime").val(etime);
+        }
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $("#engineertype").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ProjectType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        $("#engineerstate").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "OutProjectState" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        $("#engineerlevel").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ProjectLevel" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            OutProjectId: OutProjectId,
+            orgCode: orgCode,
+            name: proName,
+            year: year,
+            engineertype: OutEngType,
+            engineerstate: EngState,
+            engineerlevel: englevel,
+            sTime: $("#sTime").val(),
+            eTime: $("#eTime").val(),
+            Time: Time,
+            fullName: fullName,
+            IsDeptAdd: 1
+        }
+        //初始化固定列
+        var model = [{ label: 'ID', name: 'id', index: 'ID', width: 50, align: 'center', sortable: false, hidden: true },
+               {
+                   label: '操作', name: 'oper', width: 100, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                       var html = "<a href=javascript:f_view('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                       if (roleNames.indexOf("厂级部门用户") >= 0 || roleNames.indexOf("公司级") >= 0) {
+                           html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                           if (rowObject.SafeEvaNum > 0 && rowObject.statecode != "003") {
+                               html += "<a href=javascript:proIsover('" + rowObject.id + "')  title='完工'><i class='fa fa fa-get-pocket'></i></a>";
+                           }
+
+                       } else if ((roleNames.indexOf("负责人") >= 0 && rowObject.engineerletdeptid == currDeptId) || (roleNames.indexOf("安全管理员") >= 0 && rowObject.engineerletdeptid == currDeptId) ||
+                           (roleNames.indexOf("专工") >= 0 && rowObject.engineerletdeptid == currDeptId)) {
+                           html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                           if (rowObject.SafeEvaNum > 0 && rowObject.statecode != "003") {
+                               html += "<a href=javascript:proIsover('" + rowObject.id + "')  title='完工'><i class='fa fa fa-get-pocket'></i></a>";
+                           }
+                       }
+                       return html;
+                   }
+               },
+                       {
+                           label: '流程状态', name: 'participant', index: 'participant', align: 'center', hidden: false, formatter: function (cellvalue, options, rowObject) {
+                               if (rowObject.engineerstate == "已完工") {
+                                   return '<a style="text-decoration:underline;color:blue"  href="javascript:btn_viewflow(\'' + rowObject.id + '\')">流程结束</a>';
+                               } else {
+                                   return '<a style="text-decoration:underline;color:blue"  href="javascript:btn_viewflow(\'' + rowObject.id + '\')">流程中</a>';
+                               }
+
+                           }
+                       }
+        ];
+        $.ajax({
+            url: "../../AuthorizeManage/Module/GetModuleIdByCode",
+            data: { enCode: "Outsouringengineer" },
+            type: "post",
+            success: function (data) {
+                if (!!data) {
+                    hidModultId = data;
+                    if (!!hidModultId) {
+                        //初始化值
+                        $.SetForm({
+                            url: "../../AuthorizeManage/ModuleListColumnAuth/GetColumnAuth",
+                            param: { moduleId: hidModultId },
+                            success: function (result) {
+                                if (!!result) {
+                                    var defaultFields = result.data.DEFAULTCOLUMNFIELDS;//默认列
+                                    var defaultName = result.data.DEFAULTCOLUMNNAME;//默认列名称
+                                    var arrayDefaultName = defaultName.split(',');
+                                    var arrayDefaultFields = defaultFields.split(',');
+                                    for (var i = 0; i < arrayDefaultFields.length; i++) {
+                                        //特殊处理
+                                        if (arrayDefaultFields[i] == "outprojectname") {
+                                            model.push({
+                                                label: arrayDefaultName[i], name: arrayDefaultFields[i], index: arrayDefaultFields[i], width: 180, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                                                    var str = "";
+                                                    if (rowObject.busvalidendtime != null) {
+
+                                                        var endDate = new Date(rowObject.busvalidendtime);
+                                                        var warnDate = new Date('@DateTime.Now.AddDays(30).ToString("yyyy-MM-dd HH:mm:ss")');
+                                                        if (endDate < new Date('@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")')) {
+                                                            str += "营业执照已逾期、";
+                                                        }
+                                                        else if (endDate <= warnDate && endDate >= new Date('@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")')) {
+                                                            str += "营业执照即将逾期、";
+                                                        }
+                                                    }
+                                                    if (rowObject.splvalidendtime != null) {
+                                                        var endDate = new Date(rowObject.splvalidendtime);
+                                                        var warnDate = new Date('@DateTime.Now.AddDays(30).ToString("yyyy-MM-dd HH:mm:ss")');
+                                                        if (endDate < new Date('@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")')) {
+                                                            str += "安全生产许可证已逾期、";
+                                                        }
+                                                        else if (endDate <= warnDate && endDate >= new Date('@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")')) {
+                                                            str += "安全生产许可证即将逾期、";
+                                                        }
+                                                    }
+                                                    if (rowObject.cqvalidendtime != null) {
+                                                        var endDate = new Date(rowObject.cqvalidendtime);
+                                                        var warnDate = new Date('@DateTime.Now.AddDays(30).ToString("yyyy-MM-dd HH:mm:ss")');
+                                                        if (endDate < new Date('@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")')) {
+                                                            str += "资质证件已逾期、";
+                                                        }
+                                                        else if (endDate <= warnDate && endDate >= new Date('@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")')) {
+                                                            str += "资质证件即将逾期、";
+                                                        }
+                                                    }
+                                                    if (str.length > 0)
+                                                        return "<div class='data-danger' title='" + str.substring(0, str.length - 1) + "'>" + cellvalue + "</div>";
+                                                    else
+                                                        return cellvalue;
+                                                }
+                                            })
+                                        }
+                                        else if (arrayDefaultFields[i] == "planenddate" || arrayDefaultFields[i] == "ctualenddate" || arrayDefaultFields[i] == "actualenddate") {
+                                            model.push({
+                                                label: arrayDefaultName[i], name: arrayDefaultFields[i], index: arrayDefaultFields[i], width: 180, align: 'center', formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' }
+                                            })
+                                        }
+                                        else {
+                                            model.push({ label: arrayDefaultName[i], name: arrayDefaultFields[i], index: arrayDefaultFields[i], width: 150, align: 'center' })
+                                        }
+
+                                    }
+                                }
+                            }
+                        });
+                        $gridTable.jqGrid({
+                            autowidth: true,
+                            height: $(window).height() - 170,
+                            url: "../../OutsourcingProject/Outsouringengineer/GetPageListJson",
+                            postData: { queryJson: JSON.stringify(queryJson) },
+                            datatype: "json",
+                            colModel: model,
+                            viewrecords: true,
+                            rowNum: 30,
+                            rowList: [30, 50, 100],
+                            pager: "#gridpager",
+                            sortname: 'createdate',
+                            sortorder: 'desc',
+                            rownumbers: true,
+                            shrinkToFit: true,
+                            gridview: true,
+                            onSelectRow: function () {
+                                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                            },
+                            gridComplete: function () {
+                                $('#' + this.id).setSelection(selectedRowIndex, false);
+                            }
+                        });
+
+                    }
+                }
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                name: $.trim($("#txt_Keyword").val()),
+                engineertype: $("#engineertype").attr('data-value'),
+                engineerlevel: $("#engineerlevel").attr('data-value'),
+                orgCode: orgCode,
+                sTime: $("#sTime").val(),
+                eTime: $("#eTime").val(),
+                engineerstate: $("#engineerstate").attr('data-value'),
+                IsDeptAdd: 1
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+            $(".ui-filter-list").css("display", "none");
+            $(".ui-filter-text ").removeClass("active");
+            $(".ui-filter-text ").removeAttr("style");
+        });
+    }
+    //新增
+    function btn_add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加外包工程信息',
+            url: '/OutsourcingProject/Outsouringengineer/Form?mode=add',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    function f_view(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看外包工程信息',
+                url: '/OutsourcingProject/Outsouringengineer/Form?keyValue=' + keyValue + "&mode=view",
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 200) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+    //编辑
+    function btn_edit(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑外包工程信息',
+                url: '/OutsourcingProject/Outsouringengineer/Form?keyValue=' + keyValue + "&mode=edit",
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 200) + "px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+
+    function proIsover(id) {
+        if (id) {
+            $.RemoveForm({
+                msg: "是否确认工程已完工!?",
+                url: "../../OutsourcingProject/Outsouringengineer/ProIsOver",
+                param: { keyValue: id },
+                loading: "正在保存数据...",
+                success: function () {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要完工的工程！', 0);
+        }
+    }
+    //删除
+    function btn_delete(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../OutsourcingProject/Outsouringengineer/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的外包工程信息表！', 0);
+        }
+    }
+    function ResetCondition() {
+        $("#engineertype").attr("data-text", "");
+        $("#engineertype").attr("data-value", "");
+        $("#engineertype div:eq(0)").text("==请选择==");
+        $("#engineerstate").attr("data-text", "");
+        $("#engineerstate").attr("data-value", "");
+        $("#engineerstate div:eq(0)").text("==请选择==");
+        $("#engineerlevel").attr("data-text", "");
+        $("#engineerlevel").attr("data-value", "");
+        $("#engineerlevel div:eq(0)").text("==请选择==");
+        $("#txt_Keyword").val("");
+        $("#sTime").val("");
+        $("#eTime").val("");
+    }
+    //自定义列表
+    function customList() {
+        dialogOpen({
+            id: 'CustomList',
+            title: '自定义列表内容',
+            url: '/AuthorizeManage/ModuleListColumnAuth/Setting?moduleId=' + hidModultId + "&refreshlist=gridTable",
+            width: ($(top.window).width() - 300) + "px",
+            height: ($(top.window).height() - 300) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    //流程图
+    function btn_viewflow(id) {
+        if (id) {
+            var title = "外包工程流程图";
+            var rqUrl = "/OutsourcingProject/Outsouringengineer/Flow?keyValue=" + id;
+            dialogOpen({
+                id: 'SafetychangeFlowForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 50) + "px",
+                btn: null
+            });
+        } else {
+            dialogMsg('请选择查看行！', 0);
+        }
+    }
+
+    //导出列表数据
+    function ExportData() {
+        var queryJson = JSON.stringify({
+            name: $.trim($("#txt_Keyword").val()),
+            engineertype: $("#engineertype").attr('data-value'),
+            engineerlevel: $("#engineerlevel").attr('data-value'),
+            orgCode: orgCode,
+            engineerstate: $("#engineerstate").attr('data-value'),
+            IsDeptAdd: 1
+        })
+        $.ajax({
+            url: '../../OutsourcingProject/Outsouringengineer/ExportExcel?queryJson=' + queryJson + '&fileName=外包工程列表&currentModuleId=' + hidModultId,
+            dataType: "JSON",
+            success: function (result) {
+
+                window.location.href = "../../Utility/DownloadFile?filePath=~/Resource/Temp/" + result.resultdata;
+                Loading(false);
+            }
+        });
+    }
+
+    function showUser(ENGINEERDIRECTOR, ENGINEERDIRECTORPHONE, DEPARTMENTID, ENGINEERID) {
+        dialogOpen({
+            id: "UserForm",
+            title: '添加用户',
+            url: '/BaseManage/User/Form?ENGINEERDIRECTOR=' + ENGINEERDIRECTOR + '&ENGINEERDIRECTORPHONE=' + ENGINEERDIRECTORPHONE + '&DEPARTMENTID=' + DEPARTMENTID + '&ENGINEERID=' + ENGINEERID,
+            width: "800px",
+            height: ($(top.window).height() - 50) + "px",
+            callBack: function (iframeId) {
+                //top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title">外包工程管理</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件:</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 350px;">
+                                    <div class="ui-filter-text">
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 450px; ">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle" style="width:100px; text-align:right;">名称：</td>
+                                                <td class="formValue">
+                                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入外包单位或外包工程关键字" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" style="width:100px; text-align:right;">工程类型：</td>
+                                                <td class="formValue">
+                                                    <div id="engineertype" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" style="width:100px; text-align:right;">工程风险等级：</td>
+                                                <td class="formValue">
+                                                    <div id="engineerlevel" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" style="width:100px; text-align:right;">工程状态：</td>
+                                                <td class="formValue">
+                                                    <div id="engineerstate" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" style="width:120px; text-align:right;">
+                                                    工程创建时间：
+                                                </td>
+                                                <td class="formValue">
+                                                    <input id="sTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                                                </td>
+
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" style="width: 100px; text-align: right;">至：</td>
+                                                <td class="formValue">
+                                                    <input id="eTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                                                </td>
+                                            </tr>
+
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding-left:2px">
+                                <div class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li style="width:300px;"><a style="float:left">证书已逾期或者即将逾期</a><div style="float: left; margin-left:12px; background-color: red; height: 22px; width: 100px;"></div></li>
+                                        @*<li style="width:200px;"><a style="float:left">证书即将过期</a><div style="float: left; background-color: orange; height: 22px; width: 80px;"></div></li>
+                                    <li style="width:200px;"><a style="float:left">黑名单</a><div style="float: left; background-color: gray; margin-left: 36px; height: 22px; width: 80px;"></div></li>*@
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a class="btn btn-default" onclick="customList()"><i class="fa fa-edit"></i>&nbsp;自定义列表</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                        <a class="btn btn-default" onclick="ExportData()"><i class="fa fa-plus"></i>导出</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridpager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+            

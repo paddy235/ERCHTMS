@@ -1,0 +1,174 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script>
+    var projectID = request('projectID');
+    $(function () {
+        InitialPage();
+        GetGrid();
+
+    });
+    //初始化页面
+    function InitialPage() {
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 108.5);
+            }, 200);
+            e.stopPropagation();
+        });
+        //所有操作按钮禁用
+
+    }
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            recid: projectID,
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+
+            url: "../../SaftyCheck/SaftyCheckDataDetail/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },//绑定grid加参数
+            datatype: "json",
+            height: 650,
+            autowidth: true,
+            rowNum: 100000,
+            colModel: [
+                 { label: '主键', name: 'ID', hidden: true },
+                  { label: '所属区域主键', name: 'BelongDistrictID', hidden: true },
+                   { label: '所属区域编码', name: 'BelongDistrictCode', index: 'BelongDistrictCode', hidden: true },
+                { label: '所属区域', name: 'BelongDistrict', index: 'BelongDistrict', width: 200, align: 'left', sortable: false, hidden: true },
+                { label: '风险描述', name: 'RiskName', index: 'RiskName', width: 300, align: 'left', sortable: false, hidden: true },
+                { label: '检查对象id', name: 'CheckObjectId', index: 'BelongDistrictID', hidden: true },
+                { label: '检查对象type', name: 'CheckObjectType', index: 'BelongDistrictID', hidden: true },
+                {
+                    label: '检查对象', name: 'CheckObject', index: 'CheckObject', width: 450, align: 'left', sortable: false, headerAlign: 'center'
+                    
+                },
+                {
+                    label: '检查内容', name: 'CheckContent', index: 'CheckContent', width: 400, align: 'left', sortable: false, headerAlign: 'center'
+ 
+                }
+                
+            ],
+            multiselect: true,
+            viewrecords: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                Merger('gridTable', new Array('CheckObject'));
+               
+            }
+        });
+    }
+    
+    //保存表单;
+    function AcceptClick() {
+        //获取选中行的行记录
+        var str = "";
+        var arr = [];
+        var ids = $("#gridTable").jqGrid('getGridParam', 'selarrrow');
+        if (ids.length == 0) {
+            dialogMsg('请选择数据！', 0);
+        } else {
+            Loading(true, "正在处理，请稍候...");
+            var items = $("#gridTable").jqGridRow();
+            var arr = new Array();
+            $(items).each(function (j,item) {
+                arr.push({
+                    stid: item.CheckObjectId,
+                    name: item.CheckObject,
+                    require: item.CheckContent,
+                    type: item.CheckObjectType,
+                    checkobjecttype: item.CheckObjectType
+                });
+            });
+            top.Details.fillItems(arr);
+            top.parent.Loading(false);
+            top.Prject.dialogClose();
+            dialogClose();
+
+            //window.setTimeout(function () {
+            //    for (var i = 0; i < ids.length; i++) {
+            //        //var dataRow = $("#gridTable").jqGrid('getRowData', ids[i]);
+            //        ////var htmlDoc = $.parseHTML(dataRow.RiskName);
+            //        //dataRow.ID = "";
+            //        ////dataRow.RiskName = $(htmlDoc).val();
+            //        //arr.push(dataRow);
+
+
+            //        //因为检查内容需要多行显示 加入控件后 返回到之前界面也需要处理数据
+            //        var dom = $("#gridTable").jqGrid('getRowData', ids[i]);
+            //        var checkContent = 0;
+            //        var checkobjctname = 0;
+            //        var checkobjctid = 0;
+            //        var checkobjcttype = 0;
+            //        //检查内容
+            //        var domCheckContent = $("#gridTable").find("tr").eq(ids[i]).find("td[aria-describedby='gridTable_CheckContent']").eq(0).find("li");
+            //        var checkContentValue = "";
+            //        if (domCheckContent.length > 0) {
+            //            $(domCheckContent).each(function (m, res) {
+            //                var content = $(res).find("input[type='text']").eq(0).val();
+
+            //                if (content == "" || content == null || content == "undefined") {
+            //                    checkContent = 1;
+            //                }
+            //                checkContentValue += content + "|";
+            //            });
+            //        } else {
+            //            checkContent = 1;
+            //        }
+            //        //检查对象
+            //        var domCheckObj = $("#gridTable").find("tr").eq(ids[i]).find("td[aria-describedby='gridTable_CheckObject']").eq(0).find("li");
+            //        var checkobjname = "";
+            //        var checkobjid = "";
+            //        var checkobjtype = "";
+            //        if (domCheckObj.length > 0) {
+            //            $(domCheckObj).each(function (m, res) {
+            //                var objname = $(res).find("input[type='text']").eq(0).val();
+            //                checkobjname += objname + "|";
+
+            //                var objid = $(res).find("input[type='hidden']").eq(0).val();
+            //                checkobjid += objid + "|";
+
+            //                var objtype = $(res).find("input[type='hidden']").eq(1).val();
+            //                checkobjtype += objtype + "|";
+            //            });
+            //        } else {
+            //            checkContent = 1;
+            //        }
+            //        dom.CheckContent = checkContentValue.substr(0, checkContentValue.length - 1);
+            //        dom.checkobjctname = checkobjname.substr(0, checkobjname.length - 1);
+            //        dom.checkobjctid = checkobjid.substr(0, checkobjid.length - 1);
+            //        dom.checkobjcttype = checkobjtype.substr(0, checkobjtype.length - 1);
+            //        //dom.BelongDistrict = $("#gridTable").find("tr").eq(ids[i]).find("td[aria-describedby='gridTable_BelongDistrict']").eq(0).text().replace("&nbsp;&nbsp;&nbsp;", "");
+            //       // dom.RiskName = $("#gridTable").find("tr").eq(ids[i]).find("td[aria-describedby='gridTable_RiskName']").eq(0).find("input[type='text']").eq(0).val();
+            //        arr.push({ ID: "", BelongDistrict: dom.BelongDistrict, BelongDistrictCode: dom.BelongDistrictCode, BelongDistrictID: dom.BelongDistrictID, RiskName: dom.RiskName, CheckContent: dom.CheckContent, CheckObject: dom.checkobjctname, CheckObjectId: dom.checkobjctid, CheckObjectType: dom.checkobjcttype });
+
+            //    }
+            //    Loading(false);
+            //    top.Details.addToDetail(arr);
+            //    top.parent.Loading(false);
+            //    top.Prject.dialogClose();
+            //    dialogClose();
+            //}, 500);
+
+        }
+
+
+    }
+</script>
+
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

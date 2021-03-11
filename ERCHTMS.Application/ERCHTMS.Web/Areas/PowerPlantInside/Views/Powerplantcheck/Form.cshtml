@@ -1,0 +1,518 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+
+
+
+<script>
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId"; //部门ID
+    var deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName"; //部门ID
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var orgcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var orgID = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    //创建用户机构ID 仅省级页面会用到
+    var CreateuserOrgid = request("CreateuserOrgid");
+    var PowerPlantHandleDetailId = request('PowerPlantHandleDetailId');
+    var PowerPlantHandleId = request('PowerPlantHandleId');
+    var PowerPlantReformId = request('PowerPlantReformId');
+    var keyValue = request('keyValue');
+    var action = request('action');
+    $(function () {
+        if (action == "show") {
+            $("input").attr("readonly", "readonly");
+            $("input").attr("disabled", "disabled");
+            $("a").attr("disabled", "disabled");
+            $("div").attr("disabled", "disabled");
+            $("textarea").attr("disabled", "disabled");
+            top.window.$(".layui-layer-btn0").hide();
+            $("#historyRecord").removeAttr("disabled");
+        }
+        initControl();
+    });
+
+    //初始化控件
+    function initControl() {
+        //事故事件类别
+        ComBoxForData("AccidentEventType", "AccidentEventType");
+        //事故事件性质
+        ComBoxForData("AccidentEventProperty", "AccidentEventProperty");
+
+        $("#AUDITTIME").val("@DateTime.Now.ToString("yyyy-MM-dd")");
+        $("#AUDITPEOPLE").val(userName); //审核人姓名
+        $("#AUDITPEOPLEID").val(userId); //审核人ID
+        $("#AUDITDEPTID").val(deptId); //审核部门ID
+        $("#AUDITDEPT").val(deptName); //审核部门名称
+
+
+        $.SetForm({
+            url: "../../PowerPlantInside/Powerplantreform/GetFormJson",
+            param: { keyValue: PowerPlantReformId },
+            success: function (data) {
+                if (data != null) {
+                    $("#form1").formDeserialize(data);
+                    if (data.IsAssignPerson == "0") {
+                        $("#tr_sign").hide();
+                    }
+                    $("#RectificationPersonSignImg").attr("src", "../.." + data.RectificationPersonSignImg);
+                }
+            }
+        });
+        $.SetForm({
+            url: "../../PowerPlantInside/Powerplanthandle/GetFormJson",
+            param: { keyValue: PowerPlantHandleId },
+            success: function (data) {
+                if (data != null) {
+                    $("#form2").formDeserialize(data);
+                }
+            }
+        });
+        keyValue = keyValue.length === 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+
+
+        //验收记录信息
+        GetApproveGrid();
+
+        //视频跟图片的附件
+        file_upload.init({
+            keyValue: PowerPlantReformId, isImage: true, el: '#uploader1'
+        });
+        
+        file_upload.bindFiles(false, true, PowerPlantReformId, "uploader1", false);
+
+        ShowOrEdit("show", "uploader2", PowerPlantHandleId);
+        var isDel = action == "show" ? false : true;
+        file_upload.init({
+            keyValue: keyValue, isImage: true, el: '#uploader3'
+        });
+        file_upload.bindFiles(isDel, true, keyValue, "uploader3", isDel);
+    }
+
+    //提交表单;
+    function SubmitClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var auditresult = $("input[name='AUDITRESULT']:checked").val();
+        if (auditresult == "" || auditresult == undefined) {
+            dialogAlert("未上传签名，无法进行提交！！！", function () {
+                return false;
+            })
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["PowerPlantHandleDetailId"] = PowerPlantHandleDetailId;
+        postData["PowerPlantHandleId"] = PowerPlantHandleId;
+        postData["PowerPlantReformId"] = PowerPlantReformId;
+        //验收结果
+        var auditresult = $("input[name='AUDITRESULT']:checked").val();
+        postData["AUDITRESULT"] = auditresult;
+        postData["AUDITSIGNIMG"] = $("#AuditSignImg").attr("src");
+        $.SaveForm({
+            url: "../../PowerPlantInside/Powerplantcheck/ApporveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        });
+        return false;
+    };
+
+    function GetApproveGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#approveGridTable');
+        $gridTable.jqGrid({
+            url: "../../PowerPlantInside/Powerplantcheck/GetPageListJson?PowerInsideHandleDetailId=" + PowerPlantHandleDetailId,
+            datatype: "json",
+            height: "300px",
+            autowidth: true,
+            colModel: [
+                {
+                    label: '验收结论', name: 'auditresult', index: 'auditresult', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = rowObject.auditresult == "0" ? "验收通过" : "验收不通过";
+                        return html;
+                    }
+                },
+                {
+                    label: '验收意见', name: 'auditopinion', index: 'auditopinion', width: 150, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.auditopinion) {
+                            var content = rowObject.auditopinion.length > 20 ? rowObject.auditopinion.substring(0, 20) + "......" : rowObject.auditopinion;
+
+                            html = "<div title=" + content + ">" + content + "</div>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '验收人', name: 'auditpeople', index: 'auditpeople', width: 120, align: 'center' },
+                {
+                    label: '验收时间', name: 'audittime', index: 'audittime', width: 120, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm:ss');
+                    }
+                },
+                {
+                    label: '验收人签字', name: 'auditsignimg', index: 'auditsignimg', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var content = !!rowObject.auditsignimg ? rowObject.auditsignimg : "";
+                        var html = "";
+                        if (content == "" || content == undefined) {
+                            var html = "<img  style=\"height:50px;\" />&nbsp;";
+                        } else {
+                            html = "<img style=\"height:50px;\"  src=\"../.." + content + "\"/>&nbsp;";
+                        }
+
+                        return html;
+                    }
+                },
+                {
+                    label: '是否有验收图片', name: 'filenum', index: 'filenum', width: 200, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        if (rowObject.filenum == 0) {
+                            html = "否";
+                            return html;
+
+                        } else if (rowObject.filenum > 0) {
+                            html = "<a href=javascript:btn_Annex('" + rowObject.id + "') style='color:blue; text-decoration:underline;padding-left:0px;' title='修改'>是</a>";
+                            return html;
+
+                        }
+
+
+                    }
+
+                }
+            ],
+            pager: false,
+            rowNum: "20",
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+    }
+
+    function auditCheck(obj) {
+        var signImg = getUserSignPic(userId);
+        if (signImg != "" && signImg != undefined) {
+            $("#AuditSignImg").attr("src", "../.." + signImg);
+        } else {
+            $(obj).get(0).checked = false;
+        }
+    }
+
+    //查看
+    function btn_Annex(occid) {
+        var keyValue = occid;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Annex',
+                title: '附件列表',
+                url: '/OccupationalHealthManage/Occupatioalstaff/FileList?keyValue=' + keyValue,
+                width: '600px',
+                height: '550px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+
+    function GetHistoryInfo() {
+        var url = "/PowerPlantInside/Powerplantcheck/HistoryIndex?PowerInsideHandleDetailId=" + PowerPlantHandleDetailId;
+        var dlg = dialogOpen({
+            id: "HistoryIndex",
+            title: '验收历史记录',
+            url: url,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+</script>
+<div class="panel panel-default" id="panel0" style="padding-top:40px">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;事故事件基本信息</strong>
+        </div>
+        <div style="margin-top: 20px; margin-right: 30px;">
+            <table class="form" id="form2">
+                <tr>
+                    <td class="formTitle"></td>
+                    <td class="formValue"></td>
+                    <td class="formTitle"></td>
+                    <td class="formValue"></td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width: 150px">事故事件名称<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <input id="AccidentEventName" type="text" class="form-control" disabled="disabled" />
+                        <input id="AccidentEventId" type="hidden" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">所属部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="BelongDept" type="text" class="form-control" disabled="disabled" />
+                        <input id="BelongDeptId" type="hidden" />
+                        <input id="BelongDeptCode" type="hidden" />
+                    </td>
+                    <td class="formTitle">事故事件类别</td>
+                    <td class="formValue">
+                        <div id="AccidentEventType" type="select" class="ui-select" disabled="disabled"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">事故事件性质<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="AccidentEventProperty" type="select" class="ui-select" disabled="disabled"></div>
+                    </td>
+                    <td class="formTitle">发生时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="HappenTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" disabled="disabled" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">情况简介</td>
+                    <td class="formValue" colspan="3">
+                        <textarea rows="5" id="SituationIntroduction" class="form-control" disabled="disabled"></textarea>
+                    </td>
+                </tr>
+                @*<tr>
+                    <td class="formTitle">原因及存在问题</td>
+                    <td class="formValue" colspan="3">
+                        <textarea rows="5" id="ReasonAndProblem" class="form-control" disabled="disabled"></textarea>
+                    </td>
+                </tr>*@
+                <tr>
+                    <td class="formTitle">上传附件</td>
+                    <td class="formValue" colspan="3">
+                        <div id="uploader2" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                            <div class="queueList">
+                                <div id="dndArea2" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;事故事件整改信息</strong>
+            <span class="tools pull-right">
+                @*<a href="#" id="historyRecord" style="font-weight: bold;" onclick="GetHistoryInfo()" class="btn btn-primary btn-xs">历史记录信息</a>*@
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div style="margin-top: 20px; margin-right: 30px;">
+            <table class="form" id="form1">
+                <tr>
+                    <td class="formTitle"></td>
+                    <td class="formValue"></td>
+                    <td class="formTitle"></td>
+                    <td class="formValue"></td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width: 150px">原因及暴露问题</td>
+                    <td class="formValue" colspan="3">
+                        <textarea rows="5" id="ReasonAndProblem" class="form-control" disabled="disabled"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width: 150px">整改(防范)措施</td>
+                    <td class="formValue" colspan="3">
+                        <textarea rows="5" id="RectificationMeasures" class="form-control" disabled="disabled"></textarea>
+                    </td>
+                </tr>
+                <tr id="tr_sign">
+                    <td class="formTitle">签收部门<font face="宋体">*</font></td>
+                    <td class="formValue" style="width:40%">
+                        <input id="SignDeptName" type="text" class="form-control" readonly="readonly" />
+                        <input id="SignDeptId" type="hidden" />
+
+                    </td>
+                    <td class="formTitle">签收人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="SignPersonName" type="text" class="form-control" readonly="readonly"/>
+                        @*<a id="btn_more" class="btn btn-primary" href="javascript:showmore();"><i class="fa fa-check"></i>&nbsp;更&nbsp;&nbsp;多</a>*@
+                        <input id="SignPersonId" type="hidden" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">整改责任人</td>
+                    <td class="formValue">
+                        <input type="text" id="RectificationPerson"  class="form-control" disabled="disabled" />
+                        <input type="hidden" id="RectificationPersonId" />
+                        @*<input id="RectificationDutyDept" type="text" class="form-control" disabled="disabled" />
+                        <input id="RectificationDutyDeptId" type="hidden" />*@
+                    </td>
+                    <td class="formTitle">整改期限<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="RectificationTime" type="text" class="form-control" disabled="disabled" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">整改情况描述<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <textarea rows="5" id="RectificationSituation" class="form-control" disabled="disabled"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">整改责任人签名<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <label>
+                            <input type="radio" name="reformresult" id="reformresult1" value="0" checked disabled="disabled" />上传签名
+                        </label>
+                        <img id="RectificationPersonSignImg" style="height:50px;" />
+                    </td>
+                    <td class="formTitle">整改完成时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="RectificationEndTime" type="text" class="form-control input-wdatepicker" disabled="disabled" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">整改图片</td>
+                    <td class="formValue" colspan="3">
+                        <div id="uploader1" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                            <div class="queueList">
+                                <div id="dndArea1" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default" id="panel3">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;事故事件验收信息</strong>
+            <span class="tools pull-right">
+                <a href="#" id="historyRecord" style="font-weight: bold;" onclick="GetHistoryInfo()" class="btn btn-primary btn-xs">历史记录信息</a>
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-top: 5px; margin-right: 30px;">
+                <table id="approveGridTable"></table>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;验收信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-top: 5px; margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">验收人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="AUDITPEOPLE" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                            <input type="hidden" id="AUDITPEOPLEID" />
+                            <input type="hidden" id="AUDITDEPTID" />
+                            <input type="hidden" id="AUDITDEPT" />
+
+                        </td>
+                        <td class="formTitle">验收时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="AUDITTIME" type="text" class="form-control" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd hh:ss' })" disabled="disabled" readonly isvalid="yes" checkexpession="NotNull" />
+                            <input type="hidden" id="PROJECTID" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">验收结果<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="AUDITRESULT" id="AUDITRESULT1" value="0" onclick="auditCheck(this)" />通过
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="AUDITRESULT" id="AUDITRESULT2" value="1" onclick="auditCheck(this)" />不通过
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">签名<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <img id="AuditSignImg" style="height:50px;" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">验收意见</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="AUDITOPINION" name="AUDITOPINION" class="form-control"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">验收图片</td>
+                        <td class="formValue" colspan="3">
+                            <div id="uploader3" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="dndArea1" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style="top:40px; text-align:left; padding-left:20px; position:fixed; bottom:auto; z-index:1000;">
+    @*<a id="btn_Save" class="btn btn-primary" onclick="AcceptClick()"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+        &nbsp;&nbsp;*@
+    <a id="btn_Submit" class="btn btn-primary" onclick="SubmitClick()"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+    &nbsp;&nbsp;
+</div>

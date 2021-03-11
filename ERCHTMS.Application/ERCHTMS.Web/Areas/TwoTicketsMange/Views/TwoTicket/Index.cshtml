@@ -1,0 +1,600 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<style type="text/css">
+    .ui-jqgrid tr.jqgrow td {
+        white-space: normal !important;
+        height: auto;
+        vertical-align: text-top;
+    }
+</style>
+<script type="text/javascript">
+    var orgCode = "";
+    var deptCode = "";
+    var mode =1;
+    //$.ajaxSetup({
+    //    async: false
+    //});
+    $(function () {
+        InitialPage();
+        GetTree();
+        $(".gridPanel>ul>li").click(function () {
+            var dataIndex = $(this).attr("data-index");
+            if (dataIndex == "2") {
+                $("#edit").hide();
+                $("#delete").hide();
+            }
+            else if (dataIndex == "3" || dataIndex == "4") {
+                $("#edit").hide();
+                $("#delete").show();
+            }
+            else {
+                $("#edit").show();
+                $("#delete").show();
+            }
+        })
+        GetGrid("1");
+        GetGrid("2");
+        GetGrid("3");
+        GetGrid("4");
+    });
+    //初始化页面
+    function InitialPage() {
+        //两票类别
+        $("#type").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ticket" + mode },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: false
+        });
+
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable1').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable1').setGridHeight($(window).height() - 210);
+            }, 200);
+            e.stopPropagation();
+        });
+        $(".nav-tabs>li").bind("click", function () {
+            $(".info").hide();
+        
+            mode = $(this).data("index");
+            $("#info" + mode).show();
+            //两票类别
+            $("#type").ComboBox({
+                url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+                param: { EnCode: "ticket" + mode },
+                id: "ItemValue",
+                text: "ItemName",
+                description: "==请选择==",
+                height: "200px",
+                allowSearch: false
+            });
+        });
+       
+        //查询事件
+        $("#btn_Search").click(function () {
+            var $gridTable = $('#gridTable' + mode);
+            var queryJson = {
+                startDate: $("#startDate").val(),
+                endDate: $("#endDate").val(),
+                status: $("#status").val(),
+                deptCode:deptCode,
+                type: $("#type").attr("data-value") == undefined ? "" : $("#type").attr("data-value"),
+                keyword: $.trim($("#txt_Keyword").val())
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson),mode:mode }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            var $gridTable = $('#gridTable' + mode);
+            $("#txt_Keyword").val("");
+            $("#endDate").val(''); $("#startDate").val(''); $("#status").val(''); $("#type").attr('data-value', ''); $("#type").attr('data-text', ''); $("#type").find(".ui-select-text").html('请选择');
+            var queryJson = {
+                startDate: '',
+                endDate: '',
+                status: '',
+                type: '',
+                keyword: '',
+                deptCode:deptCode
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson), mode: mode }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    function isRight(roleIds) {
+        var res = false;
+        var arr = top.currUserRoleId.split(',');
+        for (var j = 0; j < arr.length; j++) {
+            if (roleIds.indexOf(arr[j]) >= 0) {
+                res = true;
+                break;
+            }
+        }
+        return res;
+    }
+    //加载组织机构树
+    function GetTree() {
+          var json = JSON.stringify(
+           {
+               SelectMode: 0,
+               Mode: 400
+           }
+          );
+          var item = {
+                height: $(window).height() - 50,
+                url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+                onnodeclick: function (item) {
+                    orgCode = item.OrgCode;
+                    deptCode = item.value;
+                    $('#btn_Search').trigger("click");
+                }
+          };
+            //初始化
+         $("#itemTree").treeview(item);
+    }
+    function getStatus(state,status,issubmit) {
+        var name = "";
+        var color = "blue";
+        if (state == "1") {
+          name = "已开票";
+        }
+        else if (state == "2") {
+            name = "已延期";
+            color = "orange";
+        }
+        if (state == "3") {
+            name = "已消票";
+            color = "green";
+        }
+        if (state == "4") {
+            name = "已作废";
+            color = "red";
+        }
+        if (status == 0 || issubmit == 0) {
+            name += "(保存未提交)";
+        }
+      
+        return "<font style='color:" + color + "'>" + name + "</font>";
+    }
+    //绑定列表
+    function GetGrid(mode) {
+        var cols = [
+                { label: '提交状态', name: 'iscommit', hidden: true }, { label: 'state', name: 'state', hidden: true }, { label: 'state', name: 'issubmit', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 70, align: 'center', sortable: false
+                    ,formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (rowObject.createuserid == top.currUserId && rowObject.iscommit == 0) {
+                            html += "<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        }
+                        if ((rowObject.createuserid == top.currUserId && rowObject.iscommit == 0) || (top.currUserRoleName.indexOf("公司管理员") >= 0) || IsAdmin()) {
+                            html += "<a href=javascript:del('" + rowObject.id + "')   title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '流程状态', name: 'status', align: 'center', sortable: true,width:100
+                    ,formatter: function (cellvalue, options, rowObject) {
+                        return getStatus(cellvalue,rowObject.iscommit,rowObject.issubmit);
+                    }
+                },
+                 //{
+                 //    label: '开票日期', name: 'worktime', width: 60, align: 'center', sortable: true,
+                 //    formatter: function (cellvalue, options, rowObject) {
+                 //        return formatDate(cellvalue, 'yyyy-MM-dd');
+                 //    }
+                 //},
+                 //{ label: '工作票编号', name: 'sno', width: 80, align: 'center', sortable: true },
+                 //{ label: '工作票类别', name: 'tickettype', width: 90, align: 'center', sortable: true },
+                 //{ label: '部门/班组', name: 'deptname', width: 120, align: 'center', sortable: true },
+                 //{ label: '工作内容', name: 'content', width: 200, align: 'center', sortable: true }
+        ];
+        if (mode == 1) {
+            cols.push({ label: '工作票编号', name: 'sno', width: 80, align: 'center', sortable: true });
+            cols.push({ label: '工作票类别', name: 'tickettype', width: 90, align: 'center', sortable: true });
+            cols.push({ label: '任务名称', name: 'content', width: 150, align: 'center', sortable: false });
+            cols.push({ label: '部门/班组', name: 'deptname', width: 120, align: 'center', sortable: true });
+            cols.push({ label: '工作票负责人', name: 'dutyuser', width: 100, align: 'center', sortable: true });
+            cols.push({ label: '工作票签发人', name: 'senduser', width: 100, align: 'center', sortable: true });
+            cols.push({ label: '工作票许可人', name: 'audituser', width: 100, align: 'center', sortable: true });
+            cols.push({
+                label: '工作票许可时间', name: 'workpermittime', width: 100, align: 'center', sortable: true,
+                formatter: function (cellvalue, options, rowObject) {
+                    return cellvalue==""?"":formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                }
+            });
+            cols.push({ label: '值长/班长', name: 'monitor', width: 100, align: 'center', sortable: true });
+            cols.push({
+                label: '批准工作时间', name: 'audittime', align: 'center', sortable: true
+                , formatter: function (cellvalue, options, rowObject) {
+                    if (!!cellvalue && !!rowObject.registertime) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + "至" + formatDate(rowObject.registertime, 'yyyy-MM-dd hh:mm');
+                    } else {
+                        return "";
+                    }
+                  
+                }
+            });
+         
+        }
+        if (mode == 2) {
+            cols.push({ label: '操作票编号', name: 'sno', width: 80, align: 'center', sortable: true });
+            cols.push({ label: '操作票类别', name: 'tickettype', width: 90, align: 'center', sortable: true });
+            cols.push({ label: '任务名称', name: 'content', width: 150, align: 'center', sortable: false });
+            cols.push({ label: '部门/班组', name: 'deptname', width: 120, align: 'center', sortable: true });
+            cols.push({ label: '发令人', name: 'dutyuser', width: 80, align: 'center', sortable: true });
+            cols.push({ label: '操作人', name: 'senduser', width: 80, align: 'center', sortable: true });
+            cols.push({ label: '监护人', name: 'audituser', width: 80, align: 'center', sortable: true });
+          
+            cols.push({
+                label: '批准操作时间', name: 'audittime', align: 'center', sortable: true,width: 200
+                ,formatter: function (cellvalue, options, rowObject) {
+                    if (!!cellvalue && !!rowObject.registertime) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + "至" + formatDate(rowObject.registertime, 'yyyy-MM-dd hh:mm');
+                    } else {
+                        return "";
+                    }
+
+                }
+            });
+            cols.push({ label: '登记人', name: 'createusername', width: 80, align: 'center', sortable: true });
+            cols.push({
+                label: '登记时间', name: 'createtime',  align: 'center', sortable: true,width: 100
+                ,formatter: function (cellvalue, options, rowObject) {
+                    return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                }
+        });
+        }
+        if (mode == 3) {
+            cols.push({ label: '联系票编号', name: 'sno', width: 80, align: 'center', sortable: true });
+            cols.push({ label: '联系票类别', name: 'tickettype', width: 90, align: 'center', sortable: true });
+            cols.push({ label: '任务名称', name: 'content', width: 150, align: 'center', sortable: false });
+            cols.push({ label: '部门/班组', name: 'deptname', width: 120, align: 'center', sortable: true });
+            cols.push({ label: '联系人', name: 'dutyuser', width: 100, align: 'center', sortable: true });
+            cols.push({ label: '许可人', name: 'audituser', width: 100, align: 'center', sortable: true });
+            cols.push({ label: '许可时间', name: 'audittime', width: 100, align: 'center', sortable: true });
+            cols.push({ label: '停送电编号', name: 'tsdsno', width: 80, align: 'center', sortable: true });
+            cols.push({ label: '登记人', name: 'createusername', width: 100, align: 'center', sortable: true });
+           
+            cols.push({
+                label: '登记时间', name: 'createtime', width: 100, align: 'center', sortable: true
+                ,formatter: function (cellvalue, options, rowObject) {
+                 return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                }
+            });
+        }
+        if (mode == 4) {
+            cols.push({ label: '动火票编号', name: 'sno', width: 80, align: 'center', sortable: true });
+            cols.push({ label: '作业票类别', name: 'tickettype', width: 90, align: 'center', sortable: true });
+            cols.push({ label: '任务名称', name: 'content', width: 150, align: 'center', sortable: false });
+            cols.push({ label: '部门/班组', name: 'deptname', width: 120, align: 'center', sortable: true });
+            cols.push({ label: '动火负责人', name: 'dutyuser', width: 80, align: 'center', sortable: true });
+            //cols.push({ label: '签发人', name: 'senduser', width: 80, align: 'center', sortable: true });
+            cols.push({ label: '许可人/值长', name: 'audituser', width: 80, align: 'center', sortable: true });
+            //cols.push({ label: '安监', name: 'registeruser', width: 80, align: 'center', sortable: true });
+            //cols.push({ label: '武保', name: 'audituser1', width: 80, align: 'center', sortable: true });
+            cols.push({ label: '动火地点', name: 'address', width: 150, align: 'center', sortable: true });
+            //cols.push({ label: '消防监护人', name: 'tutelageuser', width: 80, align: 'center', sortable: true });
+            cols.push({
+                label: '允许动火时间', name: 'audittime', align: 'center', sortable: true
+                ,formatter: function (cellvalue, options, rowObject) {
+                 return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                }
+            });
+        }
+        var $gridTable = $('#gridTable'+mode);
+        $gridTable.jqGrid({
+            height: $(window).height() - 210,
+            autowidth: true,
+            url: "../../TwoTicketsMange/TwoTicket/GetListJson",
+            postData:{mode:mode},
+            datatype: "json",
+            colModel: cols,
+            viewrecords: true,
+            rowNum: 30,
+            sortname: 't.createtime',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            pager: "#gridPager"+mode,
+            gridComplete: function () {
+                var tickets=$gridTable.getGridParam('userData');
+                $("#info"+mode).html("本周开票："+tickets.weekCount+" 张，本月开票："+tickets.monthCount+" 张");
+                $gridTable.setGridWidth($(window).width() - 250);
+                if(mode==4){
+                     var groupHeaders = new Array();
+                     groupHeaders.push(
+                         {
+                             startColumnName: "registeruser",
+                             numberOfColumns:2,
+                             titleText: "<b>审批人<b>"
+                         }
+                     );
+                     $gridTable.jqGrid("destroyGroupHeader");
+                     $gridTable.jqGrid("setGroupHeaders", {
+                         useColSpanStyle: true,
+                         groupHeaders: groupHeaders
+                     });
+                }
+
+            }
+        });
+        
+       
+    }
+    //新增
+    function add() {
+        var url = 'Form' + mode;
+        top.layer.open({
+            type: 2,
+            id: "TicketForm",
+            title: '开票',
+            content: '../TwoTicketsMange/TwoTicket/' + url + '?action=add&mode=' + mode,
+            area: [($(top.window).width() - 100) + "px", ($(top.window).height() - 100) + "px"],
+            btn: ["保存", "提交", "关闭"],
+            yes: function (iframeId, idx) {
+                top.TicketForm.AcceptClick(0);
+            }
+               , complate: function () {
+
+               }
+               , btn2: function (idx) {
+                   top.TicketForm.AcceptClick(1);
+                   return false;
+               }
+               , btn3: function (idx) {
+                   return true;
+               }
+        });
+    }
+    //延期
+    function action(obj,status) {
+        var id = $("#gridTable" + mode).jqGridRowValue("id");
+        if (id.length == 0) {
+            dialogMsg("请选择一条记录！", 0);
+            return false;
+        } else {
+            var title = $.trim($(obj).text());
+            var iscommit = $("#gridTable" + mode).jqGridRowValue("iscommit");
+            var issubmit = $("#gridTable" + mode).jqGridRowValue("issubmit");
+            var state = $("#gridTable" + mode).jqGridRowValue("state");
+
+            var wfstatus = $("#gridTable" + mode).jqGridRowValue("status");
+            if (status == 2 && state > 0 && issubmit==1) {
+                dialogMsg("该记录" + wfstatus+"，无法延期！", 0);
+                 return false;
+            }
+            if (status == 3 && state > 2 && issubmit == 1) {
+                dialogMsg("该记录" + wfstatus + "，无法消票！", 0);
+                return false;
+            }
+            if (status == 4 && state==3 && issubmit == 1) {
+                dialogMsg("该记录" + wfstatus + "，无法作废！", 0);
+                return false;
+            }
+            if (!!state) {
+                if ((iscommit == 0 || issubmit == 0) && status != state) {
+                    dialogMsg("该记录还未提交，无法" + title + "!", 0);
+                    return false;
+                }
+                if (issubmit == 1 && status == state) {
+                    dialogMsg("该记录已" + title + "!", 0);
+                    return false;
+                }
+            }
+           
+            var url = 'Form' + mode;
+            top.layer.open({
+                type: 2,
+                id: "TicketForm",
+                title: title,
+                content: '../TwoTicketsMange/TwoTicket/' + url + '?status='+status+'&action=audit&mode=' + mode+"&keyValue="+id,
+                area: [($(top.window).width() - 100) + "px", ($(top.window).height() - 100) + "px"],
+                btn: ["保存", "提交", "关闭"],
+                yes: function (iframeId, idx) {
+                    top.TicketForm.SaveRecord(0);
+                }
+                   , complate: function () {
+
+                   }
+                   , btn2: function (idx) {
+                       top.TicketForm.SaveRecord(1);
+                       return false;
+                   }
+                   , btn3: function (idx) {
+                       return true;
+                   }
+            });
+        }
+    }
+    //查看
+    function show(id) {
+        var url = 'Form' + mode;
+        var dlg = dialogOpen({
+            id: "Form",
+            title: '查看开票信息',
+            url: '/TwoTicketsMange/TwoTicket/' + url + '?action=show&mode=' + mode+"&keyValue="+id,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+              
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //编辑
+    function edit(id) {
+        var url = 'Form' + mode;
+        top.layer.open({
+            type: 2,
+            id: "TicketForm",
+            title: '修改信息',
+            content: '../TwoTicketsMange/TwoTicket/' + url + '?action=edit&mode=' + mode + "&keyValue=" + id,
+            area: [($(top.window).width() - 100) + "px", ($(top.window).height() - 100) + "px"],
+            btn: ["保存", "提交", "关闭"],
+            yes: function (iframeId, idx) {
+                top.TicketForm.AcceptClick(0);
+            }
+            ,complate: function () {
+            }
+            ,btn2: function (idx) {
+                top.TicketForm.AcceptClick(1);
+                   return false;
+            }
+           ,btn3: function (idx) {
+                return true;
+            }
+        });
+    }
+    //删除
+    function del(id) {
+        var $gridTable = $('#gridTable' + mode);
+        var keyValue = !!id ? id : $gridTable.jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../TwoTicketsMange/TwoTicket/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $gridTable.trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的记录！', 0);
+        }
+    }
+    function exp() {
+        var queryJson = {
+            startDate: $("#startDate").val(),
+            endDate: $("#endDate").val(),
+            status: $("#status").val(),
+            deptCode: deptCode,
+            type: $("#type").attr("data-value") == undefined ? "" : $("#type").attr("data-value"),
+            keyword: $.trim($("#txt_Keyword").val())
+        }
+        window.location.href = "Export?mode=" + mode + "&queryJson=" + JSON.stringify(queryJson)
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center" style="padding-left:10px;">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            @*<td>开票日期：</td>
+                            <td>
+                                <input id="startDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" style="width:100px; display:inline" />至
+                                <input id="endDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" style="width: 100px; display: inline" />
+                            </td>*@
+                            <td>&nbsp;&nbsp;流程状态：</td>
+                            <td>
+                                <select id="status" class="form-control">
+                                    <option value="">请选择</option>
+                                    <option value="1">已开票</option>
+                                    <option value="2">已延期</option>
+                                    <option value="3">已消票</option>
+                                    <option value="4">已作废</option>
+                                </select>
+                                 
+                            </td>
+                            <td>&nbsp;&nbsp;两票类别：</td>
+                            <td>
+                                <div id="type" type="select" class="ui-select" style="width:130px;"></div>
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入内容进行查询" style="width: 120px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"> <i class="fa fa-plus"></i> &nbsp;开票</a>
+                        <a id="edit" class="btn btn-default" onclick="action(this,2)"> <i class="fa fa-pencil-square-o"></i> &nbsp;延期</a>
+                        <a id="delete" class="btn btn-default" onclick="action(this, 3)"> <i class="fa fa-trash-o"></i> &nbsp;消票</a>
+                        <a id="remove" class="btn btn-default" onclick="action(this, 4)"> <i class="fa fa-minus-circle"></i> &nbsp;作废</a>
+                        <a id="exp" class="btn btn-default" onclick="exp()"> <i class="fa fa-cloud-download"></i> &nbsp;导出</a>
+                       
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+
+                <ul class="nav nav-tabs">
+                    <li class="active" data-index="1"><a href="#work" data-toggle="tab">工作票</a></li>
+                    <li data-index="2"><a href="#oper" data-toggle="tab">操作票</a></li>
+                    <li data-index="3"><a href="#link" data-toggle="tab">联系票</a></li>
+                    <li data-index="4"><a href="#fire" data-toggle="tab">动火票</a></li>
+                </ul>
+                <div class="tab-content" style="padding-top: 15px;">
+                    <div id="info1" class="text-right info" style="margin-right:15px;"></div>
+                    <div id="info2" class="text-right info" style="display:none; margin-right:15px;"></div>
+                    <div id="info3" class="text-right info" style="display: none; margin-right: 15px;"></div>
+                    <div id="info4" class="text-right info" style="display: none; margin-right: 15px;"></div>
+                    <div id="work" class="tab-pane active" style="padding-right: 30px;">
+                        <table id="gridTable1"></table>
+                        <div id="gridPager1"></div>
+                    </div>
+                    <div id="oper" class="tab-pane" style="padding-right: 30px;">
+                        <table id="gridTable2"></table>
+                        <div id="gridPager2"></div>
+                    </div>
+                    <div id="link" class="tab-pane" style="padding-right: 30px;">
+                        <table id="gridTable3"></table>
+                        <div id="gridPager3"></div>
+                    </div>
+                    <div id="fire" class="tab-pane" style="padding-right: 30px;">
+                        <table id="gridTable4"></table>
+                        <div id="gridPager4"></div>
+                    </div>
+                 </div>
+                  
+                </div>
+        </div>
+    </div>
+</div>
+

@@ -1,0 +1,394 @@
+﻿@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script type="text/javascript">
+    var mode = 0;
+    var editID = "";
+    var editQZ = ""
+    var orgId = request("orgId");
+    //初始化
+    $(function () {
+        
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('table').setGridWidth(($(window).width() - 70));
+                //$("#gridTable").setGridHeight($(window).height() - 170);
+               
+            }, 200);
+            e.stopPropagation();
+        });
+
+        var curAccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+        //非系统管理员，无法初始化
+        if (curAccount != "System") {
+            $("#btn_InitData").remove();
+            $("#aqyjDiv").remove();
+        }
+        if (!!orgId)
+        {
+            $("#btn_InitData").css("display","none");
+        }
+        // 预警分项指标权重设置
+        LoadGridTable0();
+        //预警分项指标项目设置 默认隐患排查
+        LoadlGridTable("01");
+        //  预警设置
+        $.SetForm({
+            url: "../../SystemManage/Classification/GetWarningInfo",
+            success: function (data) {
+ 
+                $("#dataitemdetailid").val(data.ItemDetailId);
+                var itemvalue = data.ItemValue;
+                if (!!itemvalue) {
+                    var arr = itemvalue.split('|');
+                    $("#s4").val(arr[0]);
+                    $("#s3").val(arr[1]);
+                    $("#s2").val(arr[2]);
+                    $("#s1").val(arr[3]);
+                }
+            }
+        });
+    });
+
+
+    //保存预警设置
+    function SaveWarning() {
+        var postData = { keyValue: $("#dataitemdetailid").val(), s1: $("#s1").val(), s2: $("#s2").val(), s3: $("#s3").val(), s4: $("#s4").val() };
+        $.SaveForm({
+            url: "../../SystemManage/Classification/SaveWarningForm",
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+            }
+        });
+    }
+
+    //预警分项指标权重列表
+    function LoadGridTable0() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridtable0');
+        $gridTable.jqGrid({
+            url: "../../SystemManage/Classification/GetListJson?orgId="+orgId,
+            datatype: "json",
+            height: 150,
+            autowidth: true,
+            colModel: [
+                {
+                    label: '操作', name: 'edit', index: 'edit', width: 200, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<div class='btnBox'>"
+                            + "<button type=\"button\" class=\"btn btn-primary\" onclick =\"edit('" + options.rowId + "',this)\"><i class=\"fa fa-edit\"></i>&nbsp;编辑</button>&nbsp;"
+                            + "<button type=\"button\" class=\"btn btn-primary\" style=\"display:none;\" onclick =\"save('" + options.rowId + "','" + rowObject.Id + "',this)\"><i class=\"fa fa-check\"></i>&nbsp;保存</button>&nbsp;"
+                            + "<button type=\"button\" class=\"btn btn-primary\" style=\"display:none;\" onclick =\"cancle('" + options.rowId + "',this)\"><i class=\"fa fa-remove\"></i>&nbsp;取消</button>"
+                            + "</div>";
+                        return html;
+                    }
+                },
+                { label: '分项指标', name: 'ClassificationIndex', index: 'ClassificationIndex', width: 250, align: 'center' },
+                { label: '权重比例', name: 'WeightCoeffcient', index: 'WeightCoeffcient', width: 250, align: 'center',editable: true }
+            ],
+            pager: false,
+            sortname: 'ClassificationCode',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+    }
+
+    //编辑分项指标权重
+    function edit(rowid, obj) {
+        if (!!editQZ && editQZ != rowid) {
+            dialogMsg('请先保存或取消正在编辑的项!', 0);
+        }
+        else {
+            $(obj).css("display", "none");
+            $(obj).next().removeAttr("style");
+            $(obj).next().next().removeAttr("style");
+            $("#gridtable0").jqGrid("editRow", rowid);
+            editQZ = rowid;
+        }
+    }
+
+    //保存分项指标权重
+    function save(rowid, keyid, obj) {
+        $(obj).css("display", "none");
+        $(obj).next().css("display", "none");
+        $(obj).prev().removeAttr("style");
+        var weightCoeffcientID = "#" + rowid + "_WeightCoeffcient";
+        var parameters = {
+            keys: false,
+            oneditfunc: function () { },
+            successfunc: null,
+            url: "../../SystemManage/Classification/SaveForm",
+            extraparam: { keyValue: keyid, WeightCoeffcient: $(weightCoeffcientID).val() },
+            aftersavefunc: null,
+            errorfunc: function () { dialogMsg('保存失败!', 0); },
+            afterrestorefunc: null,
+            restoreAfterError: true,
+            mtype: "post"
+        };
+        $("#gridtable0").jqGrid("saveRow", rowid, parameters);
+        $("#gridtable0").trigger("reloadGrid");
+        editQZ = "";
+    }
+
+    //取消分项指标权重
+    function cancle(rowid, obj) {
+        $(obj).css("display", "none");
+        $(obj).prev().css("display", "none");
+        $(obj).prev().prev().removeAttr("style");
+        $("#gridtable0").jqGrid("restoreRow", rowid);
+        editQZ = "";
+    }
+
+    //加载预警分项指标项目设置列表
+    function LoadlGridTable(classCode) {
+        var selectedRowIndex = 0;
+        var objId = "#gridtable" + classCode;
+        var $gridTable = $(objId);
+        $gridTable.jqGrid({
+            url: "../../SystemManage/Classification/GetClassificationIndexListJson?classificationcode=" + classCode+"&orgId="+orgId,
+            datatype: "json",
+            height: 200,
+            //width: $(window).width(),
+            autowidth: true,
+            colModel: [
+                { label: 'id', name: 'Id', index: 'Id', width: 10, align: 'center', hidden: true },
+                {
+                    label: '操作', name: 'edit', index: 'edit', width: 160, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<div class='btnBox'>"
+                              + "<button type=\"button\" class=\"btn btn-primary\" onclick =\"editParam('" + options.rowId + "','" + classCode + "',this)\"><i class=\"fa fa-edit\"></i>&nbsp;编辑</button>&nbsp;"
+                              + "<button type=\"button\" class=\"btn btn-primary\" style=\"display:none;\" onclick =\"saveParam('" + options.rowId + "','" + rowObject.Id + "','" + classCode + "',this)\"><i class=\"fa fa-check\"></i>&nbsp;保存</button>&nbsp;"
+                              + "<button type=\"button\" class=\"btn btn-primary\" style=\"display:none;\" onclick =\"cancleParam('" + options.rowId + "','" + classCode + "',this)\"><i class=\"fa fa-remove\"></i>&nbsp;取消</button>"
+                              + "</div>";
+                        return html;
+                    }
+                },
+                { label: '指标项目', name: 'IndexName', index: 'IndexName', width: 200, align: 'center' },
+                { label: '指标总分', name: 'IndexScore', index: 'IndexScore', width: 70, align: 'center', editable: true },
+                { label: '指标标准', name: 'IndexStandard', index: 'IndexStandard', width: 445, align: 'center' },
+                { label: '指标标准格式', name: 'IndexStandardFormat', index: 'IndexStandardFormat', width: 100, align: 'center', hidden: true },
+                { label: '指标值', name: 'IndexArgsValue', index: 'IndexArgsValue', editable: true, width: 80, align: 'center' },
+                { label: '计算标准', name: 'CalculateStandard', index: 'CalculateStandard', width: 760, align: 'center' }
+            ],
+            pager: false,
+            sortname: 'IndexCode',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            ondblClickRow: function (id) {
+            }
+        });
+    }
+
+    //编辑指标项目
+    function editParam(rowid,classCode, obj) {
+        if (!!editID && editID != rowid) {
+            dialogMsg('请先保存或取消正在编辑的项!', 0);
+        }
+        else {
+            $(obj).css("display", "none");
+            $(obj).next().removeAttr("style");
+            $(obj).next().next().removeAttr("style");
+            var gridObj = "#gridtable" + classCode;
+            $(gridObj).jqGrid("editRow", rowid);
+            editID = rowid;
+        }
+    }
+
+    //保存指标项目
+    function saveParam(rowid, keyid,classCode, obj) {
+        $(obj).css("display", "none");
+        $(obj).next().css("display", "none");
+        $(obj).prev().removeAttr("style");
+        var argsValueID = "#" + rowid + "_IndexArgsValue";
+        var indexScoreID = "#" + rowid + "_IndexScore";
+        var parameters = {
+            keys: false,
+            oneditfunc: function () { },
+            successfunc: null,
+            url: "../../SystemManage/Classification/SaveClassificationForm",
+            extraparam: { keyValue: keyid, IndexArgsValue: $(argsValueID).val(), IndexScore: $(indexScoreID).val() },
+            aftersavefunc: null,
+            errorfunc: function () { dialogMsg('保存失败!', 0); },
+            afterrestorefunc: null,
+            restoreAfterError: true,
+            mtype: "post"
+        };
+        var gridObj = "#gridtable" + classCode;
+        $(gridObj).jqGrid("saveRow", rowid, parameters);
+        $(gridObj).trigger("reloadGrid");
+        editID = "";
+    }
+
+    //取消指标项目
+    function cancleParam(rowid, classCode, obj) {
+        $(obj).css("display", "none");
+        $(obj).prev().css("display", "none");
+        $(obj).prev().prev().removeAttr("style");
+        var gridObj = "#gridtable" + classCode;
+        $(gridObj).jqGrid("restoreRow", rowid);
+        editID = "";
+    }
+
+    //初始化数据
+    function InitData() {
+        dialogOpen({
+            id: "Form",
+            title: "初始化各机构考核指标数据",
+            url: "/SystemManage/Classification/Form",
+            width: ($(window).width() / 2 + 160) + "px",
+            height: ($(window).height() / 2) + "px",
+            btn: null
+        });
+    }
+</script>
+
+<div class="center-Panel">
+    <div style="margin-top: 5px;"></div>
+    <div class="panel panel-default" id="aqyjDiv">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp; 预警设置</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <thead>
+                        <tr>
+                            <th class="formTitle" style="height:38px;">状态</th>
+                            <th class="formTitle" style=" text-align: center; height: 38px;">安全</th>
+                            <th class="formTitle" style=" text-align: center; height: 38px;">注意</th>
+                            <th class="formTitle" style=" text-align: center; height: 38px;">警告</th>
+                            <th class="formTitle" style=" text-align: center; height: 38px;">危险</th>
+                            <th class="formTitle" style=" text-align: center; height: 38px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="formTitle">预警分值区间</td>
+                            <td class="formValue">
+                                <input id="s1" type="text" class="form-control" />
+                                <input id="dataitemdetailid" type="hidden" class="form-control" />
+                            </td>
+                            <td class="formValue">
+                                <input id="s2" type="text" class="form-control" />
+                            </td>
+                            <td class="formValue">
+                                <input id="s3" type="text" class="form-control" />
+                            </td>
+                            <td class="formValue">
+                                <input id="s4" type="text" class="form-control" />
+                            </td>
+                            <td class="formTitle" style=" text-align:center;">
+                                <a id="btn_Save" class="btn btn-primary" onclick="SaveWarning()"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+                                <a id="btn_InitData" class="btn btn-primary" onclick="InitData()"><i class="fa fa-check"></i>&nbsp;初始化数据</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;预警分项指标权重设置</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div>
+                <table id="gridtable0"></table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel3">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;预警分项指标项目设置</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div class="portal-panel" style="padding-left:0px;">
+                <ul class="nav nav-tabs" id="ulTabs">
+                    <li class="active">
+                        <a data-toggle="tab" onclick="LoadlGridTable('01')" href="#tab1">隐患排查指标</a>
+                    </li>
+                    <li>
+                        <a data-toggle="tab" onclick="LoadlGridTable('02')" href="#tab2">安全风险管控指标</a>
+                    </li>
+                    <li>
+                        <a data-toggle="tab" onclick="LoadlGridTable('03')" href="#tab3">事故事件管理指标</a>
+                    </li>
+                    <li>
+                        <a data-toggle="tab" onclick="LoadlGridTable('04')" href="#tab4">危险源管理指标</a>
+                    </li>
+                    <li>
+                        <a data-toggle="tab" onclick="LoadlGridTable('05')" href="#tab5">应急管理指标</a>
+                    </li>
+                    <li>
+                        <a data-toggle="tab" onclick="LoadlGridTable('06')" href="#tab6">职业健康指标</a>
+                    </li>
+                    <li>
+                        <a data-toggle="tab" onclick="LoadlGridTable('07')" href="#tab7">人员管理指标</a>
+                    </li>
+                    <li>
+                        <a data-toggle="tab" onclick="LoadlGridTable('08')" href="#tab8">特种设备管理指标</a>
+                    </li>
+                    <li>
+                        <a data-toggle="tab" onclick="LoadlGridTable('09')" href="#tab9">安全教育培训指标</a>
+                    </li>
+                    <li>
+                        <a data-toggle="tab" onclick="LoadlGridTable('10')" href="#tab10">反违章管理指标</a>
+                    </li>
+                </ul>
+                <div class="tab-content" id="ulTabsDetail">
+                    <div id="tab1" class="tab-pane active">
+                        <table id="gridtable01"></table>
+                    </div>
+                    <div id="tab2" class="tab-pane">
+                        <table id="gridtable02"></table>
+                    </div>
+                    <div id="tab3" class="tab-pane">
+                        <table id="gridtable03"></table>
+                    </div>
+                    <div id="tab4" class="tab-pane">
+                        <table id="gridtable04"></table>
+                    </div>
+                    <div id="tab5" class="tab-pane">
+                        <table id="gridtable05"></table>
+                    </div>
+                    <div id="tab6" class="tab-pane">
+                        <table id="gridtable06"></table>
+                    </div>
+                    <div id="tab7" class="tab-pane">
+                        <table id="gridtable07"></table>
+                    </div>
+                    <div id="tab8" class="tab-pane">
+                        <table id="gridtable08"></table>
+                    </div>
+                    <div id="tab9" class="tab-pane">
+                        <table id="gridtable09"></table>
+                    </div>
+                    <div id="tab10" class="tab-pane">
+                        <table id="gridtable10"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

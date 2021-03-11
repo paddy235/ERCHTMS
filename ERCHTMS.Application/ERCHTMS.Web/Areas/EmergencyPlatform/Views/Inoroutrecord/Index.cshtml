@@ -1,0 +1,137 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script>
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var SUPPLIESID = request("sId");
+    $(function () {
+        InitialPage();
+        GetGrid();
+        $(".layui-layer-btn0").hide();
+    });
+    function AcceptClick() {
+        $.currentIframe().$("#gridTable").trigger("reloadGrid");
+    }
+
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    ////加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../EmergencyPlatform/Inoroutrecord/GetPageListJson?SUPPLIESID=" + SUPPLIESID,
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'id', align: 'center', sortable: true, hidden: true },
+                                           { label: '', name: 'departmentcode', hidden: true }, { label: '', name: 'organizecode', hidden: true },
+
+                                  {
+                                      label: '方式', name: 'statuname',index:'statuname', align: 'center',  width: 300
+                                  },
+                { label: '数量', name: 'num', index: 'num', align: 'center', width: 250,},
+                { label: '操作人', name: 'username', index: 'username', align: 'center',  width: 300 },
+                                     {
+                                         label: '时间', name: 'inorouttime',index:'inorouttime', width: 280, align: 'center', 
+                                         formatter: function (cellvalue, options, rowObject) {
+                                             return cellvalue.substring(0, 10);
+                                         }
+                                     }
+
+
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            pager: "#gridPager",
+            sortname: 'inorouttime',
+            sortorder: 'asc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            multiselect: false,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //新增
+    function btn_add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加出入库记录',
+            url: '/EmergencyPlatform/Inoroutrecord/Form',
+            width: 'px',
+            height: 'px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('ID');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '出入库记录',
+                url: '/EmergencyPlatform/Inoroutrecord/Form?keyValue=' + keyValue,
+                width: 'px',
+                height: 'px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_delete() {
+        var keyValue = $('#gridTable').jqGridRowValue('ID');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../EmergencyPlatform/Inoroutrecord/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的出入库记录！', 0);
+        }
+    }
+    //导出
+    function exported() {
+        var condition = $("#queryCondition").find('.dropdown-text').attr('data-value');
+        var keyword = $("#txt_Keyword").val();
+        location.href = "../../EmergencyPlatform/Inoroutrecord/ExportInoroutrecordList?condition=" + condition + "&keyword=" + keyword + "&SUPPLIESID=" + SUPPLIESID;
+    }
+
+</script>
+@*<script>$('.toolbar').authorizeButton()</script>*@
+<div class="titlePanel">
+    <div class="toolbar">
+        <div class="btn-group">
+            <a id="export" class="btn btn-default" onclick="javascript: exported()"><i class="fa fa-download"></i>&nbsp;导出</a>
+        </div>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

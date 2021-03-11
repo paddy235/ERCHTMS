@@ -1,0 +1,406 @@
+@{;
+    ViewBag.Title = "安全考核标准列表";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var dtree, gtree;
+    var enCode = "";
+    var parentId = "";
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+        //GetGrpTree();
+    });
+    //初始化页面
+    function InitialPage() {
+        //layout布局
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width() - 100));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#deptTree").setTreeHeight($(window).height() - 61);
+                $("#grpTree").setTreeHeight($(window).height() - 61);
+                $("#tab1").height($(window).height() - 61);
+                $("#grpTreePanel").height($(window).height() - 61);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载树
+
+    function GetTree(id) {
+        var arr = [];
+        //if (top.currUserRoleName.indexOf("超级管理员") >= 0 || top.currUserRoleName.indexOf("管理员") >= 0 ) {
+        //    arr=[
+        //        {
+        //            title:"新增",
+        //            text: '<i class="fa fa-file-text-o"  name="toolbtn"></i>', callback: "add"
+        //        },
+        //    {
+        //        title: "修改",
+        //        text: '<i class="fa fa-pencil-square-o toolbtn" name="toolbtn"></i>', callback: "edit"
+
+        //    },
+        //    {
+        //        title: "删除",
+        //        text: '<i class="fa fa-trash-o toolbtn" name="toolbtn"></i>', callback: "del"
+
+        //    }];
+        //}
+        if (top.currUserRoleName.indexOf("超级管理员") >= 0 || top.currUserRoleName.indexOf("公司管理员") >= 0) {
+            arr = [
+                {
+                    title: "新增",
+                    text: '<i class="fa fa-file-text-o"  name="toolbtn"></i>', callback: "add"
+                },
+                {
+                    title: "修改",
+                    text: '<i class="fa fa-pencil-square-o toolbtn" name="toolbtn"></i>', callback: "edit"
+
+                },
+                {
+                    title: "删除",
+                    text: '<i class="fa fa-trash-o toolbtn" name="toolbtn"></i>', callback: "del"
+
+                }];
+        }
+        var url = "../../OutsourcingProject/Safestandarditem/GetStandardTreeJson";
+        if (id!=undefined) {
+            url += "?tid="+id;
+        }
+        //加载组织机构树
+        var item = {
+            height: $(window).height() - 61,
+            url: url,
+            onnodeclick: function (item) {
+                enCode = item.Code.split('|')[0];
+                if (enCode == "00") enCode = "0";
+                parentId = item.id;
+                var $gridTable = $("#gridTable");
+                $gridTable.jqGrid('setGridParam', {
+                    url: "../../OutsourcingProject/Safestandarditem/GetPageListJson",
+                    postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+                }).trigger('reloadGrid');
+                $("#add").css("display", "");
+                //$("#export").css("display", "");
+            }
+            ,isTool: true
+            //自定义工具栏
+            , nodeTools: arr
+        };
+        //初始化部门树
+        dtree=$("#deptTree").treeview(item);
+        $("#tab1").height($(window).height() - 61);
+        $("div[title='标准分类']").find("span[title='删除']").remove();
+        $("div[title='标准分类']").find("span[title='修改']").remove();
+        if (id != undefined) {
+            var node = $("span[data-value='" + id + "']");
+            if (node != undefined && node != null) {
+                node.css({ "background-color": "#ccc" });
+                var h = node.position().top;
+                $("#deptTree").animate({ scrollTop: h });
+            }
+        }
+    }
+    @*function GetGrpTree() {
+        var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+        if (!(roleName.indexOf("集团用户") >= 0 || roleName.indexOf("省级用户") >= 0)) {
+            //$("#liGrpTree,#grpTreePanel").css("display", "inline-block");
+            $("#liGrpTree,#grpTreePanel").removeAttr("style");
+            //加载组织机构树
+            var item = {
+                height: $(window).height() - 61,
+                url: "../../RiskDatabase/HtStandard/GetGrpStandardTreeJson",
+                onnodeclick: function (item) {
+                    enCode = item.Code.split('|')[0];
+                    if (enCode == "00") enCode = "0";
+                    parentId = item.id;
+                    var $gridTable = $("#gridTable");
+                    $gridTable.jqGrid('setGridParam', {
+                        url: "../../RiskDatabase/HtStandard/GetGrpPageListJson",
+                        postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+                    }).trigger('reloadGrid');
+                    $("#add").css("display", "none");
+                    $("#export").css("display", "none");
+                }
+            };
+            //初始化部门树
+            gtree= $("#grpTree").treeview(item);
+            $("#grpTreePanel").height($(window).height() - 61);
+        }
+    }*@
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../OutsourcingProject/Safestandarditem/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true },
+               {
+                   label: '操作', name: 'Oper', index: 'Oper', width: 120, align: 'center',
+                   formatter: function (cellvalue, options, rowObject) {
+                       var html = "";
+                       if (!$("#grpTreePanel").hasClass("active")) {
+                           html = "&nbsp;&nbsp;&nbsp;<a href=javascript:editItem('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                           html += "&nbsp;&nbsp;&nbsp;<a href=javascript:delItem('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                       }
+                       return html;
+                   }
+               },
+                {
+                    label: '考核条款', name: 'name', width: 400, align: 'center' },
+               { label: '考核内容', name: 'content', width: 450, align: 'center' }
+
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 50, 100],
+            rownumbers: true,
+            sortname:'a.createdate',
+            sortorder: 'desc',
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+
+            },
+            gridComplete: function () {
+                if (!(top.currUserRoleName.indexOf("超级管理员") >= 0 || top.currUserRoleName.indexOf("公司管理员") >= 0  || top.currUserRoleName.indexOf("省级用户") >= 0)) {
+                    $gridTable.hideCol(["Oper"]);
+                    $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                }
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val(), enCode: enCode }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txtKeyword").val("");
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: "", enCode: enCode }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //新增标准
+    function add(id,code,name) {
+        dialogOpen({
+            id: "win",
+            title: "新增安全考核标准",
+            url: '/OutsourcingProject/Safestandarditem/Form?keyValue=&parentId=' + id+"&code="+code+"&parentName="+name,
+            width:"600px",
+            height: "300px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+
+    };
+    //新增标准项目
+    function addItem(id) {
+        dialogOpen({
+            id: "win",
+            title: "新增安全考核标准标准项",
+            url: '/OutsourcingProject/Safestandarditem/ItemForm?keyValue=&parentId=' + id,
+            width: "800px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+
+    };
+    //编辑
+    function edit(id,code,name) {
+       var idx= dialogOpen({
+            id: "win0",
+           title: "修改安全考核标准",
+           url: '/OutsourcingProject/Safestandarditem/Form?keyValue=' + id+"&parentName="+name,
+            width: "600px",
+            height: "300px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                $.currentIframe().window.$("#gridTable").trigger('reloadGrid');
+            }
+        });
+
+    }
+    //编辑项目
+    function editItem(id) {
+        var idx = dialogOpen({
+            id: "win0",
+            title: "修改安全考核",
+            url: '/OutsourcingProject/Safestandarditem/ItemForm?keyValue=' + id,
+            width: "800px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                $.currentIframe().window.$("#gridTable").trigger('reloadGrid');
+            }
+        });
+
+    }
+    //删除标准
+    function del(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: "../../OutsourcingProject/Safestandarditem/RemoveStandardForm",
+                param: { keyValue: keyValue },
+                msg:"确定删除吗?相关联的数据将同步删除，无法恢复！",
+                success: function (data) {
+                   // GetTree(id);
+                    $('#gridTable').jqGrid('setGridParam', {
+                        postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val(), enCode: enCode }) }, page: 1
+                    }).trigger('reloadGrid');
+                    var node = $("span[data-value='" + id + "']");
+                    if (node!=null && node!=undefined) {
+                        node.parent().parent().remove();
+                    }
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的数据！', 0);
+        }
+    }
+    //删除标准项目
+    function delItem(id) {
+            $.RemoveForm({
+                url: "../../OutsourcingProject/Safestandarditem/RemoveForm",
+                param: { keyValue: id },
+                success: function (data) {
+                    $.currentIframe().window.$("#gridTable").trigger('reloadGrid');
+                }
+            })
+    }
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入标准库',
+            url: '/OutsourcingProject/Safestandarditem/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    GetTree();
+                    $("#gridTable").jqGrid('setGridParam', {
+                        postData: { keyWord: "", accType: "", grade: "", areaid: "" }
+                    }).trigger('reloadGrid');
+                }
+
+            }
+        });
+    }
+    //function selectTree(id) {
+    //    var enCode = "XX";
+    //    if (id == "deptTree") {
+    //        var item = dtree.getCurrentNode();
+    //        if (!item) {
+    //            var data = dtree.getData();
+    //            item = !!data ? data[0] : null;
+    //        }
+    //        if (!!item && !!item.Code)
+    //            enCode = item.Code.split('|')[0];
+    //        if (enCode == "00") enCode = "0";
+    //        var $gridTable = $("#gridTable");
+    //        $gridTable.jqGrid('setGridParam', {
+    //            url: "../../RiskDatabase/HtStandard/GetPageListJson",
+    //            postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+    //        }).trigger('reloadGrid');
+    //        $("#add").css("display", "");
+    //        $("#export").css("display", "");
+    //    }
+    //    else {
+    //        var item = gtree.getCurrentNode();
+    //        if (!item) {
+    //            var data = gtree.getData();
+    //            item = !!data ? data[0] : null;
+    //        }
+    //        if (!!item && !!item.Code)
+    //            enCode = item.Code.split('|')[0];
+    //        if (enCode == "00") enCode = "0";
+    //        var $gridTable = $("#gridTable");
+    //        $gridTable.jqGrid('setGridParam', {
+    //            url: "../../RiskDatabase/HtStandard/GetGrpPageListJson",
+    //            postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+    //        }).trigger('reloadGrid');
+    //        $("#add").css("display", "none");
+    //        $("#export").css("display", "none");
+    //    }
+    //}
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <ul class="nav nav-tabs" id="ulTabs">
+                <li class="active" onclick="selectTree('deptTree')">
+                    <a data-toggle="tab" href="#tab1">安全考核标准分类</a>
+                </li>
+                @*<li id="liGrpTree" style="display:none;" onclick="selectTree('grpTree')"><a href="#grpTreePanel" data-toggle="tab">集团隐患排查标准分类</a></li>*@
+            </ul>
+            <div class="tab-content">
+                <div id="tab1" class="tab-pane active" style="height:300px;">
+                    <div id="deptTree"></div>
+                </div>
+                <div id="grpTreePanel" class="tab-pane" style="display:none;">
+                    <div id="grpTree"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title" id="pelTitle">安全考核标准</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td width="10"></td>
+                            <td>
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入考核内容进行搜索" style="width: 300px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="addItem(parentId)"><i class="fa fa-plus"></i>&nbsp;新增</a>
+                        <a id="export" class="btn btn-default" onclick="importData()"><i class="fa fa fa-download"></i>&nbsp;导入</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton();</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,223 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script src="~/Content/scripts/business/detailAgency.js"></script>
+<script>
+    //=================
+    //用户信息
+    //=================
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户ID
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Id
+    var deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";//当前用户所属部门名称
+    //页面请求参数
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var refid = request("refid");
+    var refname = request("refname");
+    $(function () {
+        keyValue = !!keyValue ? keyValue : newGuid();
+        //
+        //加载资料类别
+        //
+        GetTypeTree();
+        //
+        //创建代理
+        //
+        var detailAgc = new detailAgency({
+            keyValue: keyValue,
+            actiontype: actiontype,
+            saveParam: {
+                url: '../../NosaManage/Nosatrafiles/SaveForm'
+            }
+        });
+        //
+        //绑定页面控件
+        //
+        detailAgc.bindPageControls({
+            saveId: "btn_Save"
+        });
+        //
+        //初始化数据
+        //
+        detailAgc.initialPage([
+            {
+                url: '../../NosaManage/Nosatrafiles/GetFormJson',
+                param: { keyValue: keyValue },
+                forms: [{ Id: 'form1', dataProName: 'data.data', extData: { PubUserId: userId, PubUserName: userName, PubDepartId: deptId, PubDepartName: deptName, RefId: refid, RefName: refname } }],
+                upfiles: [{ Id: 'uploader', extensions: 'txt,doc,docx,pdf,xls,xlsx,rar,zip,ppt,pptx', actiontype: actiontype, isImage: false, fileDir: 'NosaTraFiles' }]
+            }
+        ]);
+        //
+        //定义并添加规则
+        //
+        detailAgc.addRule(new pageRule({ ruleId: 'valFile', ruleType: 'validate', onExecute: validateFile }));
+        detailAgc.addRule(new pageRule({ ruleId: 'selUser', ruleType: 'trigger', onExecute: selectUser }));
+        detailAgc.addRule(new pageRule({ ruleId: 'selMsgUser', ruleType: 'trigger', onExecute: selectMsgUser }));
+        //detailAgc.addRule(new pageRule({ ruleId: 'selEle', ruleType: 'trigger', onExecute: selectEle }));
+        detailAgc.bindTriggerRule([{ ctrlId: 'PubUserName', evtName: 'click', ruleId: 'selUser' }]);
+        detailAgc.bindTriggerRule([{ ctrlId: 'MsgUserName', evtName: 'click', ruleId: 'selMsgUser' }]);
+        //detailAgc.bindTriggerRule([{ ctrlId: 'RefName', evtName: 'click', ruleId: 'selEle' }]);
+    })
+    //
+    //加载分类树
+    //
+    function GetTypeTree() {
+        $("#RefId").ComboBoxTree({
+            url: "../../NosaManage/Nosatratype/GetTypeTreeJson",
+            height: "300px",
+            description: "==请选择==",
+            allowSearch: false
+        }).bind("change", function () {
+            var text = $(this).attr('data-Text');
+            $("#RefName").val(text);
+        });
+    }
+    //
+    //选择发布人及部门
+    //
+    function selectUser() {
+        selectMuchUser({ deptId: '', checkMode: 0, mode: 0, userIds: $("#PubUserId").val(), winObject: window.document.body, domId: 'PubUserName|0,PubUserId|2,PubDepartId|3,PubDepartName|5' });
+    }
+    //
+    //选择消息接收人
+    //
+    function selectMsgUser() {
+        selectMuchUser({
+            deptId: '', checkMode: 1, mode: 0, userIds: $("#MsgUserId").val(), winObject: window.document.body, domId: 'MsgUserName|0,MsgUserId|2',
+            callBack: function () {
+                var maxLen = 30;
+                var len = $("#MsgUserId").val().split(",").length;
+                if (len > maxLen) {
+                    dialogMsg('相关人员过多，请校正！', 3);
+                    $("#MsgUserName,#MsgUserId,#MsgDepartId,#MsgDepartName").val("");
+                }
+            }
+        });
+    }
+    //
+    //弹出窗口选择元素
+    //
+    function selectEle() {
+        return dialogOpen({
+            id: "selectEle",
+            title: "选择元素",
+            url: '/NosaManage/Nosaele/Select',
+            width: ($(top.window).width() - 250) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick({
+                    winObject: window.document.body,
+                    domId: 'RefId,RefName'
+                });
+            }
+        });
+    }
+    //
+    //验证上传文件
+    //
+    function validateFile() {
+        var r = true;
+
+        if ($("#uploader table tr:gt(0)").find(".filename,.state-complete").length == 0) {
+            dialogMsg('缺少文件！', 5);
+            r = false;
+        }
+        return r;
+    }
+</script>
+<style type="text/css">
+    .form .formTitle{width:120px;}    
+    .ui-select .ui-select-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:25px;}
+</style>
+<div class="center-Panel" style="margin-top:42px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">文件名<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="FileName" type="text" class="form-control" errormsg="文件名不能为空，" isvalid="yes" checkexpession="LenStr" length="200" />
+                        </td>
+                        <td class="formTitle">类别<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="RefId" type="selectTree" class="ui-select" isvalid="yes" errormsg="类别"  checkexpession="NotNull"></div>
+                            @*<input id="RefName" type="text" class="form-control" isvalid="yes" readonly="readonly" errormsg="元素" checkexpession="NotNull" />*@
+                            <input id="RefName" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">发布人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="PubUserName" type="text" class="form-control" errormsg="发布人" readonly="readonly" isvalid="yes" checkexpession="NotNull" />
+                            <input id="PubUserId" type="hidden" />
+                        </td>                   
+                        <td class="formTitle">发布单位（部门）<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="PubDepartName" type="text" class="form-control" readonly="readonly" errormsg="发布单位（部门）" isvalid="yes" checkexpession="NotNull" />
+                            <input id="PubDepartId" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">发布日期<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="PubDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="发布日期" style="width:120px;" />
+                        </td>
+                        <td class="formTitle">查阅次数</td>
+                        <td class="formValue">
+                            <input id="ViewTimes" type="text" class="form-control" disabled="disabled" style="width:120px;" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">相关人员</td>
+                        <td class="formValue" colspan="3">
+                            <input id="MsgUserName" type="text" class="form-control" readonly="readonly" errormsg="相关人员" checkexpession="NotNull" />
+                            <input id="MsgUserId" type="hidden" />
+                        </td>                        
+                    </tr>
+                    <tr>
+                        <td class="formTitle">文件</td>
+                        <td class="formValue" colspan="3">
+                            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:120px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="file_place" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style="top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+    </div>
+    <div id="HidMessage" style="width:360px; margin-left:20px; float:left;"></div>
+</div>

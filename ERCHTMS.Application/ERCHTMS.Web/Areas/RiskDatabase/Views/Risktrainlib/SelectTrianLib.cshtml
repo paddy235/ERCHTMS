@@ -1,0 +1,145 @@
+﻿@{
+    ViewBag.Title = "危险点管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script type="text/javascript">
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/Risktrainlib/GetPageJson",
+            datatype: "json",
+            height: $(window).height() - 160,
+            autowidth: true,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true },
+               { label: '', name: 'workareaid', hidden: true },
+               { label: '工作任务', name: 'worktask', width: 450, align: 'center' },
+               { label: '区域场所', name: 'workarea', width: 200, align: 'center', sortable: true },
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rownumWidth: 50,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            rownumbers: true,
+            sortname: 'createdate desc,id',
+            sortorder: 'desc',
+            shrinkToFit: false,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val() }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txtKeyword").val("");
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val() }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    function AcceptClick() {
+        var jqGridTable = $('#gridTable');
+        var workId = jqGridTable.jqGridRowValue('id');
+        var worktask = jqGridTable.jqGridRowValue('worktask');
+        var districtname = jqGridTable.jqGridRowValue('workarea');
+        var areaid = jqGridTable.jqGridRowValue('workareaid');
+        if (!!workId) {
+            top.Form.window.$("#TaskName").val(worktask);
+            top.Form.window.$("#TrainlibWorkId").val(workId);
+            top.Form.window.$("#AreaId").ComboBoxTree({
+                url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + top.currUserOrgId,
+                height: "300px",
+                description: "请选择",
+                allowSearch: true
+            })
+            top.Form.window.$("#AreaId").ComboBoxTreeSetValue(areaid);
+            ////区域关联
+            //$.ajax({
+            //    url: '../../RiskDatabase/Measures/GetLinkAreaById',
+            //    data: { AreaId: areaid },
+            //    dataType: "JSON",
+            //    async: false,
+            //    success: function (data) {
+            //        var area = eval(data);
+            //        if (area.length > 0) {
+            //            top.AddForm.window.$("#AreaId").ComboBoxTreeSetValue(area[0].districtid);
+            //        }
+            //    }
+            //});
+            $.ajax({
+                url: '../../RiskDatabase/Risktrainlibdetail/GetTrainLibDetail',
+                data: { workId: workId},
+                dataType: "JSON",
+                async: false,
+                success: function (data) {
+                    var d = eval(data);
+                    top.Form.window.$('#gridTable').clearGridData(false);
+                    for (var i = 0; i < d.length; i++) {
+                        var rowId = jqGridTable.jqGrid('getRowData').length + 1;
+                        top.Form.window.$('#gridTable').addRowData(rowId, { RiskContent: d[i].riskdesc, Measure: d[i].content });
+                    }
+                }
+            });
+            dialogClose();
+        }
+
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td width="10"></td>
+                            <td>
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入工作任务" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

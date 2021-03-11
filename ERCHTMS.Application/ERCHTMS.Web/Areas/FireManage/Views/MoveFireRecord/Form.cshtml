@@ -1,0 +1,187 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门ID
+    var pId = request('pId');
+    $(function () {
+        $("#MainId").val(pId);//记录父id
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../FireManage/MoveFireRecord/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+        //查看
+        if (actiontype == "view") {
+            $("#btn_Save").css("display", "none");
+            $("#btn_Submit").css("display", "none");
+            //$(".center-Panel").removeAttr("style");
+            $(".form-button").css("display", "none");
+            $("#form1 input,textarea,select , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        } else if (actiontype == "start") {
+            $("#endDiv").hide();
+            $("#WorkEndDate").attr("isvalid","no");
+        } else if (actiontype == "end") {
+            $("#jbxxDiv input,textarea,select , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+            $("#WorkEndDate").val("@DateTime.Now.ToString("yyyy-MM-dd HH:mm")");
+            $("#WorkRegisterUser").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName");
+            $("#WorkRegisterUserId").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId");
+        } else { }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var StartTime = $("#ExecuteStartDate").val();
+        var EndTime = $("#ExecuteEndDate").val();
+        if (new Date(StartTime.replace("-", "/").replace("-", "/")) > new Date(EndTime.replace("-", "/").replace("-", "/"))) {
+            dialogMsg('批准工作开始时间不可大于结束时间！', 0);
+            return false;;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        $.SaveForm({
+            url: "../../FireManage/MoveFireRecord/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                //$.currentIframe().$("#gridTable").trigger("reloadGrid");
+                top.Form.$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    function selectUser(options) {
+        var deptCode = options.deptCode == undefined ? "" : options.deptCode;
+        return dialogOpen({
+            id: "User",
+            title: "选择用户",
+            url: '/BaseManage/User/Select?deptId=' + options.deptId + "&checkMode=" + options.checkMode + "&mode=" + options.mode + "&deptCode=" + deptCode + "&userIds=" + options.userIds + "&deptIds=" + deptId,
+            width: ($(top.window).width() - 200) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(options);
+            }
+        });
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    
+</div>
+<div style="margin-left: 10px; margin-right: 10px;">
+    <div class="tab-content" style="padding-top: 15px;">
+        <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px;">
+            <div class="center-Panel" id="jbxxDiv">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;基本信息</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table class="form">
+                            <tr>
+                                <td class="formTitle">工作票号<font face="宋体">*</font></td>
+                                <td class="formValue">
+                                    <input id="MainId" type="hidden" />
+                                    <input id="WorkTicket" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                                <td class="formTitle">工作单位<font face="宋体">*</font></td>
+                                <td class="formValue">
+                                    <input id="WorkUnitCode" type="hidden" class="form-control" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode" />
+                                    <input id="WorkUnit" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDept('', 0, 0, '责任部门', document.body, 'Dutydept,DutydeptCode')" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">批准工作时间<font face="宋体">*</font></td>
+                                <td class="formValue">
+                                    <input id="ExecuteStartDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" isvalid="yes" checkexpession="NotNull" style="width:200px;" />
+                                </td>
+                                <td class="formTitle" style="text-align:center;">至</td>
+                                <td class="formValue">
+                                    <input id="ExecuteEndDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" isvalid="yes" checkexpession="NotNull" style="width:200px;" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">工作地点<font face="宋体">*</font></td>
+                                <td class="formValue">
+                                    <input id="WorkSite" type="text" class="form-control" />
+                                </td>
+                                <td class="formTitle">动火负责人<font face="宋体">*</font></td>
+                                <td class="formValue">
+                                    <input id="DutyUserId" type="hidden" />
+                                    <input id="DutyUser" type="text" class="form-control" readonly onclick="javascript:selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'DutyUser,,DutyUserId,,,,'});" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">动火执行人<font face="宋体">*</font></td>
+                                <td class="formValue" colspan="3">
+                                    <input id="ExecuteUserId" type="hidden" />
+                                    <input id="ExecuteUser" type="text" class="form-control" readonly 
+                                           @*onclick="javascript:selectUser({ deptId: '', checkMode: 1, mode: 0, winObject: window.document.body, domId: 'ExecuteUser,,ExecuteUserId,,,,'});"*@ 
+                                           onclick="selectUser({ deptId: '', userIds: 'dh', checkMode: 1, mode: 2, winObject: window.document.body, domId: 'ExecuteUser,,ExecuteUserId' });"
+                                           isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">登记人<font face="宋体">*</font></td>
+                                <td class="formValue">
+                                    <input id="RegisterUser" type="text" class="form-control" readonly value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"/>
+                                    <input id="RegisterUserId" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"/>
+                                </td>
+                                <td class="formTitle">登记时间<font face="宋体">*</font></td>
+                                <td class="formValue">
+                                    <input id="RegisterDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" isvalid="yes" checkexpession="NotNull" disabled="disabled" />
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="center-Panel" id="endDiv">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;动火结束记录</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table class="form">
+                            <tr>
+                                <td class="formTitle" style="width:120px;">动火工作结束时间<font face="宋体">*</font></td>
+                                <td class="formValue">
+                                    <input id="WorkEndDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                                <td class="formTitle">登记人<font face="宋体">*</font></td>
+                                <td class="formValue">
+                                    <input id="WorkRegisterUser" type="text" class="form-control" readonly />
+                                    <input id="WorkRegisterUserId" type="hidden" />
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

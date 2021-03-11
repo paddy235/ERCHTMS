@@ -1,0 +1,327 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+;
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户id
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var orgid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";  //部门信息
+    var state = 0;
+    var qtype = request('qtype');//首页代办
+    var examinetodeptid = "";
+    //var fivetype = request('fivetype'); // 检查类型
+    //var istopcheck = request('istopcheck'); // 0:上级公司检查 1：公司安全检查
+    var istype = request('istype'); // 0: 整改  1：验收
+    var seleids;
+    $(function () {
+        //qtype = '1'; //测试代办
+        InitialPage();
+        GetGrid();
+        GetTree();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#schemeTitle').html(istype == "0" ? "检查问题整改" : "检查问题验收");
+        if (istype == "1") {
+            $('#plys').show();
+        } else {
+            $('#plys').hide();
+        }
+        $('#layout').layout({
+           applyDemoStyles: false,
+            onresize: function () {
+               $(window).resize();
+             }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            qtype: qtype,
+            istype: istype
+        };
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../HiddenTroubleManage/Fivesafetycheckaudit/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                        if (istype == "0" && rowObject.actionresult != "0" && UserId == rowObject.dutyuserid) {
+                            html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='" + (istype == "0" ? "整改" : "验收") + "'><i class='fa fa-check'></i></a>&nbsp;";
+                        } else if (istype == "1" && rowObject.actionresult == "0" && rowObject.acceptreuslt != "0" && UserId == rowObject.acceptuserid) {
+                            html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='" + (istype == "0" ? "整改" : "验收") + "'><i class='fa fa-check'></i></a>&nbsp;";
+                        } 
+                        
+                        return html;
+                    }
+                },
+                {
+                    label: '流程状态', name: 'auditresult', index: 'auditresult', align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var content = "";
+                        if (rowObject.actionresult == "1" || rowObject.actionresult == null || rowObject.actionresult == '') {
+                            content = "整改中";
+                        } else {
+                            if (rowObject.acceptreuslt == 0) {
+                                content = "已验收";
+                            } else if (rowObject.acceptreuslt == 1) {
+                                content = "整改中";
+                            } else {
+                                content = "验收中";
+                            } 
+                        }
+
+                        return content;
+
+                    }
+                },
+                { label: '发现问题', name: 'findquestion', index: 'findquestion', width: 250, align: 'center', sortable: true },
+                { label: '整改措施', name: 'actioncontent', index: 'actioncontent', align: 'center', sortable: true },
+                { label: '责任部门/单位', name: 'dutydept', index: 'dutydept', align: 'center', sortable: true },
+                { label: '责任人', name: 'dutyusername', index: 'dutyusername', align: 'center', sortable: true },
+                { label: '要求完成时间', name: 'finishdate', index: 'finishdate', align: 'center', sortable: true },
+                { label: '验收人', name: 'acceptuser', index: 'acceptuser', align: 'center', sortable: true },
+                {
+                    label: '整改完成情况', name: 'actionresult', index: 'actionresult', align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var content = "";
+                        if (cellvalue == "0") {
+                            content = "已完成";
+                        } else if (cellvalue == "1") {
+                            content = "未完成";
+                        }
+
+                        return content;
+
+                    }
+                },
+                { label: '实际完成时间', name: 'actualdate', index: 'actualdate', align: 'center', sortable: true },
+                {
+                    label: '验收意见', name: 'acceptreuslt', index: 'acceptreuslt', align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var content = "";
+                        if (cellvalue == "0") {
+                            content = "通过";
+                        } else if (cellvalue == "1") {
+                            content = "未通过";
+                        }
+
+                        return content;
+
+                    }
+                },
+                { label: '备注', name: 'beizhu', index: 'beizhu', align: 'center', sortable: true },
+                { label: 'dutyuserid', name: 'dutyuserid', hidden: true },
+                { label: 'acceptuserid', name: 'acceptuserid', hidden: true }
+
+
+            ],
+            onSelectRow: function () {
+                //selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                seleids += seleids + ",";
+            },
+            onSelectAll: function (aRowids, status) {
+                //seleids = 
+                $(aRowids).each(function (i, item) {
+                    
+                });
+                $("#lblselect").html("已选中用户(" + $("#users").find("input:checked").length + "人)");
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            //multiselect: istype == 1 ? true : false,
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+
+            var queryJson = {
+                keyword: $("#txt_Keyword").val(),
+                examinetodeptid: examinetodeptid,
+                qtype: qtype,
+                istype: istype
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 1,
+                Ids: orgid
+            }
+        );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                console.log(item);
+                examinetodeptid = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        //window.setTimeout(function () {
+        //    $('#gridTable').setGridHeight($('.west-Panel').height() - $('.titlePanel').height() - $('.toolbar').height() - 70.5);
+
+        //}, 500);
+    }
+
+    function show(id, issaved) {
+        var title = "检查问题整改";
+        if (istype == "0") {
+            title = "检查问题整改";
+        } else {
+            title = "检查问题验收";
+        }
+        var url = '/HiddenTroubleManage/Fivesafetycheckaudit/Form?action=view&recid=' + id + "&istype=" + istype;
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: title,
+                url: url,
+                width: '950px',
+                height: '600px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //整改或者验收
+    function btn_edit(id) {
+        var title = "检查问题整改";
+        if (istype == "0") {
+            title = "检查问题整改";
+        } else {
+            title = "检查问题验收";
+        }
+        var url = '/HiddenTroubleManage/Fivesafetycheckaudit/Form?action=edit&recid=' + id + "&istype=" + istype;
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: title,
+                url: url,
+                width: '950px',
+                height: '600px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    // 组织机构查询所有
+    function selectAll() {
+        examinetodeptid = "";
+        $('#btn_Search').trigger("click");
+    }
+
+    // 批量验收
+    function CheckNum() {
+        var ids = $("#gridTable").getGridParam('selarrrow');
+        var idsstr = '';
+        if (ids.length > 0) {
+            $.each(ids, function (i, dom) {
+                if (i == 0) {
+                    idsstr = dom;
+                } else {
+                    idsstr += ',' + dom;
+                }
+            });
+
+            var dlg = dialogConfirm("确定执行批量验收吗？", function (isSure) {
+                if (isSure) {
+                    $.SaveForm({
+                        url: "../../HiddenTroubleManage/Fivesafetycheckaudit/CheckNumAudit?keyValueids=" + idsstr,
+                        param: { queryJson: idsstr },
+                        loading: "正在保存数据...",
+                        success: function () {
+                            $("#gridTable").trigger("reloadGrid");
+
+
+                        }
+                    })
+                }
+
+            });
+        } else {
+            dialogAlert("请选择验收的数据！", 2);
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a href="javascript:void(0);" onclick="selectAll();">组织机构树</a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title" id="schemeTitle"></div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar" style="margin-left:10px; margin-bottom:5px;">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        @*<a class="btn btn-default" id="plys" onclick="CheckNum()"><i class="fa fa-refresh"></i>批量验收</a>*@
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

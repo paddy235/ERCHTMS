@@ -1,0 +1,122 @@
+﻿@{
+    ViewBag.Title = "KScoreResult";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+
+<script>
+    var planid = request('planid');//计划id
+    var smallchaperid = request('smallchaperid');//小项节点id
+    var chaperid = request('chaperid');//大项节点id
+    var username = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    var win = top.ScoreForm.window;
+
+    $(function () {
+        initControl();
+    });
+
+    //初始化控件
+    function initControl() {
+        $("#CreateUserName").val(username);
+        $.ajax({
+            url: '../../AssessmentManage/KScoreDetail/GetChaperInfo',
+            data: { chaperid: smallchaperid },
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                if (data != null || data != undefined) {
+                    $("#sp1").html(data.Content);
+                    $("#sp2").html(data.ScoreRule);
+                    $("#normscore").val(data.Score);
+                }
+            }
+        });
+
+        //获取表单
+        if (!!smallchaperid) {
+            $.SetForm({
+                url: "../../AssessmentManage/KScoreDetail/GetFormJson",
+                param: { planid: planid, smallchaperid: smallchaperid },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if (parseInt($("#kScore").val()) > parseInt($("#normscore").val())) {
+            dialogMsg('扣分分值不能大于标准分值！', 0);
+            $("#kScore").val(0);
+            return false;
+        }
+        else if (parseInt($("#kScore").val()) < 0) {
+            dialogMsg('扣分分值不能为负数！', 0);
+            $("#kScore").val(0);
+            return false;
+        }
+        var postData = $("#form1").formSerialize("");
+        $.SaveForm({
+            url: "../../AssessmentManage/KScoreDetail/SaveForm?planid=" + planid + "&smallchaperid=" + smallchaperid,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                win.initControl(chaperid);
+                win.linkButton(chaperid);
+            }
+        })
+    }
+</script>
+<div style="margin: 0px; margin-top: 20px; background-color: white; margin-left: 20px;margin-right:20px;">
+    <div class="panel panel-default">
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">考评内容</td>
+                    <td class="formValue" colspan="3">
+                        <span id="sp1"></span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">评分细则</td>
+                    <td class="formValue" colspan="3">
+                        <span id="sp2"></span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">标准分值</td>
+                    <td class="formValue">
+                        <input id="normscore" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" style="width:150px;" readonly />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">扣分分值<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="kScore" type="text" class="form-control" isvalid="yes" checkexpession="NumNotNull"  style="width:150px;"  />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">扣分原因<font face="宋体">*</font></td>
+                    <td class="formValue" colspan='3'>
+                        <textarea id="kScoreReason" class="form-control" isvalid="yes" checkexpession="NotNull" style="min-height: 120px;"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">整改措施</td>
+                    <td class="formValue" colspan='3'>
+                        <textarea id="Measure" class="form-control" style="min-height: 120px;"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">操作人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CreateUserName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" style="width:150px;" readonly />
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>

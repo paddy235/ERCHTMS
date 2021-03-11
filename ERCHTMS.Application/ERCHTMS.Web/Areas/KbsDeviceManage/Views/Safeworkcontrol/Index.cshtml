@@ -1,0 +1,417 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+<link type="text/css" rel="stylesheet" href="~/Content/styles/kbscss/common.css">
+<link type="text/css" rel="stylesheet" href="~/Content/styles/kbscss/dilog.css">
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+<style type="text/css">
+    .btndiv {
+        float: left;
+        width: 95px;
+        height: 29px;
+        background: inherit;
+        border: none;
+        border-radius: 14px;
+        -moz-box-shadow: none;
+        -webkit-box-shadow: none;
+        box-shadow: none;
+        font-weight: 400;
+        font-style: normal;
+        font-size: 14px;
+        color: rgb(67, 67, 67);
+        text-align: center;
+        line-height: 25px;
+        cursor: pointer;
+    }
+
+    .activebtndiv {
+        float: left;
+        width: 95px;
+        height: 29px;
+        background: inherit;
+        background-color: rgba(24, 144, 255, 1);
+        border: none;
+        border-radius: 14px;
+        -moz-box-shadow: none;
+        -webkit-box-shadow: none;
+        box-shadow: none;
+        font-weight: 400;
+        font-style: normal;
+        font-size: 14px;
+        color: #FFFFFF;
+        text-align: center;
+        line-height: 25px;
+    }
+</style>
+
+
+<script>
+
+    var selectType = "";
+    var selectStatus = "";
+    var deptCode = "";
+    var LevelName = request('LevelName');
+    var AreaCode = request('AreaCode');
+    var State = request('State');
+
+
+    $(function () {
+        GetTree();
+        InitialPage();
+        GetGrid();
+        GetWorkType();
+    });
+
+
+
+
+    //加载组织机构树 
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 400
+            }
+        );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                deptCode = item.Code;
+                f_search();
+                //$('#btn_Search').trigger("click"); 
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 277);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    //获取作业类型
+    function GetWorkType() {
+        var url = top.contentPath + "/KbsDeviceManage/Safeworkcontrol/GetSafeworkItemJson";
+        $.post(url, { itemcode: "SafeWorkType" }, function (data) {
+            var list = eval("(" + data + ")")
+            var html = "<div class=\"btndiv\" style=\"font-weight: bold; width: 86px; cursor: default\">作业类型:</div>";
+            html += "<div id=\"qb\" class=\"activebtndiv\" onclick=\"SelectFun('qb', 'status')\" svalue=\"\">全部</div>";
+            for (var i = 0; i < list.length; i++) {
+                html += "<div id='" + list[i].Key + "' class=\"btndiv\" onclick=\"SelectFun('" + list[i].Key + "', 'status')\" svalue='" + list[i].itemValue + "'>" + list[i].itemName + "</div>";
+            }
+            $("#status").html(html);
+        });
+    }
+
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 277);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //加载是否超标数据
+        $("#Status").ComboBox({
+            url: top.contentPath + "/CarManage/Carinfo/GetCarInfo?name=作业风险等级",
+            id: "itemValue",
+            text: "itemName",
+            height: '100px',
+            description: "==请选择==",
+            allowSearch: true
+        });
+
+    }
+
+    //延期
+    function pass(id) {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '延期',
+            url: '/KbsDeviceManage/Safeworkcontrol/Form?action=edit&&keyValue=' + id,
+            width: '600px',
+            height: '800px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        })
+    };
+    //结束
+    function endpass(id) {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '结束',
+            url: '/KbsDeviceManage/Safeworkcontrol/Form?action=endtime&&keyValue=' + id,
+            width: '600px',
+            height: '800px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        })
+    }
+
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            selectStatus: selectStatus,
+            startTime: $("#StartTime").val(),
+            endTime: $("#EndTime").val(),
+            AreaCode: AreaCode,
+            Search: $("#txt_Keyword").val(),
+            LevelName: LevelName,
+            State: State
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 277,
+            url: "../../KbsDeviceManage/Safeworkcontrol/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                {
+                    label: '操作', name: 'id', width: 100, align: 'center', sortable: false, hidden: false, formatter: function (cellvalue, options, rowObject) {
+
+                        var html = "";
+                        if (!rowObject.actualendtime) {
+                            html = "<a style=\"color: blue;\" href='javascript:pass(\"" + rowObject.id + "\")'> 延期 </a>";
+                            html += "<a style=\"color: blue;\" href='javascript:endpass(\"" + rowObject.id + "\")'> 结束 </a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '主键', name: 'id', index: 'id', width: 250, align: 'center', hidden: true, sortable: false },
+                { label: '工作票编号', name: 'workno', index: 'workno', width: 250, align: 'center', sortable: false },
+                { label: '作业名称', name: 'taskname', index: 'taskname', width: 250, align: 'center', sortable: false },
+                { label: '作业类型', name: 'tasktype', index: 'tasktype', width: 120, align: 'center', sortable: true },
+                { label: '工作负责人', name: 'taskmanagename', index: 'taskmanagename', width: 120, align: 'center', sortable: true },
+                { label: '作业区域', name: 'taskregionname', index: 'taskregionname', width: 250, align: 'center', sortable: true },
+                { label: '部门/班组', name: 'deptname', index: 'deptName', width: 200, align: 'center', sortable: true },
+                { label: '风险等级', name: 'dangerlevel', index: 'dangerlevel', width: 120, align: 'center', sortable: true },
+                { label: '许可开始时间', name: 'actualstarttime', index: 'actualstarttime', width: 200, align: 'center', sortable: true },
+                {
+                    label: '工作结束时间', name: 'actualendtime', index: 'actualendtime', width: 200, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue)
+                            return cellvalue;
+                        else {
+                            if (new Date(rowObject.planendtime) < new Date())
+                                return rowObject.planendtime;
+                            else
+                                return "";
+                        }
+
+                    }
+                },
+
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                btn_show();
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+    }
+
+    function SelectFun(id, pid) {
+        var div = $("#" + pid).children('div');
+        for (var i = 0; i < div.length; i++) {
+            var ids = div.eq(i).attr("id");
+            if (ids != "undefined") {
+                $("#" + ids).removeClass();
+                if (id == ids) {
+                    $("#" + ids).addClass("activebtndiv");
+                } else {
+                    $("#" + ids).addClass("btndiv");
+                }
+            }
+        }
+        if (pid == "status") {
+            selectStatus = $("#" + id).attr("sValue");
+        } else {
+            selectType = $("#" + id).attr("sValue");
+        }
+        f_search();
+    }
+
+    //查看
+    function btn_show() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看',
+                url: '/KbsDeviceManage/Safeworkcontrol/Form?action=show&&keyValue=' + keyValue,
+                width: '600px',
+                height: '800px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+
+
+    //查询
+    function f_search() {
+        var queryJson = {
+            selectStatus: selectStatus,
+            startTime: $("#StartTime").val(),
+            endTime: $("#EndTime").val(),
+            deptCode: deptCode,
+            Search: $("#txt_Keyword").val(),
+            LevelName: $("#Status").attr('data-value')
+        }
+        $("#gridTable").setGridParam({ url: top.contentPath + "/KbsDeviceManage/Safeworkcontrol/GetPageListJson" });
+        $("#gridTable").setGridParam({ datatype: 'json', page: 1 })
+            .jqGrid('setGridParam', { page: 1, postData: { queryJson: JSON.stringify(queryJson) } })
+            .trigger("reloadGrid");
+    }
+    //导出数据
+    function exp() {
+
+    }
+
+    function add() {
+        dialogOpen2({
+            id: 'Edit',
+            title: '新增作业',
+            url: '@Url.Action("Edit")',
+            width: '800px',
+            height: '900px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+
+
+</script>
+
+
+
+
+<div class="main">
+    <div class="main_top">
+        <div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+            <div class="ui-layout-west">
+                <div class="west-Panel">
+                    <div class="panel-Title">
+                        <div class="col-md-10">
+                            部门
+                        </div>
+                        <div class="col-md-2 text-right" style="padding-right: 8px;">
+                            <i class="fa fa-arrow-left" style="cursor: pointer;" title="展开/收起"></i>
+                        </div>
+                    </div>
+                    <div id="itemTree"></div>
+                </div>
+            </div>
+            <div class="ui-layout-center">
+                <div class="center-Panel" style="height: 125px;">
+                    <div style="margin-top: 5px;">
+                        <div class="row">
+                            <div style="padding-top:18px; " class="col-md-12">
+                                <table>
+                                    <tr>
+                                        <td style="padding-left: 10px; font-weight: bold;">时间：</td>
+                                        <td style="width: 186px;">
+                                            <input id="StartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm'})">
+                                        </td>
+                                        <td style="padding-left: 10px" class="area">-</td>
+                                        <td style="width: 186px;" class="area">
+                                            <input id="EndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })">
+                                        </td>
+                                        <td style="padding-left: 10px; font-weight: bold;">风险等级：</td>
+                                        <td>
+                                            <div id="Status" style="width: 200px;" type="select" class="ui-select"></div>
+                                        </td>
+
+
+                                    </tr>
+                                </table>
+                            </div>
+                            <div style="padding-top: 27px;" id="status" class="col-md-12">
+                            </div>
+                        </div>
+                        <div class="row" style="margin-top: 5px; margin-bottom: 5px;">
+                            <div id="type" class="col-md-12">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="center-Panel">
+                    <div class="titlePanel">
+                        <div class="title-search">
+                            <table>
+                                <tr>
+                                    <td>
+                                        <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                    </td>
+                                    <td style="padding-left: 5px;">
+                                        <a id="btn_Search" class="btn btn-primary" onclick="f_search()"><i class="fa fa-search"></i>搜索</a>
+                                        <a id="btn_SearchAll" onclick="reload()"  class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                @*<a id="search" class="btn btn-default" onclick="f_search()"><i class="fa fa-refresh"></i>刷新</a>*@
+                                <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i> 新增</a>
+                                <a id="exp" class="btn btn-default" onclick="exp()"><i class="fa"></i>导出</a>
+                            </div>
+                        </div>
+                        <script>$('.toolbar').authorizeButton()</script>
+                    </div>
+                    <div class="gridPanel">
+                        <table id="gridTable"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="~/Content/scripts/kbsjs/dilog.js"></script>
+

@@ -1,0 +1,1520 @@
+﻿@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+    var recid = request('recid');
+    var rqaction = request('action');
+    var belongdeptid = request('belongdeptid');
+    var ctype = request('ctype');
+    var cname = request('cname');
+    var zj = request('zj');//存在的时候显示的是制定检查计划，不存在的时候显示的是登记检查结果
+    var selectedRowIndex = 0;
+    var dataRows = [];//返回的所有的选中风险点的IDs
+    var ts = "专项安全检查"
+    var choose = 0;//1：选择现有检查表-2：现在部门检查表,保存后需要重新生成一张新的检查表
+    var isEdit = true;
+    var isShow = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("IsShowCheckContent").Trim())";
+
+    var matrixid = request('matrixid');  // 矩阵安全检查id 2021/01/23
+    var matrixtime = '';  //矩阵安全检查时间
+    $(function () {
+        if (isShow.length > 0) {
+            $(".hidecontent").hide();
+        }
+        //设置title
+        if (cname != "") ts = cname;
+        $("#showTitle").html("&nbsp;&nbsp;" + ts);
+        //安全检查类型
+        $("#CheckDataType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "SaftyCheckType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        //安全检查级别
+        $("#CheckLevel").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "SaftyCheckLevel" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        initControl();
+        GetGrid();
+
+        GetMatrixInfo();// 获取矩阵安全检查基本信息
+    });
+
+    // 获取矩阵安全检查基本信息 2021/01/23 
+    function GetMatrixInfo() {
+        if (matrixid != "" && matrixid != null) {
+            $.SetForm({
+                url: "../../HiddenTroubleManage/Matrixsafecheck/GetFormJson",
+                param: { keyValue: matrixid },
+                success: function (data) {
+                    //console.log("获取矩阵安全检查基本信息");
+                    //console.log(data);
+                    if (data != null) {
+                        $('#Remark').val(data.CONTENT);
+                        $('#CheckBeginTime').val(data.CHECKTIME.substr(0, 10));
+                        $('#CheckEndTime').val(data.CHECKTIME.substr(0, 10));
+                        matrixtime = data.CHECKTIME.substr(0, 10);
+                        $('#CheckDept').val(data.CHECKDEPTNAME);
+                        $('#CheckDeptID').val(data.CHECKDEPTCODE);
+                        $('#DeptId').val(data.CHECKDEPT);
+                        $('#CheckUsers').val(data.CHECKUSERNAME);
+                        $('#CheckLevelID,#CheckUserIds').val(data.CHECKUSERCODE);
+                        $('#CheckDeptCode').val(data.CHECKUSERDEPT);
+                    }
+
+                }
+            });
+        }
+
+    }
+
+    //初始化控件
+    function initControl() {
+        $("#CheckDataType").ComboBoxSetValue(ctype);
+        //获取表单
+        if (!!recid) {
+            $.SetForm({
+                url: "../../SaftyCheck/SaftyCheckDataRecord/GetFormJson",
+                param: { keyValue: recid },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.CheckLevel == "0") {
+                        $("#CheckLevel").ComboBoxSetValue(data.SJCheckLevel);
+                    }
+                    if (data.IsSkip!=null) {
+                        if (data.IsSkip == 0) {
+                            document.getElementById("IsSkip1").checked = true;
+                        } else {
+                            document.getElementById("IsSkip2").checked = true;
+                        }
+                    }
+                    if (data.IsAuto!=null) {
+                        if (data.IsAuto == 0) {
+                            document.getElementById("IsAuto1").checked = true;
+                        } else {
+                            document.getElementById("IsAuto2").checked = true;
+                            if (data.SelType == 0) {
+                                document.getElementById("SelType1").checked = true;
+                                $(".days").show();
+                            }
+                            if (data.SelType == 1) {
+                                document.getElementById("SelType2").checked = true;
+                                $(".thweeks").show();
+
+                            }
+                            $(".autotype,.sx").show();
+                            if (data.AutoType == 0) {
+                                $(".days,.thweeks,.weeks,.rounds").hide();
+                            }
+                            if (data.AutoType == 1) {
+                                $(".weeks,.rounds").show(); $(".days,.thweeks").hide();
+                                if (data.Weeks != null) {
+                                    $(".weeks").find("input:checkbox").each(function (i, dom) {
+                                        if (data.Weeks.indexOf($(dom).val()) >= 0) {
+                                            dom.checked = true;
+                                        }
+                                    });
+                                }
+                            }
+                            if (data.AutoType == 2) {
+                                $(".seltype,.months,.rounds").show();
+                                if (data.ThWeeks != null) {
+                                    $(".thweeks").find("input:checkbox").each(function (i, dom) {
+                                        if (("," + data.ThWeeks + ",").indexOf("," + $(dom).val() + ",") >= 0) {
+                                            dom.checked = true;
+                                        }
+                                    });
+                                }
+                                if (data.Months != null) {
+                                    $(".months").find("input:checkbox").each(function (i, dom) {
+                                        if (("," + data.Months + ",").indexOf("," + $(dom).val() + ",") >= 0) {
+                                            dom.checked = true;
+                                        }
+                                    });
+                                }
+                                if (data.Days != null) {
+                                    $(".days").find("input:checkbox").each(function (i, dom) {
+                                        if (("," + data.Days + ",").indexOf("," + $(dom).val() + ",") >= 0) {
+                                            dom.checked = true;
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+        } else {
+            $("#Export").attr("disabled", "disabled");
+        }
+
+        if (rqaction == "view") {
+            $(".btn10").remove();
+            $("#Choose").attr("disabled", "disabled");
+            //$("#ChooseDept").attr("disabled", "disabled");
+            disabledControl();
+            var users=","+$("#CheckUserIds").val()+",";
+            if (users.indexOf("," + top.currUserAccount + ",") >= 0 || top.currUserRoleName.indexOf("厂级部门用户") >= 0) {
+                isEdit = true;
+            } else {
+                isEdit = false;
+            }
+           
+        }
+        $(".weeks,.thweeks,.months,.seltype,.sx,.days").find("input").bind("click", function () {
+          
+            getDisplay();
+        });
+        //设置检查级别默认值
+        if (rqaction == "add")//新增默认检查名称为时间+日常检查
+        {
+            if (top.window.currUserRoleName.indexOf("公司")>=0 || top.window.currUserRoleName.indexOf("厂级")>=0) {
+                $("#CheckLevel").ComboBoxSetValue(1);
+            }
+            else if (top.window.currUserRoleName.indexOf("班组")>=0) {
+                $("#CheckLevel").ComboBoxSetValue(4);
+            }
+            else if (top.window.currUserRoleName.indexOf("部门")>=0) {
+            $("#CheckLevel").ComboBoxSetValue(2);
+        }
+        recid = newGuid();
+
+        }
+        file_upload.init({
+            keyValue: recid, extensions: '', isImage: false, el: '#uploader', extensions: 'doc,docx,pdf,png,jpg,jpeg', fileSingleSizeLimit: 500 * 1024 * 1024
+        });
+        file_upload.bindFiles(isEdit, false, recid, "uploader", isEdit);
+    }
+    function setStatus(obj, mode) {
+        if (mode==0) {
+            top.window.$("#divUsers").find(".chkUser").each(function (i,dom) {
+                this.checked = obj.checked;
+            });
+        }
+        if (mode == 1) {
+            top.window.$("#divUsers").find(".chkUser").each(function (i, dom) {
+                this.checked = !this.checked;
+            });
+        }
+    }
+    function setStatus(obj, mode) {
+        if (mode == 0) {
+            top.window.$("#divUsers").find(".chkUser").each(function (i, dom) {
+                this.checked = obj.checked;
+            });
+        }
+        if (mode == 1) {
+            top.window.$("#divUsers").find(".chkUser").each(function (i, dom) {
+                this.checked = !this.checked;
+            });
+        }
+    }
+    function selCheckUsers(objId, obj, mode) {
+        if ($("#CheckLevelID").val().length == 0 || $("#CheckManageManID").val().length == 0) {
+             dialogMsg('请先选择检查组长和检查成员信息！', 0);
+             return false;
+        }
+        var uIds = $("#CheckLevelID").val() + "," + $("#CheckManageManID").val();
+        $.post("../../BaseManage/User/GetUserJson", { UserIDs: uIds }, function (data) {
+            var html = "";
+            html += "<div style='padding:20px;' id='divUsers'><table style='width:95%' cellpadding='0' cellspacing='0' class='table1' border='1'><tr><td style='width:20%;font-weight:bold;text-align:center;'>检查人员</td><td style='width:60%;font-weight:bold;text-align:center;'>部门</td><td style='width:20%;font-weight:bold;text-align:center;'><input type='checkbox' id='chkAll' style='width:25px;height:25px;' title='全选或全不选' onclick=\"top.window.frames['Details'].window.setStatus(this,0)\" /><label for='chkAll'></label></td></tr>";
+            //var names = top.Details.window.$("#CheckUsers").val().split(',');
+            var val = $("input[stid='" + objId + "']").attr("uid");
+            var names = $("#CheckUsers").val().split(',');
+            var accounts = $("#CheckLevelID").val().split(',');
+            var codes = $("#CheckDeptCode").val().split(',');
+            if ($("#CheckManageMan").val().length > 0) {
+                if ($.inArray($("#CheckManageMan").val(), names) < 0) {
+                    names.push($("#CheckManageMan").val());
+                    accounts.push($("#CheckManageManID").val());
+                    codes.push($("#AllotDept").val());
+                }
+            }
+            var json = $.parseJSON(data);
+            $(json).each(function (j, item) {
+                html += "<tr><td style='text-align:center;'>" + item.realname + "</td><td style='text-align:center;'>" + item.deptname + "</td><td style='text-align:center;'><input type='checkbox' class='chkUser' value='" + item.account + "' style='width:25px;height:25px;' id='chk" + j + "' code='" + item.deptcode + "' name='" + item.realname + "'";
+                if (val != undefined) {
+                    if (val.indexOf(item.account) >= 0) {
+                        html += " checked='true'";
+                    }
+                }
+                html += " /></td></tr></div>";
+
+            });
+            html += "</table></div>";
+            var dlg = dialogContent({
+                id: "seluser",
+                content: html,
+                title: "选择检查人员",
+                width: "600px",
+                height: "500px",
+                callBack: function (iframeId) {
+                    var arr = top.window.$("#divUsers").find("input:checked[code]");
+                    if (arr.length == 0) {
+                        dialogMsg("请选择人员！", 0);
+                    } else {
+                        var users = "";
+                        var codes = "";
+                        var accounts = "";
+                        $(arr).each(function (j, dom) {
+                            users += $(dom).attr("name") + ",";
+                            accounts += $(dom).val() + ",";
+                            codes += $(dom).attr("code") + ",";
+                        });
+                        if (users.length > 0) {
+                            users = users.substring(0, users.length - 1);
+                            codes = codes.substring(0, codes.length - 1);
+                            accounts = accounts.substring(0, accounts.length - 1);
+                        }
+                        if(mode==0){
+                             $("input[stid='" + objId + "']").val(users);
+                             $("input[stid='" + objId + "']").attr("uid",accounts);
+                             $("input[stid='" + objId + "']").attr("ucode",codes);
+                         } else {
+                            $(obj).val(users);
+                            $(obj).attr("uid",accounts);
+                            $(obj).attr("ucode",codes);
+                        }
+                        top.layer.close(dlg);
+                    }
+                }
+            });
+
+        });
+
+        //var html = "<div style='padding:10px;'><input type='checkbox' id='chkAll' onclick=\"top.window.frames['Details'].window.setStatus(this,0)\" /><label for='chkAll'>全选/全不选</label></div>";
+        //html += "<div style='padding:20px;' id='divUsers'>";
+        //var names = $("#CheckUsers").val().split(',');
+        //var accounts = $("#CheckLevelID").val().split(',');
+        //var codes = $("#CheckDeptCode").val().split(',');
+        //if ($("#CheckManageManID").val().length > 0) {
+        //    if ($.inArray($("#CheckManageManID").val(), accounts) < 0) {
+        //        names.push($("#CheckManageMan").val());
+        //        accounts.push($("#CheckManageManID").val());
+        //    }
+        //    codes.push($("#AllotDept").val());
+        //}
+        //$(names).each(function (j, name) {
+        //    var account = accounts[j];
+
+        //    html += "<div><input type='checkbox' class='chkUser' value='" + account + "' id='chk" + j + "' code='" + codes[j] + "' name='" + name + "'";
+        //    if ($(obj).attr("uid")!=undefined) {
+        //        if ($(obj).attr("uid").indexOf(account) >= 0) {
+        //            html += " checked='true'";
+        //        }
+        //    }
+        //    html += " /><label for='chk" + j + "'>" + name + "</label></div>";
+        //});
+        //html += "</div>";
+        //var dlg=dialogContent({
+        //    id: "seluser",
+        //    content: html,
+        //    title: "选择检查人员",
+        //    width: "300px",
+        //    height: "500px",
+        //    callBack: function (iframeId) {
+        //        var arr=top.window.$("#divUsers").find("input:checked");
+        //        if (arr.length==0) {
+        //            dialogMsg("请选择人员！",0);
+        //        } else {
+        //            var users = "";
+        //            var codes = "";
+        //            var accounts = "";
+        //            $(arr).each(function (j, dom) {
+        //                users += $(dom).attr("name") + ",";
+        //                accounts+= $(dom).val() + ",";
+        //                codes += $(dom).attr("code") + ",";
+        //            });
+        //            if (users.length>0) {
+        //                users = users.substring(0, users.length - 1);
+        //                codes = codes.substring(0, codes.length - 1);
+        //                accounts = accounts.substring(0, accounts.length - 1);
+        //            }
+        //            if(mode==0){
+        //                $("input[stid='" + objId + "']").val(users);
+        //                $("input[stid='" + objId + "']").attr("uid",accounts);
+        //                $("input[stid='" + objId + "']").attr("ucode",codes);
+        //            } else {
+
+        //                $(obj).val(users);
+        //                $(obj).attr("uid",accounts);
+        //                $(obj).attr("ucode",codes);
+        //            }
+
+        //            top.layer.close(dlg);
+        //        }
+        //    }
+        //});
+    }
+    function getDeptCode() {
+        var codes = "";
+        $(".ckuser").each(function (i, dom) {
+            if ($(dom).attr("ucode") != undefined) {
+                var arr = $(dom).attr("ucode").split(',');
+                $(arr).each(function (j, code) {
+                    if (code.length>0) {
+                        code = code + ",";
+                        if (codes.indexOf(code) < 0) {
+                            codes += code;
+                        }
+                    }
+                });
+            }
+           
+        });
+        if (codes.length>0) {
+            codes = codes.substring(0, codes.length-1);
+        } 
+        return codes;
+    }
+    //获取
+    function getAccount() {
+        var codes = "";
+        $(".ckuser").each(function (i, dom) {
+            if ($(dom).attr("uid")!=undefined) {
+                var arr = $(dom).attr("uid").split(',');
+                $(arr).each(function (j, code) {
+                    code = code + ",";
+                    if (codes.indexOf(code) < 0) {
+                        codes += code;
+                    }
+                });
+            }
+        });
+        if (codes.length > 0) {
+            codes = codes.substring(0, codes.length - 1);
+        }
+        return codes;
+    }
+    //新增检查项目
+    function addCheckContent(obj, stid) {
+        var $gridTable = $("#gridTable");
+        var title = $(obj).attr("title");
+        var li = $gridTable.find("li[oname='" + title + "']:last");
+        var id = newGuid();
+        var rowid = 0;
+        var nli = "<li pid='" + id + "'><input stid='" + stid + "' style='width:100%;height:30px;' type='text' class='form-control ckuser' placeholder='请选择检查人员' value='" + $("#CheckUsers").val() + "'  onclick=selCheckUsers('" + stid + "',this,1) isvalid='yes' checkexpession='NotNull' uid='" + $("#CheckUserIds").val() + "' ucode='" + $("#CheckDeptCode").val() + "' oname='" + $(obj).attr("title") + "' rid='" + $(obj).parent().prev().prev().text() + "'  /></li>";
+        if (li != undefined) {
+            rowid = li.find("input:last").attr("rowid");
+            rowid++;
+
+           li.parent().append("<li style='border-bottom:1px solid #ccc' pid='" + id + "' oname='" + title + "'><input style='border: none;width:90%;height:30px;'  type='text'  class='ckcontent' onchange='setChange(this)' rowid='" + rowid + "' /><a onclick=\"removeCheckContent(this)\" title='删除检查内容'><i class='fa fa-minus-circle'></i></a></li>");
+           li.parent().parent().next().find("ul").append(nli);
+        } else {
+            rowid = $(obj).parent().next().next().find("ul").find("input:last").attr("rowid");
+            rowid++;
+            $(obj).parent().next().find("ul").append("<li style='border-bottom:1px solid #ccc' pid='" + id + "' oname='" + title + "'><input style='border: none;width:90%;height:30px;' type='text' class='ckcontent' onchange='setChange(this)' rowid='" + rowid + "' /><a onclick=\"removeCheckContent(this)\" title='删除检查内容'><i class='fa fa-minus-circle'></i></a></li>");
+            $(obj).parent().next().next().find("ul").append(nli);
+        }
+        setInfo();
+    }
+    //删除检查对象
+    function delRow(obj) {
+        var idx = dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                var grid = $("#gridTable");
+                var val = $(obj).parent().children().eq(0).attr("title");
+                grid.find("span[title='" + val + "']").each(function (j, dom) {
+                    grid.delRowData($(dom).parent().parent().attr("id"));
+                });
+                top.layer.close(idx);
+            }
+        });
+    }
+    //选择设备
+    var nodeSB = null;
+    var arrNodeSB = null;
+    function selEquipment(obj) {
+        var span = $(obj).parent().find("span").eq(0);
+        nodeSB = span.get(0);
+        arrNodeSB = $("#gridTable").find("span[id='" + span.attr("id")+"']");
+        selectEquipment(window, 'deviceid', "0&from=0");
+    }
+    var nodeDS = null;
+    var arrNodeDS = null;
+    //选择危险源
+    function selDangerSource(obj) {
+        var span = $(obj).parent().find("span").eq(0);
+        nodeDS = span.get(0);
+        arrNodeDS = $("#gridTable").find("span[id='" + span.attr("id") + "']");
+        selectHisrelationhd_qd(window, 'deviceid', "0&from=0");
+    }
+    //加载表格(检查表详情项)
+    function GetGrid() {
+        var queryJson = {
+            recid: recid
+        }
+        var hiddenState = false;
+        if (zj == "0") {
+            hiddenState = true;
+        }
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../SaftyCheck/SaftyCheckDataDetail/GetTableListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },//绑定grid加参数
+            datatype: "json",
+            height: $(window).height() - 420,
+            autowidth: true,
+            //pager: "#gridPager",
+            rowNum: 10000000,
+            colModel: [
+                { label: '主键', name: 'pkid', hidden: true },
+                { label: '', name: 'checkobjecttype', hidden: true },
+                { label: '', name: 'rid', hidden: true }, { label: '', name: 'stid', hidden: true },
+                {
+                     label: '风险描述', name: 'content',align: 'left', sortable: false, hidden: true
+                 },
+                  {
+                      label: '检查对象', name: 'name',  width: 300, align: 'left', sortable: false, headerAlign: 'center', classes: "name1"
+                       , formatter: function (cellvalue, options, rowObject) {
+                           cellvalue = cellvalue.replace(/？/g, "");
+                           var ctype = rowObject.checkobjecttype == null || rowObject.checkobjecttype == undefined || rowObject.checkobjecttype == "undefined" || rowObject.checkobjecttype == "null" ? "3" : rowObject.checkobjecttype;
+                           if (rqaction == "view") {
+                               return "<span  title='" + rowObject.name + "' id='" + rowObject.stid + "' ctype='" + ctype + "'>" + rowObject.name + '</span>';
+                           } else {
+                               var innerText = "<span title='" + rowObject.name + "' id='" + rowObject.stid + "' ctype='" + ctype + "'>" + cellvalue + '</span>&nbsp;&nbsp;<i class="fa fa-user" onclick="selCheckUsers(\'' + rowObject.stid + '\',this,0)" title="选择检查人员" style="cursor:pointer;"></i>';
+                               innerText += "<a onclick=\"addCheckContent(this,'"+rowObject.stid+"')\"  title='"+rowObject.name+"'><i class='fa fa-plus-circle'></i></a>";
+                               innerText += "<a onclick=\"delRow(this)\" title='删除'><i class='fa fa-minus-circle'></i></a>";
+                               innerText += "<a onclick=\"selEquipment(this)\" title='选择设备'><i class='fa fa-gavel'></i></a>";
+                               innerText += "<a onclick=\"selDangerSource(this)\" title='选择危险源'><i class='fa fa-mixcloud'></i></a>";
+                               return innerText;
+                           }
+                       }
+                  },
+                {
+                    label: '检查内容', name: 'require', width: 400, align: 'left', sortable: false, headerAlign: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        //if (!!rowObject.require) {
+                            if (rowObject.require.indexOf("<ul") < 0) {
+                                var innerText = "<ul style='list - style:none; '>";
+                                cellvalue = rowObject.require.split('|');
+                                $(cellvalue).each(function (i, dom) {
+                                    if (rqaction != "view") {
+                                        innerText += "<li oname='" + rowObject.name + "' pid='" + rowObject.pkid + "'><input style='border: none;width:90%;height:30px;' type='text' title='" + dom + "' value='" + dom + "' onchange='setChange(this)' class='ckcontent' rowid='" + options.rowId + "' /><a onclick=\"removeCheckContent(this,'" + rowObject.name + "')\"   title='删除检查内容'><i class='fa fa-minus-circle'></i></a></li>";
+                                    } else {
+                                        innerText += "<li oname='" + rowObject.name + "' pid='" + rowObject.pkid + "'><input style='border: none;width:90%;height:30px;' type='text' title='" + dom + "' value='" + dom + "' onchange='setChange(this)' class='ckcontent' rowid='" + options.rowId + "' /></li>";
+                                    }
+                                });
+                                innerText += "</ul>";
+                                return innerText;
+                            } else {
+                                var content = $.parseHTML(cellvalue);
+                                var li = $(content).find("li");
+                                var innerText = "<ul style='list - style:none; '>";
+                                $(li).each(function (i, dom) {
+                                    if (!!$(dom).text()) {
+                                        if (rqaction != "view") {
+                                            innerText += "<li oname='" + rowObject.name + "' pid='" + rowObject.pkid + "'><input style='border: none;width:90%;height:30px;' type='text' title='" + $(dom).text() + "' value='" + $(dom).text() + "' onchange='setChange(this)' class='ckcontent' rowid='" + options.rowId + "'/><a onclick=\"removeCheckContent(this,'" + rowObject.name + "')\"   title='删除检查内容'><i class='fa fa-minus-circle'></i></a></li>";
+                                        } else {
+                                            innerText += "<li oname='" + rowObject.name + "' pid='" + rowObject.pkid + "'><input style='border: none;width:90%;height:30px;' type='text' title='" + $(dom).text() + "' value='" + $(dom).text() + "' onchange='setChange(this)' class='ckcontent' rowid='" + options.rowId + "'/></li>";
+                                        }
+                                    }
+                                });
+                                innerText += "</ul>";
+                                return innerText;
+
+                            }
+                        //} else {
+                        //    var cellvalue = "<ul style='list-style:none; '></ul>";
+                        //    return cellvalue;
+                        //}
+                    }
+                },
+                 {
+                     label: '检查人员', name: 'checkman',  align: 'left', sortable: false,headerAlign: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         cellvalue = cellvalue == undefined || cellvalue == null ? "" : cellvalue;
+                         var account = rowObject.checkmanid == undefined || rowObject.checkmanid == null ? "" : rowObject.checkmanid;
+                         var code = rowObject.belongdept == undefined || rowObject.belongdept == null ? "" : rowObject.belongdept;
+                         var innerText = "";
+                         if (rqaction == "view") {
+                             innerText = !!cellvalue ? cellvalue : "";
+                         } else {
+                             innerText = "<ul>"
+                             innerText += "<li pid='" + rowObject.pkid + "'><input stid='" + rowObject.stid + "' rid='" + (rowObject.rid == undefined ? "" : rowObject.rid) + "'  oname='" + rowObject.name + "' risk='" + (rowObject.content == undefined ? "" : rowObject.content) + "' otype='" + (rowObject.checkobjcttype == undefined ? "" : rowObject.checkobjcttype) + "' style='width:100%;height:30px;' type='text' class='form-control ckuser' placeholder='请选择检查人员' value='" + cellvalue + "'  onclick=selCheckUsers('" + rowObject.stid + "',this,1) isvalid='yes' checkexpession='NotNull' uid='" + account + "' ucode='" + code + "'  class='seluser' /></li>";
+                             innerText + "</ul>";
+                         }
+                         return innerText;
+                     }
+                 }
+            ],
+            viewrecords: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                setInfo();
+                Merger('gridTable', new Array('name'));
+                getSelIds();
+            }
+        });
+    }
+    //删除检查内容
+    function removeCheckContent(obj, title) {
+
+        var dlg = dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                if ($(obj).parent().parent().find("li").length > 1) {
+                    var id = $(obj).parent().attr("pid");
+                    $(obj).parent().parent().parent().next().find("li[pid='" + id + "']").remove();
+                    $(obj).parent().remove();
+                } else {
+                    var node = $(obj).parent().parent().parent().prev();
+                    if (node.attr("rowspan") != undefined) {
+                        var node1 = node.parent().next().find(".name1");
+                        node1.attr("rowspan", parseInt(node.attr("rowspan")) - 1);
+                        node1.show();
+
+                    } else {
+                        node = $("#gridTable").find(".name1:visible>input:text[title='" + title + "']").eq(0);
+                        if (node != undefined) {
+                            node = node.parent();
+                            if (node.attr("rowspan") != undefined) {
+                                var rowspanCount = node.attr("rowspan");
+                                node.attr("rowspan", parseInt(rowspanCount) - 1);
+                            }
+                        }
+                    }
+                    $(obj).parent().parent().parent().parent().remove();
+                }
+                top.layer.close(dlg);
+            }
+        });
+    }
+    function checkData() {
+        if (document.getElementById("IsAuto2").checked && (document.getElementById("AutoType").selectedIndex < 0 || $("#AutoType").val().length == 0)) {
+            dialogMsg("请选择周期类型！", 0);
+            return false;
+        }
+        else {
+            if ($("#AutoType").val() == "1") {
+                if ($(".weeks").find("input:checked").length == 0) {
+                    dialogMsg("请选择星期！", 0);
+                    return false;
+                }
+                else if ($("#Rounds").val().length == 0) {
+                    dialogMsg("请填写期限！", 0);
+                    return false;
+                }
+                else {
+                    return true;
+                }
+
+            }
+            else if ($("#AutoType").val() == "2") {
+                if ($(".months").find("input:checked").length == 0) {
+                    dialogMsg("请选择月份！", 0);
+                    return false;
+                }
+                if ($(".seltype").find("input:checked").length == 0) {
+                    dialogMsg("请选择日期或星期！", 0);
+                    return false;
+                }
+                if ($("#Rounds").val().length == 0) {
+                    dialogMsg("请填写期限！", 0);
+                    return false;
+                } else {
+                    var val = $(".seltype").find("input:checked").eq(0).val();
+                    if (val == "0") {
+                        if ($(".days").find("input:checked").length == 0) {
+                            dialogMsg("请选择日期！", 0);
+                            return false;
+                        } else {
+                            return true;
+                        }
+                    } else {
+                        if ($(".thweeks").find("input:checked").length == 0) {
+                            dialogMsg("请选择周！", 0);
+                            return false;
+                        } else {
+                            return true;
+                        }
+                    }
+                }
+
+            } else {
+                return true;
+            }
+        }
+    }
+    function getDisplay() {
+        var isAuto = $(".isauto").find("input:checked").eq(0).val();
+        var IsSkip = $(".sx").find("input:checked").eq(0).val();
+        var seltype = $(".seltype").find("input:checked").eq(0).val();
+        var weeks = "", weeksdesc = "";
+        $(".weeks").find("input:checked").each(function (j, dom) {
+            weeks += $(dom).val() + ",";
+            weeksdesc += $(dom).next().html() + ",";
+        });
+        if (weeks.length > 0) {
+            weeks = weeks.substring(0, weeks.length - 1);
+            weeksdesc = weeksdesc.substring(0, weeksdesc.length - 1);
+        };
+        var days = "", daysdesc = "";
+        $(".days").find("input:checked").each(function (j, dom) {
+            days += $(dom).val() + ",";
+            daysdesc += $(dom).next().html() + ",";
+        });
+        if (days.length > 0) {
+            days = days.substring(0, days.length - 1);
+            daysdesc = daysdesc.substring(0, daysdesc.length - 1);
+        }
+        var thweeks = "", thweeksdesc = "";
+        $(".thweeks").find("input:checked").each(function (j, dom) {
+            thweeks += $(dom).val() + ",";
+            thweeksdesc += $(dom).next().html() + ",";
+        });
+        if (thweeks.length > 0) {
+            thweeks = thweeks.substring(0, thweeks.length - 1);
+            thweeksdesc = thweeksdesc.substring(0, thweeksdesc.length - 1);
+        }
+        var months = "", monthsdesc = "";
+        $(".months").find("input:checked").each(function (j, dom) {
+            months += $(dom).val() + ",";
+            monthsdesc += $(dom).next().html() + ",";
+        });
+        if (months.length > 0) {
+            months = months.substring(0, months.length - 1);
+            monthsdesc = monthsdesc.substring(0, monthsdesc.length - 1);
+        }
+        var display = "每天";
+        var autoType = $("#AutoType").val();
+        if (autoType == 1) {
+            display = "每周:" + weeksdesc;
+        }
+        if (autoType == 2) {
+            display = "每月";
+            if (seltype == 0) {
+                if (daysdesc.length>0) {
+                    display = display + ",按日期:" + daysdesc;
+                }
+            }
+            if (seltype == 1) {
+                if (thweeksdesc.length>0) {
+                    display = display + ",按周:" + thweeksdesc;
+                }
+            }
+            if (monthsdesc.length>0) {
+                display = display + ",月份:" + monthsdesc;
+            }
+           
+        }
+        if (IsSkip == 1) {
+            display += ",跳过双休"
+        }
+        $("#Display").val(display);
+        return display;
+    }
+    //保存表单;
+    function AcceptClick() {
+        $(".poptip").hide();
+
+        // 矩阵时间判断 20210123
+        if (matrixtime != "" && matrixtime != null) {
+            var mtrixebegin = new Date($('#CheckBeginTime').val());
+            var mtrixeend = new Date($('#CheckEndTime').val());
+            var martrixcheck = new Date(matrixtime);
+            if (((mtrixebegin < martrixcheck) && (mtrixeend < martrixcheck)) || ((mtrixebegin > martrixcheck) && (mtrixeend > martrixcheck))) {
+                dialogMsg("检查时间必须包含矩阵检查时间：" + matrixtime+"！", 0);
+                return false;
+            }
+        }
+
+        if (!$('#form1').Validform() ) {
+            return false;
+        }
+        if(!checkData()){
+            return false;
+        }
+        var isAuto = $(".isauto").find("input:checked").eq(0).val();
+        var IsSkip = $(".sx").find("input:checked").eq(0).val();
+        var seltype = $(".seltype").find("input:checked").eq(0).val();
+        var weeks = "", weeksdesc = "";
+        $(".weeks").find("input:checked").each(function (j, dom) {
+            weeks += $(dom).val() + ",";
+            weeksdesc += $(dom).next().html() + ",";
+        });
+        if (weeks.length > 0) {
+            weeks = weeks.substring(0, weeks.length - 1);
+            weeksdesc = weeksdesc.substring(0, weeksdesc.length - 1);
+        };
+        var days = "", daysdesc = "";
+        $(".days").find("input:checked").each(function (j, dom) {
+            days += $(dom).val() + ",";
+            daysdesc += $(dom).next().html() + ",";
+        });
+        if (days.length > 0) {
+            days = days.substring(0, days.length - 1);
+            daysdesc = daysdesc.substring(0, daysdesc.length - 1);
+        }
+        var thweeks = "", thweeksdesc = "";
+        $(".thweeks").find("input:checked").each(function (j, dom) {
+            thweeks += $(dom).val() + ",";
+            thweeksdesc += $(dom).next().html() + ",";
+        });
+        if (thweeks.length > 0) {
+            thweeks = thweeks.substring(0, thweeks.length - 1);
+            thweeksdesc = thweeksdesc.substring(0, thweeksdesc.length - 1);
+        }
+        var months = "", monthsdesc = "";
+        $(".months").find("input:checked").each(function (j, dom) {
+            months += $(dom).val() + ",";
+            monthsdesc += $(dom).next().html() + ",";
+        });
+        if (months.length > 0) {
+            months = months.substring(0, months.length - 1);
+            monthsdesc = monthsdesc.substring(0, monthsdesc.length - 1);
+        }
+        var display = "每天";
+        var autoType = $("#AutoType").val();
+        if (autoType == 1) {
+            display = "每周:" + weeksdesc;
+        }
+        if (autoType == 2) {
+            display = "每月";
+            if (seltype == 0) {
+                display = display + ",按日期:" + daysdesc;
+            }
+            if (seltype == 1) {
+                display = display + ",按周:" + thweeksdesc;
+            }
+            display = display + ",月份:" + monthsdesc;
+        }
+        if (IsSkip == 1) {
+            display += ",跳过双休"
+        }
+        var json = "";
+        //主记录信息
+        var postData = $("#form1").formSerialize(recid);
+        postData["BelongDeptID"] = belongdeptid;
+        var checkContent = 0;
+        postData["CheckDataType"] = ctype;
+        postData["CheckDeptCode"] = getDeptCode();
+        postData["CheckUserIds"] = getAccount();
+
+        postData["IsAuto"] = isAuto;
+        postData["AutoType"] = $("#AutoType").val();
+        postData["IsSkip"] = IsSkip;
+        postData["Weeks"] = weeks;
+        postData["SelType"] = seltype;
+        postData["Days"] = days;
+        postData["ThWeeks"] = thweeks;
+        postData["Display"] = display;
+        postData["Months"] = months;
+        //检查项目及人员安排
+        var arr = new Array();
+        var users = $("#gridTable").find(".ckuser");
+
+        if (users.length > 0) {
+            $(users).each(function (j, dom) {
+                var pid = $(dom).parent().attr("pid") == undefined ? "-1" : $(dom).parent().attr("pid");
+                var account = $(dom).attr("uid") == undefined ? "" : $(dom).attr("uid");
+                var domContent = $(dom).parent().parent().parent().prev().find("li[pid='" + pid + "']").find(".ckcontent").eq(0);
+                var content = "";
+                if (domContent != undefined) {
+                    content = domContent.val();
+                }
+                if (content.length>0) {
+                    arr.push({
+                        AutoId:j,
+                        BelongDept: $(dom).attr("ucode"), //检查项目责任部门（多个逗号分隔）
+                        ID: newGuid(), //主键Id
+                        CheckDataId: $(dom).attr("rid") == undefined ? "" : $(dom).attr("rid"), //关联检查内容Id（来自安全检查标准）
+                        CheckMan: $(dom).val(),//检查人员姓名（多个逗号分隔）
+                        CheckManID: account,//检查人员账号（多个逗号分隔）
+                        RiskName: $(dom).attr("risk") == undefined ? "" : $(dom).attr("risk"), //风险描述
+                        CheckContent: content,//检查内容
+                        CheckObject: $(dom).parent().parent().parent().prev().prev().find("span").text(), //检查对象
+                        CheckObjectId: $(dom).parent().parent().parent().prev().prev().find("span").attr("id"), //检查对象Id（来自安全检查标准,可以为空）
+                        CheckObjectType: $(dom).parent().parent().parent().prev().prev().find("span").attr("ctype"),//检查对象类型（检查对象类型 0为设备 1为危险源）
+                        RecID: recid  //关联检查记录Id
+                    });
+                }
+                if (account.length == 0 || content.length == 0) {
+                    checkContent = 1;
+                }
+            });
+            json = JSON.stringify(arr);
+            postData["projectItem"] = encodeURIComponent(json);
+            
+        } else {
+            dialogMsg('检查工作安排不能为空！', 0);
+            return false;
+        }
+
+        if (checkContent == 1) {
+            dialogMsg('检查内容和检查人员不能为空！', 0);
+            return false;
+        }
+
+        $.SaveForm({
+            url: "../../SaftyCheck/SaftyCheckDataRecord/SaveFormDate?keyValue=" + recid,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+
+                if (matrixid != "" && matrixid != null) {
+                    // 不影响原逻辑下更新矩阵检查信息
+                    $.SetForm({
+                        url: "../../HiddenTroubleManage/Matrixsafecheck/SetFormJson",
+                        param: { keyValue: matrixid, recid: recid },
+                        success: function () {
+
+                        }
+                    });
+                }
+                
+            }
+        });
+    }
+    //选择检查表进行新增
+    var dofromList1 = null;
+    function addProject(obj) {
+        if ($("#CheckUsers").val().length==0) {
+            dialogMsg('请先选择检查成员！', 0);
+            return false;
+        } else {
+            dofromList1 = dialogOpen({
+                id: "Prject",
+                title: "选择检查项目",
+                url: '/SaftyCheck/SaftyCheckData/Index?isAdd=' + "Add" + "&justData=true&ctype=" + ctype,
+                width: "px",
+                height: "600px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                    choose = 0;
+                }
+            });
+        }
+
+    };
+    //操作显示
+    function funcAction(action, rowObject) {
+        if (action == "count") {
+            var url = '/HiddenTroubleManage/HTBaseInfo/Index?SAFETYCHECKOBJECTID=' + rowObject;
+            if (checkedRow(rowObject)) {
+                dialogOpen({
+                    id: 'Details',
+                    title: '隐患列表',
+                    url: url,
+                    width: '800px',
+                    height: ($(top.window).height() - 100) + "px",
+                    callBack: function (iframeId) {
+                        top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                    }
+                });
+            }
+        } else if (action == "reg") {
+            //如果没有保存检查表就不能登记隐患
+            if (!!recid) {
+                var url = '/HiddenTroubleManage/HTBaseInfo/Form?SAFETYCHECKOBJECTID=' + rowObject + "&SAFETYCHECKTYPE=" + recid;
+                if (checkedRow(rowObject)) {
+                    dialogOpen({
+                        id: 'HTWindow',
+                        title: '登记隐患',
+                        url: url,
+                        width: '900px',
+                        height: ($(top.window).height() - 100) + "px",
+                        btn: null,
+                        callBack: function (iframeId) {
+                            top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                        }
+                    });
+                }
+            } else {
+                dialogMsg('请选保存检查表！', 0);
+            }
+        }
+    }
+    function addToDetail(obj) {
+        gridCount = 1;
+        var projectItem = $("#gridTable").jqGrid('getRowData');
+        //清空之前选择的安全检查表数据
+        $("#gridTable").clearGridData(false);
+        //
+        var data = eval(JSON.stringify(obj));
+        $("#gridTable").jqGrid("setGridParam", {
+            datatype: "local",
+            data: data,
+            rowNums: data.length
+        }).trigger("reloadGrid");
+    }
+    function setPer() { }
+    function setValue() {
+        selectUser({ deptId: "", checkMode: 0, mode: 0, callBack: setPer, winObject: document.body, domId: 'CheckManageMan,CheckManageManID,,,AllotDept' });
+    }
+    function setPerName(CheckManageMan, CheckManageManID,deptCodeDomId) {
+        selectUser({ deptId: "", checkMode: 1, mode: 0, callBack: setPer, winObject: document.body, domId: CheckManageMan + ',' + CheckManageManID + ",,," + deptCodeDomId, userIds: $('#' + CheckManageManID).val() });
+    }
+    //导出
+    function ExportDetails() {
+        //获取绑定的所有的记录
+        var json = "";
+        var projectItem = $("#gridTable").jqGrid('getRowData');
+        if (projectItem.length > 0) {
+            $("#show").empty();
+            var table = $($(".ui-jqgrid-bdiv").html());
+            var header = $(".ui-jqgrid-htable").html();
+            table.find("#gridTable").css({ "background": "gray" });
+            table.find("#gridTable").attr("cellpadding", "0");
+            table.find("#gridTable").attr("cellspacing", "0");
+            table.find("#gridTable").attr("width", "100%");
+            table.find("#gridTable").css({ "width": "100%" });
+            table.find("#gridTable").attr("border", "1");
+            table.find("td,th").css({ "background-color": "white" });
+
+            table.find("tbody").before(header);
+            table.find("#gridTable").find("th[id='gridTable_stid']").remove();
+            table.find("#gridTable").find("th[id='gridTable_pkid']").remove();
+            table.find("#gridTable").find("th[id='gridTable_rid']").remove();
+            table.find("#gridTable").find("th[id='gridTable_content']").remove();
+            table.find("#gridTable").find("th[id='jqgh_gridTable_rid']").remove();
+            table.find("#gridTable").find("th[id='gridTable_checkobjecttype']").remove();
+            table.find("#gridTable").find("td[aria-describedby='gridTable_checkobjecttype']").remove();
+            table.find("#gridTable").find("td[aria-describedby='gridTable_pkid']").remove();
+            table.find("#gridTable").find("td[aria-describedby='gridTable_rid']").remove();
+            table.find("#gridTable").find("td[aria-describedby='jqgh_gridTable_rid']").remove();
+            table.find("#gridTable").find("td[aria-describedby='gridTable_content']").remove();
+            table.find("#gridTable").find("td[aria-describedby='gridTable_stid']").remove();
+            table.find("#gridTable").find("tr[class ='jqgfirstrow']").remove();
+            table.find("#gridTable").find("td[hidecol='true']").remove();
+            table.find("#gridTable").find("td[aria-describedby='gridTable_require']").each(function (i,dom) {
+                $(dom).html($(dom).find(".ckcontent").val());
+            });
+            table.find("#gridTable").find("td[aria-describedby='gridTable_checkman']").each(function (i, dom) {
+                if($(dom).find("li").length>0){
+                    $(dom).html($(dom).find(".ckuser").val());
+                }
+            });
+            table.find("#gridTable").find("td[aria-describedby='gridTable_name']").each(function (i, dom) {
+                if($(dom).attr("style").indexOf("none")>=0){
+                    $(dom).remove();
+                }
+            });
+            table.find("th[role='columnheader']").find("span").remove();
+            table.find("td,th").css({ "background-color": "white" });
+            $("#show").html(table.html())
+            json = JSON.stringify($("#show").html());
+        }
+       //document.write(table.html());
+        var postData = JSON.stringify($("#form1").formSerialize(recid));
+        var ts = $("#CheckDataType").attr("data-text");
+        Loading(true, "正在导出...");
+        $.ajax({
+            url: "../../SaftyCheck/SaftyCheckDataRecord/ExportDetailsZX",
+            data: { keyValue: recid, ctype: ts, projectItem: encodeURIComponent(json), entity: encodeURIComponent(postData) },
+            type: "post",
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+
+                window.location.href = "../../Utility/DownloadFile?filePath=~/Resource/temp/" + data.resultdata + "&speed=1024000";
+                Loading(false);
+            }
+        });
+    }
+    //选择检查部门
+    function setDeptValue() {
+        selectDept('', 1, 0, '选择部门', window.document.body, 'CheckDept,CheckDeptID,DeptId', $('#CheckDeptID').val());
+    }
+    //选择部门检查表
+    function addDeptCheckTable() {
+        if ($("#CheckDept").val() != "" && $("#CheckDept").val() != null && $("#CheckDept").val() != undefined) {
+            data = new Array();
+            selIds = "";
+            $("#gridTable").clearGridData();
+            $.SetForm({
+                url: "../../SaftyCheck/SaftyCheckDataRecord/AddDeptCheckTable",
+                param: { DeptCode: $("#CheckDeptID").val(), Type: ctype },
+                loading: "正在获取数据...",
+                success: function (result) {
+                    if (result.length>0) {
+                        var arr = [];
+                        for (var i = 0; i < result.length; i++) {
+                            arr.push({
+                                pkid: newGuid(),
+                                count: "0",
+                                content: result[i].riskname,
+                                require: result[i].checkcontent,
+                                rid: result[i].checkdataid,
+                                name: result[i].checkobject,
+                                stid: result[i].checkobjectid,
+                                checkobjecttype: result[i].checkobjecttype,
+                                createuserdeptcode: result[i].createuserdeptcode,
+                                checkman: $("#CheckUsers").val(),
+                                checkmanid: $("#CheckLevelID").val(),
+                                belongdept: $("#CheckDeptCode").val()
+                            });
+                        }
+                        choose = 2;
+                        //addToDetail(arr);
+                        fillItems(arr);
+
+                    } else {
+                        dialogMsg('该部门无检查表!!!', 0);
+                    }
+                }
+            })
+
+        } else {
+            dialogMsg('请先选择检查部门!', 0);
+        }
+
+    }
+    //选择检查项目
+    function select() {
+        getSelIds();
+        dofromList = dialogOpen({
+            id: "Items",
+            title: "选择检查项目",
+            url: '/RiskDatabase/HtStandard/selectitems?pType=1',
+            width: (top.window.$(window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                choose = 1;
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    };
+    var stids = "";
+    var selIds = "";
+    var data = new Array();//存储选择的检查项目
+    //选择检查项目,新增项目或选择检查表后动态填充表格
+    function fillItems(items, ids) {
+        var $gridTable = $("#gridTable");
+        //data = $.merge(data, items);
+ 
+        //if (data.length > 0) {
+        //    //重新获取检查内容有修改过的数据
+        //    $gridTable.find("input:text[ischange='1']").each(function (j, dom) {
+        //        var idx = $(dom).attr("rowid");
+              
+        //        data[idx - 1].require = $(dom).val();
+        //    });
+        //}
+        //为了考虑性能此处根据新增的数据行记录数做简单处理
+        //小于10条则采用逐行新增的方式，其他则采用批量添加的方式
+        //if (items.length < 10) {
+            var len = $gridTable.find(".ckcontent").length;
+            var idx = len == 0 ? 0 : len;
+            $(items).each(function (j, item) {
+                $gridTable.addRowData(parseInt(idx) + j + 1, item);
+            });
+        //}
+        //else {
+        //    //注意此方法会覆盖现有记录，不是追加行
+        //    $gridTable[0].addJSONData(data);
+        //}
+        //设置当前记录总数
+        setInfo();
+        //获取本次操作选择的检查对象（含上级分类）
+        if (ids != undefined) {
+            stids = ids;
+            top.Details.window.selIds += ","+ids;
+        }
+        $(".unwritten").html("");
+    }
+    //设置列表当前总记录数
+    function setInfo() {
+        var $gridTable = $("#gridTable");
+        $("#gridPager").html("<b>当前共有&nbsp;" + $gridTable.find(".ckcontent").length + "&nbsp;条记录</b>");
+    }
+    //标记有更改过的检查内容的文本框并属性标记
+    function setChange(obj) {
+        $(obj).attr("ischange", "1");
+    }
+    //查看时获取已选择的检查对象
+    function getSelIds() {
+       
+        $("#gridTable").find("td[aria-describedby='gridTable_stid']").each(function (j, dom) {
+            if (selIds.indexOf($(dom).text()) < 0) {
+                selIds+=","+$(dom).text();
+            }
+        });
+        selIds += "," + stids;
+    }
+    //选择检查成员
+    function selUsers(obj) {
+        if ($("#CheckDeptID").val().length==0) {
+            dialogMsg('请先选择检查部门!', 0);
+        } else {
+            selectUser({
+                Ids: $("#DeptId").val(), deptId: $("#DeptId").val(), checkMode: 1, mode: "2&pfrom=100", callBack: function () {
+                    $("#CheckUserIds").val($("#CheckLevelID").val());
+                }, winObject: document.body, domId: 'CheckUsers,CheckLevelID,,,CheckDeptCode', userIds: $('#CheckLevelID').val()
+            });
+        }
+
+    }
+    //清空所有记录
+    function removeItem() {
+        var dlg = dialogConfirm("确定清空吗？", function (isSure) {
+            if (isSure) {
+                data = new Array();
+                selIds = "";
+                $("#gridTable").clearGridData();
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //新增安全检查表项
+    var dofrom = null;
+    function addItems(bid) {
+        choose = 0;
+        dofrom = dialogOpen({
+            id: "PrjectItem",
+            title: "新增检查项目",
+            url: '/SaftyCheck/SaftyCheckDataDetail/Form?mode=0',
+            width: "800px",
+            height: "400px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+              
+            }
+        });
+    };
+    //检查工作安排
+    function setWork() {
+        if ($("#CheckUsers").val().length == 0 || $("#CheckManageMan").val().length == 0) {
+            dialogMsg('请先选择检查组长和检查成员!', 0);
+        } else {
+            dialogOpen({
+                id: "Work",
+                title: "检查工作安排",
+                url: '/SaftyCheck/SaftyCheckDataRecord/WorkSet',
+                width: "800px",
+                height: ($(top.window).height()-50)+"px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+        }
+    }
+    function setTask(obj) {
+        if (obj.checked) {
+            var val = $(obj).val();
+            if (val == 0) {
+                $("#AutoType").val("");
+                $(".autotype,.weeks,.seltype,.thweeks,.days,.sx,.months").hide();
+            } else {
+                $(".autotype").show();
+            }
+
+        }
+    }
+    function selType(obj) {
+        var val = $(obj).val();
+        if (val.length > 0) {
+            $("#SelType1,#SelType2").removeAttr("checked");
+            $(".sx").show();
+            if (val == "0") {
+                $(".weeks,.seltype,.thweeks,.days,.months,.rounds").hide();
+                $(".thweeks,.weeks,.days,.months").find("input:checkbox").removeAttr("checked");
+            }
+            if (val == "1") {
+                $(".thweeks,.days,.months,.selType").find("input:checkbox").removeAttr("checked");
+                $(".seltype,.thweeks,.days,.months").hide();
+                $(".weeks,.rounds").show();
+
+            }
+            if (val == "2") {
+                $(".weeks").find("input:checkbox").removeAttr("checked");
+                $(".seltype,.months,.rounds").show();
+                $(".weeks").hide();
+            }
+            getDisplay();
+        }
+    }
+
+    function setItem(obj) {
+        var val = $(obj).val();
+        if (val == 0) {
+            $(".days").show(); $(".thweeks").hide();
+        } else {
+            $(".days").hide(); $(".thweeks").show();
+        }
+    }
+    var dlgCheck;
+    function selCheckName() {
+        dlgCheck=dialogOpen({
+            id: "CheckNameSet",
+            title: "选择检查名称",
+            url: '/SaftyCheck/SaftyCheckData/CheckNameSet',
+            width: "800px",
+            height: ($(top.window).height() - 200) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+</script>
+<div style="margin: 10px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong id="showTitle"></strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">检查名称<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <div class="input-group" style="width:100%;">
+                            <input id="CheckDataRecordName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                            <span id="selCheckName" class="input-group-addon" onclick="selCheckName();" title="选择检查名称"><i class="fa fa-check"></i></span>
+                        </div>
+                       
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">检查开始时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CheckBeginTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                    <td class="formTitle">检查结束时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CheckEndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">检查类型<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="CheckDataType" type="select" class="ui-select" disabled="disabled" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                    <td class="formTitle">检查级别<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="CheckLevel" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">检查部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CheckDept" type="text" class="form-control" placeholder="请选择部门" isvalid="yes"  checkexpession="NotNull" readonly onclick="setDeptValue()" />
+                        <input id="CheckDeptID" type="hidden" /><input id="DeptId" type="hidden" />
+                    </td>
+                    <td class="formTitle">检查组长<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CheckManageMan" type="text" class="form-control" placeholder="请选择检查组长" readonly onclick="setValue()" isvalid="yes" checkexpession="NotNull" />
+                        <input id="CheckManageManID" type="hidden" /><input id="AllotDept" type="hidden" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">检查组成员<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <input id="CheckUsers" type="text" class="form-control" placeholder="请选择检查成员" readonly onclick="selUsers(this);" isvalid="yes" checkexpession="NotNull" />
+                        <input id="CheckLevelID" type="hidden" /><input id="CheckUserIds" type="hidden" /><input id="CheckDeptCode" type="hidden" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">检查区域</td>
+                    <td class="formValue" colspan="3">
+                        <div class="input-group" style="width:100%;">
+                            <input id="AreaName" type="text" class="form-control" placeholder="输入或选择区域" isvalid="yes" checkexpession="LenStrOrNull" length="1000" maxlength="1000" />
+                            <span id="ChooseRiskDesc" class="input-group-addon" onclick="selectArea(window.document.body, 'AreaName',2);" title="选择区域"><i class="fa fa-check"></i></span>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="hidecontent">
+                    <td class="formTitle">检查目的</td>
+                    <td class="formValue" colspan="3">
+                        <input id="Aim" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="1000" maxlength="1000" />
+                    </td>
+                </tr>
+                
+                <tr class="hidecontent">
+                    <td class="formTitle">检查内容</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="Remark" class="form-control readonly1" style="height:40px;" rows="3" maxlength="1000" isvalid="yes" checkexpession="LenStrOrNull" length="1000"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">周期性计划<font face="宋体">*</font></td>
+                    <td class="formValue isauto">
+                        <input type="radio" id="IsAuto1" value="0" name="IsAuto" checked="checked" onclick="setTask(this)"><label for="IsAuto1">否</label>
+                        <input type="radio" id="IsAuto2" value="1" name="IsAuto" onclick="setTask(this)"><label for="IsAuto2">是</label>
+                    </td>
+                    <td class="formTitle autotype" style="display:none;">周期类型<font face="宋体">*</font></td>
+                    <td class="formValue autotype" style="display:none;">
+                        <select id="AutoType" class="form-control" onchange="selType(this)">
+                            <option value=""></option>
+                            <option value="1">按周</option>
+                            <option value="2">按月</option>
+                        </select>
+
+                    </td>
+                </tr>
+                <tr style="display:none;" class="sx">
+                    <td class="formTitle">跳过双休<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input type="radio" id="IsSkip1" value="0" name="IsSkip" checked="checked"><label for="IsAuto1">否</label>
+                        <input type="radio" id="IsSkip2" value="1" name="IsSkip"><label for="IsAuto2">是</label>
+                    </td>
+                    <td class="formTitle">周期显示</td>
+                    <td class="formValue">
+                        <input id="Display" type="text" class="form-control" readonly="readonly" />
+                    </td>
+                </tr>
+                <tr class="weeks" style="display:none;">
+                    <td class="formTitle">星期</td>
+                    <td class="formValue" colspan="3">
+                        <input type="checkbox" id="Week1" value="1" name="Weeks"><label for="Week1">星期一</label>
+                        <input type="checkbox" id="Week2" value="2" name="Weeks"><label for="Week2">星期二</label>
+                        <input type="checkbox" id="Week3" value="3" name="Weeks"><label for="Week3">星期三</label>
+                        <input type="checkbox" id="Week4" value="4" name="Weeks"><label for="Week4">星期四</label>
+                        <input type="checkbox" id="Week5" value="5" name="Weeks"><label for="Week5">星期五</label>
+                        <input type="checkbox" id="Week6" value="6" name="Weeks"><label for="Week6">星期六</label>
+                        <input type="checkbox" id="Week7" value="0" name="Weeks"><label for="Week7">星期日</label>
+                    </td>
+                </tr>
+                <tr class="seltype" style="display:none;">
+                    <td class="formTitle">日期或星期</td>
+                    <td class="formValue" colspan="3">
+                        <input type="radio" id="SelType1" value="0" name="SelType" onclick="setItem(this)"><label for="SelType1">按日期</label>
+                        <input type="radio" id="SelType2" value="1" name="SelType" onclick="setItem(this)"><label for="SelType2">按星期</label>
+                    </td>
+                </tr>
+                <tr class="months" style="display:none;">
+                    <td class="formTitle">月份</td>
+                    <td class="formValue" colspan="3">
+                        <div>
+                            <input type="checkbox" id="Months1" value="1" name="Months"><label for="Months1">1</label>
+                            <input type="checkbox" id="Months2" value="2" name="Months"><label for="Months2">2</label>
+                            <input type="checkbox" id="Months3" value="3" name="Months"><label for="Months3">3</label>
+                            <input type="checkbox" id="Months4" value="4" name="Months"><label for="Months4">4</label>
+                            <input type="checkbox" id="Months5" value="5" name="Months"><label for="Months5">5</label>
+                            <input type="checkbox" id="Months6" value="6" name="Months"><label for="Months6">6</label>
+                            <input type="checkbox" id="Months7" value="7" name="Months"><label for="Months7">7</label>
+                            <input type="checkbox" id="Months8" value="8" name="Months"><label for="Months8">8</label>
+                            <input type="checkbox" id="Months9" value="9" name="Months"><label for="Months9">9</label>
+                            <input type="checkbox" id="Months10" value="10" name="Months"><label for="Months10">10</label>
+                            <input type="checkbox" id="Months11" value="11" name="Months"><label for="Months11">11</label>
+                            <input type="checkbox" id="Months12" value="12" name="Months"><label for="Months12">12</label>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="thweeks" style="display:none;">
+                    <td class="formTitle">第几周</td>
+                    <td class="formValue">
+                        <input type="checkbox" id="ThWeek1" value="0" name="ThWeeks"><label for="ThWeek1">第一周</label>
+                        <input type="checkbox" id="ThWeek2" value="1" name="ThWeeks"><label for="ThWeek2">第二周</label>
+                        <input type="checkbox" id="ThWeek3" value="2" name="ThWeeks"><label for="ThWeek3">第三周</label>
+                        <input type="checkbox" id="ThWeek4" value="3" name="ThWeeks"><label for="ThWeek4">第四周</label>
+                        <input type="checkbox" id="ThWeek5" value="4" name="ThWeeks"><label for="ThWeek5">第五周</label>
+                    </td>
+                </tr>
+                <tr class="days" style="display:none;">
+                    <td class="formTitle">日期</td>
+                    <td class="formValue" colspan="3">
+                        <div>
+                            <input type="checkbox" id="Days1" value="1" name="Days"><label for="Days1">1</label>
+                            <input type="checkbox" id="Days2" value="2" name="Days"><label for="Days2">2</label>
+                            <input type="checkbox" id="Days3" value="3" name="Days"><label for="Days3">3</label>
+                            <input type="checkbox" id="Days4" value="4" name="Days"><label for="Days4">4</label>
+                            <input type="checkbox" id="Days5" value="5" name="Days"><label for="Days5">5</label>
+                            <input type="checkbox" id="Days6" value="6" name="Days"><label for="Days6">6</label>
+                            <input type="checkbox" id="Days7" value="7" name="Days"><label for="Days7">7</label>
+                            <input type="checkbox" id="Days8" value="8" name="Days"><label for="Days8">8</label>
+                            <input type="checkbox" id="Days9" value="9" name="Days"><label for="Days9">9</label>
+                            <input type="checkbox" id="Days10" value="10" name="Days"><label for="Days10">10</label>
+                            <input type="checkbox" id="Days11" value="11" name="Days"><label for="Days11">11</label>
+                            <input type="checkbox" id="Days12" value="12" name="Days"><label for="Days12">12</label>
+                            <input type="checkbox" id="Days13" value="13" name="Days"><label for="Days13">13</label>
+                            <input type="checkbox" id="Days14" value="14" name="Days"><label for="Days14">14</label>
+                            <input type="checkbox" id="Days15" value="15" name="Days"><label for="Days15">15</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="Days16" value="16" name="Days"><label for="Days16">16</label>
+                            <input type="checkbox" id="Days17" value="17" name="Days"><label for="Days17">17</label>
+                            <input type="checkbox" id="Days18" value="18" name="Days"><label for="Days18">18</label>
+                            <input type="checkbox" id="Days19" value="19" name="Days"><label for="Days19">19</label>
+                            <input type="checkbox" id="Days20" value="20" name="Days"><label for="Days20">20</label>
+                            <input type="checkbox" id="Days21" value="21" name="Days"><label for="Days21">21</label>
+                            <input type="checkbox" id="Days22" value="22" name="Days"><label for="Days22">22</label>
+                            <input type="checkbox" id="Days23" value="23" name="Days"><label for="Days23">23</label>
+                            <input type="checkbox" id="Days24" value="24" name="Days"><label for="Days24">24</label>
+                            <input type="checkbox" id="Days25" value="25" name="Days"><label for="Days25">25</label>
+                            <input type="checkbox" id="Days26" value="26" name="Days"><label for="Days26">26</label>
+                            <input type="checkbox" id="Days27" value="27" name="Days"><label for="Days27">27</label>
+                            <input type="checkbox" id="Days28" value="28" name="Days"><label for="Days28">28</label>
+                            <input type="checkbox" id="Days29" value="29" name="Days"><label for="Days29">29</label>
+                            <input type="checkbox" id="Days30" value="30" name="Days"><label for="Days30">30</label>
+                            <input type="checkbox" id="Days31" value="31" name="Days"><label for="Days31">31</label>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="rounds" style="display:none;">
+                    <td class="formTitle">期限(天)</td>
+                    <td class="formValue">
+                        <input id="Rounds" type="text" class="form-control" isvalid="yes" checkexpession="PositiveNumOrNull" onchange="getDisplay()" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;检查成员及分工</strong>
+            <span class="tools pull-right">
+                <a href="javascript:setWork()" class="btn btn-primary btn-xs btn10">检查成员及分工</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="javascript:select()" class="btn btn-primary btn-xs btn10">选择检查项目</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="javascript:addProject(this)" id="Choose" class="btn btn-primary btn-xs btn10">选择检查表</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                @*<a href="javascript:addDeptCheckTable(this)" id="ChooseDept" class="btn btn-primary btn-xs btn10">选择部门检查表</a>&nbsp;&nbsp;&nbsp;&nbsp;*@
+                <a href="javascript:addItems()" id="choose1" class="btn btn-primary btn-xs btn10">新增项目</a>&nbsp;&nbsp;&nbsp;&nbsp; 
+                <a href="javascript:removeItem(this)" id="remove" class="btn btn-primary btn-xs btn10">清空项目</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="javascript:ExportDetails(this)" id="Export" class="btn btn-primary btn-xs">导&nbsp;&nbsp;出</a>&nbsp;&nbsp;
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table id="gridTable"></table>
+            <div id="gridPager"></div>
+        </div>
+    </div>
+
+    <div class="panel panel-default" style="display:none;">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;检查报告</strong>
+            <span class="tools pull-right">
+
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                <div class="queueList">
+                    <div id="uploaderFile" class="placeholder">
+                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                    </div>
+                </div>
+                <div class="statusBar" style="display:none;">
+                    <div class="progress">
+                        <span class="text">0%</span>
+                        <span class="percentage"></span>
+                    </div>
+                    <div class="info"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <div id="show" style="display:none;"></div>
+   
+</div>

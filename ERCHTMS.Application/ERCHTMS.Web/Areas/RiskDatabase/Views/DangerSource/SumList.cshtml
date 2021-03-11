@@ -1,0 +1,330 @@
+﻿@{
+    ViewBag.Title = "危险点管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script type="text/javascript">
+    var IsGdxy = false;//版本标示
+    var areaId = "";
+    var areaName = "";
+    var areaCode = request("code");
+    var initAreaId = "";
+    var level = request("level");
+    var year = request("year");
+    var deptCode = "";
+    var mode = request("mode");
+    var orgCode = request("orgCode");
+    var orgId = request("orgId");
+    var IndexState = request("IndexState");
+    $(function () {
+        IsGdxy = GetVersion();
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        if (!!mode) {
+            $(".toolbar").remove();
+        }
+        if (!!level) {
+            $("#Grade").find("option").eq(parseInt(level)).attr("selected", "true");
+            $("#Grade").selectpicker("refresh");
+        }
+        level = level == 0 ? "" : level;
+        var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+        if (roleNames.indexOf("公司级用户") >= 0 || roleNames.indexOf("厂级部门用户") >= 0) {
+            deptCode = top.currUserOrgCode;
+        } else {
+            deptCode = top.currUserDeptCode;
+        }
+        if (roleNames.indexOf("集团用户") >= 0) {
+            deptCode = "00";
+        }
+
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 200);
+                $("#itemTree").height($(window).height() - 65);
+                $("#deptTree").height($(window).height() - 65);
+
+            }, 200);
+            e.stopPropagation();
+        });
+       
+
+    }
+
+    //加载树
+    var deptCode = "";//部门编码
+    function GetTree() {
+        if (top.currUserRoleName.indexOf("省级") >= 0) {
+            $("#area").remove();
+            var json = JSON.stringify(
+             {
+                 SelectMode: 0,
+                 Mode: 5
+             }
+           );
+        }
+        else {
+            var json = JSON.stringify(
+                       {
+                           SelectMode: 0,
+                           Mode: 0
+                       }
+              );
+        }
+        url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+        //加载组织机构树
+        var item = {
+            height: $(window).height() - 65,
+            url: url,
+            onnodeclick: function (item) {
+                deptCode = item.Code;
+                areaCode = "";
+                var $gridTable = $("#gridTable");
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化部门树
+        $("#deptTree").treeview(item);
+
+        var o = {
+            onnodeclick: function (item) {
+                deptCode = "";
+                initAreaId = item.initAreaIds;//多个用英文逗号分隔
+                areaCode = item.code;
+                areaId = item.id;
+                height: $(window).height() - 65;
+                //展开下级
+                // $(".bbit-tree-selected").children('.bbit-tree-ec-icon').trigger("click");
+                $('#btn_Search').trigger("click");
+            },
+            method: "GET",
+            datatype: "json",
+            url: "../../RiskDatabase/DangerSource/GetTreeJson1?organizeId=@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId"
+        };
+        $("#itemTree").treeview(o);
+
+        if ($("#deptTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    function show(risktype,areaname,riskname,areacode) {
+        var dlg = dialogOpen({
+            id: 'Sum',
+            title: '风险辨识清单',
+            url: '/RiskDatabase/DangerSource/SumItem?risktype=' + risktype + "&areaname=" + areaname + "&riskname=" + riskname + "&areacode=" + areacode,
+            width: ($(top.window).width()) + "px",
+            height: ($(top.window).height()) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+    var state = false;
+    var isAll = false;
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/DangerSource/GetPageSumListJson",
+            postData: !!level ? { queryJson: JSON.stringify({ year: year, level: level, deptCode: deptCode, areaCode: areaCode }), mode: mode, allList: 1, IndexState: IndexState } : { mode: mode, areaCode: areaCode, allList: 1, IndexState: IndexState },
+            datatype: "json",
+            height: $(window).height() - 200,
+            autowidth: true,
+            colModel: [
+               { label: '风险类别', name: 'risktype', width: 80, align: 'center'},
+               { label: "风险点", name: "riskname", width: 250, align: "center" },
+               { label: "所属区域", name: "districtname", width: 150, align: "center" },
+               {
+                   label: '风险等级', name: 'gradeval', width: 80, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                       if (cellvalue == 1) {
+                           return "重大风险";
+                       } else if (cellvalue== 2) {
+                           return "较大风险";
+                       } else if (cellvalue== 3) {
+                           return "一般风险";
+                       } else {
+                           return "低风险";
+                       }
+                   }
+               },
+               {
+                   label: "管控层级", name: "fl", width: 150, sortable: false, align: "center"
+               },
+               { label: "管控责任单位", name: "unit", width: 200, sortable: false, align: "center" },
+               { label: "责任人", name: "man", width: 200, sortable: false, align: "center" },
+                {
+                    label: "辨识数量", name: "num", width: 100, align: "center", sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return "<a style='text-decoration:underline;cursor:pointer;color:blue;' title='点击查看详情' onclick=\"show('" + encodeURIComponent(rowObject.risktype) + "','" + encodeURIComponent(rowObject.districtname) + "','" + encodeURIComponent(rowObject.riskname) + "','"+rowObject.areacode+"')\">" + cellvalue + "项</a>";
+                    }
+                }
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            rownumbers: true,
+            rownumWidth: 50,
+            sortname: 'risktype,districtname,riskname',
+            sortorder:'asc',
+            shrinkToFit:true
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            isAll = false;
+            $gridTable.jqGrid('setGridParam', {
+                postData: {  queryJson: JSON.stringify({ deptCode: deptCode, areaCode: areaCode, riskname: $("#txtKeyword").val(), level: $("#Grade").val(), riskType: $("#RiskType").val() }) }, page: 1
+            }).trigger('reloadGrid');
+            var title = "风险点";
+            if ($("#RiskType").val().length>0) {
+                var type = $("#RiskType").val();
+               
+                if (type=="作业") {
+                    title = "工作任务";
+                }
+                else if (type == "设备") {
+                    title = "设备名称";
+                }
+                else if (type == "区域") {
+                    title = "系统";
+                }
+                else if (type == "岗位") {
+                    title = "岗位名称";
+                }
+                else if (type == "管理") {
+                    title = "危险源";
+                }
+                else{
+                    title = "工器具/危化品名称";
+                }
+                $("#jqgh_gridTable_riskname").text(title);
+            } else {
+                $("#jqgh_gridTable_riskname").text(title);
+            }
+        });
+        $("#btn_SearchAll").click(function () {
+            isAll = true;
+            $("#txtKeyword").val(""); $("#Grade").val(""); $("button[data-id='Grade']").find(".filter-option").text('请选择'); $("#RiskType").val(""); $("button[data-id='RiskType']").find(".filter-option").text('请选择');
+            $(".inner li").removeClass("selected");
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ deptCode: deptCode, areaCode: areaCode, riskname: $("#txtKeyword").val(), level: $("#Grade").val(), riskType: $("#RiskType").val() }) }, page: 1
+            }).trigger('reloadGrid');
+            var title = "风险点";
+            $("#jqgh_gridTable_riskname").text(title);
+        });
+    }
+    function exportExcel() {
+       // Loading(true, "数据正在处理中……");
+        var queryJson=JSON.stringify({ deptCode: deptCode, areaCode: areaCode, riskname: $("#txtKeyword").val(), level: $("#Grade").val(), riskType: $("#RiskType").val() }) 
+        //$.ajax({
+        //    url: '../../RiskDatabase/Risk/ExportExcel?queryJson=' + queryJson + '&fileName=风险清单',
+        //    dataType: "JSON",
+        //    success: function (result) {
+        //        window.location.href = "../../Utility/DownloadFile?filePath=~/Resource/Temp/" + result.resultdata;
+        //        Loading(false);
+        //    }
+        //});
+        window.location.href = "../../RiskDatabase/DangerSource/ExportSumList?queryJson=" + queryJson + "&fileName=风险清单";
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <ul class="nav nav-tabs" id="ulTabs">
+                <li class="active">
+                    <a data-toggle="tab" href="#tab1">按部门</a>
+                </li>
+                <li id="area">
+                    <a data-toggle="tab" href="#tab2">按区域</a>
+                </li>
+            </ul>
+            <div class="tab-content">
+                <div id="tab1" class="tab-pane active">
+                    <div id="deptTree"></div>
+
+                </div>
+                <div id="tab2" class="tab-pane">
+                    <div id="itemTree" style="overflow: auto; height: 500px;">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center" style="margin-left: 5px;">
+        <div class="center-Panel">
+            <div class="panel-Title" id="pelTitle">风险清单</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                风险类别&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                <select id="RiskType" class="form-control" style="width:80px;">
+                                    <option value="">请选择</option>
+                                    <option value="作业">作业</option>
+                                    <option value="设备">设备</option>
+                                    <option value="区域">区域</option>
+                                    <option value="管理">管理</option>
+                                    <option value="岗位">岗位</option>
+                                    <option value="工器具及危化品">工器具及危化品</option>
+                                </select>
+                            </td>
+                            <td>
+                                &nbsp;&nbsp;风险等级&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                <select id="Grade" class="form-control" style="width:70px;">
+                                    <option value="">请选择</option>
+                                    <option value="1">重大风险</option>
+                                    <option value="2">较大风险</option>
+                                    <option value="3">一般风险</option>
+                                    <option value="4">低风险</option>
+                                </select>
+                            </td>
+                            <td width="10"></td>
+                            <td>
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入关键字进行搜索" style="width: 150px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a  class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a  class="btn btn-default" onclick="exportExcel();"><i class="fa fa fa-download"></i>&nbsp;导出</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

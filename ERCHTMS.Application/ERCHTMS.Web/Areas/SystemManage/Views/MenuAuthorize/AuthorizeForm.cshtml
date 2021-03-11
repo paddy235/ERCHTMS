@@ -1,0 +1,347 @@
+﻿@using ERCHTMS.Entity.SystemManage;
+@using Newtonsoft.Json
+@using ERCHTMS.Web.Areas.SystemManage.Model
+@{
+    ViewBag.Title = "AuthorizeForm";
+    Layout = "~/Views/Shared/_Form.cshtml";
+    List<MenuConfigEntity> entities = Model;
+    List<string> menuAuthList = ViewBag.MenuAuthList;
+
+    string departId = ViewBag.DepartId;
+    string departName = ViewBag.DepartName;
+    string departCode = ViewBag.DepartCode;
+    string dataJson = JsonConvert.SerializeObject(entities);
+    List<MenuConfigEntity> CheckMenus = entities.Where(x => menuAuthList.Contains(x.Id)).ToList();
+    string chekc = JsonConvert.SerializeObject(menuAuthList);
+
+    List<MenuTreeModel> MenuTreeList = ViewBag.MenuTree;
+    List<MenuTreeModel> authTreeModel = ViewBag.authTreeModel;
+}
+<script>
+    var dataJson = JSON.parse( "@Html.Raw(HttpUtility.JavaScriptStringEncode( dataJson))");
+    var checkdataJson = JSON.parse('@Html.Raw(chekc)');
+    var departCode = '@departCode';
+    var departId = '@departId';
+    var departName = '@departName';
+    var treeModel = JSON.parse('@Html.Raw(JsonConvert.SerializeObject(MenuTreeList))');
+    var authTreeModel = JSON.parse('@Html.Raw(JsonConvert.SerializeObject(authTreeModel))');
+    $(function () {
+
+        $(".sorllDiv").css({ height: ($(top.window).height() - 50) + "px" });
+        var item = {
+            height: $(window).height() - 50,
+            showcheck: true,
+            url: false,
+            data: treeModel,
+            onnodeclick: function (item) {
+              
+                setTimeout("log()", 100)
+            },
+            oncheckboxclick: function (tree, item) {
+                if ( tree.associationId != null) {
+                    //把管理的菜单给勾上
+                    var assIds = tree.associationId.split(",");
+                    if (assIds != undefined && assIds.length > 0) {
+                        $("#ModuleTree").setCheckedNodes(assIds);  
+                        //$(assIds).each(function (index, assId) {//勾选的则显示出来
+                            //$("#ModuleTree").setCheckedNodeOne(assId);
+                            //var nid = assId.replace(/[^\w]/gi, "_");
+                            //var et = $("#ModuleTree_" + nid + "_cb");
+                            //if (et.length == 1) {
+                            //    et.attr("src", top.contentPath + "/Content/scripts/plugins/tree/images/icons/" + "checkbox_1.png");
+                            //}
+                           // $("#AuthTree" + '_' + assId.replace(/-/g, "_")).show();
+                        //})
+                    } 
+                } 
+                setTimeout("log()",100)
+
+            
+                //if (item == 1) {
+                //    //选中
+                //    if (tree.parentnodes != "0" && tree.parentnodes != "1" && tree.parentnodes != "2") {//非一级节点
+                     
+                //        var rootNode = GetRootNode(tree);//找到根节点
+                //        if (rootNode.id != "0" && rootNode.id != "1" && rootNode.id != "2"  ) {
+                //            //1.先删除父节点下非本节点的其他同级节点
+                //            for (var i = 0; i < tree.parent.ChildNodes.length; i++) {
+                //                if (tree.parent.ChildNodes[i].id != tree.id) {
+                //                    tree.parent.ChildNodes.splice(i);
+                //                }
+                //            }
+                //        }
+                //    } else {
+                //        //如果是一级节点，则该节点下所有的子节点也会被一起选中，直接把该节点添加到待选区即可
+                //        authTreeModel.push(tree);
+                //    }
+                //} else {
+                //    //取消选中
+                //}
+                //console.log(tree);
+                //console.log(item);
+            }
+        };
+        $("#ModuleTree").treeview(item);
+        var AuthTreeitem = {
+            height: $(window).height() - 50,
+            showcheck: true,
+            url: false,
+            data: authTreeModel,
+            onnodeclick: function (item) {
+                if (item.checkstate == 0) {
+                    $("#AuthTree").setCheckedNodeOne(item.id);
+                }
+            }
+        };
+        $("#AuthTree").treeview(AuthTreeitem);
+        InitCHECKData()//树菜单渲染完成之后调用
+        //$(".bbit-tree-ec-icon").trigger("click");
+            
+
+    })
+    function log() {
+        CheckEvent($("#ModuleTree").getCheckedAllNodes());
+    }
+    /// checkbox状态改变事件  Id-选中的菜单ID  platformType-平台类型  associationId-关联的菜单的ID  elemt-当前的元素
+    function CheckMenu(Id, platformType, associationId, elemt) {
+
+        if ($(elemt).is(":checked")) {
+            //把选中的菜单添加到待选区
+            var checkHtml = ' <tr id="chk' + Id + '"  name="check' + platformType +'"><td class="col-md-5 ">' + $(elemt).attr("text") + '</td><td class="col-md-6">' + $(elemt).attr("remark") + '</td></tr>'
+            checkdataJson.push(Id);
+            $("#type" + platformType).after(checkHtml)
+            var assArry = associationId.split(',');
+            for (var i = 0; i < assArry.length; i++) {
+
+                //判断元素是否存在，存在就不添加
+                if (!!document.getElementById(assArry[i])) {
+                    document.getElementById(assArry[i]).checked = true;
+                }
+                if (!document.getElementById("chk" + assArry[i])) {
+                    if (!!document.getElementById(assArry[i])) {
+                        checkdataJson.push(assArry[i]);
+                        //1、先把关联的勾给勾上
+                        //2、把关联菜单添加到待选取
+                        //关联菜单的类型
+                        var associationPlatform = $("#" + assArry[i]).attr("platform");
+                        var thisHtml = ' <tr  id="chk' + assArry[i] + '" name="check' + platformType+'"><td class="col-md-5 ">' + $("#" + assArry[i]).attr("text") + '</td><td class="col-md-6">' + $("#" + assArry[i]).attr("remark") + '</td></tr>'
+                        $("#type" + associationPlatform).after(thisHtml)
+                    }
+
+                //3、把关联菜单添加到带选取
+                }
+
+            }
+        } else {
+            //移除
+            $("#chk" + Id).remove();
+            for (var i = 0; i < checkdataJson.length; i++) {
+                if (checkdataJson[i] == Id) {
+                    checkdataJson.splice(i, 1);
+                }
+            }
+        }
+    }
+    //保存
+    function AcceptClick() {
+
+        var postData = {
+            ModuleIds: $("#ModuleTree").getCheckedAllNodes(),
+            departCode: departCode,
+            departId: departId,
+            departName: departName,
+        }
+        console.log(postData);
+        $.SaveForm({
+            url: "../../SystemManage/MenuAuthorize/SaveMenuAuth",
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                //$.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }, 
+        })
+    }
+
+    function TipBtn(name, elemt) {
+        if ($(elemt).text() == "收起") {
+            $("tr[name=" + name + "]").hide();
+            console.log($("img[name=img_" + name + "]"));
+            //$("img[name=img_" + name + "]").attr("src", "/ERCHTMS/Content/images/t_12.png")
+            $(elemt).text("展开")
+
+            $(elemt).append('<img name="img_app" src="/ERCHTMS/Content/images/t_12.png">')
+        } else {
+            $("tr[name=" + name + "]").show();
+
+            $(elemt).text("收起")
+            $(elemt).append('<img name="img_app" src="/ERCHTMS/Content/images/t_06.png">')
+        }
+
+    }
+
+    function GetRootNode(tree) {
+        if (!!tree.parent) {//存在父节点
+            if (tree.parentnodes != "0" && tree.parentnodes != "1" && tree.parentnodes != "2")//并且 父节点不是最顶级节点
+            {
+                return GetRootNode(tree.parent)
+            } else {
+                return tree.parent;
+            }
+        } else {
+            return tree;
+        }
+    }
+    //点击事件之后调用的方法
+    function InitCHECKData() {
+        $("div[id^='AuthTree_']").not($("#AuthTree_1,#AuthTree_2,#AuthTree_0,#AuthTree_3")).hide()//先隐藏所有的待选项
+        $(checkdataJson).each(function (index, item) {//勾选的则显示出来
+            $("#AuthTree" + '_' + item.replace(/-/g, "_")).show();
+        })
+    }
+    function CheckEvent(checkitem) {
+        $("div[id^='AuthTree_']").not($("#AuthTree_1,#AuthTree_2,#AuthTree_0,#AuthTree_3")).hide()//先隐藏所有的待选项
+        $(checkitem).each(function (index, item) {//勾选的则显示出来
+            $("#AuthTree" + '_' + item.replace(/-/g, "_")).show();
+        })
+    }
+
+</script>
+<style>
+    /*下*/
+    .downBtn {
+        background-image: url(/ERCHTMS/Content/images/black_arrow_8.png);
+        height: 8px;
+        width: 8px;
+        background-position: 0px -8px;
+    }
+    /*上*/
+    .topBtn {
+        height: 8px;
+        width: 8px;
+        background-image: url(/ERCHTMS/Content/images/black_arrow_8.png);
+        background-position: 0px -0px;
+    }
+</style>
+<!-- 0-window终端 1-Android终端 2-手机APP-->
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west col-md-6">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    系统功能列表
+                </div>
+            </div>
+            <div id="ModuleTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-west col-md-6">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    授权功能列表
+                </div>
+            </div>
+            <div id="AuthTree"></div>
+        </div>
+    </div>
+</div>
+
+    @*<div class="container" style="height: 100%; ">
+        <div class="col-md-12">
+            <div class="col-md-6">
+                <div class="col-md-12" style="margin-top:20px; margin-bottom:10px;"><h5>系统功能列表</h5></div>
+                <div class="col-md-12 table-bordered sorllDiv" style="overflow-y:scroll;">
+
+                    <table id="tab_menu" class="table-bordered col-md-12" style="margin:5px -3px;">
+                        <tr>
+                            <td class="col-md-1"></td>
+                            <td class="col-md-5 text-center">功能名称</td>
+                            <td class="col-md-6">备注</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="text-center" style="color:#2e99d4;">安卓终端<span style="margin-left:10px;"><a href="javascript:void(0)" onclick="TipBtn('andorid',this)">收起<img name="img_andorid" src="~/Content/images/t_06.png" /></a> </span></td>
+                        </tr>
+                        @foreach (var menu in entities.Where(x => x.PaltformType == 1))
+                        {
+                            bool isHave = CheckMenus.Any(x => x.Id == menu.Id);
+                            <tr id="@Html.Raw("tr"+menu.Id)" name="andorid">
+                                <td class="col-md-1 text-center"><input type="checkbox" @Html.Raw(isHave ? "checked=\"checked\"" : "") id="@menu.Id" platform="@menu.PaltformType" value="@menu.Id" text="@menu.ModuleName" remark="@menu.Remark" onchange="CheckMenu('@menu.Id','1','@menu.AssociationId',this)" /></td>
+                                <td class="col-md-5 ">@menu.ModuleName</td>
+                                <td class="col-md-6">@menu.Remark</td>
+                            </tr>
+                        }
+
+                        <tr>
+                            <td colspan="3" class="text-center" style="color:#2e99d4;">Windwos终端<span style="margin-left:10px;"><a href="javascript:void(0)" onclick="TipBtn('windows',this)">收起<img name="img_windows" src="~/Content/images/t_06.png" /></a> </span></td>
+
+                        </tr>
+                        @foreach (var menu in entities.Where(x => x.PaltformType == 0))
+                        {
+                            bool isHave = CheckMenus.Any(x => x.Id == menu.Id);
+                            <tr id="@Html.Raw("tr"+menu.Id)" name="windows">
+                                <td class="col-md-1 text-center"><input type="checkbox" @Html.Raw(isHave ? "checked=\"checked\"" : "") id="@menu.Id" platform="@menu.PaltformType" value="@menu.Id" text="@menu.ModuleName" remark="@menu.Remark" onchange="CheckMenu('@menu.Id','0','@menu.AssociationId',this)" /></td>
+                                <td class="col-md-5 ">@menu.ModuleName</td>
+                                <td class="col-md-6">@menu.Remark</td>
+                            </tr>
+                        }
+                        <tr>
+                            <td colspan="3" class="text-center" style="color:#2e99d4;">手机APP<span style="margin-left:10px;"><a href="javascript:void(0)" onclick="TipBtn('app',this)">收起<img name="img_app" src="~/Content/images/t_06.png" /></a> </span></td>
+                        </tr>
+                        @foreach (var menu in entities.Where(x => x.PaltformType == 2))
+                        {
+                            bool isHave = CheckMenus.Any(x => x.Id == menu.Id);
+                            <tr id="@Html.Raw("tr"+menu.Id)" name="app">
+                                <td class="col-md-1 text-center"><input type="checkbox" @Html.Raw(isHave ? "checked=\"checked\"" : "") id="@menu.Id" platform="@menu.PaltformType" value="@menu.Id" text="@menu.ModuleName" remark="@menu.Remark" onchange="CheckMenu('@menu.Id','2','@menu.AssociationId',this)" /></td>
+                                <td class="col-md-5 ">@menu.ModuleName</td>
+                                <td class="col-md-6">@menu.Remark</td>
+                            </tr>
+                        }
+                    </table>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="col-md-12" style="margin-top:20px; margin-bottom:10px;"><h5>授权功能列表</h5></div>
+                <div class="col-md-12 table-bordered sorllDiv" style=" overflow-y:scroll;">
+                    <table id="tab_check" class="table-bordered col-md-12" style="margin:5px -3px;">
+                        <tr>
+                            <td class="col-md-6 text-center">功能名称</td>
+                            <td class="col-md-6">备注</td>
+                        </tr>
+                        <tr id="type1">
+                            <td colspan="3" class="text-center" style="color:#2e99d4;">安卓终端<span style="margin-left:10px;"><a href="javascript:void(0)" onclick="TipBtn('check1',this)">收起<img name="img_check1" src="~/Content/images/t_06.png" /></a> </span></td>
+                        </tr>
+                        @foreach (var menu in CheckMenus.Where(x => x.PaltformType == 1))
+                        {
+                            <tr id="@Html.Raw("chk"+menu.Id)" name="check1">
+                                <td class="col-md-6 ">@menu.ModuleName</td>
+                                <td class="col-md-6">@menu.Remark</td>
+                            </tr>
+                        }
+                        <tr id="type0">
+                            <td colspan="3" class="text-center" style="color:#2e99d4;">Windwos终端<span style="margin-left:10px;"><a href="javascript:void(0)" onclick="TipBtn('check0',this)">收起<img name="img_check0" src="~/Content/images/t_06.png" /></a> </span></td>
+
+                        </tr>
+                        @foreach (var menu in CheckMenus.Where(x => x.PaltformType == 0))
+                        {
+                            <tr id="@Html.Raw("chk"+menu.Id)" name="check0">
+                                <td class="col-md-6 ">@menu.ModuleName</td>
+                                <td class="col-md-6">@menu.Remark</td>
+                            </tr>
+                        }
+                        <tr id="type2">
+                            <td colspan="3" class="text-center" style="color:#2e99d4;">手机APP<span style="margin-left:10px;"><a href="javascript:void(0)" onclick="TipBtn('check2',this)">收起<img name="img_check2" src="~/Content/images/t_06.png" /></a> </span></td>
+                        </tr>
+                        @foreach (var menu in CheckMenus.Where(x => x.PaltformType == 2))
+                        {
+                            <tr id="@Html.Raw("chk"+menu.Id)" name="check2">
+                                <td class="col-md-6 ">@menu.ModuleName</td>
+                                <td class="col-md-6">@menu.Remark</td>
+                            </tr>
+                        }
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>*@
+
+

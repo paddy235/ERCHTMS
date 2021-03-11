@@ -1,0 +1,397 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+<script src="~/content/scripts/plugins/highcharts/highcharts.7.0.js"></script>
+<script src="~/content/scripts/plugins/highcharts/modules/exporting.7.0.js"></script>
+<script src="~/content/scripts/plugins/highcharts/modules/drilldown.7.0.js"></script> @*下钻获取图表数据*@
+@*<script src="~/content/scripts/plugins/highcharts/modules/exporting.js"></script>*@
+<script src="~/Content/scripts/business/statisticsAgency.js"></script>
+<script src="~/content/scripts/plugins/highcharts/modules/no-data-to-display.7.0.js"></script>
+<script type="text/javascript">
+    //
+    //初始化及用户信息
+    //
+    var iscompany = "";
+    var selectRootDeptId = "";
+    var curDeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var curDeptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var curDeptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var curOrganizeId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    var curOrganizeCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var curOrganizeName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeName";
+    var startTime = "@DateTime.Now.ToString("yyyy-01-01")";
+    var endTime = "@DateTime.Now.ToString("yyyy-MM-dd")";
+    //页面代理
+    var staAgc = null;
+    //
+    //页面加载完成
+    //
+    $(function () {
+        //
+        //创建代理
+        //
+        staAgc = new statisticsAgency({
+            pageControls: {
+                queryId: "queryArea",
+                searchId: "",
+                resetId: "",
+                btns: [
+                    { id: 'btn_Export', url: '', args: "" },
+                    { id: 'lr-panel-one', url: 'Index' },
+                    { id: 'lr-panel-two', url: 'TrendIndex' },
+                    { id: 'lr-panel-three', url: 'CompareIndex' },
+                    { id: "DepartmentName", onClick: selectDepart }
+                ]
+            }
+        });
+        //
+        //绑定页面控件
+        //
+        staAgc.bindPageControls();
+        ////初始化
+        staAgc.initialPage([
+            {
+                url: '../../LllegalStandard/LllegalStandard/GetInitDataJson',
+                ctrls: [{ Id: 'LllegalType', memberId: 'ItemDetailId', memberText: 'ItemName', description: '==全部==', dataProName: 'data.LllegalType' }]
+            },
+            {
+                url: '../../LllegalManage/LllegalStatistics/QueryCurUser',
+                ctrls: [],
+                callBack: setPageData
+            }
+        ]);
+       
+        //加载内容
+        LoadData();
+        //重置
+        $("#btn_Reset").click(function () {
+            reset();
+            LoadData();
+        });
+        //查询
+        $("#btn_Search").click(function () {
+            LoadData();
+        });
+        //查询
+        $("#btn_Export").click(function () {
+            window.location.href = "../../LllegalManage/LllegalStatistics/ExportCompareNumber?queryJson=" + getQueryJson();
+        });
+    })
+
+
+    function LoadData()
+    {
+        $.ajax({
+            type: "get",
+            url: "../../LllegalManage/LllegalStatistics/QueryLllegalNumberDrilldownColumn", //饼图
+            data: { queryJson: getQueryJson() },
+            success: function (data) {
+                if (!!data) {
+                    var obj = eval("(" + data + ")");
+                    LoadContainer(obj.columnTotal, obj.columnChildren);
+                    GetGridTable(obj.columnList);
+                }
+            }
+        });
+    }
+
+
+    //加载表格1
+    function GetGridTable(tdata) {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable1');
+        //隐患基本信息
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: parseFloat($(window).height() / 2 - 100),
+            datatype: "local",
+            data: tdata,
+            colModel: [
+                {
+                    label: '单位', name: 'fullname', index: 'fullname', width: 400, align: 'center', sortable: false
+                },
+                {
+                    label: '一般违章', name: '一般违章', index: '一般违章', width: 300, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = cellvalue;
+                        if (cellvalue > 0) {
+                            html = '<a style=\"text-decoration: underline;color: blue;\"  href=javascript:openLllegalList("' + rowObject.encode + '","' + $("#LllegalType").attr("data-value") + '","' + eval("rowObject.id" + options.colModel.name) + '")>' + cellvalue + '</a>';
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '较严重违章', name: '较严重违章', index: '较严重违章', width: 300, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = cellvalue;
+                        if (cellvalue > 0) {
+                            html = '<a style=\"text-decoration: underline;color: blue;\"  href=javascript:openLllegalList("' + rowObject.encode + '","' + $("#LllegalType").attr("data-value") + '","' + eval("rowObject.id" + options.colModel.name) + '")>' + cellvalue + '</a>';
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '严重违章', name: '严重违章', index: '严重违章', width: 200, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = cellvalue;
+                        if (cellvalue > 0) {
+                            html = '<a style=\"text-decoration: underline;color: blue;\"  href=javascript:openLllegalList("' + rowObject.encode + '","' + $("#LllegalType").attr("data-value") + '","' + eval("rowObject.id" + options.colModel.name) + '")>' + cellvalue + '</a>';
+                        }
+                        return html;
+                    }
+                }
+            ],
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //
+    //设置页面数据
+    //
+    function setPageData(data) {
+        iscompany = data;
+        if (iscompany == "1") {
+            $("#DepartmentName").val(curOrganizeName);
+            $("#DepartmentCode").val(curOrganizeCode);
+            $("#DepartmentId").val(curOrganizeId);
+        }
+        else {
+            $("#DepartmentName").val(curDeptName);
+            $("#DepartmentCode").val(curDeptCode);
+            $("#DepartmentId").val(curDeptId);
+        }
+        selectRootDeptId = $("#DepartmentId").val();
+        $("#StartTime").val(startTime);
+        $("#EndTime").val(endTime);
+    }
+
+
+    //加载对比图(各部门登记的)
+    function LoadContainer(xdata, sdata) {
+
+        $('#container1').highcharts({
+            chart: {
+                type: 'column'
+            },
+            title: {
+                text: '各级别违章数量对比统计图'
+            },
+            xAxis: {
+                type: 'category'
+            },
+            yAxis: {
+                min: 0,
+                title: {
+                    text: '数量'
+                },
+                stackLabels: {
+                    enabled: true,
+                    style: {
+                        fontWeight: 'bold',
+                        color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                    }
+                }
+            },
+            exporting: { enabled: false},
+            legend: {
+                align: 'right',
+                x: -30,
+                verticalAlign: 'top',
+                y: 25,
+                floating: true,
+                backgroundColor: (Highcharts.theme && Highcharts.theme.background2) || 'white',
+                borderColor: '#CCC',
+                borderWidth: 1,
+                shadow: false
+            },
+            //tooltip: {
+            //    pointFormat: '{series.name}: {point.y}<br/>合计: {point.stackTotal}'
+            //},
+            tooltip: {
+                crosshairs: true,
+                shared: true
+            },
+            plotOptions: {
+                column: {
+                    stacking: 'normal',
+                    dataLabels: {
+                        enabled: true,
+                        color: (Highcharts.theme && Highcharts.theme.dataLabelsColor) || 'white'
+                    }
+                }
+            },
+            series: xdata,
+            drilldown: { series: sdata },
+            lang: { noData: "暂无数据可显示!" },
+            noData: {
+                position: {
+                    align: 'center',
+                    verticalAlign: 'middle'
+                },
+                attr: {
+                    'stroke-width': 1
+                },
+                style: {
+                    fontWeight: 'bold',
+                    fontSize: '15px',
+                    color: '#202030'
+                }
+            }
+        });
+    }
+
+
+    //
+    //重置查询条件
+    //
+    function getQueryJson() {
+        var queryJson = {
+            deptCode: $("#DepartmentCode").val(),
+            deptId: $("#DepartmentId").val(),
+            startTime: $("#StartTime").val(),
+            endTime: $("#EndTime").val(),
+            orgId: $("#DepartmentId").val(),
+            legType: $("#LllegalType").attr("data-value"),
+            levelGroups: "一般违章,较严重违章,严重违章",
+            deptMark: "lllegalteamcode"
+        };
+        return JSON.stringify(queryJson);
+    }
+    //
+    //选择单位
+    //
+    function selectDepart() {
+        if (selectRootDeptId == "0")
+            selectDept("", 0, 2, '选择单位', window.document.body, 'DepartmentName,DepartmentCode,DepartmentId');
+        else
+            selectDept(selectRootDeptId, 0, 8, '选择单位', window.document.body, 'DepartmentName,DepartmentCode,DepartmentId');
+    }
+    //
+    //重置按钮
+    //
+    function reset() {
+        //选择单位
+        if (iscompany == "1") {
+            $("#DepartmentName").val(curOrganizeName);
+            $("#DepartmentCode").val(curOrganizeCode);
+            $("#DepartmentId").val(curOrganizeId);
+        }
+        else {
+            $("#DepartmentName").val(curDeptName);
+            $("#DepartmentCode").val(curDeptCode);
+            $("#DepartmentId").val(curDeptId);
+        }
+        $("#StartTime").val(startTime);
+        $("#EndTime").val(endTime);
+        $("#LllegalType").resetCombobox("==全部==", "");
+    }
+    //
+    //打开链接
+    //
+    function openLllegalList(deptCode, legTypeId, legLevelId) {
+        var idx = dialogOpen({
+            id: 'LllegalList',
+            title: '违章列表',
+            btns: 1,
+            btn: ["关闭"],
+            url: '/LllegalManage/LllegalRegister/SdIndex?Qtype=1&DeptCode=' + deptCode + "&LllegalType=" + legTypeId + "&LllegalLevel=" + legLevelId + "&StartTime=" + $("#StartTime").val() + "&EndTime=" + $("#EndTime").val() + "&layerId=LllegalList",
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+</script>
+<style type="text/css">
+    .ui-select {
+        width: 200px;
+    }
+
+    .formTitle {
+        padding-left: 10px;
+        font-weight:bold;
+    }
+    .ui-row-ltr a{padding-left:0px;}
+
+</style>
+<div class="center-Panel">
+    <div class="panel-Title">违章数量统计信息</div>
+    <div class="titlePanel">
+        <div class="title-search">
+            <table class="queryform">
+                <tr>
+                    <th style="padding-left: 10px;">选择单位：</th>
+                    <td style="padding-left: 5px;">
+                        <input id="DepartmentName" type="text" style="width: 200px;" class="form-control" placeholder="请选择单位" readonly />
+                        <input id="DepartmentCode" type="hidden" />
+                        <input id="DepartmentId" type="hidden" />
+                    </td>
+                    <th style="padding-left: 10px;">违章时间：</th>
+                    <td>
+                        <div style="width: 40%;margin-left:10px;display:inline-block;vertical-align:middle;">
+                            <input id="StartTime" readonly type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker()">
+                        </div>
+                        <div style="width: 10%; text-align: center;display:inline-block;">至</div>
+                        <div style="width: 40%;display:inline-block;vertical-align:middle;">
+                            <input id="EndTime" readonly type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()">
+                        </div>
+                    </td>
+                    <td class="formTitle">违章类型：</td>
+                    <td class="formValue">
+                        <div id="LllegalType" type="select" class="ui-select" data-value=""/>
+                    </td>
+                    <td style="padding-left: 20px;">
+                        <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>&nbsp;&nbsp;
+                        <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>&nbsp;&nbsp;
+                        <a id="btn_Export" class="btn btn-primary"><i class="fa fa-file-excel-o"></i>&nbsp;导出</a>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <a id="lr-panel-one" class="btn btn-default" ><i class="fa fa fa-pie-chart" ></i>&nbsp;统计图</a>
+                <a id="lr-panel-two" class="btn btn-default" ><i class="fa fa fa-area-chart" ></i>&nbsp;趋势图</a>
+                <a id="lr-panel-three" class="btn btn-default" style="background-color: rgb(51, 122, 183); color: rgb(255, 255, 255);"><i class="fa fa fa-bar-chart" style="color: rgb(255, 255, 255);"></i>&nbsp;对比图&nbsp;</a>
+            </div>
+        </div>
+    </div>
+    <div class="west-Panel">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="container1"></div>
+            </div>
+        </div>
+        <div class="panel panel-default" id="statisticsList">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计列表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table id="gridTable1"></table>    
+            </div>
+        </div>
+    </div>
+</div>

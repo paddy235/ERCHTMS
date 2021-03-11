@@ -1,0 +1,169 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <!--框架必需start-->
+    <script src="~/Content/scripts/jquery/jquery-1.10.2.min.js"></script>
+    <link href="~/Content/styles/font-awesome.min.css" rel="stylesheet" />
+    <link href="~/Content/scripts/plugins/jquery-ui/jquery-ui.min.css" rel="stylesheet" />
+    <script src="~/Content/scripts/plugins/jquery-ui/jquery-ui.min.js"></script>
+    <!--框架必需end-->
+    <!--bootstrap组件start-->
+    <link href="~/Content/scripts/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link href="~/Content/scripts/bootstrap/bootstrap.extension.css" rel="stylesheet" />
+    <script src="~/Content/scripts/bootstrap/bootstrap.min.js"></script>
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+        <script src="~/content/scripts/bootstrap/html5shiv.js"></script>
+        <script src="~/content/scripts/bootstrap/respond.min.js"></script>
+        <script src="~/content/scripts/bootstrap/jquery.placeholder.min.js"></script>
+        <script src="~/content/scripts/bootstrap/json2.js" type="text/javascript"></script>
+        <script src="~/content/scripts/bootstrap/core.js" type="text/javascript"></script>
+    <![endif]-->
+    <!--bootstrap组件end-->
+    <script src="~/Content/scripts/plugins/datepicker/WdatePicker.js"></script>
+    @System.Web.Optimization.Styles.Render("~/Content/scripts/plugins/jqgrid/css",
+    "~/Content/scripts/plugins/tree/css",
+    "~/Content/scripts/plugins/datetime/css",
+    "~/Content/scripts/plugins/wizard/css",
+    "~/Content/styles/framework-ui.css")
+    @System.Web.Optimization.Scripts.Render("~/Content/scripts/plugins/jqgrid/js",
+    "~/Content/scripts/plugins/tree/js",
+    "~/Content/scripts/plugins/validator/js",
+    "~/Content/scripts/plugins/wizard/js",
+    "~/Content/scripts/plugins/datepicker/js",
+    "~/Content/scripts/utils/js")
+
+    <script type="text/javascript">
+        var chkId = "";
+        var mode = "";
+        $(function () {
+            initControl();
+        })
+        //初始化控件
+        function initControl() {
+
+            chkId = top.Details.window.recid;
+            //获取对应电厂的模板
+            $.ajax({
+                type: "get",
+                url: "../../Home/GetCurrentFactory",
+                success: function (data) {
+                    var yhurlargs = "?filePath=~/Resource/ExcelTemplate/safetycheck/隐患导入模板.xls&mode=1";
+                    var wzurlargs = "?filePath=~/Resource/ExcelTemplate/safetycheck/违章导入模板.xls&mode=2";
+                    var wturlargs = "?filePath=~/Resource/ExcelTemplate/safetycheck/问题导入模板(安全检查版本).xls&mode=8"; //通用问题(安全检查)专用
+                    //可门检查专用
+                    if (!!data && data=="5") {
+                        mode = "5";
+                        wzurlargs = "?filePath=~/Resource/ExcelTemplate/safetycheck/违章导入模板(华电可门版本).xls&mode=5"; //mode=5 可门专用
+                        yhurlargs = "?filePath=~/Resource/ExcelTemplate/safetycheck/隐患导入模板(华电可门版本).xls&mode=1"; //可门专用
+                    }
+                    //江陵检查专用
+                    if (!!data && data=="6") {
+                        mode = "6";
+                        yhurlargs = "?filePath=~/Resource/ExcelTemplate/safetycheck/隐患导入模板(华电江陵版本).xls&mode=6"; //mode=6 江陵专用
+                    }
+                    //西塞山检查专用
+                    if (!!data && data == "8") {
+                        mode = "8";
+                        wturlargs = "?filePath=~/Resource/ExcelTemplate/safetycheck/问题导入模版(西塞山安全检查版本).xls&mode=8"; //mode=8 西塞山问题(安全检查)专用
+                    }
+                    $("#lllegal").attr("href", $("#lllegal").attr("href") + wzurlargs);
+                    $("#hidtrouble").attr("href", $("#hidtrouble").attr("href") + yhurlargs);
+                    $("#question").attr("href", $("#question").attr("href") + wturlargs);
+
+                    $(".temp").each(function (j, dom) {
+                        $(dom).attr("href", $(dom).attr("href") + "&chkId=" + chkId);
+                    });
+                    if (top.window.isWz == "1") {
+                        $("#lllegal").css("display", "");
+                    }
+                    if (top.window.isWt == "1")
+                    {
+                        $("#question").css("display", "");
+                    }
+                }
+            });
+        }
+
+        //保存表单
+        function AcceptClick() {
+            var RepeatData = $("input[name='RepeatData']:checked").val();
+            if ($("#file1").val().length > 0) {
+                var dlg = dialogConfirm("确定导入吗？", function (isSure) {
+                    if (isSure) {
+                        top.layer.close(dlg);
+                        $("#form1").attr("action", "../../HiddenTroubleManage/HTBaseInfo/ImportHiddenInfo?checkid=" + chkId + "&repeatdata=" + RepeatData + "&mode=" + mode);
+                        top.window.$(".layui-layer-btn0").eq(1).hide();
+                        top.Details.window.isImport = true;
+                        setInterval("LoadModel()", 500);
+                        $("#form1").trigger("submit");
+                    }
+
+                });
+            }
+            else {
+                dialogMsg("请选择文件！", 2);
+            }
+        }
+
+        function LoadModel() {
+            Loading(true, "请稍候,正在导入数据……");
+        }
+    </script>
+</head>
+<body>
+    <form action="../../HiddenTroubleManage/HTBaseInfo/ImportHiddenInfo" method="post" enctype="multipart/form-data" id="form1">
+        <div class="row" style="margin:10px;">
+            <div class="col-sm-12" style="margin-bottom:5px;">
+                <strong>
+                    注：请上传指定格式的excel文件. <br />
+                    <a target="_blank" class="temp" id="hidtrouble" href="../../Utility/DownloadFileInsertAreas" style="color:blue; text-decoration:underline;">1、点击下载隐患导入模板</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <a target="_blank" class="temp" id="lllegal" href="../../Utility/DownloadFileInsertAreas" style="color:blue; text-decoration:underline; display:none; ">2、点击下载违章导入模板</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <a target="_blank" class="temp" id="question" href="../../Utility/DownloadFileInsertAreas" style="color:blue; text-decoration:underline;display:none; ">3、点击下载问题导入模板</a>
+                </strong>
+            </div>
+            <div>
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">选择文件：</td>
+                        <td class="formValue">
+                            <input type="file" id="file1" name="file1" class="form-control" multiple />
+                            <div style="color:red;">最多可选择2个文件</div>
+                            <input type="hidden" id="FileName" name="FileName" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">重复数据：</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="RepeatData" id="RepeatData1" value="1" />覆盖
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="RepeatData" id="RepeatData2" value="0" checked="checked" />跳过
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="font-weight:bold;">
+                            说明：
+                            <p>&nbsp;&nbsp;&nbsp;1.excel文件请务必使用系统提供的模板文件;</p>
+                            <p>
+                                &nbsp;&nbsp;&nbsp;2.若有图片文件请统一放在一个文件中并进行压缩，压缩文件格式必须为zip格式;
+                            </p>
+                            <p> &nbsp;&nbsp;&nbsp;3.exel表格中填写的数据请务必按照模板要求填写，否则将无法导入</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        @*防止跨站请求伪造*@
+        @Html.AntiForgeryToken()
+    </form>
+</body>
+</html>

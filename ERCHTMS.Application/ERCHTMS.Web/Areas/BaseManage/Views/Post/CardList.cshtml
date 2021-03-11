@@ -1,0 +1,339 @@
+﻿@{
+    ViewBag.Title = "岗位管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var _itemCode = "";
+
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //加载组织机构树
+    function GetTree() {
+        var json;
+
+        json = JSON.stringify(
+                    {
+                        SelectMode: 0,
+                        Mode: 0
+                    }
+                  );
+        var item = {
+            height: $(window).height() - 48,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _itemCode = item.value;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    //初始化页面
+    function InitialPage() {
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 108.5);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../BaseManage/Post/GetPageListJson",
+            datatype: "json",
+            height: $(window).height() - 175,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'roleid', hidden: true }, { label: 'createuserid', name: 'createuserid', hidden: true }, { label: 'organizecode', name: 'organizecode', hidden: true }, { label: 'deptcode', name: 'deptcode', hidden: true },
+                {
+                     label: '操作', name: 'Oper', width: 80, align: 'center', sortable: false
+                },
+                { label: '所属部门', name: 'deptname', index: 'deptname', width: 200, align: 'center' },
+                { label: '岗位名称', name: 'fullname', index: 'FullName', width: 200, align: 'center' }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 't.createdate desc,t.organizeid',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                var rows = $gridTable.jqGrid("getRowData");//获取当前页记录行数据
+                //查询用户对该模块的数据操作权限
+                $.post(top.contentPath + "/AuthorizeManage/PermissionJob/GetDataAuthority", { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val() }, function (data) {
+                    var jsonArr = eval("(" + data + ")");
+                    $(rows).each(function (i, item) {
+                        var uId = item.createuserid;
+                        var dCode = item.deptcode; //获取记录创建人的所属部门Code
+                        var oCode = item.organizecode;  //获取记录创建人的所属机构Code
+                        var btns = $("td[aria-describedby='gridTable_Oper']").eq(i).children();//获取操作列中定义的操作按钮
+                        var html = "<a href=\"javascript:view('" + uId + "')\" title=\"查看\"><i class=\"fa fa-eye\"></i></a>";
+                        //如果操作列中没有定义任何按钮则根据系统权限设置自动绑定操作按钮
+                        if (btns.length == 0) {
+                            $(jsonArr).each(function (j, item1) {
+                                var authType = parseInt(item1.authorizetype);//获取数据操作权限范围.1：本人,2：本部门，3：本部门及下属部门，4：本机构，5：全部
+                                switch (authType) {
+                                    //本用户
+                                    case 1:
+                                        if (top.currUserId == uId) {
+                                            html += "<a href=\"javascript:" + item1.actionname + "('" + uId + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                        //本部门
+                                    case 2:
+                                        if (top.currUserDeptCode == dCode) {
+                                            html += "<a href=\"javascript:" + item1.actionname + "('" + uId + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                        //本子部门
+                                    case 3:
+                                        if (dCode.indexOf(top.currUserDeptCode) >= 0) {
+                                            html += "<a href=\"javascript:" + item1.actionname + "('" + uId + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                        //本机构
+                                    case 4:
+                                        if (oCode == top.currUserOrgCode) {
+                                            html += "<a href=\"javascript:" + item1.actionname + "('" + uId + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                    case 5:
+                                        html += "<a href=\"javascript:" + item1.actionname + "('" + uId + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        break;
+                                }
+
+
+                            });
+
+                            $("td[aria-describedby='gridTable_Oper']").eq(i).html(html);
+                        } else {
+
+                            html = "";
+                            //遍历用户对该模块的数据操作权限
+                            $(jsonArr).each(function (j, item1) {
+                                html += item1.encode + ",";
+                                var authType = item1.authorizetype;//获取数据操作权限范围.1：本人,2：本部门，3：本部门及下属部门，4：本机构，5：全部
+                                switch (authType) {
+                                    //本用户
+                                    case 1:
+                                        if (top.currUserId != uId) {
+                                            $(btns).find("a[name='" + item1.itemcode + "']").remove();
+                                        }
+                                        break;
+                                        //本部门
+                                    case 2:
+                                        if (top.currUserDeptCode != dCode) {
+                                            $(btns).find("a[name='" + item1.itemcode + "']").remove();
+                                        }
+                                        break;
+                                        //本子部门
+                                    case 3:
+                                        if (dCode.indexOf(top.currUserDeptCode) < 0) {
+                                            $(btns).find("a[name='" + item1.itemcode + "']").remove();
+                                        }
+                                        break;
+                                        //本机构
+                                    case 4:
+                                        if (oCode != top.currUserOrgCode) {
+                                            $(btns).find("a[name='" + item1.itemcode + "']").remove();
+                                        }
+                                        break;
+                                }
+                            });
+
+                            $(btns).each(function (j, dom) {
+                                if (html.indexOf(dom.attr("name")) < 0) {
+                                    $(dom).remove();
+                                }
+                            });
+                        }
+
+                    });
+                });
+
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                condition: "FullName",
+                keyword: $.trim($("#txt_Keyword").val()),
+                _itemCode: _itemCode
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) },
+                page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    //编辑
+    function edit() {
+        var keyValue = $("#gridTable").jqGridRowValue("roleid");
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: "Form",
+                title: '修改应急处置卡信息',
+                url: '/BaseManage/Post/CardForm?action=edit&keyValue=' + keyValue,
+                width:($(window).width()-200)+ "px",
+                height: ($(window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+        }
+    }
+    //查看
+    function view() {
+        var keyValue = $("#gridTable").jqGridRowValue("roleid");
+        if (checkedRow(keyValue)) {
+           var dlg= dialogOpen({
+                id: "Form",
+                title: '查看应急处置卡信息',
+                url: '/BaseManage/Post/CardForm?action=show&keyValue=' + keyValue,
+                width: ($(window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn:['关闭'],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $("#gridTable").jqGridRowValue("roleid");
+        if (keyValue) {
+            $.RemoveForm({
+                url: "../../BaseManage/Post/RemoveCard",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的岗位！', 0);
+        }
+    }
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        idx = dialogOpen({
+            id: "ImportCard",
+            title: '导入应急处置卡',
+            url: '/BaseManage/Post/ImportCard',
+            width: "600px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    $("#gridTable").jqGrid('setGridParam', {
+                        postData: { keyWord: "" }
+                    }).trigger('reloadGrid');
+                }
+
+            }
+        });
+    }
+    //导出
+    function exp(){
+        Loading(true, "正在导出……");
+        var queryJson = {
+            condition: "FullName",
+            keyword: $.trim($("#txt_Keyword").val()),
+            _itemCode: _itemCode
+        }
+        $.ajax({
+            method:"post",
+            url: '../../BaseManage/Post/ExportCard?queryJson=' + JSON.stringify(queryJson) + '&fileName=应急处置卡清单',
+            dataType: "JSON",
+            success: function (result) {
+                window.location.href = "../../Utility/DownloadFile?filePath=~/Resource/Temp/" + result.resultdata;
+                Loading(false);
+            }
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div id="tree_div" class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a href="javascript:selectAll();">组织机构树</a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center" style="margin-left: 5px;">
+        <div class="center-Panel">
+            <div class="panel-Title" id="pelTitle">应急处置卡</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                岗位名称：
+                            </td>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="edit" class="btn btn-default" onclick="edit()"><i class="fa fa-pencil-square-o"></i>&nbsp;编辑</a>
+                    </div>
+                    @*<div class="btn-group">
+                    </div>*@
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+

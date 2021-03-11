@@ -1,0 +1,289 @@
+﻿@{
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<!--第三方统计图start-->
+<script src="~/Content/Scripts/plugins/highcharts/highcharts.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/modules/exporting.js"></script>
+<script>
+    var isrefesh = false;//切换选项卡是否刷新
+    $(function () {
+        InitialPage();
+        Ini();
+        Image();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 108.5);
+                $('#LibrarygridTable').setGridWidth($('.gridPanel').width());
+                $('#LibrarygridTable').setGridHeight($(window).height() - 108.5);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //初始化控件
+    function Ini() {
+        //加载人员
+        $("#RiskId").ComboBox({
+            url: top.contentPath + "/OccupationalHealthManage/Hazardfactors/GetRiskCmbList",
+            id: "itemValue",
+            text: "itemName",
+            height: '100px',
+            description: "==请选择==",
+            allowSearch: true
+        }).bind("change", function () {
+            if ($(this).attr('data-text').length > 6) {
+                document.getElementById("RiskId").style.width = ($(this).attr('data-text').length * 15) + "px";
+            } else {
+                document.getElementById("RiskId").style.width = "200px";
+            }
+        });
+    }
+
+
+    //统计图
+    function Image() {
+        $.get("GetHazardSickImage", { "year": $("#Time").val(), "risk": $("#RiskId").attr('data-value') }, function (data) {
+            var json = eval("(" + data + ")");
+
+            $('#dbcontainer').highcharts({
+                chart: {
+                    zoomType: 'xy'
+                },
+                title: {
+                    text: '职业病年度变化趋势'
+                },
+                xAxis: {
+                    categories: json.y,
+                    crosshair: true,
+                    labels: {
+                        format: '{value}月',
+                    },
+                },
+                yAxis: [{ // Primary yAxis
+                    labels: {
+                        format: '{value}%',
+                        style: {
+                            color: Highcharts.getOptions().colors[1]
+                        }
+                    },
+                    title: {
+                        text: '超标率%',
+                        style: {
+                            color: Highcharts.getOptions().colors[1]
+                        }
+                    },
+                    min: 0,
+                    max: 100,
+                }, { // Secondary yAxis
+                    title: {
+                        text: '监测数量',
+                        style: {
+                            color: Highcharts.getOptions().colors[1]
+                        }
+                    },
+                    labels: {
+                        format: '{value}个',
+                        style: {
+                            color: Highcharts.getOptions().colors[1]
+                        }
+                    },
+                    opposite: true
+                }
+                //, { // Secondary yAxis
+                //    title: {
+                //        text: '超标数量',
+                //        style: {
+                //            color: Highcharts.getOptions().colors[2]
+                //        }
+                //    },
+                //    labels: {
+                //        format: '{value} 个',
+                //        style: {
+                //            color: Highcharts.getOptions().colors[2]
+                //        }
+                //    },
+                //    opposite: true
+                //}
+                ],
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true
+                },
+                series: json.x
+                , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        });
+    }
+
+    //根据年份来统计
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 500,
+            url: "../../OccupationalHealthManage/Statistics/GetHazardSick",
+            postData: { "year": $("#Time").val(), "risk": "" },
+            datatype: "json",
+            colModel: [
+                  { label: '月份', name: 'Sicktype', index: 'INFORMCARDNAME', width: 300, align: 'center', sortable: false },
+                { label: '监测数量', name: 'SickUserNum', index: 'SickValue', width: 300, align: 'center', sortable: false },
+                {
+                    label: '超标数量', name: 'SickValue', index: 'INFORMACARDPOSITION', width: 300, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue > 0 && rowObject.Sicktype != "合计") {
+                            html = "<a href=javascript:show('" + rowObject.Sicktype + "') style='color:blue; text-decoration:underline;padding-left:0px;'  title='查看'>" + cellvalue + "</a>";
+                            return html;
+                        } else if (rowObject.Sicktype == "合计") {
+                            return cellvalue;
+                        }
+                        else {
+                            return 0;
+                        }
+
+                    }
+                },
+                { label: '超标率', name: 'Proportion', index: 'SETTINGTIME', width: 300, align: 'center', sortable: false },
+
+            ],
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            loadError: function (xhr, status, error) {
+                top.location.href = "../../Login/Index?Login_Error=1";
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#Search").click(function () {
+            Image();
+            $gridTable.jqGrid('setGridParam', {
+                postData: { "year": $("#Time").val(), "risk": $("#RiskId").attr('data-value') }
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+    //查看
+    function show(month) {
+        var keyValue = month;
+        //if (checkedRow(keyValue)) {
+        var dlg = dialogOpen({
+            id: "Form",
+            title: '查看超标因素',
+            url: '/OccupationalHealthManage/Hazarddetection/Index?month=' + $("#Time").val() + "-" + keyValue,
+            width: "1400px",
+            height: ($(top.window).height() - 300) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+        // }
+    }
+
+
+
+
+</script>
+
+<div class="border" id="desktop" style=" background: #fff; overflow-y: auto;overflow-x:hidden; ">
+    <div style="margin-top:10px;">
+        <div class="row">
+            <table style="width:100%;">
+                <tr>
+                    <td style="width: 130px; font-weight: bold; padding-left: 10px; " align="right">
+                        职业病危害因素名称
+                    </td>
+                    <td style="width: 155px; padding-left: 10px; ">
+                        <div id="RiskId" type="select" class="ui-select" style="width:200px;"></div>
+                    </td>
+                    <td style="width: 65px; font-weight: bold; padding-left: 10px; " align="right">
+                        年度
+                    </td>
+                    <td style="width: 165px; padding-left: 10px; ">
+                        <input id="Time" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy")" onfocus="WdatePicker({ dateFmt: 'yyyy' })" readonly="readonly" style="width: 100px;" />
+                    </td>
+                    <td align="right" style="width:140px;">
+                        <a id="Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                    </td>
+                    <td align="right">
+                        <div class="toolbar">
+                            <div class="btn-group">
+
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div id="con3">
+        <div class="panel panel-default" style="margin-top:10px;">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="dbcontainer" style="margin:10px;">
+                    <center style="margin-top:50px;">正在加载数据……</center>
+                </div>
+            </div>
+        </div>
+        <div class="row" id="grid2">
+            <div class="panel panel-default" style="margin:10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <table id="gridTable"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+

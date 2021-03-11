@@ -1,0 +1,448 @@
+﻿
+@{
+    ViewBag.Title = "实时在厂人员统计";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+
+<script>
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户id
+    var indexdeal = request('indexdeal');//首页待办跳转
+    var _belongcode = "";
+    var _isOrg = "";
+    var useraccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+    var IsHrdl = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("IsOpenPassword"))";
+    var RoleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var state = 0; //0 内部  1 外部
+    $(function () {
+        InitialPage();
+        GetTree();
+        if (RoleName.indexOf("承包商级用户")>=0)
+        {
+            $('#con1').hide();
+            $('#con2').show();
+        }
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 45);
+            }, 200);
+            e.stopPropagation();
+        });
+        $("#itemTree").height($(window).height() - 45);
+
+        if (!!indexdeal) {
+            $("#showrange").children().eq(2).attr("selected", "selected");
+        }
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+              {
+                  SelectMode: 0,
+                  Mode: 957
+              }
+            );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _belongcode = item.value;
+                _isOrg = item.Sort;
+                var DeptType = item.DeptType;
+                if (_belongcode) {
+                    if (_belongcode.indexOf("cx100_") == 0 || _belongcode.indexOf("ls100_") == 0) {//外包
+                        $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $("#btn_out").addClass('btn-primary');
+                        $('#con1').hide(); $('#con2').show();
+                    }
+                    else {
+                        if (DeptType == "长协" || DeptType == "临时") {//外包
+                            $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $("#btn_out").addClass('btn-primary');
+                            $('#con1').hide(); $('#con2').show();
+                        }
+                        else {//内部
+                            $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $("#btn_in").addClass('btn-primary');
+                            $('#con1').show(); $('#con2').hide();
+                        }
+                    }
+                } else {
+                    $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $("#btn_in").addClass('btn-primary');
+                    $('#con1').show(); $('#con2').hide();
+                }
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 170);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+    //加载表格
+    function GetGrid() {
+        $.post("../../PersonList/GetList", { queryJson: getQueryJson() }, function (data) {
+            if (data != null) {
+                var list = eval("(" + data + ")");
+                var con1html = "";
+                var con1num = 1;
+                var con2html = "";
+                var con2num = 1;
+                var cx_html = "";
+                var ls_html = "";
+                $(list).each(function (v, item) {
+                    if (item.depttype == "内部") {
+                        var inTable = 'inTable' + con1num.toString();
+                        var inPage = 'inPage' + con1num.toString();
+                        con1html += '<div class="panel panel-default" style="margin:10px;"><div class="panel-heading"><strong>' + con1num + '.<span>' + item.fullname + '</span>:<a style="color:#199ed8;text-decoration:none">' + item.person + '</a>人&nbsp&nbsp<lable style="color: #199ed8">[' + item.depttype + ']</lable></strong><span class="tools pull-right"><a class="fa fa-chevron-up" title="展开/收起" onclick="loadTable(this)"></a></span></div><div class="panel-body" style="display:none"><table id="' + inTable + '"></table><div id="' + inPage + '"></div></div></div>';
+                        con1num++;
+                    }
+                    else {
+                        var outTable = 'outTable' + con2num.toString();
+                        var outPage = 'outPage' + con2num.toString();
+
+                        if (item.depttype == "长协") {
+                            cx_html += '<div class="panel panel-default" style="margin:10px;"><div class="panel-heading"><strong>' + con2num + '.<span>' + item.fullname + '</span>:<a style="color:#199ed8;text-decoration:none">' + item.person + '</a>人&nbsp&nbsp<lable style="color: #FF9D6D">[' + item.depttype + ']</lable></strong><span class="tools pull-right"><a class="fa fa-chevron-up" title="展开/收起" onclick="loadTable(this)"></a></span></div><div class="panel-body" style="display:none"><table id="' + outTable + '"></table><div id="' + outPage + '"></div></div></div>';
+                        }
+                        else {
+                            ls_html += '<div class="panel panel-default" style="margin:10px;"><div class="panel-heading"><strong>' + con2num + '.<span>' + item.fullname + '</span>:<a style="color:#199ed8;text-decoration:none">' + item.person + '</a>人&nbsp&nbsp<lable style="color: #FF9D6D">[' + item.depttype + ']</lable></strong><span class="tools pull-right"><a class="fa fa-chevron-up" title="展开/收起" onclick="loadTable(this)"></a></span></div><div class="panel-body" style="display:none"><table id="' + outTable + '"></table><div id="' + outPage + '"></div></div></div>';
+
+                        }
+                        con2num++;
+                    }
+                });
+                con2html += (cx_html + ls_html);
+                $("#con1").html(con1html);
+                $("#con2").html(con2html);
+            }
+        });
+
+        $("#btn_Search").click(function () {
+            GetGrid();
+        })
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var query = {
+            Name: $("#PersonName").val(),
+            deptCode: _belongcode,
+            isOrg: _isOrg
+        }
+        return JSON.stringify(query);
+    }
+
+    $.RemoveForm = function (options) {
+        var defaults = {
+            msg: "注：确定要离厂吗？",
+            loading: "正在处理数据...",
+            url: "",
+            param: [],
+            type: "post",
+            dataType: "json",
+            success: null
+        };
+        var options = $.extend(defaults, options);
+        dialogConfirm(options.msg, function (r) {
+            if (r) {
+                Loading(true, options.loading);
+                window.setTimeout(function () {
+                    var postdata = options.param;
+                    if ($('[name=__RequestVerificationToken]').length > 0) {
+                        postdata["__RequestVerificationToken"] = $('[name=__RequestVerificationToken]').val();
+                    }
+                    $.ajax({
+                        url: options.url,
+                        data: postdata,
+                        type: options.type,
+                        dataType: options.dataType,
+                        success: function (data) {
+                            if (data.type == "3" || data.success == false) {
+                                dialogAlert(data.message, -1);
+                            } else {
+                                dialogMsg(data.message, 1);
+                                options.success(data);
+                            }
+                        },
+                        error: function (XMLHttpRequest, textStatus, errorThrown) {
+                            Loading(false);
+                            dialogMsg(errorThrown, -1);
+                        },
+                        beforeSend: function () {
+                            //Loading(true, options.loading);
+                        },
+                        complete: function () {
+                            Loading(false);
+                        }
+                    });
+                }, 500);
+            }
+        });
+    }
+
+    //离场
+    function del(obj) {
+        var keyValue = obj;
+        if (keyValue) {
+            $.RemoveForm({
+                url: "../../PersonList/UpdateByID",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    window.location.reload();
+                }
+            })
+        } else {
+            dialogMsg('请选择需要离场的数据！', 0);
+        }
+    }
+
+
+    var exportRes;
+    //导出
+    function exportResult() {
+        if (confirm("是否导出？")) {
+            //var query = {
+
+            //}
+            //var deptName = $(exportRes).parent().parent().find('span').eq(0).text();
+            //var personName = $("#PersonName").val();
+            location.href = "../../HJBPerson/PersonList/ExportData?state=" + state + "";
+        }
+    }
+
+    //加载人员数据
+    function loadTable(obj)
+    {
+        exportRes = obj;
+        if ($(obj).attr("class") == "fa fa-chevron-up") {
+            $(obj).removeClass("fa-chevron-up").addClass("fa-chevron-down");
+            $(obj).parent().parent().parent().find('.panel-body').css('display', 'block');
+            var deptName = $(obj).parent().parent().find('span').eq(0).text();
+            var personName = $("#PersonName").val();
+            var $gridTable;
+            $(obj).parent().parent().parent().find('table').each(function (v) {
+                if ($(obj).parent().parent().parent().find('table').eq(v).attr("id") != undefined)
+                {
+                    $gridTable = $(obj).parent().parent().parent().find('table').eq(v);
+                    return false;
+                }
+            });
+            $gridTable.jqGrid({
+                url: "../../PersonList/GetTable",
+                datatype: "json",
+                //height: $(window).height() - 170,
+                autowidth: true,
+                postData: { deptName: deptName, personName: personName},
+                colModel: [
+                    //{ label: '主键', name: 'id', sortable: true, width: 10, align: 'center', hidden: true },
+                    { label: '用户ID', name: 'userid', sortable: true, width: 10, align: 'center', hidden: true },
+                    { label: '姓名', name: 'realname', index: 'realname', width: 350, align: 'center', sortable: false },
+                    { label: '性别', name: 'gender', index: 'gender', width: 150, align: 'center', sortable: false },
+                    { label: '岗位名称', name: 'dutyname', index: 'dutyname', width: 350, align: 'center', sortable: false },
+                    { label: '门禁通道名称', name: 'devicename', index: 'devicename', width: 250, align: 'center', sortable: false },
+                    { label: '进厂时间', name: 'createdate', index: 'createdate', width: 250, align: 'center', sortable: false },
+                    {
+                        label: '操作', name: '', width: 80, align: 'center', sortable: false,
+                        formatter: function (cellvalue, options, rowObject) {
+                            var html = "";
+                            html += "<a href=javascript:sel('" + rowObject.userid + "') title='查看' style='color: #199ed8'>查看</a>";
+                            if (UserId.indexOf("1521c21a-62c9-4aa1-9093-a8bda503ea89") >= 0 || RoleName.indexOf("公司") >= 0 || RoleName.indexOf("厂级部门用户") >= 0 || RoleName.indexOf("安全管理员") >= 0 || RoleName.indexOf("超级管理员") >= 0) {
+                                html += "<a href=javascript:del('" + rowObject.userid + "') title='离厂' style='color: #199ed8'>离厂</i></a>";
+                            }
+                            return html;
+                        }
+                    },
+                ],
+                viewrecords: true,
+                rowNum: 20,
+                rowList: [20, 40, 100],
+                pager: $(obj).parent().parent().parent().find('div').eq(2),
+                sortname: 'b.deptsort asc,b.DEPTSORT asc,b.userid',
+                sortorder: 'desc',
+                rownumbers: true,
+                shrinkToFit: true,
+                gridview: true,
+                onSelectRow: function () {
+                },
+                loadError: function (xhr, status, error) {
+                },
+                gridComplete: function () {
+
+                }
+            });
+
+        }
+        else {
+            $(obj).removeClass("fa-chevron-down").addClass("fa-chevron-up");
+            $(obj).parent().parent().parent().find('.panel-body').css('display', 'none');
+        }
+
+    }
+
+
+    //查看
+    function sel(obj) {
+        var keyValue = obj;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看人员档案',
+                url: '/PersonManage/Person/Form?action=show&keyValue=' + keyValue,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["导出", "关闭"],
+                callBack: function (iframeId) {
+                    var score = $($("#gridTable").jqGridRowValue("score")).text();
+                    window.location.href = "../PersonManage/Person/ExportUserInfo?userId=" + keyValue + "&score=" + score;
+                    //top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //设置
+    function set()
+    {
+        var dlg = dialogOpen({
+            id: "set",
+            title: '实时在厂人员统计设置',
+            url: '/HJBPerson/PersonList/Set?ModuleType=0',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: ["保存","关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //侧边栏展开/收起功能实现
+    function setBar(obj) {
+        var left = $(".ui-layout-west").css("left");
+        if (left == "-185px") {
+            $(obj).attr("class", "fa fa-arrow-left");
+            $(".ui-layout-west").css({ left: "0px" });
+            $(".ui-layout-center").css({ left: $(".ui-layout-west").width(), width: $(window).width() - $(".ui-layout-west").width() - 10 });
+            if (document.getElementById("con1") != undefined) {
+
+                $('#con1').find('table').setGridWidth(($('#con1').width() - 50));
+                $('#con2').find('table').setGridWidth(($('#con2').width() - 50));
+            }
+
+        } else {
+            $(obj).attr("class", "fa fa-arrow-right");
+            $(".ui-layout-west").css({ left: "-185px" });
+            $(".ui-layout-center").css({ left: "35px", width: $(window).width() - 40 });
+            if (document.getElementById("con1") != undefined) {
+                $('#con1').find('table').setGridWidth(($('#con1').width() - 50));
+                $('#con2').find('table').setGridWidth(($('#con2').width() - 50));
+            }
+        }
+
+    };
+
+
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer" title="展开/收起"></i>
+                </div>
+                <a onclick=""></a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">实时在厂人员统计</div>
+            <div class="titlePanel">
+                <div style="margin-top:20px">
+                    <table style="width:100%">
+                        <tr >
+                            <td style="width:25%;padding-left:100px;" ><div style="float:left;width:80%; height:50px;border:1px solid #0094ff;text-align:center;background-color:#f3f7ee;line-height:50px">在厂总人数:<span style="color:#0094ff">@ViewBag.allPerson</span>人</div></td>
+                            <td style="width:25%;padding-left:100px;"><div style="float:left;width:80%;height:50px;border:1px solid #0094ff;text-align:center;background-color:#f3f7ee;line-height:50px">在厂内部人数:<span style="color:#0094ff">@ViewBag.inPerson</span>人</div></td>
+                            <td style="width:25%;padding-left:100px;"><div style="float:left;width:80%;height:50px;border:1px solid #0094ff;text-align:center;background-color:#f3f7ee;line-height:50px">在厂外包人数:<span style="color:#0094ff">@ViewBag.outPerson</span>人</div></td>
+                            <td style="width:25%;padding-left:100px;"><div style="float:left;width:80%;height:50px;border:1px solid #0094ff;text-align:center;background-color:#f3f7ee;line-height:50px">在厂外包单位数:<span style="color:#0094ff">@ViewBag.outsourcing</span>个</div></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td><input id="PersonName" type="text" class="form-control" style="width:200px" placeholder="按姓名关键字查询" /></td>
+                            <td style="padding-left:10px">
+                                <div class="ui-filter-list-bottom">
+                                    <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group" style="margin-top:10px">
+                        <a id="set" class="btn btn-primary" onclick="set()">设置</a>&nbsp;&nbsp;&nbsp;
+                        <a id="export" class="btn btn-primary" onclick="exportResult()" style="margin-left:10px;margin-right:10px">导出</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="row">
+                <table style="width: 100%;">
+                    <tr>
+                        <td>
+                            <div style="margin-left: 10px;" class="toolbar">
+                                <div class="btn-group">
+                                    @if (ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName.Contains("承包商级用户"))
+                                    {
+                                        <button id="btn_out" class="btn btn-primary btn10" type="button" onclick="state = 1;$('#con1').hide();$('#con2').show();$('.btn10').removeClass('btn-primary');$('.btn10').addClass('btn-default');$(this).addClass('btn-primary');"><i class="fa fa"></i>&nbsp;外包单位</button>
+                                    }
+                                    else
+                                    {
+                                        <button id="btn_in" class="btn btn-primary btn10" type="button" onclick="state = 0;$('#con1').show();$('#con2').hide();$('.btn10').removeClass('btn-primary');$('.btn10').addClass('btn-default');$(this).addClass('btn-primary');"><i class="fa fa"></i>&nbsp;电厂内部</button>
+                                        <button id="btn_out" class="btn btn-default btn10" type="button" onclick="state = 1;$('#con1').hide();$('#con2').show();$('.btn10').removeClass('btn-primary');$('.btn10').addClass('btn-default');$(this).addClass('btn-primary');"><i class="fa fa"></i>&nbsp;外包单位</button>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div id="con1" style="margin-top: 10px;" class="gridPanel">
+            </div>
+            <div id="con2" style="margin-top: 10px;display:none;" class="gridPanel">
+            </div>
+        </div>
+    </div>
+</div>

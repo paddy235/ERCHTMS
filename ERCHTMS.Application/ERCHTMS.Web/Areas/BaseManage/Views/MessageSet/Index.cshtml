@@ -1,0 +1,202 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var keyValue = top.currUserOrgId;
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //layout布局
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 145);
+            }, 200);
+            e.stopPropagation();
+        });
+
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            autowidth: true,
+            height: $(window).height() - 145,
+            url: "../../BaseManage/MessageSet/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                { label: 'id', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false
+                },
+                { label: '类别', name: 'kind', width: 150, align: 'center', sortable: true },
+                { label: '项目', name: 'name', width: 150, align: 'center', sortable: true },
+                { label: '编码', name: 'code', width: 100, align: 'center', sortable: true },
+                { label: '条件', name: 'event', width: 150, align: 'center', sortable: true },
+                { label: '标题', name: 'title', width: 200, align: 'center', sortable: true },
+                { label: '内容', name: 'content', width: 300, align: 'center', sortable: true },
+                 {
+                     label: '状态', name: 'status', width: 100, align: 'center', sortable: true, formatter: function (value) {
+                         return value == 1 ? "启用" : "禁用";
+                     }
+                 },
+                 {
+                     label: '是否极光推送', name: 'ispush', width: 100, align: 'center', sortable: true, formatter: function (value) {
+                         return value == 1 ? "是" : "否";
+                     }
+                 }
+            ],
+            rowList: [15, 20, 30, 50, 100],
+            rowNum: 15,
+            pager: "#gridPager",
+            sortname: 'kind,id',
+            sortorder: 'asc'
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                keyword: $("#txt_Keyword").val(),
+                condition: $("#selType").val()
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) },
+                page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val("");
+            $("#selType").val("");
+            var queryJson = {
+                condition: '',
+                keyword: '',
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '消息设置',
+            url: '/BaseManage/MessageSet/Form',
+            width: '800px',
+            height: ($(top.window).height() - 40) + 'px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //复制
+    function copy(id) {
+        var keyValue = !!id ? id : $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '快速新建',
+                url: '/BaseManage/MessageSet/Form?mode=Copy&keyValue=' + keyValue,
+                width: '800px',
+                height: ($(top.window).height() - 40) + 'px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //编辑
+    function edit(id) {
+        var keyValue = !!id ? id : $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑信息',
+                url: '/BaseManage/MessageSet/Form?keyValue=' + keyValue,
+                width: '800px',
+                height: ($(top.window).height() - 40) + 'px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function del(id) {
+        var keyValue = !!id ? id : $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../BaseManage/MessageSet/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的积分设置！', 0);
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="width:80px; text-align:right">
+                                搜索条件：
+                            </td>
+                            <td style="width:120px;">
+                                <select id="selType" class="form-control" style="width:100px;">
+                                    <option value="">请选择</option>
+                                    <option value="Code">编码</option>
+                                    <option value="Name">名称</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入项目名称关键字进行查询" style="width: 300px;" />
+                            </td>
+
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+
+
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table><div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

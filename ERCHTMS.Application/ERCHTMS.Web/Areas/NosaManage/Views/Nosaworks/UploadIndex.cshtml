@@ -1,0 +1,247 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var myupload = request("myupload");
+    var selectId = "";//选择节点
+    //导入刷新用
+    var isImport = false;
+    //页面代理
+    var lagc = null;
+    $(function () {
+        //
+        //加载树
+        //
+        GetTree();
+        //
+        //创建页面代理
+        //
+        lagc = new listAgency({
+            hasPowerOper: false,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            },
+            gridId: "gridTable",
+            gridJustHeight: 143,
+            gridOptions: {
+                height: $(window).height() - 143,
+                url: "../../NosaManage/Nosaworks/GetListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'state',
+                sortorder: 'asc,createdate desc'
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:uploadresult('" + rowObject.id + "','" + userId + "','view')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (rowObject.issubmited == "是" && rowObject.dutyuserid.indexOf(userId)>=0 && (!rowObject.submituserid || rowObject.submituserid.indexOf(userId)<0)) {
+                            html += "&nbsp;<a href=javascript:uploadresult('" + rowObject.id + "','" + userId + "','check')  title='上传'><i class='fa fa-cloud-upload'></i></a>";
+                        }                       
+                        return html;
+                    }
+                },
+                { label: '工作项目', name: 'name', index: 'name', width: 150, align: 'center', sortable: true },
+                { label: '频次', name: 'ratenum', index: 'ratenum', width: 80, align: 'center', sortable: true },
+                {
+                    label: '完成时间', name: 'itemcol', index: 'itemcol', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return cellvalue.split('|')[1];
+                    }
+                },
+                {
+                    label: '任务截止日期', name: 'enddate', index: 'enddate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '责任部门', name: 'dutydepartname', index: 'dutydepartname', width: 150, align: 'center', sortable: true },
+                { label: '责任人', name: 'dutyusername', index: 'dutyusername', width: 200, align: 'center', sortable: true },
+                { label: '工作成果', name: 'workresult', index: 'workresult', width: 120, align: 'center', sortable: true },
+                {
+                    label: '状态', name: 'eledutydepartname', index: 'eledutydepartname', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var sta = rowObject.itemcol.split('|')[0];
+                        var html = sta;                        
+                        if (sta == "通过") {
+                            html = "<div style='background-color:green;color:#fff;'>" + sta + "</div>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '要素编号', name: 'eleno', index: 'eleno', width: 80, align: 'center', sortable: true },
+                { label: '要素', name: 'elename', index: 'elename', width: 80, align: 'center', sortable: true },
+                { label: '要素负责人', name: 'eledutyusername', index: 'eledutyusername', width: 100, align: 'center', sortable: true },
+                { label: '要素部门', name: 'eledutydepartname', index: 'eledutydepartname', width: 100, align: 'center', sortable: true }                
+            ]
+        });
+        //
+        //绑定页面控件
+        //
+        lagc.bindPageControls({
+            searchId: "btn_Search",
+            resetId: "btn_Reset",
+            refreshId: "refresh",
+            addId: "add"
+        });
+        //
+        //绑定页面事件
+        //
+        lagc.addPageEvents({ onBuildQuery: buidQuery, onReset: reset, onResize: resize });
+        //
+        //初始化
+        //
+        lagc.initialPage();        
+    });
+    //
+    //加载要素树
+    //
+    function GetTree() {
+        var itreHeight = $(window).height() - 55;
+        var item = {
+            height: itreHeight,
+            url: "../../NosaManage/Nosaele/GetEleTreeJson",
+            onnodeclick: function (item) {
+                selectId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        var itree = $("#itemTree");
+        itree.treeview(item);
+        if (itree.html().length == 0) {
+            itree.setTreeHeight(itreHeight);
+        }
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        //设置树节点的宽度
+        //$(".ui-layout-west").css({ width: "200px" });
+        //$(".ui-layout-resizer").css("left", "205px");
+        //$(".ui-layout-center").css({ left: "205px", width: $(window).width() - 210 });
+    }
+    //
+    //重新定义查询条件
+    //
+    function buidQuery() {
+        var name = $("#Name").val();
+        var starttime = $("#StartTime").val();
+        var endtime = $("#EndTime").val();
+        var rnd = Math.random();
+        var data = { name: name, eleid: selectId, starttime: starttime, endtime: endtime, datascope: 1, waitforupload: myupload, rnd: rnd };
+        return JSON.stringify(data);
+    }
+    //
+    //重置条件
+    //
+    function reset() {
+        $("#Name,#StartTime,#EndTime").val("");
+        selectId = "";
+        myupload = "";
+        $(".bbit-tree-selected").removeClass("bbit-tree-selected");
+    }
+    //
+    //窗口大小改变
+    //
+    function resize() {
+        var gh = $(window).height() - 143;
+        var gw = $(".gridPanel").width();
+        var th = $(window).height() - 55;
+        $("#itemTree").setTreeHeight(th);
+        $("#gridTable").setGridHeight(gh);
+        $("#gridTable").setGridWidth(gw);
+        //$(".ui-layout-resizer").css("left", $(".ui-layout-west").width() + 5);
+    }
+    //
+    //上传成果
+    //
+    function uploadresult(id, dutyuserid, actiontype) {
+
+        var title = "上传工作成果";
+        if (actiontype == "view") {
+            title = "查看工作成果";
+        }
+        var dlgArg = {
+            id: 'Result',
+            title: title,
+            url: '/NosaManage/Nosaworks/UploadResult?actiontype=' + actiontype + '&workid=' + id + "&dutyuserid=" + dutyuserid + "&keyValue=-1",
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                if (top.frames[iframeId].AcceptClick)
+                    top.frames[iframeId].AcceptClick();
+            },
+            btn: null
+        };
+        dialogOpen(dlgArg);
+    }    
+</script>
+<style type="text/css">
+    .titlePanel, .gridPanel {
+        min-width: 994px;
+    }
+</style>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel" >
+            <div class="panel-Title">
+                要素
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center" >
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title" style="height:0px;"></div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table class="queryform" id="queryArea">
+                        <tr>
+                            <td class="formTitle">任务截止日期：</td>
+                            <td class="formValue">
+                                <input id="StartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" style="width:100px;display:inline-block;" />-<input id="EndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" style="width:100px;display:inline-block;" />
+                            </td>  
+                            <td class="formTitle">&nbsp;工作项目：</td>
+                            <td class="formValue">
+                                <input id="Name" type="text" class="form-control" queryPro="name" style="width: 150px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="refresh" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

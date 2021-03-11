@@ -1,0 +1,926 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,inital-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link type="text/css" rel="stylesheet" href="~/Content/hdjl/css/common.css">
+    <link type="text/css" rel="stylesheet" href="~/Content/hdjl/css/index.css">
+    <link type="text/css" rel="stylesheet" href="~/Content/hdjl/css/bigScreen.css">
+    <link rel="stylesheet" href="~/Content/hdjl/css/swiper.min.css">
+    <link rel="stylesheet" type="text/css" href="~/Content/hdjl/css/daterangepicker.css" />
+    <link href="~/Content/scripts/plugins/tree/tree.css" rel="stylesheet" />
+    <link href="~/Content/styles/framework-ui.css" rel="stylesheet" />
+    <script type="text/javascript" src="~/Content/hdjl/js/rem.js"></script>
+    <script type="text/javascript" src="~/Content/scripts/desktop/echarts.min.js"></script>
+    <script type="text/javascript" src="~/Content/scripts/jquery/jquery-2.0.3.min.js"></script>
+    <script type="text/javascript" src="~/Content/scripts/plugins/nicescroll/nicescroll.min.js"></script>
+    <script type="text/javascript" src="~/Content/hdjl/js/swiper.jquery.min.js"></script>
+    <script type="text/javascript" src="~/Content/scripts/plugins/datetime/moment.min.js"></script>
+    <script type="text/javascript" src="~/Content/hdjl/js/daterangepicker.min.js"></script>
+    <script src="~/Content/scripts/utils/framework-ui.js"></script>
+    <script src="~/Content/scripts/plugins/tree/tree.js"></script>
+
+    <title>华电江陵-首页</title>
+    <style>
+        #AQYHPC {
+            height: 2.5rem;
+        }
+    </style>
+    <script type="text/javascript">
+        //var SafetyDay = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("安全生产天数", "XSSIndex"))";//安全生产天数
+        var now = "@DateTime.Now.ToString("yyyy-MM-dd")";
+        var now1 = "@DateTime.Now.ToString("yyyy-MM")";
+        var prevDate = "@DateTime.Now.AddMonths(-1).ToString("yyyy-MM")";
+        var Year = "";
+        var ShowType="";
+        $(function () {
+            $("#ExamineType").ComboBoxTree({
+                url: "../HiddenTroubleManage/Publicity/GetExamineTypeDataJson",
+                description: "==请选择==",
+                allowSearch: false
+            }).bind("change", function () {
+                LoadAQYHJC();
+                });
+            $("#ShowType").ComboBox({
+                description: "==请选择==",
+            }).bind("change", function () {
+                LoadAQYHJC();
+            });
+                    $.ajax({
+                        type: "get",
+                        url: "../HiddenTroubleManage/Publicity/GetPublicityDefault",
+                        success: function (data) {
+                            if (!!data) {
+                                var ndata = eval("(" + data + ")");
+                                $("#ExamineType").ComboBoxTreeSetValue(ndata.ExamineType);
+                                var staffType = ndata.StaffType;
+                                $("#ShowType").ComboBoxSetValue(ndata.ShowType);
+                                $(".side-nav").find("li").removeClass("active");
+                                $(".side-nav").find("li[data-id='" + staffType + "']").addClass("active");
+                                Year = ndata.Year;
+                                $("#ShowType").ComboBoxSetValue(ndata.ShowType);
+                                LoadAQYHJC();
+                            }
+                        }
+                    });
+            //$.ajax({
+            //    url: "../SystemManage/DataItemDetail/GetDataItemListJson",
+            //    data: { EnCode: "ExamineType" },
+            //    type: "GET",
+            //    dataType: "json",
+            //    async: false,
+            //    success: function (data) {
+            //        $(data).each(function (index, ele) {
+            //            $("#selectAQYHPC").append("<option value=\"" + ele.ItemValue + "\">" + ele.ItemName + "</option>")
+            //        })
+
+            //        $.ajax({
+            //            type: "get",
+            //            url: "../HiddenTroubleManage/Publicity/GetPublicityDefault",
+            //            success: function (data) {
+            //                debugger;
+            //                if (!!data) {
+            //                    var ndata = eval("(" + data + ")");
+            //                    $("#selectAQYHPC").val(ndata.ExamineType);
+
+            //                    LoadAQYHJC();
+            //                }
+            //            }
+            //        });
+            //    },
+            //    error: function (XMLHttpRequest, textStatus, errorThrown) {
+            //        dialogMsg(errorThrown, -1);
+            //    }
+            //});
+            getData(); //待办事项
+            HighRiskWorkingForLeaderCockpit(); //今日高风险作业
+            getNews(); //通知公告
+            //安全隐患排查 未整改隐患切换
+            $('.secTit_list li').on('click', function () {
+                var index = $(this).index();
+                if (index > 0) {
+                    $("#selectAQYHPC").hide();
+                    $("#hiddenTrouble").removeAttr("onclick");
+                    $("#hiddenTrouble").attr("onclick", "top.openTab('', '../HiddenTroubleManage/HTBaseInfo/Index?ChangeStatus=未整改', '未整改隐患数')");
+                    $('.zk-swiper-wrap').hide()
+                    $('.my-table').show();
+                    LoadNoChangeHidList();
+                }
+                else {
+                    $("#selectAQYHPC").show();
+                    $("#hiddenTrouble").removeAttr("onclick");
+                    $("#hiddenTrouble").attr("onclick", "top.openTab('9b7124b2-d18c-4535-ace8-dfc82d530ca7', '../HiddenTroubleManage/Publicity/Index', '安全检查公示')");
+                    $('.zk-swiper-wrap').show()
+                    $('.my-table').hide();
+
+                }
+                $(this).addClass('active').siblings().removeClass('active');
+            })
+            $(".side-nav li").on('click', function () {
+                var index = $(this).index();
+                $(this).addClass('active').siblings().removeClass('active');
+                LoadAQYHJC();
+            });
+            $("#selectAQYHPC").change(function () {
+                LoadAQYHJC();
+            })
+            //FirstLoadAQYHJC();//LoadAQYHJC(); //安全隐患排查
+            //LoadNoChangeHidList(); //未整改隐患
+            getLllegal();
+            $('.sec4_list li').on('click', function () {
+                $(this).addClass('active').siblings().removeClass('active');
+                getSafetyworksupervise();
+            })
+            getSafetyworksupervise(); //安全重点工作督办
+            //$.ajax({
+            //    url: "../SystemManage/BaseData/GetSafeDays",
+            //    data: { EnCode: "ExamineType" },
+            //    type: "GET",
+            //    async: false,
+            //    success: function (data) {
+            //        $(".left1").html("");
+            //        $(".left1").html(" <span>安全生产天数<em>" + SafetyDay + "</em>天</span>");
+            //    },
+            //    error: function (XMLHttpRequest, textStatus, errorThrown) {
+            //        dialogMsg(errorThrown, -1);
+            //    }
+            //})
+
+
+        })
+        function getData() {
+            $.get("../Desktop/GetDeptStatData?v=" + new Date(), { itemType: "DBSX" }, function (data) {
+                if (data.length > 2) {
+                    var json = eval("(" + data + ")");
+                    var count = 0;
+                    var divIndex = 0;
+                    var head = "<div class=\"swiper-slide\"><ul class=\"nav1\"></ul></div>";
+                    $(json.resultdata).each(function (index, ele) {
+                        if (ele.Num != "0" && ele.Num != null) {
+                            if (ele.itemcode == "CKPLAN") {
+                                var arr = ele.Num.split(',');
+                                if (arr[0] != "0") {
+                                    count += parseInt(arr[0]);
+                                    var html = "<li onclick=\"showBigTrb('" + arr[1] + "','" + arr[2] + "','" + arr[3] + "','" + arr[4] + "','" + arr[5] + "','" + ele.address + "')\"><span class=\"buleColor\">" + arr[0] + "</span><p>" + ele.itemname + "</p></li>";
+                                    if (divIndex % 5 == 0) {
+                                        $("#dbsx").append(head);
+                                    }
+                                    $("#dbsx ul").eq(parseInt(divIndex / 5)).append(html);
+                                    divIndex++;
+                                }
+                            }
+                            else
+                            {
+                                count += parseInt(ele.Num);
+                                var html = "<li onclick=\"" + ele.callback.replace(/\s/g, "") + "\"><span class=\"buleColor\">" + ele.Num + "</span><p>" + ele.itemname + "</p></li>";
+                                if (divIndex % 5 == 0) {
+                                    $("#dbsx").append(head);
+                                }
+                                $("#dbsx ul").eq(parseInt(divIndex / 5)).append(html);
+                                divIndex++;
+                            }
+
+                        }
+                    });
+                    //待办事项
+                    var mySwiper1 = new Swiper('.swiper-container1', {
+                        loop: true,
+                        // 如果需要前进后退按钮
+                        nextButton: '.swiper-button-next',
+                        prevButton: '.swiper-button-prev',
+                    })
+                    $(".needDealt").append("<p>(共" + count + "条)</p>");
+                }
+            });
+
+            $.post("../Desktop/PowerPlantSafetyHomePage", { itemType: "SSJK", mode: 0 }, function (data) {
+                if (data.length > 2) {
+                    var count = 0;
+                    var json = eval("(" + data + ")");
+                    var html = "";
+                    var yjzb = [];
+
+                    $(json.resultdata).each(function (index, item) {
+                        if (!!item.TypeCode) {
+                            //预警指标
+                            if (item.TypeCode == "CJLDJSC-001") {
+                                yjzb.push(item);
+                            }
+                        }
+                    });
+                    var head = "<div class=\"swiper-slide\"><ul class=\"nav2\"></ul></div>";
+                    var body = "";
+                    var cls = ["img1","img2","img3","img4","img5","img6"];
+                    $(yjzb).each(function (index,ele) {
+                        body = "<li onclick=" + ele.callback.replace(/\s/g, "") + "><div class=\"icon " + cls[index % 6] + "\"></div><span>" + ele.itemname + "</span> <p class=\"buleColor1\">" + ele.Num + "</p></li>";
+                        if (index % 6 == 0) {
+                            $("#yjzb").append(head);
+                        }
+                        $("#yjzb ul").eq(parseInt(index / 6)).append(body);
+                    })
+                    //工作预警
+                    var mySwiper2 = new Swiper('.swiper-container2', {
+                        loop: true,
+                        // 如果需要分页器
+                        pagination: '.swiper-pagination2',
+                        paginationClickable: true
+                    })
+                }
+            })
+        }
+
+        //今日作业风险
+        function HighRiskWorkingForLeaderCockpit() {
+            $.post("../Desktop/GetHighRiskWorkingForLeaderCockpit", {}, function (data) {
+                var json;
+                json = eval("(" + data + ")");
+                var resultdata = JSON.parse(json.resultdata);
+                //今日作业风险
+                if (!!resultdata.dtdata) {
+                    var array = resultdata.dtdata;
+                    var curIndex = 0;
+                    $(array).each(function (index, ele) {
+                        curIndex = index + 1;
+                        var risktypename = !!ele.risktypename ? ele.risktypename : "";
+                        var trText = "<tr onclick=\"ViewRiskWork('" + ele.id + "')\"><td width=\"6%\">" + curIndex + "</td><td  width=\"14%\">" + ele.itemname + "</td><td width=\"12%\">" + ele.workareaname + "</td><td width=\"12%\">" + risktypename + "</td><td width=\"20%\">" + ele.workdeptname + "</td></tr>";
+                        $("#riskworkbody").append(trText);
+                    });
+                    //表格滚动条
+                    var scrollParam = {
+                        autohidemode: true,
+                        cursorcolor: "#d0ebfc",
+                        cursorwidth: "5px",
+                        cursorborder: "none",
+                        cursorborderradius: "2.5px"
+                    }
+                    $("#riskworkbody").niceScroll(scrollParam);
+                }
+            });
+        }
+
+        function ViewRiskWork(id)
+        {
+            var keyValue = id;
+            var title = "查看高风险通用作业申请";
+            var url = "";
+            url = "/HighRiskWork/HighRiskCommonApply/CheckForm?keyValue=" + keyValue + "&mode=view";
+            var dlg = dialogOpen({
+                id: "Form",
+                title: title,
+                url: url,
+                width: ($(top.window).width() - 300) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+
+        //通知公告
+        function getNews() {
+            //公告
+            $.post("../Desktop/getNotices", function (data) {
+                var json = eval("(" + data + ")");
+                json = eval(json.resultdata);
+                var html = "";
+                if (json.length == 0) {
+                    html = "<center>暂无数据显示</center>";
+                } else {
+                    $(json).each(function (j, item) {
+                        if (j >= 4) {
+                            return false;
+                        }
+                        var isimportant = item.isimportant == "是" ? " class=\"current\"" : "";
+                        html += "<li" + isimportant + " onclick=showNews('" + item.id + "','" + item.issend + "') ><p>" + cutString(item.title,24) + "</p><span class=\"content\">" + Emptystr(item.publisherdept) + " |  " + Emptystr(item.notictype) + "</span><span class=\"a1a1a1\">" + item.time + "</span></li>";
+                    });
+                }
+                $("#Notice").html(html);
+            });
+        }
+        //查看公告
+        function showNews(id, issend) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看公告',
+                url: '/Content/SecurityDynamics/showNotice.html?keyValue=' + id + "&issend=" + issend,
+                width: "690px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+
+        //安全隐患排查
+        function LoadAQYHJC()
+        {
+            var queryJson = {
+                ExamineType: $("#ExamineType").attr("data-code"),//$("#selectAQYHPC").val(),
+                StaffType: $(".side-nav li.active").attr("data-id"),
+                Year: Year,
+                ShowType: $("#ShowType").ComboBoxGetValue()
+            };
+            $.ajax({
+                type: "get",
+                url: "../HiddenTroubleManage/Publicity/GetPublicityList?queryJson=" + JSON.stringify(queryJson),
+                success: function (data) {
+                    if (!!data) {
+                        var ndata = eval("(" + data + ")");
+                        var html = "";
+                        $("#AQYHPC").html("");
+                        if (ndata.dt.length > 0) {
+                            var stafftype = $(".side-nav li.active").attr("data-id");
+                            var headtemp = "";
+                            if (stafftype != 4) {
+                                headtemp = "<th>姓名</th><th>部门/单位</th><th>岗位</th>";
+                            }
+                            else {
+                                headtemp = "<th>部门/单位</th>";
+                            }
+                            var head = "<div class=\"swiper-slide\"><table><tr><th>序号</th>" + headtemp + "<th>隐患总数</th><th>管理类</th><th>实体类</th></tr></table></div>";
+                            var body = "";
+                            $(ndata.dt).each(function (index, ele) {
+                                if (stafftype != 4) {
+                                    body = "<tr><td>" + (index + 1) + "</td><td>" + Emptystr(ele.name) + "</td><td>" + Emptystr(ele.dept) + "</td><td>" + Emptystr(ele.post) + "</td><td>" + ele.hiddennum + "</td><td>" + ele.managerhidden + "</td><td>" + ele.entityhidden + "</td></tr>";
+                                }
+                                else {
+                                    body = "<tr><td>" + (index + 1) + "</td><td>" + Emptystr(ele.dept) + "</td><td>" + ele.hiddennum + "</td><td>" + ele.managerhidden + "</td><td>" + ele.entityhidden + "</td></tr>";
+                                }
+                                if (index % 5 == 0) {
+                                    $("#AQYHPC").append(head);
+                                }
+                                $("#AQYHPC div").eq(parseInt(index / 5)).find("table").eq(0).append(body);
+                            });
+                            $(".zk-swiper-pagination").show();
+                            new Swiper('.zk-swiper0', {
+                                speed: 1000,
+                                spaceBetween: 15,
+                                autoplay: 10000,
+                               // aotuplayStopOnLast:true,
+                                //freeMode: true,
+                                allowTouchMove: false,
+                                pagination: '.zk-swiper-pagination',
+                            });
+                        }
+                        else {
+                            $(".zk-swiper-pagination").hide();
+                        }
+
+                    }
+                }
+            });
+        }
+
+        function Emptystr(obj)
+        {
+            if (obj == null || obj == "undefind") {
+                return "";
+            }
+            else {
+                return obj;
+            }
+        }
+
+        //减少天数
+        function SubtractDays(date, value) {
+            var d = new Date(date);
+            d.setDate(d.getDate() - value);
+            var m = d.getMonth() + 1;
+            return d.getFullYear() + "-" + m + "-" + d.getDate();
+        }
+        //未整改隐患
+        function LoadNoChangeHidList()
+        {
+            $.ajax({
+                type: "get",
+                url: "../Desktop/GetNoChangeHidList?code=",  //获取柱状图
+                success: function (data) {
+                    if (!!data) {
+
+                        var ndata = eval("(" + data + ")");
+
+                        var html = "";
+                        if (ndata.resultdata.length > 0) {
+                            $("#troubleTable").show();
+                            $(ndata.resultdata).each(function (index, ele) {
+
+
+                                //标记
+                                var filepath = !!ele.filepath ? ele.filepath.split(',')[0].replace("~", "..") : "";
+                                var curdate = now;
+                                var changedeadine = ele.changedeadine; //整改截止时间
+                                var status = "";
+                                if (!!changedeadine) {
+
+                                    var d1 = new Date(curdate.replace(/\-/g, "\/"));  //当前时间
+
+                                    var d2 = new Date(changedeadine.replace(/\-/g, "\/"));  //整改截止时间
+
+                                    var d3 = new Date(SubtractDays(changedeadine, 3).replace(/\-/g, "\/")); //提前三天
+
+                                    var d4 = new Date(SubtractDays(changedeadine, 5).replace(/\-/g, "\/")); //提前五天
+
+                                    //逾期未整改
+                                    if (d1 > d2) {
+                                        status = "<span class=\"red\">已逾期</span>";
+                                    }
+                                    //即将到期未整改
+                                    //一般隐患
+                                    if (ele.rankname == "一般隐患" && d3 <= d1 && d1 <= d2) {
+                                        status = "<span class=\"orange\">即将到期</span>";
+                                    }
+                                }
+                                html += "<tr onclick=\"viewdata('" + ele.id + "','" + ele.addtype + "','" + ele.workstream + "')\"><td width='150px'><div class=\"img-wrap\"> <img src=\"" + filepath + "\" >" + status + "</div></td>";
+                                html += "<td width='150px'>" + ele.hiddescribe + "</td><td width='130px'>" + ele.districtname + "</td><td width='150px'>" + ele.changedutydepartname + "</td><td>" + formatDate(ele.changedeadine, 'yyyy-MM-dd') + "</td></tr>";
+
+                            });
+                            $("#hdtrouble").append(html);
+                            //表格滚动条
+                            var scrollParam = {
+                                autohidemode: true,
+                                cursorcolor: "#d0ebfc",
+                                cursorwidth: "5px",
+                                cursorborder: "none",
+                                cursorborderradius: "2.5px"
+                            }
+                            $("#hdtrouble").niceScroll(scrollParam);
+                        }
+                        else {
+                            $("#troubleTable").hide();
+                        }
+                    }
+                }
+            });
+        }
+        //查看视图
+        function viewdata(obj, atype, workstream) {
+            var rqUrl = "";
+            var title = "查看隐患";
+
+            //未整改隐患的查看页面
+            if (workstream == "隐患登记") {
+                if (atype == "0") {
+                    rqUrl = '/HiddenTroubleManage/HTBaseInfo/Form?keyValue=' + obj + '&actiontype=view';
+                }
+                else if (atype == "2" || atype == "3") {
+                    rqUrl = '/HiddenTroubleManage/HTBaseInfo/CForm?keyValue=' + obj + '&actiontype=view';
+                }
+                else  //已整改的查看页面
+                {
+                    title = "已整改隐患查看";
+                    rqUrl = '/HiddenTroubleManage/HTBaseInfo/NewForm?keyValue=' + obj + '&actiontype=view';
+                }
+            }
+            else if (workstream == "制定整改计划") {
+                rqUrl = '/HiddenTroubleManage/HTChangePlan/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患完善") {
+                rqUrl = '/HiddenTroubleManage/HTPerfection/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患申诉") {
+                rqUrl = '/HiddenTroubleManage/HtAppealInfo/Approve?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患评估") {
+                rqUrl = '/HiddenTroubleManage/HTApproval/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患整改") {
+                rqUrl = '/HiddenTroubleManage/HTChangeInfo/Form?keyValue=' + obj + '&actiontype=view';
+            }
+
+            dialogOpen({
+                id: 'HidDoneForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: null
+            });
+        }
+
+        function getLllegal() {
+            //违章曝光
+            $.ajax({
+                type: "get",
+                url: "../Desktop/QueryExposureLllegal?num=6",  //获取柱状图
+                success: function (data)
+                {
+                    var obj = eval("(" + data + ")");
+                    var html = "";
+                    if (!!obj) {
+                        if (obj.length > 0) {
+                            var head = "<div class=\"swiper-slide swiper-slide1\"><div class=\"clearfix\"></div></div>";
+                            for (var i = 0; i < obj.length; i++) {
+                                var tempValue = "";
+                                var url = "";
+                                if (!!obj[i].lllegaldescribe) {
+                                    tempValue = obj[i].lllegaldescribe.length > 12 ? obj[i].lllegaldescribe.substring(0, 10) : obj[i].lllegaldescribe;
+                                }
+                                if (!!obj[i].filepic) {
+                                    url = !!obj[i].filepic ? obj[i].filepic.replace("~", "..") : "#";
+                                }
+                                if (url == "" || url == "#") {
+                                    url = "../Content/images/no.png";
+                                }
+                                html = "<div class=\"swiper-img fl\" onclick=viewlllegal('" + obj[i].id + "','" + obj[i].addtype + "','" + obj[i].flowstate + "') title='点击查看详情' style='cursor:pointer;'><img src=\"" + url + "\" /><p class=\"slider-text\">" + tempValue + "</p> <p class=\"slider-date\">" + obj[i].createdate + "</p></div>";
+                                if (i % 3 == 0) {
+                                    $("#LllegalManage").html(head);
+                                }
+                                $("#LllegalManage div.clearfix").eq(parseInt(i / 3)).append(html)
+                            }
+                            console.log($("#LllegalManage").html());
+                            //违章曝光
+                            var mySwiper4 = new Swiper('.swiper-container4', {
+                                loop: true,
+                                autoplay: 3000,
+                                // 如果需要分页器
+                                pagination: '.swiper-pagination4',
+                                paginationClickable: true
+                            });
+                        }
+                        else {
+                            $("#LllegalManage").html("暂无数据显示");
+                        }
+                    }
+
+                   // $(".swiper-container4").height("260px");
+                }
+            });
+        }
+
+
+        //查看违章详情
+        function viewlllegal(obj, atype, flowstate) {
+            var rqUrl = "";
+            var title = "";
+
+            //未整改隐患的查看页面
+            if (flowstate == "违章登记") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalRegister/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (flowstate == "违章核准") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalApprove/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (flowstate == "违章整改") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalReform/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (flowstate == "违章验收") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalAccept/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (flowstate == "验收确认") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalConfirm/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else {
+                if (atype == "0") {
+                    title = "查看违章";
+                    rqUrl = '/LllegalManage/LllegalConfirm/Form?keyValue=' + obj + '&actiontype=view';
+                }
+                else  //已整改的查看页面
+                {
+                    title = "已整改违章查看";
+                    rqUrl = '/LllegalManage/LllegalRegister/NewForm?keyValue=' + obj + '&actiontype=view';
+                }
+            }
+
+            var dlg = dialogOpen({
+                id: 'LllegalForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+
+        function getSafetyworksupervise()
+        {
+            $.ajax({
+                type: "get",
+                url: "../SafetyWorkSupervise/Safetyworksupervise/GetSuperviseStat?keyValue=" + $(".sec4_list li.active").attr("data-id"),
+                success: function (data) {
+                    if (!!data) {
+                        var ndata = eval("(" + data + ")");
+                        $("#superviseTable").html("");
+                        if (ndata.length > 0) {
+                            $("#table1").show();
+                            $(ndata).each(function (index, ele) {
+                                var date = "";
+                                var type=$(".sec4_list li.active").attr("data-id");
+                                if (type == 1 ) {
+                                    date = prevDate;
+                                }
+                                else
+                                {
+                                    date = now1;
+                                }
+                                var html = "<tr><td width=\"6%\">" + (index + 1) + "</td><td width=\"24%\">" + ele.dutydeptname + "</td><td width=\"12%\"><span class=\"table-blue\" onclick=\"top.$.tab.addTab('778f847a-2956-40da-b354-dd91662891b8', '../SafetyWorkSupervise/SafetyWorkSupervise/Index?mode=syStat&supervisedate="+date+"&code="+ele.dutydeptcode+"', '安全重点工作督办')\">" + ele.num + "</span></td><td width=\"12%\">" + ele.yblnum + "</td>";
+                                html += "<td width=\"10%\">" + ele.yqnum + "</td><td width=\"12%\">" + ele.ybhnum + "</td><td width=\"10%\">" + ele.lv + "%</td></tr>";
+                                $("#superviseTable").append(html);
+                            });
+                            //表格滚动条
+                            var scrollParam = {
+                                autohidemode: true,
+                                cursorcolor: "#d0ebfc",
+                                cursorwidth: "5px",
+                                cursorborder: "none",
+                                cursorborderradius: "2.5px"
+                            }
+                            $('#superviseTable').niceScroll(scrollParam);
+                        }
+                        else {
+                            $("#table1").hide();
+                        }
+                    }
+                }
+            });
+        }
+
+        //截取字符串
+        function cutString(str, len) {
+            if (str != null && str != undefined) {
+                if (str.length > len) {
+                    return str.substring(0, len) + "...";
+                } else {
+                    return str;
+                }
+            } else {
+                return "";
+            }
+
+        }
+
+        //安全检查
+        function showBigTrb(val1, val2, val3, val4, val5, url) {
+            var title = "安全检查";
+            url = url + '&rcnum=' + val1 + "&zxnum=" + val2 + "&jjrnum=" + val3 + "&jjnum=" + val4 + "&zhnum=" + val5;
+            openTab("3e3772fb-e1c2-42c9-9f98-fb0477158845", url, "待办安全检查");
+        }
+    </script>
+</head>
+<body>
+    <div class="main">
+        <div class="main_top">
+            <div class="topDiv">
+                <div class="topDiv_left left1">
+                    @*<span>安全生产天数</span>*@
+                    @{
+                        var list = new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetDataItemListByItemCode("'XSSIndex'");
+                        if (list.Count() > 0)
+                        {
+                            var entity = list.FirstOrDefault();
+                            DateTime t1 = DateTime.Parse(entity.ItemCode);
+                            TimeSpan ts = new TimeSpan(DateTime.Now.Ticks - t1.Ticks);
+                            int days = ts.Days + int.Parse(entity.ItemValue);
+                            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                            sb.AppendFormat("<span>安全生产天数<em>{0}</em>天</span>", days.ToString());
+                            //foreach (char str in days.ToString().ToCharArray())
+                            //{
+
+                            //}
+                            @Html.Raw(sb.ToString());
+                        }
+                    }
+                </div>
+                <div class="topDiv_left left2">
+                    <div class="needDealt">
+                        <span>待办事项</span>
+                    </div>
+                    <div class="swiperBody">
+                        <div class="swiper-container swiper-container1">
+                            <div class="swiper-wrapper" id="dbsx">
+                                @*<div class="swiper-slide">
+                                    <ul class="nav1">
+                                    </ul>
+                                </div>*@
+                            </div>
+                        </div>
+                        <div class="swiper-button-prev"></div>
+                        <div class="swiper-button-next"></div>
+                    </div>
+                </div>
+                <div class="topDiv_left left3">
+                    <label>快捷入口</label>
+                    <ul class="nav">
+                        <li>
+                            <p  onclick="top.$.tab.addTab('778f847a-2956-40da-b354-dd91662891b8', '../SafetyWorkSupervise/SafetyWorkSupervise/Index', '安全重点工作督办')">安全重点工作督办</p>
+                            <p>安全工作考核</p>
+                        </li>
+                        <li>
+                            <p  onclick="top.$.tab.addTab('b614f91e-452d-412e-815d-ef7685eb164f', '../SaftyCheck/SaftyCheckDataRecord/ZXIndex?ctype=2&cname=专项安全检查', '专项安全检查')">专项安全检查</p>
+                            <p  onclick="top.$.tab.addTab('9b7124b2-d18c-4535-ace8-dfc82d530ca7', '../HiddenTroubleManage/Publicity/Index', '安全检查公示')">安全检查公示</p>
+                        </li>
+                        <li>
+                            <p  onclick="top.$.tab.addTab('a0d36d2e-0f7f-49e4-84e7-2e42b295bf51', '../HiddenTroubleManage/HTRegister/Index', '隐患登记')">隐患登记</p>
+                            <p  onclick="top.$.tab.addTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0', '../HiddenTroubleManage/HTBaseInfo/Index', '隐患台账')">隐患台账</p>
+                        </li>
+                        <li>
+                            <p  onclick="top.$.tab.addTab('8832c669-716e-4c3a-8ee4-2b0cadf43386', '../HighRiskWork/HighRiskCommonApply/Index', '高风险作业许可')">高风险作业许可</p>
+                            <p  onclick="top.$.tab.addTab('dc6d830a-6f26-4c89-b4f0-84f704898bdb', '../EmergencyPlatform/Drillplanrecord/Index', '应急演练记录')">应急演练记录</p>
+                        </li>
+                        <li>
+                            <p  onclick="top.$.tab.addTab('d39862cb-eb85-446f-a690-401387b110a2', '../OutsourcingProject/Startapplyfor/Index', '开工申请')">开工申请</p>
+                            <p  onclick="top.$.tab.addTab('c9a4abd0-8b20-44ea-9701-ebebbc7ccdd3', '../OutsourcingProject/Intromission/Index', '入厂许可')" class="fontBule">入厂许可</p>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="fl main_left">
+            <div class="section1">
+                <div class="sec_top clearfix">
+                    <h3 class="fl">安全重点工作督办</h3>
+                    <p class="more-p fr" onclick="top.$.tab.addTab('778f847a-2956-40da-b354-dd91662891b8', '../SafetyWorkSupervise/SafetyWorkSupervise/Index', '安全重点工作督办')">更多 ></p>
+                    <ul class="sec4_list fr clearfix">
+                        <li class="active" data-id="0">本月</li>
+                        <li data-id="1">上月</li>
+                    </ul>
+
+                </div>
+                <div class="tips">
+                    <table class="table" id="table1">
+                        <thead>
+                            <tr>
+                                <th width="6%">序号</th>
+                                <th width="24%">部门/单位</span></th>
+                                <th width="12%">工作数量</th>
+                                <th width="12%">已办理反馈</th>
+                                <th width="10%">逾期未办理</th>
+                                <th width="12%">已闭环</th>
+                                <th width="10%">处理进度</th>
+                            </tr>
+                        </thead>
+                        <tbody class="table1-tbody" id="superviseTable">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="section2">
+                <div class="sec_top clearfix">
+                    <ul class="secTit_list clearfix fl">
+                        <li class="active">安全隐患排查</li>
+                        <li>未整改隐患</li>
+                    </ul>
+                    <div class="clearfix fr filter-section">
+                        @*<select class="fl" id="selectAQYHPC">
+
+        </select>*@
+                        @*<div style="float:left;width:60%;">
+
+                            <div id="ExamineType" type="select" class="ui-select" style="width:140px">
+
+                            </div>
+                        </div>
+                        <div style="float:right;width:40%;text-align:center;margin-top:0px;margin-left:5px;">
+                            <a class="fl" id="hiddenTrouble" onclick="top.openTab('9b7124b2-d18c-4535-ace8-dfc82d530ca7', '../HiddenTroubleManage/Publicity/Index?ExamineType='+$('#ExamineType').attr('data-code')+'', '安全检查公示')">更多></a>
+                        </div>*@
+                       <table>
+                           <tr>
+                               <td>
+                                   <div id="ExamineType" type="select" class="ui-select" style="width:140px">
+
+                                   </div>
+                                  
+                               </td><td> &nbsp;&nbsp;</td>
+                               <td>
+                                   <div id="ShowType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width:80px">
+                                       <ul>
+                                           <li data-value="1">按月</li>
+                                           <li data-value="2">按周</li>
+                                       </ul>
+                                   </div>
+
+</td><td> &nbsp;&nbsp;</td>
+                               <td style="text-align:right;">
+                                   
+                                   <a class="fl" id="hiddenTrouble" onclick="top.openTab('9b7124b2-d18c-4535-ace8-dfc82d530ca7', '../HiddenTroubleManage/Publicity/Index?ExamineType=' + $('#ExamineType').attr('data-code') + '&Year=' + Year + '&ShowType=' + $('#ShowType').ComboBoxGetValue() + '', '安全检查公示')">更多></a>
+                               </td>
+                           </tr>
+                       </table>
+                    </div>
+                </div>
+                <div class="tips">
+                    <div class="zk-swiper-wrap clearfix">
+                        <ul class="side-nav fl">
+                            <li class="active" data-id="1">部门主任(项目经理)</li>
+                            <li data-id="2">专业管理人员</li>
+                            <li data-id="3">班组长</li>
+                            <li data-id="4">班组</li>
+                        </ul>
+                        <div class="swiper-container zk-swiper zk-swiper0 fl">
+                            <div class="swiper-wrapper" id="AQYHPC">
+                            </div>
+                            <div class="zk-swiper-pagination swiper-pagination"></div>
+                        </div>
+                    </div>
+                    <table class="my-table table"  style="height:2.7rem;">
+                        <thead>
+                            <tr id="troubleTable">
+                                <th width="150px;">隐患图片</th>
+                                <th>隐患描述</th>
+                                <th>隐患区域</th>
+                                <th>责任部门</th>
+                                <th>截止时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hdtrouble" style="height:2.4rem;">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="fl main_center">
+            <div class="section3">
+                <span class="warningIndex">
+                    今日高风险作业
+                    <p class="more-p fr pr" onclick="top.$.tab.addTab('95f41b85-75fd-4f97-bc86-dd61b317d3af', '../HighRiskWork/HighRiskCommonApply/Ledger', '通用高风险作业台账')">更多 ></p>
+                </span>
+                <div class="tips">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th width="6%">序号</th>
+                                <th width="14%">作业类型</span></th>
+                                <th width="12%">作业区域</th>
+                                <th width="12%">风险等级</th>
+                                <th width="20%">作业单位/部门</th>
+                            </tr>
+                        </thead>
+                        <tbody class="table1-tbody" id="riskworkbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="section4">
+                <div class="sec_top clearfix">
+                    <h3 class="fl">违章曝光</h3>
+                    <p class="more-p fr"  onclick="openTab('109d0e86-d8d8-4794-a15e-7308d1646344', '../LllegalManage/LllegalRegister/SdIndex?isexposure=是&Qtype=1', '违章台账')">更多 ></p>
+                </div>
+                <div class="sec4_con">
+                    <div class="swiperBody4">
+                        <div class="swiper-container swiper-container4">
+                            <div class="swiper-wrapper swiper-wrapper4" id="LllegalManage">
+                            </div>
+                            
+                        </div>
+                        <div id="pagination4" class="swiper-pagination swiper-pagination4" ></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="fr main_right">
+            <div class="section5">
+                <div class="sec_top clearfix">
+                    <h3 class="fl">通知公告</h3>
+                    <p class="more-p fr" onclick="openTab('fe8d5f36-64a1-408e-8aa7-42469400ef0c', '../RoutineSafetyWork/Announcement/Index', '公告')">更多 ></p>
+                </div>
+                <div class="sec5_con clearfix">
+                    <ul class="navs" id="Notice">
+                        
+                    </ul>
+                </div>
+            </div>
+            <div class="section6">
+                <div class="sec_top clearfix">
+                    <h3 class="fl">工作预警</h3>
+                </div>
+                <div class="tips">
+                    <div class="swiper-container swiper-container2">
+                        <div class="swiper-wrapper" id="yjzb">
+                        </div>
+                        <div class="swiper-pagination swiper-pagination2 "></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+
+@*<div class="swiper-slide swiper-slide1">
+    <div class="clearfix">
+    <div class="swiper-img fl" onclick="viewlllegal('ed436f60-8dbe-4f31-be00-7009343e6da8','0','违章整改')" title="点击查看详情" style="cursor:pointer;">
+        <img src="../Content/images/no.png" style="height:150px;width:150px;"><p></p>
+        <p class="slider-text">111</p>
+         <p class="slider-date">2020-06-23 13:35:40</p>
+        </div>
+    <div class="swiper-img fl" onclick="viewlllegal('ed436f60-8dbe-4f31-be00-7009343e6da8','0','违章整改')" title="点击查看详情" style="cursor:pointer;">
+        <img src="../Content/images/no.png" style="height:150px;width:150px;">
+        <p></p>
+        <p class="slider-text">111</p> 
+        <p class="slider-date">2020-06-23 13:35:40</p>
+        </div>
+</div></div>*@

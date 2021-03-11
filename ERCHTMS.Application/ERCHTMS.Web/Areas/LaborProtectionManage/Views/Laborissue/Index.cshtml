@@ -1,0 +1,194 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script>
+    var type = request('type');
+    $(function () {
+        InitialPage();
+        GetGrid();
+        IniDropDownList();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 206);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    function IniDropDownList() {
+        $.ajax({
+            url: '../../PersonManage/Transfer/GetOrganizeId',
+            type: "GET",
+            async: false,
+            dataType: "text",
+            success: function (result) {
+                //部门
+                $("#DeptId").ComboBoxTree({
+                    url: top.contentPath + "/BaseManage/Department/GetTreeJson?organizeId=" + result,
+                    description: "==请选择==",
+                    height: "200px",
+                    allowSearch: true
+                });
+            }
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            time: $("#txt_Keyword").val(),
+            type: type
+        }
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 206,
+            url: "../../LaborProtectionManage/Laborissue/GetListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作',
+                    name: 'Oper',
+                    width: 160,
+                    align: 'center',
+                    sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=\"javascript:See('" + options.rowId + "')\" title=\"查看\">查看详情</a>";
+                        return html;
+                    }
+                },
+                {
+                    label: '操作人',
+                    name: 'laboroperationusername',
+                    index: 'laboroperationusername',
+                    width: 200,
+                    align: 'center'
+                },
+                {
+                    label: '操作日期',
+                    name: 'laboroperationtime',
+                    index: 'laboroperationtime',
+                    width: 200,
+                    align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            // rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var deptcode = "";
+            if ($("#DeptId").attr('data-value') != null && $("#DeptId").attr('data-value') != "") {
+                deptcode = $("#DeptId").attr('data-code');
+            }
+            var queryJson = {
+                DeptCode: deptcode,
+                time: $("#txt_Keyword").val(),
+                type: type
+            }
+            $gridTable.jqGrid('setGridParam',
+                {
+                    postData: { queryJson: JSON.stringify(queryJson) },
+                    page: 1
+                }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress',
+            function (event) {
+                if (event.keyCode == "13") {
+                    $('#btn_Search').trigger("click");
+                }
+            });
+    }
+    //查看
+    function See(id) {
+
+        if (type == 0) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '劳动防护发放记录表',
+                url: '/LaborProtectionManage/Laborissuedetail/SeeIndex?keyValue=' + id,
+                width: '1200px',
+                height: '900px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        } else {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '劳动防护回收记录表',
+                url: '/LaborProtectionManage/Laborrecycling/SeeIndex?keyValue=' + id,
+                width: '1200px',
+                height: '900px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+
+
+
+</script>
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            <tr>
+                <td>
+                    <input id="txt_Keyword" type="text" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" readonly="readonly" class="form-control input-wdatepicker" placeholder="请输入要查询的日期" style="width: 200px;" />
+                </td>
+                <td>
+                    &nbsp;&nbsp;操作人所在部门:
+                </td>
+                <td style="width: 200px;">
+                    <div id="DeptId" type="select" class="ui-select"></div>
+                </td>
+                <td style="padding-left: 5px;">
+                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="toolbar">
+        <div class="btn-group">
+            <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+        </div>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

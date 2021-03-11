@@ -1,0 +1,312 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";//系统管理员
+    var selectId = "", selectName = "", selectCode = "";//选择节点
+    //导入刷新用
+    var isImport = false;
+    //页面代理
+    var lagc = null;
+    var flag = 0;
+    $(function () {
+        //
+        //加载树
+        //
+        GetTree();
+        //
+        //创建页面代理
+        //
+        lagc = new listAgency({
+            hasPowerOper: false,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            },
+            gridId: "gridTable",
+            gridJustHeight: 143,
+            gridOptions: {
+                height: $(window).height() - 143,
+                url: "../../RoutineSafetyWork/FileManage/GetListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'createdate',
+                sortorder: 'desc',
+                multiselect: true
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return buildOper(rowObject);
+                    }
+                },
+                { label: '文件名称', name: 'filename', index: 'filename', width: 220, align: 'center', sortable: true },
+                { label: '文件编号', name: 'fileno', index: 'fileno', width: 120, align: 'center', sortable: true },
+                { label: '发布单位（部门）', name: 'releasedeptname', index: 'releasedeptname', width: 120, align: 'center', sortable: true },
+                {
+                    label: '发布时间', name: 'releasetime', index: 'releasetime', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+
+                { label: '文件类型', name: 'filetypename', index: 'filetypename', width: 100, align: 'center', sortable: true },
+                { label: '备注', name: 'remark', index: 'remark', width: 90, align: 'center', sortable: true }
+            ]
+        });
+        //
+        //绑定页面控件
+        //
+        lagc.bindPageControls({
+            searchId: "btn_Search",
+            resetId: "btn_Reset",
+            refreshId: "refresh",
+            expId: "exp",
+            btns: [
+                { id: "rmstore", onClick: removeStore },
+                { id: "lnkViewRoot", onClick: viewAll },
+            ]
+        });
+        //
+        //绑定页面事件
+        //
+        lagc.addPageEvents({ onBuildQuery: buidQuery, onReset: reset});
+        //
+        //初始化
+        //
+        lagc.initialPage();
+        //
+        //页面跳转
+        //
+        lagc.addPageGotoUrl({
+            expArg: { url: '../../RoutineSafetyWork/FileManage/Export' }
+        })
+        //
+        //页面跳转
+        //
+        detail = function(id){
+            var dlgArg = {
+                id: "Detail",
+                title: '查看文件',
+                url: '/RoutineSafetyWork/FileManage/Form?actiontype=view&keyValue=' + id,
+                width: "800px",
+                height: $(window).height() - 55 + "px",
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+    });
+    //
+    //重新定义查询条件
+    //
+    function buidQuery() {
+        var filename = $("#FileName").val();
+        var rnd = Math.random();
+        var data = { filename: filename, refid: selectCode, mystore: 1, rnd: rnd, flag: flag };
+        return JSON.stringify(data);
+    }
+    //
+    //重置条件
+    //
+    function reset() {
+        $("#FileName").val("");
+        $(".bbit-tree-selected").removeClass("bbit-tree-selected");
+        selectId = selectName = selectCode = "";
+    }
+    //
+    //查看全部数据
+    //
+    function viewAll() {
+        $(".bbit-tree-selected").removeClass("bbit-tree-selected");
+        selectId = selectName = "";
+        lagc.queryData();
+    }
+    //
+    //构造操作栏
+    //
+    function buildOper(rowObject) {
+        var html = "<a href=javascript:detail('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+        return html;
+    }
+    //
+    //收藏
+    //
+    function removeStore() {
+        var ids = [];
+        var chkList = $("input:checked").not("#cb_gridTable");
+        if (chkList.length == 0) {
+            dialogMsg('请选择要取消收藏的记录！', 0);
+        }
+        else {
+            $.each(chkList, function (i, n) {
+                var self = $(this);
+                var id = self.attr("id").replace("jqg_gridTable_", "");
+                ids.push(id);
+            });
+            $.ajax({
+                url: "RemoveStore",
+                type: "get",
+                dataType: "json",
+                async: false,
+                data: { ids: ids.join(",") },
+                success: function (data) {
+                    if (!!data && data.type == 1) {
+                        $("#gridTable").trigger("reloadGrid", [{
+                            page: 1
+                        }]);
+                        dialogMsg("取消收藏成功。", 1);
+                    } else {
+                        dialogMsg("取消收藏失败。", -1);
+                    }
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    dialogMsg(errorThrown, -1);
+                }
+            });
+        }
+    }
+    //
+    //类型操作
+    //
+    {
+        //
+        //加载元素树
+        //
+        function GetTree() {
+            var itreHeight = $(window).height() - 55;
+            var item = {
+                height: itreHeight,
+                url: "../../RoutineSafetyWork/FileManage/GetTypeTreeJson",
+                onnodeclick: function (item) {
+                    selectId = item.id;
+                    selectName = item.text;
+                    selectCode = item.value;
+                    lagc.addPageGotoUrl({
+                        addArg: {
+                            title: '添加文件',
+                            url: '/RoutineSafetyWork/FileManage/Form?refid=' + selectId + "&refname=" + selectName,
+                            btn: null
+                        }
+                    });
+                    $('#btn_Search').trigger("click");
+                }
+            };
+            //初始化
+            var itree = $("#itemTree");
+            itree.treeview(item);
+            if (itree.html().length == 0) {
+                itree.setTreeHeight(itreHeight);
+            }
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize();
+                }
+            });
+        }
+    }
+    function ckSelect(obj) {
+        //0表示不包含，1表示包含
+        if ($(obj)[0].checked) {
+            flag = 1;
+        }
+        else {
+            flag = 0;
+        }
+        $("#btn_Search").click();
+    }
+</script>
+<style type="text/css">
+    .titlePanel, .gridPanel {
+        min-width: 680px;
+    }
+
+    #gridTable tr td a:hover {
+        text-decoration: underline;
+    }
+
+    .panel-Title a {
+        cursor: pointer;
+    }
+    .CheckPanel ul {
+        width: 100%;
+        height: 100%;
+    }
+
+        .CheckPanel ul li {
+            width: 200px;
+            float: left;
+            margin-top: 10px;
+            height: 32px;
+        }
+
+    .CheckInput {
+        width: 14px;
+        float: left;
+    }
+
+    .CheckLabel {
+        line-height: 32px;
+    }
+</style>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a id="lnkViewRoot" title="查看全部">文件管理</a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title" style="height:0px;"></div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table class="queryform" id="queryArea">
+                        <tr>
+                            <td style="width:160px;">
+                                <div class="CheckInput"><input type="checkbox" id="ckSelect" class="form-control" onclick="ckSelect(this)" name="ckSelect" /></div><div class="CheckLabel">包含下级节点数据</div>
+                            </td>
+                            <td class="formTitle">&nbsp;文件名称：</td>
+                            <td class="formValue">
+                                <input id="FileName" type="text" class="form-control" querypro="filename" style="width: 300px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="refresh" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="exp" class="btn btn-default"><i class="fa fa-file-excel-o"></i>导出</a>
+                        <a id="rmstore" class="btn btn-default"><i class="fa fa-drupal"></i>取消收藏</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,230 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script>
+    var planid = request('planid');
+    var chaperid = "";
+    var state = 0;
+    $(function () {
+        initControl("");
+        GetGrid();//所有项
+        GetGrid1();//不适宜项
+    });
+    //初始化控件,(chapid)存储选中项的大章节节点id
+    function initControl(chapid) {
+        //获取表单
+        if (!!planid) {
+            $.ajax({
+                url: '../../AssessmentManage/NoSuitableDetail/GetDetailInfo',
+                data: { planid: planid },
+                dataType: "JSON",
+                async: false,
+                success: function (data) {
+                    var count = 0;
+                    if (data.length > 0) {
+                        var html = "<table><tr>";
+                        $(data).each(function (i, data) {
+                            if (count == 0 && data.isclick == 1)//当前登录人可点击此项
+                            {
+                                chaperid = data.chaptersid;
+                                count++;
+                            }
+                            if (chapid != "") {
+                                chaperid = chapid;
+                            }
+                            if (data.isclick == 2) {
+                                html += "<td style='width:300px;'><a  style='width:100%;font-size:12px;background-color:gray' class='btn btn-default btn10'  href='#'>" + data.chaptersname + "(" + data.nosuitnum + ")</a></td>";
+                            }
+                            else {
+                                if (chaperid == data.chaptersid) {
+                                    html += "<td style='width:300px;'><a id='" + data.chaptersid + "'  style='width:100%;font-size:12px;' class='btn btn-default btn10 btn-primary'  href=javascript:linkButton('" + data.chaptersid + "') >" + data.chaptersname + "(" + data.nosuitnum + ")</a></td>";
+                                }
+                                else {
+                                    html += "<td style='width:300px;'><a id='" + data.chaptersid + "'  style='width:100%;font-size:12px;' class='btn btn-default btn10'  href=javascript:linkButton('" + data.chaptersid + "') >" + data.chaptersname + "(" + data.nosuitnum + ")</a></td>";
+                                }
+                            }
+                            if ((i + 1) % 5 == 0) {
+                                html += "</tr>";
+                                html += "<tr>";
+                            }
+                        });
+                        html += "</tr></table>";
+                        $("#div1").html(html);
+                    }
+                }
+            });
+        }
+
+        //所有项选项卡
+        $("#tab1").click(function () {
+            $("#div2").attr("style", "display:block");
+            $("#div3").attr("style", "display:none");
+
+            $('#gridTable').jqGrid('setGridParam', {
+                postData: { chaperOrfrist: chaperid, planid: planid }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //不适宜项选项卡
+        $("#tab2").click(function () {
+            $("#div3").attr("style", "display:block");
+            $("#div2").attr("style", "display:none");
+
+            $('#gridTable1').jqGrid('setGridParam', {
+                postData: { chaperOrfrist: chaperid, planid: planid }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+
+    }
+
+    //选择是
+    function radyesclick(smallchaperid) {
+        dialogOpen({
+            id: 'NoSuit',
+            title: '不适宜项原因',
+            url: '/AssessmentManage/NoSuitableDetail/NoSuitResult?planid=' + planid + "&smallchaperid=" + smallchaperid + "&chaperid=" + chaperid,
+            width: "600px",
+            height: "400px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+
+    //选择否
+    function radnoclick(smallchaperid) {
+        $.RemoveForm({
+            msg: "确定取消不适宜项？",
+            url: '../../AssessmentManage/NoSuitableDetail/RemoveForm',
+            param: { planid: planid, smallchaperid: smallchaperid },
+            success: function (data) {
+                initControl(chaperid);
+                linkButton(chaperid);
+            }
+        })
+    }
+
+    //加载所有项表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 350,
+            url: "../../AssessmentManage/NoSuitableDetail/GetAllDetailPage",
+            postData: { chaperOrfrist: chaperid, planid: planid },
+            datatype: "json",
+            colModel: [{ label: '主键', name: 'sid', hidden: true },
+                { label: '要素号', name: 'majornumber', width: 100, align: 'center', sortable: true },
+                { label: '考评项目', name: 'chaptersname', width: 200, align: 'center', sortable: true },
+                { label: '考评内容', name: 'content', width: 500, align: 'center', sortable: true },
+                { label: '标准分值', name: 'score', width: 100, align: 'center', sortable: true },
+                {
+                    label: '是否为不适宜项', name: 'nsuitreason', width: 100, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == undefined || cellvalue == null || cellvalue == "") {
+                            html = "<input type='radio' name='UnitType_" + options.rowId + "' id='UnitType_" + options.rowId + "' value='1' onclick=\"radyesclick('" + rowObject.sid + "')\" />是&nbsp;&nbsp;&nbsp;<input type='radio' name='UnitType_" + options.rowId + "' id='UnitType2_" + options.rowId + "' value='2' checked='checked' onclick=\"radnoclick('" + rowObject.sid + "')\" />否";
+
+                        }
+                        else {
+                            html = "<input type='radio' name='UnitType_" + options.rowId + "' id='UnitType_" + options.rowId + "' value='1' onclick=\"radyesclick('" + rowObject.sid + "')\"  checked='checked'/>是&nbsp;&nbsp;&nbsp;<input type='radio' name='UnitType_" + options.rowId + "' id='UnitType2_" + options.rowId + "' value='2' onclick=\"radnoclick('" + rowObject.sid + "')\" />否";
+                        }
+                        return html;
+                    }
+                }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [5, 10, 15],
+            pager: "#gridPager",
+            sortname: "cast(replace(majornumber,'.','') as number)",
+            sortorder: 'asc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+        });
+    }
+
+    //加载不适宜项表格
+    function GetGrid1() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable1');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 350,
+            url: "../../AssessmentManage/NoSuitableDetail/GetNoSuitDetailPage",
+            postData: { chaperOrfrist: chaperid, planid: planid },
+            datatype: "json",
+            colModel: [{ label: '主键', name: 'id', hidden: true },
+                { label: '要素号', name: 'majornumber', width: 100, align: 'center', sortable: true },
+                { label: '考评项目', name: 'chaptersname', width: 200, align: 'center', sortable: true },
+                { label: '考评内容', name: 'content', width: 600, align: 'center', sortable: true },
+                { label: '标准分值', name: 'score', width: 100, align: 'center', sortable: true },
+                { label: '不适宜原因', name: 'nsuitreason', width: 300, align: 'center', sortable: false },
+                { label: '操作人', name: 'createusername', width: 130, align: 'center', sortable: false },
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [5, 10, 15],
+            pager: "#gridPager1",
+            sortname: "cast(replace(majornumber,'.','') as number)",
+            sortorder: 'asc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+        });
+    }
+
+    function linkButton(cid) {
+        chaperid = cid;
+        $('.btn10').removeClass('btn-primary');
+        $('.btn10').addClass('btn-default');
+        $("#" + cid).addClass('btn-primary');
+        $('#gridTable,#gridTable1').jqGrid('setGridParam', {
+            postData: { chaperOrfrist: chaperid, planid: planid }, page: 1
+        }).trigger('reloadGrid');
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        $.SaveForm({
+            close: false,
+            url: "../../AssessmentManage/AssessmentSum/SaveSumInfo?planid=" + planid + "&chaperid=" + chaperid,
+            param: { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val()},
+            loading: "正在处理...",
+            success: function () {
+
+            }
+        })
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 20px; margin-left: 20px;">
+    <div id="div1" style="min-height:200px;">
+    </div>
+    <div class="titlePanel">
+        <ul class="nav nav-tabs">
+            <li class="active"><a id="tab1" data-toggle="tab">所有项</a></li>
+            <li><a id="tab2" data-toggle="tab">不适宜项</a></li>
+        </ul>
+    </div>
+    <div class="gridPanel" style="display:block" id="div2">
+        <table id="gridTable"></table>
+        <div id="gridPager"></div>
+    </div>
+    <div class="gridPanel" style="display:none" id="div3">
+        <table id="gridTable1"></table>
+        <div id="gridPager1"></div>
+    </div>
+</div>

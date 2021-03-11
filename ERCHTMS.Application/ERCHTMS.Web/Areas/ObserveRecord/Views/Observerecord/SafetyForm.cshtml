@@ -1,0 +1,154 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/Content/scripts/plugins/jqgrid/jqgrid.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/dialog/dialog.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/layout/jquery.layout.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/plugins/jqgrid/grid.locale-cn.js"></script>
+<script src="~/Content/scripts/plugins/jqgrid/jqgrid.min.js"></script>
+<script>
+    var type = request('type');
+    var issafety = request('issafety');
+    var recordid = request('recordid');
+    var mode = request('mode');
+    var keyValue = request('keyValue');
+
+    $(function () {
+        InitPage();
+        $("#ObserveType").ComboBoxSetValue(type);
+        //根据类别排除对应字段
+        if (issafety == "1") {
+            $("#typename").html("安全行为分类");
+            $("#xwms").html("安全行为描述<font face='宋体'>*</font>");
+            
+            $(".notSafety").each(function (i, item) {
+                item.style.display = "none";
+            })
+            $(".isnot").each(function (i, item) {
+                item.setAttribute("checkexpession", "");
+                item.setAttribute("isvalid", "");
+            })
+        } else {
+            $("#typename").html("问题分类");
+            $("#xwms").html("问题描述<font face='宋体'>*</font>");
+            $(".notSafety").each(function (i, item) {
+                item.style.display = "";
+            })
+            $(".isnot").each(function (i, item) {
+                item.setAttribute("checkexpession", "NotNull");
+                item.setAttribute("isvalid", "yes");
+            })
+        }
+    })
+    function InitPage() {
+        $("#ObserveType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ObsType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../Observerecord/Observerecord/GetSafetyDesc",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+
+    }
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize();
+        postData["Recordid"] = recordid;
+        postData["Observetype"] = type;
+        postData["ObservetypeName"] = $("#ObserveType").attr("data-text");
+        postData["IsSafety"] = issafety;
+        $.SaveForm({
+            url: "../../Observerecord/Observerecord/SaveSafetyDescForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                var queryJson = {
+                    type: type,
+                    issafety: issafety,
+                    recordid: recordid
+                };
+                var _$jqgrid = top.frames["obsForm"].window.$("#gridTable_" + type)
+                if (issafety == "1") {
+                    _$jqgrid = top.frames["obsForm"].window.$("#gridTable_" + type)
+                } else {
+                    _$jqgrid = top.frames["obsForm"].window.$("#gridNotTable_" + type)
+                }
+                _$jqgrid.jqGrid('setGridParam', {
+                    postData: { queryJson: JSON.stringify(queryJson) },
+                }).trigger('reloadGrid');
+            }
+        })
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+
+    <div id="safetyInfo" class="panel panel-default">
+        <div class="panel-heading"> </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td id="typename" style="width:150px;" class="formTitle">安全行为分类<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="ObserveType" disabled type="select" class="ui-select" isvalid="yes"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td id="xwms" class="formTitle">安全行为描述<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="BehaviorDesc" type="text" class="form-control" maxlength="300" isvalid="yes" checkexpession="NotNull"></textarea>
+                    </td>
+                </tr>
+                <tr class="notSafety">
+                    <td class="formTitle">直接原因</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="ImmediateCause" type="text" maxlength="300" class="form-control"></textarea>
+                    </td>
+                </tr>
+                <tr class="notSafety">
+                    <td class="formTitle">间接原因</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="RemoteCause" type="text" maxlength="300" class="form-control"></textarea>
+                    </td>
+                </tr>
+                <tr class="notSafety">
+                    <td class="formTitle">纠正措施<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="RemedialAction" type="text" maxlength="300" class="form-control isnot" isvalid="yes" checkexpession="NotNull"></textarea>
+                    </td>
+                </tr>
+                <tr class="notSafety">
+                    <td class="formTitle">预防措施</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="PreventiveMeasures" type="text" maxlength="300" class="form-control"></textarea>
+                    </td>
+                </tr>
+                <tr class="notSafety">
+                    <td class="formTitle">整改责任人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="PersonreSponsibleId" type="hidden" />
+                        <input id="PersonreSponsible" type="text" class="form-control isnot" readonly onclick="selectUser({ deptId: '', userIds: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'PersonreSponsible,,PersonreSponsibleId' });" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                    <td class="formTitle">整改期限<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ReformDeadline" type="text" class="form-control input-datepicker isnot fxtime" isvalid="yes" checkexpession="NotNull" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>

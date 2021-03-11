@@ -1,0 +1,558 @@
+﻿@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/plugins/ckeditor/ckeditor.js"></script>
+<script src="~/Content/scripts/plugins/simditor/js/module.min.js"></script>
+<script src="~/Content/scripts/plugins/simditor/js/uploader.min.js"></script>
+<script src="~/Content/scripts/plugins/simditor/js/hotkeys.min.js"></script>
+<link href="~/Content/scripts/plugins/cxColor/css/jquery.cxcolor.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/cxColor/js/jquery.cxcolor.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script type="text/javascript">
+    var keyValue = request("keyValue");//安措计划报告主键
+    var actiontype = request('actiontype');
+    var deptCode = request('deptCode');//编制人所在部门编号
+    var state = request("state");//提交状态
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        if (state == "1") {
+            //如果已提交，单位管理员进来智能修改提交
+            $("#btn_Save").attr("disabled", "disabled");
+        }
+        if (actiontype == "add") {
+            $("#Content").val("本季度部门应完成“安措”项目**项，计划费用**万元，实际花费**万元，实际完成**项，完成率**，验收合格率**。");
+        } else {
+            $.SetForm({
+                url: "../../RoutineSafetyWork/SafeSummary/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#tab1").formDeserialize(data);
+                    if (actiontype == "detail") {
+                        $(":input").attr("disabled", "disabled");
+                        $(".form-button").remove()
+                        $("#panel1").css("margin-top", "0px");
+                    }
+                }
+            });
+        }
+        GetGrid();
+        GetGrid1();
+
+        $("#btn_Save").click(function () {
+
+            SaveForm("0");
+        });
+
+        $("#btn_Submit").click(function () {
+            SaveForm("1");
+        });
+        keyValue = keyValue.length == 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+        file_upload.init({
+            keyValue: keyValue, extensions: 'doc,docx,xls,xlsx,zip,jpg,png,ppt,pdf', isImage: false, el: '#uploader'
+        });
+
+        var isDel = actiontype == "detail" ? false : true;
+        file_upload.bindFiles(isDel, false, keyValue, "uploader", isDel);
+    }
+    //保存/提交
+    function SaveForm(action)
+    {
+        if (!$("#tab1").Validform() || !$("#gridTable").Validform()) {
+            return false;
+        }
+        if ($("#Quarter").val() == "-1") {
+            dialogMsg("请选择季度!", 3);
+            return false;
+        }
+        var rows = $("#gridTable").jqGrid('getRowData');
+        if (rows.length == 0) {
+            var rows = $("#gridTable").jqGrid('getRowData');
+            dialogMsg("未查询到本季度计划完成情况!", 3);
+            return false;
+        }
+        var datas = [];
+        $(rows).each(function (j, row) {
+            //状态为“已完成”，保存实际完成时间和实际费用
+            var publishstate = $("#publishstate_" + row.id + " :selected").val();
+            datas.push(Object.assign({}, {
+                Id: row.id,
+                FinishDate: publishstate == "1" ? "": $("#finishdate_" + row.id + "").val() ,
+                Fee: publishstate == "1" ? "":$("#fee_" + row.id + "").val() ,
+                TempState: publishstate
+            }));
+        });
+        var postData = $("#tab1").formSerialize(keyValue);
+        postData["postState"] = action;
+        var dataJson = JSON.stringify(datas);
+        postData["dataJson"] = dataJson;
+        $.SaveForm({
+            url: "../../RoutineSafetyWork/SafeSummary/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        });
+    }
+
+    var queryJson = "";
+    var $gridTable;
+    function GetGrid() {
+        $gridTable = $("#gridTable");
+        queryJson = {
+            belongYear: parseInt($("#BelongYear").val()),
+            quarter: parseInt($("#Quarter").val()),
+            deptCode: deptCode,
+            actiontype: actiontype,
+            keyValue: keyValue
+        };
+        $gridTable.jqGrid({
+            url: "../../RoutineSafetyWork/SafeMeasure/GetSafeMeasureData",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            height: 160,
+            emptyrecords: true,
+            autowidth: true,
+            rowNum: 100000000,
+            //pager: "#gridPager1",
+            emptyrecords: "没有检索到数据",
+            colModel: [
+                {
+                    label: '操作', name: 'oper', width: 80, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<div style='text-align:center' class='opt'><a  href=javascript:detail('" + rowObject.id + "')  style='text-decoration:underline;color:blue'>查看</a></div>";
+                        return html;
+                    }
+                },
+                {
+                    label: '主键', name: 'id', index: 'id', hidden: true
+                },
+                {
+                    label: '项目', name: 'projectname', index: 'projectname', width: 210, align: 'center', sortable: true
+                },
+                {
+                    label: '状态', name: 'publishstate', index: 'publishstate', width: 90, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var showvalue = 1; 
+                        if (actiontype == "detail") {
+                            return rowObject.tempstate == 2 ? "已完成" : "未完成";
+                        } else {
+                            if (actiontype == "add") {
+                                //新增
+                                showvalue = 1;
+                            } else {
+                                showvalue = rowObject.tempstate == null ? 1 : rowObject.tempstate;
+                            }
+                            var str = "<div class='input-group' style='width: 100 %;'>";
+                            str += "<select id='publishstate_" + rowObject.id + "' class='publishstate' onchange='changeValid();'>";
+                            if (showvalue == 1) {
+                                str += "<option value='1' selected='selected'>未完成</option>";
+                                str += "<option value='2'>已完成</option>";
+                            }
+                            else if (showvalue == 2) {
+                                str += "<option value='1'>未完成</option>";
+                                str += "<option value='2' selected='selected'>已完成</option>";
+                            }
+                            str += "</select>";
+                            str += "</div>";
+                            return str;
+                        }
+                    }
+                },
+                {
+                    label: '调整情况', name: 'stauts', index: 'stauts', width: 180, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "无调整") {
+                            return cellvalue;
+                        } else {
+                            var title = "";
+                            if (rowObject.approveusernames == null || rowObject.approveusernames == "") {
+                                title = rowObject.stauts;
+                            } else {
+                                title = rowObject.approveusernames;
+                            }
+                            return "<span title='" + title + "'><a  href=javascript:btn_approve('" + rowObject.id + "')  style='text-decoration:underline;color:blue'>" + rowObject.stauts + "</a></span>";
+                        }
+                    }
+                },
+                {
+                    label: '计划完成时间', name: 'planfinishdate', index: 'planfinishdate', width: 120, align: 'center', sortable: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '计划费用(万)', name: 'cost', index: 'cost', width: 100, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return "<div style='text-align:right'>" + cellvalue + "</div>";
+                    }
+                },
+                {
+                    label: '执行部门', name: 'departmentname', index: 'departmentname', width: 160, align: 'center', sortable: true
+                },
+                {
+                    label: '实际完成时间<font face="宋体">*</font>', name: 'finishdate', index: 'finishdate', width: 140, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        cellvalue = cellvalue == null ? "" : cellvalue;
+                        if (actiontype == "detail" ) {
+                            return cellvalue;
+                        } else {
+                            var html = '<input id="finishdate_' + rowObject.id + '" type="text" class=\'form-control input-wdatepicker ck\' style="width:130px;" placeholder="年/月/日" onfocus="WdatePicker({ dateFmt: \'yyyy-MM-dd\',maxDate: \'%y-%M-%d\' })" ';
+                            var showvalue = 1;
+                            if (actiontype == "add") {
+                                //新增
+                                showvalue = 1;
+                            } else {
+                                showvalue = rowObject.tempstate == null ? 1 : rowObject.tempstate;
+                            }
+                            if (showvalue == 2) {
+                                html += ' checkexpession="NotNull" isvalid="yes"';
+                            }
+                            cellvalue = actiontype == "add" ? "" : cellvalue;
+                            html += ' value=\'' + cellvalue + '\' />';
+                            return html;
+                        }
+                    }
+                },
+                {
+                    label: '实际费用(万)<font face="宋体">*</font>', name: 'fee', index: 'fee', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        cellvalue = cellvalue == null ? "" : cellvalue;
+                        if (actiontype == "detail") {
+                            return cellvalue;
+                        } else {
+                            var html = "<input id='fee_" + rowObject.id + "' type='text' class='form-control fee' placeholder='实际费用' style='width:100px;' ";
+                            var showvalue = 1;
+                            if (actiontype == "add") {
+                                //新增
+                                showvalue = 1;
+                            } else {
+                                showvalue = rowObject.tempstate == null ? 1 : rowObject.tempstate;
+                            }
+                            if (showvalue == 2) {
+                                html += ' checkexpession="PositiveSpotSixNumNotNul" isvalid="yes"';
+                            }
+                            cellvalue = actiontype == "add" ? "" : cellvalue;
+                            html += " value=\"" + cellvalue + "\" />";
+                            return html;
+                        }
+
+
+                    }
+                }
+            ],
+            viewrecords: true,
+            onSelectRow: function () {
+            },
+            gridComplete: function () {
+                //setInfo();
+            }
+        });
+
+        $("#Quarter").change(function () {
+            queryJson.belongYear = parseInt($("#BelongYear").val());
+            queryJson.quarter = parseInt($("#Quarter").val());
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //下季度安措计划
+    var $gridTable1;
+    function GetGrid1() {
+        $gridTable1 = $("#gridTable1");
+        var belongYear = parseInt($("#BelongYear").val());
+        var quarter = parseInt($("#Quarter").val()) + 1;
+        if (quarter == 5) {
+            belongYear += 1;
+            quarter = 1;
+        }
+
+        queryJson = {
+            belongYear: belongYear,
+            quarter: quarter,
+            deptCode: deptCode,
+            actiontype: actiontype,
+            keyValue: ""
+        };
+        $gridTable1.jqGrid({
+            url: "../../RoutineSafetyWork/SafeMeasure/GetSafeMeasureData",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            height: 160,
+            emptyrecords: true,
+            autowidth: true,
+            rowNum: 100000000,
+            //pager: "#gridPager1",
+            emptyrecords: "没有检索到数据",
+            colModel: [
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<div style='text-align:center' class='opt'><a  href=javascript:detail('" + rowObject.id + "','" + rowObject.adjustid + "','" + rowObject.processstate + "')  style='text-decoration:underline;color:blue'>查看</a></div>";
+                        return html;
+                    }
+                },
+                {
+                    label: '项目', name: 'projectname', index: 'projectname', width: 220, align: 'center', sortable: true
+                },
+                {
+                    label: '状态', name: 'publishstate', index: 'publishstate', width: 160, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return cellvalue == 1 ? "未完成" : "已完成";
+                    }
+                },
+                {
+                    label: '调整情况', name: 'stauts', index: 'stauts', width: 160, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "无调整") {
+                            return cellvalue;
+                        } else {
+                            var title = "";
+                            if (rowObject.approveusernames == null || rowObject.approveusernames == "") {
+                                title = rowObject.stauts;
+                            } else {
+                                title = rowObject.approveusernames;
+                            }
+                            return "<span title='" + title + "'><a  href=javascript:btn_approve('" + rowObject.id + "')  style='text-decoration:underline;color:blue'>" + rowObject.stauts + "</a></span>";
+                        }
+                    }
+                },
+                {
+                    label: '计划完成时间', name: 'planfinishdate', index: 'planfinishdate', width: 160, align: 'center', sortable: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '计划费用(万)', name: 'cost', index: 'cost', width: 140, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return "<div style='text-align:right'>" + cellvalue + "</div>";
+                    }
+                },
+                {
+                    label: '执行部门', name: 'departmentname', index: 'departmentname', width: 150, align: 'center', sortable: true
+                }
+            ],
+            viewrecords: true,
+            onSelectRow: function () {
+            },
+            gridComplete: function () {
+                //setInfo();
+            }
+        });
+        $("#Quarter").change(function () {
+            queryJson.belongYear = parseInt($("#BelongYear").val());
+            queryJson.quarter = parseInt($("#Quarter").val()) + 1;
+            if (queryJson.quarter == 5) {
+                queryJson.belongYear = queryJson.belongYear+ 1;
+                queryJson.quarter = 1;
+            }
+            $gridTable1.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    function onBelongYearChanged() {
+        //当前季度
+        queryJson.belongYear = parseInt($("#BelongYear").val());
+        queryJson.quarter = parseInt($("#Quarter").val());
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        }).trigger('reloadGrid');
+        //下一季度
+        queryJson.quarter = parseInt($("#Quarter").val()) + 1;
+        if (queryJson.quarter == 5) {
+            queryJson.belongYear = queryJson.belongYear + 1;
+            queryJson.quarter = 1;
+        }
+        $gridTable1.jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        }).trigger('reloadGrid');
+    }
+
+    function changeValid() {
+        $(".publishstate").each(function () {
+            //实际完成时间
+            var ft = $(this).parent().parent().siblings(":eq(7)").children();
+            var fee = $(this).parent().parent().siblings(":eq(8)").children();
+            if ($(this).val() == "2") {
+                //已完成
+                ft.attr("isvalid", "yes");
+                ft.attr("checkexpession", "NotNull");
+                fee.attr("isvalid", "yes");
+                fee.attr("checkexpession", "PositiveSpotSixNumNotNul");
+            } else {
+                //未完成
+                ft.removeAttr("isvalid");
+                ft.removeAttr("checkexpession");
+                fee.removeAttr("isvalid");
+                fee.removeAttr("checkexpession");
+            }
+        });
+    }
+
+    //查看
+    function detail(id) {
+        var dlg = dialogOpen({
+            id: "Form",
+            title: '查看安措计划详情',
+            url: '/RoutineSafetyWork/SafeMeasure/Detail?keyValue=' + id,
+            width: "1200px",
+            height: "720px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //查看调整申请
+    function btn_approve(id) {
+
+        var keyValue = id;
+        var dlg = dialogOpen({
+            id: "List",
+            title: '查看调整申请/审批记录',
+            url: '/RoutineSafetyWork/SafeMeasure/ApproveRecord?keyValue=' + keyValue,
+            width: "800px",
+            height: "520px",
+            btn: [],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+</script>
+
+<div class="center-Panel">
+    <div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+        <div style="float:left;">
+            <a id="btn_Save" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+            &nbsp; &nbsp;
+            <a id="btn_Submit" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+            &nbsp; &nbsp;
+        </div>
+    </div>
+    <div class="panel panel-default" style="margin-top: 42px;" id="panel1">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息&nbsp;&nbsp;</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form" style="margin-top: 15px;" id="tab1">
+                <tr>
+                    <td class="formTitle">年份<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="BelongYear" type="text" class="form-control input-wdatepicker" isvalid="yes" checkexpession="NotNull" onfocus="WdatePicker({startDate:'%y' ,dateFmt: 'yyyy',onpicked:onBelongYearChanged })" value="@DateTime.Now.Year.ToString()" />
+                    </td>
+                    <td class="formTitle">季度<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <select id="Quarter" class=" show-menu-arrow form-control" style="width:342px;">
+                                <option value="-1">请选择</option>
+                                <option value="1">第一季度</option>
+                                <option value="2">第二季度</option>
+                                <option value="3">第三季度</option>
+                                <option value="4">第四季度</option>
+                            </select>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="formTitle">报告名称<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="ReportName" type="text" class="form-control" placeholder="自动生成" readonly />
+                        </div>
+                    </td>
+                    <td class="formTitle">部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="DepartmentName" type="text" class="form-control" value="@Html.Raw(new ERCHTMS.Code.OperatorProvider().Current().DeptName)" disabled="disabled" />
+                            <input id="DepartmentId" type="hidden" value="@Html.Raw(new ERCHTMS.Code.OperatorProvider().Current().DeptId)" />
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">总结内容</td>
+                    <td class="formValue" colspan="3">
+                        <div class="input-group" style="width:100%;">
+                            <textarea id="Content" class="form-control" rows="4" maxlength="500"></textarea>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">编制人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="OperateUserName" type="text" class="form-control" value="@Html.Raw(new ERCHTMS.Code.OperatorProvider().Current().UserName)" disabled="disabled" />
+                            <input id="OperateUserId" type="hidden" value="@Html.Raw(new ERCHTMS.Code.OperatorProvider().Current().UserId)" />
+                        </div>
+                    </td>
+                    <td class="formTitle">编制时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="OperateDate" type="text" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd")" disabled="disabled" />
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default" style="margin-top: 20px;" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;本季度计划完成情况&nbsp;&nbsp;</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table id="gridTable"></table>
+            <div id="gridPager"></div>
+        </div>
+    </div>
+    <div class="panel panel-default" style="margin-top: 20px;" id="panel3">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;下季度安措计划安排&nbsp;&nbsp;</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table id="gridTable1"></table>
+            <div id="gridPager"></div>
+        </div>
+    </div>
+    <div class="panel panel-default" id="panel4">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;附件</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                <div class="queueList">
+                    <div id="uploaderFile" class="placeholder">
+                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                    </div>
+                </div>
+                <div class="statusBar" style="display:none;">
+                    <div class="progress">
+                        <span class="text">0%</span>
+                        <span class="percentage"></span>
+                    </div>
+                    <div class="info"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

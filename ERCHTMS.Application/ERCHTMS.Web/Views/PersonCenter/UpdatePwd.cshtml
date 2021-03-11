@@ -1,0 +1,203 @@
+﻿@{
+    ViewBag.Title = "个人中心";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+
+    var user = ERCHTMS.Code.OperatorProvider.Provider.Current();
+    ERCHTMS.Busines.SystemManage.DataItemDetailBLL di = new ERCHTMS.Busines.SystemManage.DataItemDetailBLL();
+    List<string> lst = new ERCHTMS.Busines.SystemManage.PasswordSetBLL().IsPasswordRuleStatus(user);
+}
+<script src="~/Content/scripts/plugins/jquery.md5.js"></script>
+<script src="~/Content/scripts/plugins/uploadify/ajaxfileupload.js"></script>
+<script src="~/Content/scripts/plugins/cookie/jquery.cookie.js"></script>
+<style type="text/css">
+    .file {
+        position: relative;
+        display: inline-block;
+        overflow: hidden;
+        text-decoration: none;
+        text-indent: 0;
+        cursor: pointer !important;
+    }
+
+        .file input {
+            position: absolute;
+            font-size: 100px;
+            right: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer !important;
+        }
+
+        .file:hover {
+            text-decoration: none;
+            cursor: pointer !important;
+        }
+</style>
+<script type="text/javascript">
+    var keyValue = '@ViewBag.userId';
+    var callframeid = request("callframeid");
+    var currUserId = request("currUserId");
+    var isHRDL = "@(lst[0])";
+    var pwdReg = "@(lst[1])";
+    var pwdMsg = "@(lst[2])";
+    var pwdLen = "@(lst[3])";
+    $(function () {
+        InitialPage();
+    });
+    function InitialPage() {
+        RevisePasswordPanel();
+    }
+    function AcceptClick() {
+        var NewPassword = $.trim($("#NewPassword").val());
+        var RedoNewPassword = $.trim($("#RedoNewPassword").val());
+        var VerifyCode = $.trim($("#VerifyCode").val());
+        if (NewPassword == "") {
+            $("#NewPassword").parent().find('div').html("<div class=\"form-error-text\">请输入新密码</div>");
+            return false;
+        }
+        if (RedoNewPassword == "") {
+            $("#RedoNewPassword").parent().find('div').html("<div class=\"form-error-text\">请重复输入新密码</div>");
+            return false;
+        }
+        if (NewPassword.length > 16) {
+            $("#NewPassword").parent().find('div').html("<div class=\"form-error-text\">密码长度不能超过16位!</div>");
+            return false;
+        }
+        if (RedoNewPassword.length > 16) {
+            $("#RedoNewPassword").parent().find('div').html("<div class=\"form-error-text\">密码长度不能超过16位!</div>");
+            return false;
+        }
+        if (VerifyCode == "") {
+            $(".VerifyCodemsg").html("<div class=\"form-error-text\">请输入验证码</div>");
+            return false;
+        }
+        if (isStrongPwd(NewPassword)==false) {
+            $(".NewPassword").html("<div class=\"form-error-text\">密码至少包含"+pwdMsg+"且长度至少为"+pwdLen+"位</div>");
+            return false;
+        }
+        if (!isStrongPwd(RedoNewPassword)==false) {
+            $(".RedoNewPassword").html("<div class=\"form-error-text\">密码至少包含" + pwdMsg + "且长度至少为" + pwdLen + "位</div>");
+            return false;
+        }
+        if (NewPassword != RedoNewPassword) {
+            $("#RedoNewPassword").parent().find('div').html("<div class=\"form-error-text\">您两次输入的密码不一致！</div>");
+            return fasle;
+        }
+            Loading(true, "正在提交数据...");
+            var postData = {
+                password: $("#NewPassword").val(),
+                verifyCode: $("#VerifyCode").val()
+            }
+            $.ajax({
+                url: "@Url.Content("~/PersonCenter/ResetPassword")",
+                data: postData,
+                type: "post",
+                dataType: "json",
+                success: function (data) {
+                    if (data.type == 1) {
+                        top.layer.close(top.dlg);
+                        top.window.location.href = top.window.location.href;
+                    } else {
+                        $("#VerifyCodeImag").trigger("click");
+                        $(".VerifyCodemsg").val('');
+                        $(".VerifyCodemsg").html("<div class=\"form-error-text\">" + data.message + "</div>");
+                    }
+                    Loading(false);
+                }
+        });    
+    }
+    //修改密码
+    function RevisePasswordPanel() {
+        var chePassword = false;
+        $("#VerifyCodeImag").click(function () {
+            $("#VerifyCode").val('');
+            $("#VerifyCodeImag").attr("src", "@Url.Content("~/Login/VerifyCode")?time=" + Math.random());
+        })
+        
+        $("#NewPassword").blur(function () {
+            $("#NewPassword").parent().find('div').html("");
+            if ($(this).val() == "") {
+                return false;
+            }
+            if ($(this).val() == $("#OldPassword").val()) {
+                $("#NewPassword").parent().find('div').html("<div class=\"form-error-text\">新密码不能与旧密码相同</div>")
+            } else {
+                if (isStrongPwd($(this).val())==false) {
+                    $("#NewPassword").parent().find('div').html("<div class=\"form-error-text\">密码至少包含" + pwdMsg + "且长度至少为" + pwdLen + "位</div>");
+                    return false;
+                } else {
+                    $("#NewPassword").parent().find('div').html("<div class=\"form-succeed-text\"></div>")
+                }
+               
+            }
+        });
+        $("#RedoNewPassword").blur(function () {
+            $("#RedoNewPassword").parent().find('div').html("")
+            if ($(this).val() == "") {
+                return false;
+            }
+            if ($(this).val() != $("#NewPassword").val()) {
+                $("#RedoNewPassword").parent().find('div').html("<div class=\"form-error-text\">您两次输入的密码不一致！</div>")
+            } else {
+                if (!isStrongPwd($(this).val()) == false) {
+                    $("#RedoNewPassword").parent().find('div').html("<div class=\"form-error-text\">密码至少包含" + pwdMsg + "且长度至少为" + pwdLen + "位</div>");
+                    return false;
+                } else {
+                    $("#RedoNewPassword").parent().find('div').html("<div class=\"form-succeed-text\"></div>")
+                }
+              
+            }
+        });
+        $("#VerifyCode").blur(function () {
+            $(".VerifyCodemsg").html("")
+            if ($(this).val() == "") {
+                return false;
+            }
+        });
+        
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+                <div id="RevisePassword" class="flag">
+                    <table class="form">
+                        <tr>
+                            <td class="formTitle" style="height: 60px;"></td>
+                            <td>
+                                <p style="color: red ">温馨提醒：您好，为了账号安全请您修改密码，密码长度不少于@(lst[3])位，其中必须包括@(lst[2])，请妥善保管您的新密码。</p>
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <td class="formTitle">新密码<font face="宋体">*</font></td>
+                            <td class="formValue">
+                                <input id="NewPassword" type="password" class="form-control input-profile" style="float: left;" />
+                                <div style="width: 100%; float: left"></div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="formTitle">重复新密码<font face="宋体">*</font></td>
+                            <td class="formValue">
+                                <input id="RedoNewPassword" type="password" class="form-control input-profile" style="float: left;" />
+                                <div style="width: 100%; float: left"></div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="formTitle">验证码<font face="宋体">*</font></td>
+                            <td class="formValue">
+                                <div style="float: left;">
+                                    <input id="VerifyCode" maxlength="4" type="text" class="form-control input-profile" style="width: 100px;" />
+                                </div>
+                                <div style="float: left; width: 200px;">
+                                    <img src="~/PersonCenter/VerifyCode" id="VerifyCodeImag" width="100" height="30" alt="点击更换验证码"
+                                         title="点击更换验证码" style="cursor: pointer; padding-top: 2px; padding-left: 5px;" />
+                                </div>
+                                <div class="VerifyCodemsg" style="width: 300px; float: left"></div>
+                            </td>
+                        </tr>
+                         
+                    </table>
+                </div>
+    </div>
+</div>
+

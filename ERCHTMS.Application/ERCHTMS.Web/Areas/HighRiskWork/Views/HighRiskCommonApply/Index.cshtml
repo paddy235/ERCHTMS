@@ -1,0 +1,456 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    ;
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户id
+    var indexstatus = request('indexstatus');//首页跳转
+    var indexdeal = request('indexdeal');//首页待办跳转
+    var indexprocess = request('indexprocess');//首页正在进行高风险作业
+    var indexstatistics = request('indexstatistics');//首页统计跳转
+    var useraccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //通用作业许可状态
+        $("#CommonStatus").ComboBox({
+            param: { EnCode: "CommonStatus" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "======全部======",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+
+
+        //通用作业类型
+        $("#CommonType").ComboBox({
+            param: { EnCode: "CommonType" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "======全部======",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        if (!!indexstatus || !!indexprocess) {
+            $("#CommonStatus").ComboBoxSetValue(indexstatus);
+            $("#CommonStatus div:eq(0)").text("审核(批)通过");
+        }
+
+        if (!!indexdeal) {
+            $("#showrange").children().eq(4).attr("selected", "selected");
+        }
+
+        if (!!indexstatistics) {
+            $("#CommonStatus").ComboBoxSetValue("5");
+            $("#CommonStatus div:eq(0)").text("审核(批)通过");
+            $("#CommonType").ComboBoxSetValue(indexstatistics);
+            $.ajax({
+                url: '../../SystemManage/DataItemDetail/GetListByCodeJson',
+                data: { itemCode: "CommonType" },
+                dataType: "JSON",
+                async: false,
+                success: function (result) {
+                    if (!!result) {
+                        var arr = eval(result);
+                        $(arr).each(function (i, item) {
+                            if (item.itemvalue == indexstatistics) {
+                                $("#CommonType div:eq(0)").text(item.itemname);
+                                return false;
+                            }
+                        });
+                    }
+                }
+            });
+
+        }
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../HighRiskWork/HighRiskCommonApply/GetPageTableJson",
+            datatype: "json",
+            postData: { queryJson: getQueryJson() },
+            colModel: [
+                { label: '主键', name: 'id', width: 10, align: 'left', sortable: true, hidden: true },
+                  {
+                      label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                      formatter: function (cellvalue, options, rowObject) {
+                          var html = "<a href=javascript:show('" + rowObject.id + "','" + rowObject.investigatestate + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                          //当issaved为0,则为登记状态，可以编辑，反之则无法编辑
+                          if (UserId == rowObject.createuserid && rowObject.investigatestate == "0") {
+                              html += "<a href=javascript:edit('" + rowObject.id + "','" + rowObject.investigatestate + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>&nbsp;";
+                              html += "<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>&nbsp;";
+                          }
+                          if (UserId == rowObject.createuserid && rowObject.investigatestate == "1") {
+                              html += "<a href=javascript:update('" + rowObject.id + "')  title='撤销'><i class='fa fa-backward'></i></a>&nbsp;";
+                          }
+                          if (rowObject.investigatestate == "1" || rowObject.investigatestate == "2") {
+                              if (!!rowObject.approveuseraccount) {
+                                  if (parseStrEmpty(rowObject.outtransferuseraccount).indexOf(useraccount + ',') < 0 && (rowObject.approveuseraccount.indexOf(useraccount + ',') >= 0 || parseStrEmpty(rowObject.intransferuseraccount).indexOf(useraccount + ',') >= 0)) {
+                                      var title = "审核";
+                                      if (rowObject.investigatestate == "1") {
+                                          title = "确认";
+                                      }
+                                      html += "<a href=javascript:approve('" + rowObject.id + "','" + rowObject.investigatestate + "')  title='" + title + "'><i class='fa fa-check'></i></a>";
+                                  }
+                              }
+                          }
+                          return html;
+                      }
+                  },
+                {
+                    label: '作业许可状态', name: 'applystatename', index: 'applystatename', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a  href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>" + rowObject.applystatename + "</a>";
+                        return html;
+                    }
+                },
+                { label: '申请编号', name: 'applynumber', index: 'applynumber', width: 150, align: 'center', sortable: false },
+                { label: '作业类型', name: 'worktype', width: 150, align: 'center', sortable: true },
+                { label: '风险等级', name: 'risktype', width: 150, align: 'center', sortable: true },
+                {
+                    label: '作业单位类别', name: 'workdepttype', index: 'workdepttype', width: 200, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return cellvalue = rowObject.workdepttype == "0" ? "单位内部" : "外包单位";
+                    }
+                },
+                   { label: '作业地点', name: 'workplace', width: 200, align: 'center', sortable: false },
+                {
+                    label: '计划作业时间', name: 'workstarttime', width: 300, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.workendtime, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                { label: '作业单位', name: 'workdeptname', index: 'workdeptname', width: 100, align: 'center', sortable: false },
+                { label: '申请人', name: 'applyusername', index: 'applyusername', width: 100, align: 'center', sortable: false },
+                { label: '申请时间', name: 'createdate', index: 'createdate', width: 100, align: 'center', sortable: true, formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } },
+                //{ label: '确认、审核/批部门', name: 'flowdeptname', index: 'flowdeptname', width: 150, align: 'center' },
+                //{ label: '审核流程', name: 'flowname', index: 'flowname', width: 150, align: 'center' }
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 30, 40],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+        $("#btn_Search").click(function () {
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                ////隐藏搜索框
+                var title = $(".ui-filter-text");
+                title.trigger("click");
+            }
+
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加高风险通用作业申请',
+            url: '/HighRiskWork/HighRiskCommonApply/Form?mode=add',
+            width: ($(top.window).width() - 300) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var query = {
+            applynumber: $("#ApplyNumber").val(),
+            status: $("#CommonStatus").attr("data-value"),
+            worktype: $("#CommonType").attr("data-value"),
+            st: $("#StartTime").val(),
+            et: $("#EndTime").val(),
+            workdept: $("#DepartmentCode").val(),
+            workdeptid: $("#DepartId").val(),
+            myself: $("#showrange option:selected").val(),
+            indexprocess: indexprocess
+        }
+        return JSON.stringify(query);
+    }
+
+
+    //编辑
+    function edit(id, state) {
+        var keyValue = id;
+        var url = "";
+        //申请状态下
+        if (state == "0") {
+            url = "/HighRiskWork/HighRiskCommonApply/Form?keyValue=" + keyValue + "&mode=edit&state=" + state;
+
+        } else {  //非申请下查看
+            url = "/HighRiskWork/HighRiskCommonApply/CheckForm?keyValue=" + keyValue + "&mode=edit&state=" + state;
+        }
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑高风险通用作业申请',
+                url: url,
+                width: ($(top.window).width() - 300) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+
+    //删除
+    function del(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../HighRiskWork/HighRiskCommonApply/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的高风险通用作业申请！', 0);
+        }
+    }
+
+
+    //撤销
+    function update(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.ConfirmAjax({
+                url: '../../HighRiskWork/HighRiskCommonApply/UpdateForm',
+                param: { keyValue: keyValue },
+                msg: "确定撤销该申请吗？",
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要撤销的高风险通用作业申请！', 0);
+        }
+    }
+
+    //查看
+    function show(id, state) {
+        var keyValue = id;
+        var title = "查看高风险通用作业申请";
+        var url = "";
+        //申请状态下
+        if (state == "0") {
+            url = "/HighRiskWork/HighRiskCommonApply/Form?keyValue=" + keyValue + "&mode=view&state=" + state;
+
+        } else {  //非申请下查看
+            url = "/HighRiskWork/HighRiskCommonApply/CheckForm?keyValue=" + keyValue + "&mode=view&state=" + state;
+        }
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: title,
+                url: url,
+                width: ($(top.window).width() - 300) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+
+    //审核高风险通用申请
+    function approve(id, state, engineerid) {
+        var keyValue = id;
+        var url = "/HighRiskWork/HighRiskCommonApply/CheckForm?keyValue=" + keyValue + "&mode=approve&state=" + state;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: "审核高风险通用作业申请",
+                url: url,
+                width: ($(top.window).width() - 300) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //重置所有查询条件
+    function ResetCondition() {
+        //作业许可证状态
+        $("#CommonStatus").attr("data-text", "===全部===");
+        $("#CommonStatus").attr("data-value", "");
+        $("#CommonStatus div:eq(0)").text("===全部===");
+        //作业类型
+        $("#CommonType").attr("data-text", "===全部===");
+        $("#CommonType").attr("data-value", "");
+        $("#CommonType div:eq(0)").text("===全部===");
+
+        $("#filter-form").find(":input").val("");
+    }
+
+
+    //导出
+    function exportResult() {
+        var queryJson = getQueryJson();
+        location.href = "../../HighRiskWork/HighRiskCommonApply/ExportData?queryJson=" + queryJson;
+    }
+
+
+    //查看流程图
+    function OpenViewFlow(keyValue) {
+        var title = "高风险通用作业流程图";
+        var rqUrl = "/HighRiskWork/HighRiskCommonApply/Flow?keyValue=" + keyValue;
+        dialogOpen({
+            id: 'WorkFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title">通用高风险作业</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 420px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle">申请编号：</td>
+                                                <td class="formValue">
+                                                    <input id="ApplyNumber" type="text" class="form-control" style="width: 200px;" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">许可状态：</td>
+                                                <td class="formValue">
+                                                    <div id="CommonStatus" type="select" class="ui-select"></div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">作业类型：</td>
+                                                <td class="formValue">
+                                                    <div id="CommonType" type="select" class="ui-select"></div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">作业时间：</td>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="StartTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="EndTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">作业单位：</td>
+                                                <td class="formValue">
+                                                    <input id="DepartmentName" type="text" style="width: 200px;" class="form-control" placeholder="请选择单位" readonly onclick="selectDept('', 0, 2, '选择单位', document.body, 'DepartmentName,DepartmentCode,DepartId');" />
+                                                    <input id="DepartmentCode" type="hidden" />
+                                                    <input id="DepartId" type="hidden" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">查看范围：</td>
+                                                <td class="formValue">
+                                                    <select id="showrange" class=" show-menu-arrow form-control">
+                                                        <option value="" selected="selected">全部</option>
+                                                        <option value="1">本人申请</option>
+                                                        <option value="2">本人待确认</option>
+                                                        <option value="3">本人待审核(批)</option>
+                                                        <option value="4">本人待操作</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-primary" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>新增</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download"></i>&nbsp;导出</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+        

@@ -1,0 +1,640 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/plugins/crypto/crypto.min.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+    var keyValue = request("keyValue"); //主键 隐患信息主键
+    var actiontype = request("actiontype"); //操作动作
+    var orgId = request("orgid"); //机构id
+    var orgName = request("orgname"); //机构名称
+    $(function () {
+
+        //查看下
+        if (actiontype == "view") {
+            $("#btn_Save").attr("disabled", "disabled");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("readonly", "readonly");
+            });
+        }
+
+        //初始化组件
+        $.SetForm({
+            url: "../../HiddenTroubleManage/WfSetting/InitPageDataJson?vdate=" + new Date(),
+            success: function (data) {
+
+                //流程配置实例
+                $("#INSTANCEID").ComboBox({
+                    id: "ID",
+                    text: "INSTANCENAME",
+                    description: "===请选择===",
+                    allowSearch: false,
+                    height: '300px',
+                    data: data.Instance
+                });
+
+                ////起始流程
+                $("#STARTFLOW").ComboBox({
+                    id: "name",
+                    text: "name",
+                    description: "===请选择===",
+                    allowSearch: false,
+                    data: []
+                });
+                ////目标流程
+                $("#ENDFLOW").ComboBox({
+                    id: "name",
+                    text: "name",
+                    description: "===请选择===",
+                    allowSearch: false,
+                    data: []
+                });
+
+                $("#INSTANCEID").bind("change", function () {
+                    $.SetForm({
+                        url: "../../HiddenTroubleManage/WfInstance/GetActivityJson?instanceid=" + $("#INSTANCEID").ComboBoxGetValue(),
+                        success: function (data) {
+                            if (!!data) {
+                                data.push({ id: "其他", name: "其他" });
+
+                                ////起始流程
+                                $("#STARTFLOW").ComboBox({
+                                    id: "name",
+                                    text: "name",
+                                    description: "===请选择===",
+                                    allowSearch: false,
+                                    data: data
+                                });
+                                ////目标流程
+                                $("#ENDFLOW").ComboBox({
+                                    id: "name",
+                                    text: "name",
+                                    description: "===请选择===",
+                                    allowSearch: false,
+                                    data: data
+                                });
+                            }
+                        }
+                    });
+                });
+
+                //提交类型
+                var array = new Array();
+                array.push({ ItemName: "制定提交" });
+                array.push({ ItemName: "提交" });
+                array.push({ ItemName: "同级提交" });
+                array.push({ ItemName: "上报" });
+                array.push({ ItemName: "限制上报" });
+                array.push({ ItemName: "转交" });
+                array.push({ ItemName: "制定退回" });
+                array.push({ ItemName: "退回" });
+                $("#SUBMITTYPE").ComboBox({
+                    id: "ItemName",
+                    text: "ItemName",
+                    description: "===请选择===",
+                    allowSearch: false,
+                    data: array
+                });
+            }
+        });
+
+
+        //获取表单数据
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../HiddenTroubleManage/WfSetting/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    //详情
+                    if (null != data) {
+
+                        $("#form1").formDeserialize(data);
+
+                        //流程配置实例
+                        $("#INSTANCEID").ComboBoxSetValue(data.INSTANCEID);
+
+                        $.SetForm({
+                            url: "../../HiddenTroubleManage/WfInstance/GetActivityJson?instanceid=" + data.INSTANCEID,
+                            success: function (flowdata) {
+                                if (!!flowdata) {
+                                    flowdata.push({ id: "其他", name: "其他" });
+                                    ////起始流程
+                                    $("#STARTFLOW").ComboBox({
+                                        id: "name",
+                                        text: "name",
+                                        description: "===请选择===",
+                                        allowSearch: false,
+                                        data: flowdata
+                                    });
+                                    ////目标流程
+                                    $("#ENDFLOW").ComboBox({
+                                        id: "name",
+                                        text: "name",
+                                        description: "===请选择===",
+                                        allowSearch: false,
+                                        data: flowdata
+                                    });
+                                    //起始流程
+                                    $("#STARTFLOW").ComboBoxSetValue(data.STARTFLOW);
+                                    //目标流程
+                                    $("#ENDFLOW").ComboBoxSetValue(data.ENDFLOW);
+                                }
+                            }
+                        });
+                        //提交类型
+                        $("#SUBMITTYPE").ComboBoxSetValue(data.SUBMITTYPE);
+
+                        //是否自动处理
+                        if (data.ISAUTOHANDLE == "是") {
+                            $("input[name='ISAUTOHANDLE']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISAUTOHANDLE']:eq(1)").prop("checked", "checked");
+                        }
+                        //是否更改流程状态
+                        if (data.ISUPDATEFLOW == "是") {
+                            $("input[name='ISUPDATEFLOW']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISUPDATEFLOW']:eq(1)").prop("checked", "checked");
+                        }
+                        //是否执行脚本获取起始流程参与者
+                        if (data.ISEXCUTECURSQL == "是") {
+                            $("input[name='ISEXCUTECURSQL']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISEXCUTECURSQL']:eq(1)").prop("checked", "checked");
+                        }
+                        //是否执行脚本获取目标流程参与者
+                        if (data.ISEXCUTESQL == "是") {
+                            $("input[name='ISEXCUTESQL']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISEXCUTESQL']:eq(1)").prop("checked", "checked");
+                        }
+
+                        //是否结束流程
+                        if (data.ISENDPOINT == "是") {
+                            $("input[name='ISENDPOINT']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISENDPOINT']:eq(1)").prop("checked", "checked");
+                        }
+
+                    }
+
+                }
+            });
+
+            StartGrid(keyValue);
+            EndGrid(keyValue);
+        }
+    });
+
+
+    //加载起始流程条件
+    function StartGrid(objId) {
+        var selectedRowIndex = 0;
+        var $startGridTable = $('#startGridTable');
+
+        var queryJson = {
+            mode: 'start',
+            settingid: objId
+        };
+
+        $startGridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() / 2,
+            url: "../../HiddenTroubleManage/WfCondition/GetWfConditionInfoPageList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', index: 'id', width: 100, align: 'center', hidden: true },
+                 {
+                     label: '操作', name: 'oper', index: 'id', width: 150, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:viewcd('" + rowObject.id + "','start')  title='查看'><i class='fa fa-eye'></i></a>";
+                         html += "&nbsp;&nbsp;&nbsp;<a href=javascript:removecd('" + rowObject.id + "','start')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         html += "&nbsp;&nbsp;&nbsp;<a href=javascript:editcd('" + rowObject.id + "','start','" + rowObject.organizeid + "','" + rowObject.organizename + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                         return html;
+                     }
+                 },
+                { label: '所属机构单位', name: 'organizename', index: 'organizename', width: 200, align: 'center', sortable: true },
+                { label: '流程配置附加说明', name: 'explains', index: 'explains', width: 200, align: 'center', sortable: true },
+                { label: '部门性质', name: 'depttype', index: 'depttype', width: 120, align: 'center', sortable: true },
+                { label: '角色性质', name: 'roletype', index: 'roletype', width: 120, align: 'center', sortable: true },
+                { label: '部门选择形式', name: 'choosetype', index: 'choosetype', width: 120, align: 'center', sortable: true },
+                { label: '角色性质判定规则', name: 'rolerule', index: 'rolerule', width: 120, align: 'center', sortable: true },
+                { label: '是否执行脚本', name: 'isexecsql', index: 'isexecsql', width: 120, align: 'center', sortable: true },
+                {
+                    label: '脚本语句', name: 'sqlcontent', index: 'sqlcontent', width: 150, align: 'center', sortable: true
+                }
+            ],
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            pager: "#gridPager0",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //加载目标流程条件
+    function EndGrid(objId) {
+        var selectedRowIndex = 0;
+        var $endGridTable = $('#endGridTable');
+
+        var queryJson = {
+            mode: 'end',
+            settingid: objId
+        };
+
+        $endGridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() / 2,
+            url: "../../HiddenTroubleManage/WfCondition/GetWfConditionInfoPageList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', index: 'id', width: 100, align: 'center', hidden: true },
+                 {
+                     label: '操作', name: 'oper', index: 'id', width: 150, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:viewcd('" + rowObject.id + "','end')  title='查看'><i class='fa fa-eye'></i></a>";
+                         html += "&nbsp;&nbsp;&nbsp;<a href=javascript:removecd('" + rowObject.id + "','end')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         html += "&nbsp;&nbsp;&nbsp;<a href=javascript:editcd('" + rowObject.id + "','end','" + rowObject.organizeid + "','" + rowObject.organizename + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                         return html;
+                     }
+                 },
+                { label: '所属机构单位', name: 'organizename', index: 'organizename', width: 200, align: 'center', sortable: true },
+                { label: '流程配置附加说明', name: 'explains', index: 'explains', width: 200, align: 'center', sortable: true },
+                { label: '部门性质', name: 'depttype', index: 'depttype', width: 120, align: 'center', sortable: true },
+                { label: '角色性质', name: 'roletype', index: 'roletype', width: 120, align: 'center', sortable: true },
+                { label: '部门选择形式', name: 'choosetype', index: 'choosetype', width: 120, align: 'center', sortable: true },
+                { label: '角色性质判定规则', name: 'rolerule', index: 'rolerule', width: 120, align: 'center', sortable: true },
+                { label: '是否执行脚本', name: 'isexecsql', index: 'isexecsql', width: 120, align: 'center', sortable: true },
+                {
+                    label: '脚本语句', name: 'sqlcontent', index: 'sqlcontent', width: 150, align: 'center', sortable: true
+                }
+            ],
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            pager: "#gridPager1",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //起始流程条件
+    function addstart() {
+        var rqUrl = '/HiddenTroubleManage/WfCondition/Form?keyValue=&mode=start&settingid=' + keyValue + '&orgid=' + orgId + '&orgname=' + orgName;
+        var title = "新增起始流程条件";
+        dialogOpen({
+            id: 'StartCdForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //目标流程条件
+    function addend() {
+        var rqUrl = '/HiddenTroubleManage/WfCondition/Form?keyValue=&mode=end&settingid=' + keyValue + '&orgid=' + orgId + '&orgname=' + orgName;
+        var title = "新增目标流程条件";
+        dialogOpen({
+            id: 'EndCdForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //删除
+    function removecd(obj, mode) {
+        $.RemoveForm({
+            url: '../../HiddenTroubleManage/WfCondition/RemoveForm',
+            param: { keyValue: obj },
+            success: function (data) {
+                if (mode == "start") {
+                    $('#startGridTable').trigger('reloadGrid');
+                }
+                else {
+                    $('#endGridTable').trigger('reloadGrid');
+                }
+            }
+        });
+    }
+
+    //编辑视图
+    function editcd(obj, mode, organizeID, organizeName) {
+        var rqUrl = '/HiddenTroubleManage/WfCondition/Form?keyValue=' + obj + '&mode=' + mode + '&orgid=' + organizeID + '&orgname=' + organizeName;
+        var title = "编辑流程导向配置条件";
+        dialogOpen({
+            id: 'EditCDForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //查看视图
+    function viewcd(obj, mode) {
+        var rqUrl = '/HiddenTroubleManage/WfCondition/Form?keyValue=' + obj + '&actiontype=view' + '&mode=' + mode;
+        var title = "查看流程导向配置条件";
+
+        var dlg = dialogOpen({
+            id: 'ViewCDForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        //是否自动处理
+        var isautohandle = $("input[name='ISAUTOHANDLE']:checked").val();
+        postData["ISAUTOHANDLE"] = isautohandle;
+        //是否更改流程状态
+        var isupdateflow = $("input[name='ISUPDATEFLOW']:checked").val();
+        postData["ISUPDATEFLOW"] = isupdateflow;
+        //是否执行脚本获取起始流程参与者
+        var isexcutecursql = $("input[name='ISEXCUTECURSQL']:checked").val();
+        postData["ISEXCUTECURSQL"] = isexcutecursql;
+        //是否执行脚本获取目标流程参与者
+        var isexcutesql = $("input[name='ISEXCUTESQL']:checked").val();
+        postData["ISEXCUTESQL"] = isexcutesql;
+
+        //是否结束流程
+        var isexcutesql = $("input[name='ISENDPOINT']:checked").val();
+        postData["ISENDPOINT"] = isexcutesql;
+
+        var flowcode = "bosafety";
+        if (!!$("#FLOWCODE").val()) {
+            if ($("#FLOWCODE").val().length >= 8) {
+                flowcode = $("#FLOWCODE").val().substring(0, 8);
+            }
+        }
+        //起始脚本
+        if (!!$("#SCRIPTCURCONTENT").val()) {
+            var SCRIPTCURCONTENT = encodeURIComponent($("#SCRIPTCURCONTENT").val());
+
+            postData["SCRIPTCURCONTENT"] = encryptByDES(SCRIPTCURCONTENT, flowcode, flowcode).toUpperCase();
+        }
+        //目标脚本
+        if (!!$("#SCRIPTCONTENT").val()) {
+            var SCRIPTCONTENT = encodeURIComponent($("#SCRIPTCONTENT").val());
+            postData["SCRIPTCONTENT"] = encryptByDES(SCRIPTCONTENT, flowcode, flowcode).toUpperCase();
+        }
+
+
+        $.SaveForm({
+            url: "../../HiddenTroubleManage/WfSetting/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        });
+    }
+
+</script>
+
+<div class="center-Panel">
+    <div style="margin-top: 5px;"></div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;流程导向配置信息&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">流程代码</span></td>
+                        <td class="formValue" colspan="3">
+                            <input id="FLOWCODE" type="text" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">流程导向配置名称</span></td>
+                        <td class="formValue">
+                            <input id="SETTINGNAME" type="text" class="form-control" />
+                            <input id="ID" type="hidden" />
+                        </td>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">流程配置实例</span></td>
+                        <td class="formValue">
+                            <div id="INSTANCEID" type="select" class="ui-select" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">起始流程</td>
+                        <td class="formValue">
+                            <div id="STARTFLOW" type="select" class="ui-select" />
+                        </td>
+                        <td class="formTitle">目标流程</td>
+                        <td class="formValue">
+                            <div id="ENDFLOW" type="select" class="ui-select" />
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="formTitle">提交形式</td>
+                        <td class="formValue">
+                            <div id="SUBMITTYPE" type="select" class="ui-select" />
+                        </td>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">是否自动处理当前流程</span></td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISAUTOHANDLE" id="ISAUTOHANDLE1" value="是" checked="checked" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISAUTOHANDLE" id="ISAUTOHANDLE2" value="否" />否
+                                </label>
+                            </div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td class="formTitle">是否更改流程状态</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISUPDATEFLOW" id="ISUPDATEFLOW1" value="是" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISUPDATEFLOW" id="ISUPDATEFLOW2" value="否" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">流程状态Flag</td>
+                        <td class="formValue">
+                            <input id="WFFLAG" type="text" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">是否执行脚本获取起始流程参与者</span></td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISEXCUTECURSQL" id="ISEXCUTECURSQL1" value="是" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISEXCUTECURSQL" id="ISEXCUTECURSQL2" value="否" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">顺序号</td>
+                        <td class="formValue">
+                            <input id="SERIALNUMBER" type="text" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">起始流程参与者执行脚本(仅限查询)</span></td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="SCRIPTCURCONTENT" class="form-control" isvalid="yes" rows="6" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">是否执行脚本获取目标流程参与者</span></td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISEXCUTESQL" id="ISEXCUTESQL1" value="是" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISEXCUTESQL" id="ISEXCUTESQL2" value="否" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">是否结束流程</span></td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISENDPOINT" id="ISENDPOINT1" value="是" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISENDPOINT" id="ISENDPOINT2" value="否" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">目标流程参与者执行脚本(仅限查询)</span></td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="SCRIPTCONTENT" class="form-control" isvalid="yes" rows="6" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">起始优先等级</span></td>
+                        <td class="formValue">
+                            <input id="STARTLEVEL" type="text" class="form-control" title="同时满足起始流程的角色，通过优先等级来确定流程走向" />
+                        </td>
+                        <td class="formTitle">目标优先等级</td>
+                        <td class="formValue">
+                            <input id="ENDLEVEL" type="text" class="form-control" title="同时满足目标流程的角色，通过优先等级来确定流程走向" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">备注</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REMARKS" class="form-control" isvalid="yes" rows="6" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel0">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;起始流程条件</strong>
+            <span class="tools pull-right">
+                <a class="btn btn-primary btn-xs" onclick='javascript: $("#startGridTable").trigger("reloadGrid")'>&nbsp;刷新</a>&nbsp;&nbsp;
+                <a id="btn_addstart" href="javascript:addstart()" class="btn btn-primary btn-xs">新 增</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div>
+                <table id="startGridTable"></table>
+                <div id="gridPager0"></div>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel1">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;目标流程条件</strong>
+            <span class="tools pull-right">
+                <a class="btn btn-primary btn-xs" onclick='javascript: $("#endGridTable").trigger("reloadGrid")'>&nbsp;刷新</a>&nbsp;&nbsp;
+                <a id="btn_addend" href="javascript:addend()" class="btn btn-primary btn-xs">新 增</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div>
+                <table id="endGridTable"></table>
+                <div id="gridPager1"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,1202 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/html2canvas/html2canvas.min.js"></script>
+<script>;
+    var orgid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    var userid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var mycode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var seltype = 0; // 0：台历  1：列表   
+    var nowy = "@DateTime.Now.ToString("yyyy")";
+    var nowm = "@DateTime.Now.ToString("MM")";
+    var timetype = 0; // 0:月度  1：年度
+    var examinetodeptid = ""; //左边的组织部门
+    var dmydeptname = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var addAuthority = 0;
+    $(function () {
+        GetAuthority();
+        InitialPage();
+        GetTree();
+        get_ContentList();
+    });
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 1,
+                Ids: orgid
+            }
+        );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                console.log(item)
+                examinetodeptid = item.id;
+                dmydeptname = item.text;
+                //$('#btn_Search').trigger("click");
+                search();
+                get_ContentList();
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+
+    // 获取当前权限
+    function GetAuthority() {
+        $.ajax({
+            url: "../../AuthorizeManage/PermissionJob/GetOperAuthority",
+            type: "post",
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                $(data).each(function (e,val) {
+                    if (val.encode == "add") {
+                        addAuthority = 1;
+                    }
+                });
+                
+
+            }
+        })
+    }
+
+    // 列表搜索
+    function search() {
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            examinetodeptid: examinetodeptid,
+            year: $('#yearSel').val(),
+            month: $('#monthSel').val(),
+            timetype: timetype
+        }
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        }).trigger('reloadGrid');
+
+        $('#myyear').html($('#yearSel').val());
+        $('#mymonth').html($('#monthSel').find("option:selected").text());
+        $('#mydeptn').html(dmydeptname);
+        if (timetype == 1) {
+            $('#mymonth').html('');
+        }
+        
+    }
+
+    //初始化页面
+    function InitialPage() {
+        $('#monthSel').val(nowm);
+        $.ajax({
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetYearList",
+            type: "GET",
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                $('#yearSel').empty();
+                if (data.length != 0) {
+                    $(data).each(function () {
+                        $('#yearSel').append(' <option value="' + this.yealname + '">' + this.yealname +'</option>');
+                    });
+                } else {
+                    $('#yearSel').append(' <option value="' + nowy + '">' + nowy + '</option>');
+                }
+
+                $('#yearSel').val(nowy);
+
+            }
+        })
+
+        $('#layout').layout({
+           applyDemoStyles: false,
+            onresize: function () {
+               $(window).resize();
+             }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 110);
+            }, 200);
+            e.stopPropagation();
+        });
+        //$('#monthTable').height($(window).height() - 110);
+        //$('#yearTable').height($(window).height() - 110);
+        $('#canledarshow').height($(window).height() - 106);
+        $('#canledarshow').width($(window).width() - $('.west-Panel').width()-8);
+        $('#monthSel,#yearSel').change(function () {
+            search();
+            get_ContentList();
+        });
+    }
+
+    //  新增安全检查
+    function btn_apply(id) {
+        var title = "选择安全检查类型";
+        var url = "/HiddenTroubleManage/Matrixsafecheck/CheckForm?keyType=" + id;
+        var dlg = dialogOpen({
+            id: "ActionCheckForm",
+            title: title,
+            url: url,
+            width: "350px",
+            height: "250px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            examinetodeptid: examinetodeptid,
+            year: $('#yearSel').val(),
+            month: $('#monthSel').val(),
+            timetype: timetype
+        };
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 200,
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'isover', name: 'isover', hidden: true },
+                
+                { label: 'checkid', name: 'checkid', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 60, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                        if (rowObject.isover == '1') {
+                            if (rowObject.createuserdeptcode == mycode && addAuthority == 1 && (rowObject.issubmit == "1" || rowObject.issubmit == "2")) {
+                                html += "<a href=javascript:btn_apply('" + rowObject.id + "')  title='新建检查计划'><i class='fa fa-plus'></i></a>&nbsp;";
+                            }
+                            
+                        } else {
+                            if (rowObject.createuserid == userid) {
+                                html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>&nbsp;";
+                                html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i ></a >&nbsp; ";
+                            }
+                            
+                        }
+                        
+                        return html;
+                    }
+                },
+                { label: '检查时间', name: 'checktime', index: 'checktime', width: 60, align: 'center', sortable: true },
+                { label: '检查内容', name: 'content', index: 'content', width: 250, align: 'center', sortable: true },
+                { label: '检查部门', name: 'checkdeptname', index: 'checkdeptname', width: 200, align: 'center', sortable: true },
+                { label: '检查人员', name: 'checkusername', index: 'checkusername', align: 'center', sortable: true },
+                { label: 'issubmit', name: 'issubmit', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 't.CHECKTIME ',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true
+        });
+        if ($('#mydeptn').length == 0) {
+            var groupHeaders = new Array();
+            groupHeaders.push(
+                {
+                    startColumnName: "rn",
+                    numberOfColumns: 10,
+                    titleText: '<div><b><span id="mydeptn">' + dmydeptname + '</span><span id="myyear">' + $('#yearSel').val() + '</span>年<span id="mymonth">' + $('#monthSel').find("option:selected").text() + '份</span>矩阵式安全检查表</b></div>'
+                }
+            );
+            $('#gridTable').jqGrid("setGroupHeaders", {
+                useColSpanStyle: true,
+                groupHeaders: groupHeaders
+            });
+        }
+
+       
+
+        if (timetype == 1) {
+            $('#mymonth').html('');
+        }
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '新增矩阵安全检查',
+            url: '/HiddenTroubleManage/Matrixsafecheck/Form?action=add',
+            width: "750px",
+            height: "600px",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    function show(id) {
+        dialogOpen({
+            id: 'Form',
+            title: '新增矩阵安全检查',
+            url: '/HiddenTroubleManage/Matrixsafecheck/Form?action=view&recid='+ id,
+            width: "750px",
+            height: "600px",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //编辑
+    function btn_edit(id) {
+        dialogOpen({
+            id: 'Form',
+            title: '新增矩阵安全检查',
+            url: '/HiddenTroubleManage/Matrixsafecheck/Form?action=edit&recid=' + id,
+            width: "750px",
+            height: "600px",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //删除
+    function btn_delete(id) {
+        $.RemoveForm({
+            url: '../../HiddenTroubleManage/Matrixsafecheck/RemoveForm',
+            param: { keyValue: id },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        })
+    }
+
+    // 设置
+    function set() {
+        dialogOpen({
+            id: 'SetForm',
+            title: '设置矩阵安全检查',
+            url: '/HiddenTroubleManage/Matrixsafecheck/SetForm',
+            width:   "850px",
+            height:  "750px",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    function selday(numtype) {
+        seltype = numtype;
+        $('#rlSel,#listSel').removeClass('matrixSel').removeClass('matrixSelR');
+        if (seltype == 0) {
+            $('#rlSel').addClass("matrixSel");
+            $('#listSel').addClass("matrixSelR");
+        } else if (seltype == 1) {
+            $('#listSel').addClass("matrixSel");
+        }
+
+        if (seltype == 0) {
+            $('#listshow').hide();
+            $('#canledarshow').show();
+
+            //$('#export_matrix,#export').show();
+        } else if (seltype == 1) {
+            $('#listshow').show();
+            $('#canledarshow').hide();
+            //$('#export_matrix,#export').hide();
+            GetGrid();
+        }
+        get_ContentList();
+    }
+
+    function timeday(numtype) {
+        timetype = numtype;
+        $('#mSel,#ySel').removeClass('matrixSel');
+        if (timetype == 0) {
+            $('#mSel').addClass("matrixSel");
+            
+        } else if (timetype == 1) {
+            $('#ySel').addClass("matrixSel");
+        }
+
+        get_ContentList();
+        search();
+    }
+
+    // 日历部门的变化
+    function get_ContentList() {
+        // 不同日历的显隐
+        if (seltype == 0) {
+            if (timetype == 0) { // 月度
+                $('#monthTable').show();
+                $('#yearTable').hide();
+            } else {
+                $('#monthTable').hide();
+                $('#yearTable').show();
+            }
+        }
+
+        var queryJson = {
+            examinetodeptid: examinetodeptid
+        };
+        // 获取日历检查内容
+        $.ajax({
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetContentPageJson",
+            type: "GET",
+            data: { queryJson: JSON.stringify(queryJson) },
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                $('#month_dept_content,#year_dept_content').empty();
+                $(data).each(function (i, va) {
+                    $('#month_dept_content').append('<p style="font-size: 20px;">' + va.code + '、' + va.content + '</p>');
+                    $('#year_dept_content').append('<li style="font-size: 20px;">' + va.code + '、' + va.content + '</li>');
+                });
+
+            }
+        })
+
+        // 获取日历部门内容
+        $.ajax({
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetDeptPageJson",
+            type: "GET",
+            data: { queryJson: JSON.stringify(queryJson) },
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                $('#month_dept_dept,#year_dept_dept').empty();
+                $(data).each(function (i, va) {
+                    $('#month_dept_dept').append('<p style="font-size: 20px;">' + va.code + '、' + va.deptname + '</p>');
+                    $('#year_dept_dept').append('<li style="font-size: 20px;">' + va.code + '、' + va.deptname + '</li>');
+                });
+            }
+        })
+
+        var calendarname = "";
+        calendarname += dmydeptname;
+        calendarname += $('#yearSel').val();
+        if (timetype == 0) {
+            calendarname += $('#monthSel').find("option:selected").text();
+        }
+        
+        
+        // 修改日历标题
+        $('#calendar_titleV2,#calendar_title').html(calendarname + '矩阵式安全检查表');
+
+        
+        getCanlendarList();
+
+        
+
+    }
+
+    // 获取日历检查计划内容
+    function getCanlendarList() {
+        var queryJson = {
+            examinetodeptid: examinetodeptid,
+            year: $('#yearSel').val(),
+            month: $('#monthSel').val(),
+            timetype: timetype
+        };
+        // 获取日历检查计划内容
+        $.ajax({
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetCanlendarListJson",
+            type: "GET",
+            data: { queryJson: JSON.stringify(queryJson) },
+            dataType: "JSON",
+            async: false,
+            success: function (canlendardata) {
+                //console.log(data);
+
+                var days = getDaysbymonth($('#yearSel').val(), $('#monthSel').val());
+                var week = getDaysbyWeek($('#yearSel').val(), $('#monthSel').val());
+
+                if (timetype == 0) { // 月度
+                    var monthcell = $('#matrixContent');
+                    monthcell.empty();
+                    var cellNum = 35;// 默认情况下35
+                    if ((parseInt(days) + parseInt(week)) > 35) {
+                        cellNum = 42; //超过需要42个格子
+                        $('#checkConstyle').height('85.6vh');
+                    } else {
+                        $('#checkConstyle').height('71.5vh');
+                    }
+                    for (var i = 0; i < cellNum; i++) {
+                        if (i < parseInt(week) || i >= ((parseInt(days) + parseInt(week)))) {
+                            monthcell.append('<li></li>');
+                        } else {
+                            var htmlcon = '<li >' + (i - parseInt(week) + 1) + '</li>';
+                            var isnum = 0;
+                            $(canlendardata).each(function (e,val) {
+                                if ((val.checktime == ($('#yearSel').val() + "-" + $('#monthSel').val() + "-" + (i - parseInt(week) + 1))) && isnum == 0) {
+                                    var color_back = ""; 
+                                    var cli = "";
+                                    if (val.issubmit == '1') {
+                                        color_back = 'style="background-color: #73b131;cursor: pointer;"';
+                                    } else if(val.issubmit == '3') {
+                                        color_back = 'style="background-color: #c00000;"';
+                                    } else if (val.issubmit == '2') {
+                                        color_back = 'style="cursor: pointer;"';
+                                    }
+                                    if (val.isover == '1' && addAuthority == 1 &&  val.createuserdeptcode == mycode && (val.issubmit == "1" || val.issubmit=="2")) {
+                                        cli = "onclick='btn_apply(\"" + val.id + "\");' ";
+                                    }
+                                    htmlcon = '<li class="activeItem"  ' + color_back + '  ' + cli + '><p style="font-size: 26px;">' + (i - parseInt(week) + 1) + '</p><p class="redDesc">' + (val.contentnum + '-' + val.checkdeptnum) + '</p >';
+                                    if (val.checkusername == null) {
+                                        htmlcon += '<div class="hiddenItem"><p>检查内容：<span style="font-size: 20px;font-weight: inherit;">' + val.content + '</span></p> <p>检查部门：<span style="font-size: 20px;font-weight: inherit;">' + val.checkdeptname + '</span></p></div>';
+                                    } else {
+                                        htmlcon += '<div class="hiddenItem"><p>检查内容：<span style="font-size: 20px;font-weight: inherit;">' + val.content + '</span></p> <p>检查部门：<span style="font-size: 20px;font-weight: inherit;">' + val.checkdeptname + '</span></p><p>检查人员:<span style="font-size: 20px;font-weight: inherit;">' + val.checkusername + '</span></p></div>';
+                                    }
+                                   
+
+                                    //if()
+
+                                    htmlcon += '</li > ';
+                                    isnum = 1;
+                                }
+                            });
+                            //monthcell.append('<li name="toolcanlendar" data-toggle="tooltip" title="<table><tr><td>检查内容：<td><td>时段3<td></tr><tr><td>检查部门：<td><td>时段3<td></tr></table>">' + (i - parseInt(week) + 1) + '</li>');
+                            monthcell.append(htmlcon);
+                        }
+                    }
+                    //$('[name="toolcanlendar"]').tooltip({ html: true });
+                    //$('[name="toolcanlendar"]').click(function () {
+                    //    alert(12)
+                    //});
+
+                } else { //年度
+                    $('[name="month_conte"]').empty();
+                    $(canlendardata).each(function (e, val) {
+                        $('#month_' + val.checktimemonth).append('<li style="font-size: 20px;">' + (val.contentnum + '-' + val.checkdeptnum) + '</li>');
+                    });
+                }
+                
+            }
+        })
+    }
+
+    // 获取当前月有多少周
+    function getDaysbymonth(year, month) {
+        var days = new Date(year, parseInt(month), 0).getDate()
+        return days;
+    }
+
+    // 获取时间是星期几
+    function getDaysbyWeek(year, month) {
+        var day = new Date(year, parseInt(month)-1, 1);
+
+        //var week = new Array('星期天', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六');
+        var week = new Array(0,1, 2, 3, 4, 5, 6);
+        return week[day.getDay()];
+    }
+
+    // 待办页面
+    function actionform() {
+        dialogOpen({
+            id: 'ActionForm',
+            title: '待办',
+            url: '/HiddenTroubleManage/Matrixsafecheck/ActionForm',
+            width: "",
+            height: "",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //  导入
+    function exportIn() {
+        var title = "导入矩阵安全检查";
+        var url = "/HiddenTroubleManage/Matrixsafecheck/Matiximport";
+        var dlg = dialogOpen({
+            id: "Matiximport",
+            title: title,
+            url: url,
+            width: "350px",
+            height: "250px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();                
+            },
+            cancel: function (index) {
+                if (seltype == 0) {
+                    getCanlendarList();
+                } else {
+                    search();
+                }
+
+            }
+        });
+    }
+
+
+    // 导出
+    function export_matrix() {
+        var hei = 0;
+        if (seltype == 0 || seltype == 1) {
+            if (timetype == 0) {
+                //hei = $('#monthTable').height();
+                //$('#monthTable').height(hei + 133);
+                if (seltype == 1) {
+                    $('#monthTable').show();
+                    $('#canledarshow').show();
+                }
+                html2canvas(document.querySelector('#monthTable'), { useCORS: true }).then(function (canvas) {
+                    //console.log(canvas.toDataURL().split(',')[1]);
+                    //console.log(canvas.toDataURL());
+                    //$('#monthTable').height(hei);
+                    if (seltype == 1) {
+                        $('#monthTable').hide();
+                        $('#canledarshow').hide();
+                    }
+                    $.ajax({
+                        url: "../../HiddenTroubleManage/Matrixsafecheck/SavePic",
+                        type: "post",
+                        data: { qystr: canvas.toDataURL().split(',')[1]},
+                        dataType: "JSON",
+                        async: false,
+                        success: function (data) {
+             
+                            window.location.href = "../../HiddenTroubleManage/Matrixsafecheck/ExportAuditTotal?qystr="+data;
+
+                        }
+                    })
+
+                })
+
+            } else {
+                if (seltype == 1) {
+                    $('#canledarshow').show();
+                    $('#yearTable').show();
+
+                }
+                html2canvas(document.querySelector('#yearTable'), { useCORS: true }).then(function (canvas) {
+                    //console.log(canvas.toDataURL().split(',')[1]);
+                    //console.log(canvas.toDataURL());
+                    //$('#monthTable').height(hei);
+                    if (seltype == 1) {
+                        $('#canledarshow').hide();
+                        $('#yearTable').hide();
+                    }
+                    $.ajax({
+                        url: "../../HiddenTroubleManage/Matrixsafecheck/SavePic",
+                        type: "post",
+                        data: { qystr: canvas.toDataURL().split(',')[1] },
+                        dataType: "JSON",
+                        async: false,
+                        success: function (data) {
+         
+                            window.location.href = "../../HiddenTroubleManage/Matrixsafecheck/ExportAuditTotal?qystr=" + data;
+
+                        }
+                    })
+                })
+            }
+
+            
+            
+        } 
+        
+    }
+
+</script>
+<style>
+    .matrixSel {
+        border-color: #337ab7 !important;
+        color: #337ab7 !important;
+    }
+    .matrixSelR {
+        border-left-color: #337ab7 !important;
+    }
+
+
+
+
+    li {
+        list-style: none;
+    }
+
+    .flex {
+        display: -webkit-box;
+        display: -webkit-flex;
+        display: -ms-flexbox;
+        display: flex;
+    }
+
+    .flex_column {
+        -webkit-box-orient: vertical;
+        -webkit-flex-direction: column;
+        -ms-flex-direction: column;
+        flex-direction: column;
+    }
+
+    .flex1 {
+        -webkit-box-flex: 1;
+        -webkit-flex: 1;
+        -ms-flex: 1;
+        flex: 1;
+    }
+
+    .flex2 {
+        -webkit-box-flex: 2;
+        -webkit-flex: 2;
+        -ms-flex: 2;
+        flex: 2;
+    }
+
+    .flex3 {
+        -webkit-box-flex: 3;
+        -webkit-flex: 3;
+        -ms-flex: 3;
+        flex: 3;
+    }
+
+    .flex_Jcenter {
+        -webkit-justify-content: center;
+        justify-content: center;
+    }
+
+    .flex_Acenter {
+        display: -webkit-box;
+        display: -webkit-flex;
+        display: flex;
+        -webkit-box-align: center;
+        -webkit-align-items: center;
+        align-items: center;
+    }
+
+    .flex_sp {
+        -webkit-justify-content: space-between;
+        justify-content: space-between;
+    }
+
+    .flex_sa {
+        -webkit-justify-content: space-around;
+        justify-content: space-around;
+    }
+
+    .flex_wrap {
+        flex-wrap: wrap;
+    }
+
+    .font28 {
+        font-size: 28px;
+    }
+
+    .bgRed {
+        background-color: #c00000;
+    }
+
+    .bgGreen {
+        background-color: #73b131;
+    }
+
+    .bgBlue {
+        background-color: #248edf;
+    }
+
+    .bgPink {
+        background-color: #fbd4b4;
+    }
+
+    .txtCenter {
+        text-align: center;
+    }
+
+
+    .tableV {
+        width: 100%;
+        margin: 0 auto;
+        font-size: 22px;
+        border-collapse: collapse;
+    }
+
+        .tableV th,
+        .tableV td {
+            text-align: center;
+        }
+
+    .tableHeader {
+        padding: 14px 0;
+        color: #ffffff;
+    }
+
+    .secondTitle th {
+        padding: 10px 0;
+        font-size: 26px;
+    }
+
+    .threeTitle th {
+        padding: 15px 0;
+        font-size: 22px;
+    }
+
+    .threeTitleCon td {
+        height: 25.1vh;
+    }
+
+    .checkCon,
+    .checkDepart,
+    .quarterCon {
+        position: relative;
+    }
+
+        .checkCon p {
+            padding: 8px 0 8px 20px;
+            /* padding-left: 20px; */
+            text-align: left;
+            /* line-height: 46px; */
+        }
+
+        .checkCon ul,
+        .checkDepart ul,
+        .quarterCon ul {
+            padding-left: 10px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow-y: auto;
+        }
+
+        .checkCon li,
+        .checkDepart li {
+            padding: 8px 0;
+            text-align: left;
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        .quarterCon ul {
+            margin: 10px;
+            text-align: left;
+            font-size: 20px;
+            border-radius: 5px;
+            background-color: #2991c5;
+        }
+
+
+    /* 月检查表 */
+    .monthTable {
+        width: 100%;
+        margin: 0 auto;
+        border: 1px solid #333333;
+    }
+
+    .h3Title {
+        padding: 20px 0;
+        text-align: center;
+        background-color: #c00000;
+        font-size: 28px;
+        color: #ffffff;
+    }
+
+    .monthTable .time ul {
+        background-color: #fbd4b4;
+    }
+
+    .monthTable .time li,
+    .monthTable .check li {
+        padding: 14.5px 0;
+        box-sizing: border-box;
+        width: 14.28%;
+        text-align: center;
+        border-right: 1px solid #333333;
+    }
+
+        .monthTable .check li:first-child {
+            width: 60%;
+        }
+
+        .monthTable .check li:last-child {
+            width: 40%;
+        }
+
+    .monthTable .monthNum li {
+        width: 14.28%;
+        box-sizing: border-box;
+        padding-left: 20px;
+        height: 14.3vh;
+        text-align: left;
+        font-size: 26px;
+        font-weight: 550;
+        border-right: 1px solid #333333;
+        border-bottom: 1px solid #333333;
+    }
+
+    .monthTable .checkCon {
+        height: 71.5vh;
+    }
+    /*.monthTable .checkConV2 {
+        height: 85.7vh;
+    }*/
+
+        .monthTable .checkCon li {
+            width: 50%;
+        }
+
+    .greenDesc,
+    .redDesc {
+        /*width: 90%;
+        word-break: break-all;
+        margin: 20px auto 0;
+        font-size: 20px;
+        font-weight: 500;
+        background-color: #fff;
+        overflow-y: scroll;*/
+        width: 90%;
+        height: 5vh;
+        word-break: break-all;
+        margin: 10px auto 0;
+        font-size: 18px;
+        font-weight: 500;
+        background-color: #fff;
+        overflow-y: scroll;
+    }
+
+    .activeItem {
+        position: relative;
+    }
+
+    .hiddenItem {
+        position: absolute;
+        width: 20vw;
+        padding: 8px;
+        left: 180px;
+        top:-100px;
+        display: none;
+        transition: all .5;
+        background-color: #ffffff;
+        z-index: 10;
+        border-radius: 5px;
+    }
+
+    .hiddenItem p {
+        padding: 8px 0;
+        font-size: 22px;
+        font-weight: 500;
+    }
+
+    .activeItem:hover .hiddenItem {
+        display: block;
+    }
+
+</style>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a href="javascript:void(0);">组织机构树</a>
+            </div>
+            <div id="itemTree"></div>
+            
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title" id="schemeTitle">
+                <div class="btn-group" style=" margin-top:-5px;margin-left:0px;">
+                    <a class="btn  matrixSel" id="rlSel" style="height:26px;width:50px;font-weight:200; border-color: rgb(204, 204, 204);" onclick="selday(0)">日历</a>
+                    <a class="btn  matrixSelR" id="listSel" style="height:26px;width:50px;font-weight:200;border-color: rgb(204, 204, 204); " onclick="selday(1)">列表</a>
+                </div>
+            </div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div> 查询时间：</div>
+                            </td>
+                            <td>
+                                <div style="margin-left:20px;">
+                                    <select id="yearSel" class="form-control" style="height:26px;">
+                                        @*<option value="2021">2021</option>
+                                        <option value="2022">2022</option>
+                                        <option value="2022">2022</option>*@
+                                    </select>
+                                </div>
+
+                            </td>
+                            <td>
+                                <div style="margin-left:5px;">
+                                    <select id="monthSel" class="form-control" style="height:26px;">
+                                        <option value="01">一月</option>
+                                        <option value="02">二月</option>
+                                        <option value="03">三月</option>
+                                        <option value="04">四月</option>
+                                        <option value="05">五月</option>
+                                        <option value="06">六月</option>
+                                        <option value="07">七月</option>
+                                        <option value="08">八月</option>
+                                        <option value="09">九月</option>
+                                        <option value="10">十月</option>
+                                        <option value="11">十一月</option>
+                                        <option value="12">十二月</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="margin-left:15px;">
+                                    <a class="btn  matrixSel" id="mSel" style="height:26px;width:50px;font-weight:200; border-color: rgb(204, 204, 204);" onclick="timeday(0)">月度</a>
+                                    <a class="btn " id="ySel" style="height:26px;width:50px;font-weight:200;border-color: rgb(204, 204, 204);margin-left:-4px;" onclick="timeday(1)">年度</a>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar" style="margin-left:10px; margin-bottom:5px;">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        @*<a class="btn btn-default" onclick="actionform()"><i class="fa fa-refresh"></i>待办</a>*@
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel" id="listshow" style="display:none;">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+            <div class="gridPanel" id="canledarshow" style="overflow-y:scroll;">
+                    <div class="monthTable" id="monthTable" @*style="overflow-y:scroll;display:block;"*@ >
+                        <h3 class="h3Title" id="calendar_title">检修部2021年1月份矩阵式安全检查表</h3>
+
+                        <div class="main flex">
+                            <div class="time" style="width: 70%;">
+                                <ul class="flex flex_sp secondTitle" style="border-bottom: 1px solid #333333;font-size: 24px;font-weight: 550;">
+                                    <li class="weeks" style="font-size: 22px;">星期日</li>
+                                    <li class="weeks" style="font-size: 22px;">星期一</li>
+                                    <li class="weeks" style="font-size: 22px;">星期二</li>
+                                    <li class="weeks" style="font-size: 22px;">星期三</li>
+                                    <li class="weeks" style="font-size: 22px;">星期四</li>
+                                    <li class="weeks" style="font-size: 22px;">星期五</li>
+                                    <li class="weeks" style="font-size: 22px;">星期六</li>
+                                </ul>
+
+                                <ul class="flex flex_sp flex_wrap secondTitle monthNum" id="matrixContent">
+                                    @*<li></li>
+                                    <li></li>
+                                    <li>1</li>
+                                    <li>2</li>
+                                    <li>3</li>
+                                    <li>4</li>
+                                    <li>5</li>
+                                    <li>6</li>
+                                    <li style="background-color: #73b131;">
+                                        <p>7</p>
+                                        <p class="greenDesc">1,2,e,r,d,s,s,x,d,f,z,z,,z,1,2,e,r,d,s,s,x,d,f,z,z,,z</p>
+                                    </li>
+                                    <li>8</li>
+                                    <li>9</li>
+                                    <li>10</li>
+                                    <li>11</li>
+                                    <li>12</li>
+                                    <li>13</li>
+                                    <li>14</li>
+                                    <li>15</li>
+                                    <li style="background-color: #c00000;">
+                                        <p>7</p>
+                                        <p class="redDesc">1,2,e,r,d,s,s,x,d,f,z,z,,z</p>
+                                    </li>
+                                    <li>17</li>
+                                    <li>18</li>
+                                    <li>19</li>
+                                    <li>20</li>
+                                    <li>21</li>
+                                    <li>22</li>
+                                    <li>23</li>
+                                    <li>24</li>
+                                    <li>25</li>
+                                    <li>26</li>
+                                    <li>27</li>
+                                    <li>28</li>
+                                    <li>29</li>
+                                    <li>
+                                        <p>7</p>
+                                        <p class="redDesc">1,2,e,r,d,s,s,x,d,f,z,z,,z</p>
+                                    </li>
+                                    <li>31</li>
+                                    <li></li>
+                                    <li></li>*@
+     
+                                    
+                                </ul>
+                            </div>
+                            <div class="check" style="width: 30%;">
+                                <ul class="flex flex_sp secondTitle" style="border-bottom: 1px solid #333333;font-size: 24px;font-weight: 550;">
+                                    <li class="weeks" style="background-color: #73b131;font-size: 22px;">检查内容</li>
+                                    <li class="weeks" style="background-color: #248edf;font-size: 22px;">检查部门</li>
+                                </ul>
+                                <ul class="flex flex_sp flex_wrap secondTitle checkCon" id="checkConstyle">
+                                    <li style="background-color: #73b131;" id="month_dept_content">
+                                        @*<p>1、安全文明生产联合检查</p>
+                                        <p>1、安全文明生产联合检查</p>
+                                        <p>1、安全文明生产联合检查</p>
+                                        <p>1、安全文明生产联合检查</p>
+                                        <p>1、安全文明生产联合检查</p>
+                                        <p>1、安全文明生产联合检查</p>
+                                        <p>1、安全文明生产联合检查</p>
+                                        <p>1、安全文明生产联合检查</p>
+                                        <p>1、安全文明生产联合检查</p>*@
+
+                                    </li>
+                                    <li style="background-color: #248edf;" id="month_dept_dept">
+
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="yearTable"  style="width:100%;display:none;" >
+                        <table class="tableV" border="1" >
+                            <tr class="bgRed txtCenter">
+                                <th class="font28 tableHeader" colspan="8" id="calendar_titleV2">检修部2021矩阵式安全检查表</th>
+                            </tr>
+                            <tr class="secondTitle">
+                                <th colspan="3" style="background-color: #e6efff;">第一季度</th>
+                                <th colspan="3" style="background-color: #e6efff;">第二季度</th>
+                                <th class="bgGreen">检查内容</th>
+                                <th class="bgBlue">检查部门</th>
+                            </tr>
+                            <tr class="threeTitle">
+                                <th class="bgPink" width="12%">一月</th>
+                                <th class="bgPink" width="12%">二月</th>
+                                <th class="bgPink" width="12%">三月</th>
+                                <th class="bgPink" width="12%">四月</th>
+                                <th class="bgPink" width="12%">五月</th>
+                                <th class="bgPink" width="12%">六月</th>
+                                <th rowspan="5" class="checkCon bgGreen" style="width: 17%;">
+                                    <ul id="year_dept_content">
+                                        @*<li>1、安全文明生产联合检查</li>
+                                        <li>1、安全文明生产联合检查</li>
+                                        <li>1、安全文明生产联合检查</li>*@
+                                    </ul>
+
+                                </th>
+                                <th rowspan="5" class="checkDepart bgBlue">
+                                    <ul id="year_dept_dept">
+                                        <li>1、安全文明生产联合检查</li>
+                                        <li>1、安全文明生产联合检查</li>
+                                        <li>1、安全文明生产联合检查</li>
+                                    </ul>
+                                </th>
+
+                            </tr>
+                            <tr class="threeTitleCon">
+                                <td class="bgPink quarterCon" >
+                                    <ul id="month_01" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon">
+                                    <ul  id="month_02" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon" >
+                                    <ul id="month_03" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon" >
+                                    <ul id="month_04" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon">
+                                    <ul  id="month_05" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon" >
+                                    <ul id="month_06" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+
+                            </tr>
+
+                            <tr class="secondTitle">
+                                <th colspan="3" style="background-color: #e6efff;">第一季度</th>
+                                <th colspan="3" style="background-color: #e6efff;">第二季度</th>
+
+                            </tr>
+                            <tr class="threeTitle">
+                                <th class="bgPink">七月</th>
+                                <th class="bgPink">八月</th>
+                                <th class="bgPink">九月</th>
+                                <th class="bgPink">十月</th>
+                                <th class="bgPink">十一月</th>
+                                <th class="bgPink">十二月</th>
+
+                            </tr>
+                            <tr class="threeTitleCon">
+                                <td class="bgPink quarterCon" >
+                                    <ul id="month_07" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon" >
+                                    <ul id="month_08" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon" >
+                                    <ul id="month_09" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon" >
+                                    <ul id="month_10" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon" >
+                                    <ul id="month_11" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+                                <td class="bgPink quarterCon">
+                                    <ul id="month_12" name="month_conte">
+                                        <li>1-a,d,v,c</li>
+                                        <li>2-l,o,k,p,s,v</li>
+                                    </ul>
+                                </td>
+
+                            </tr>
+                        </table>
+                    </div>
+            </div>
+                
+        </div>
+    </div>
+</div>

@@ -1,0 +1,1292 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+
+<script src="~/Content/scripts/plugins/jquery.md5.js"></script>
+<script src="~/Content/scripts/plugins/uploadify/ajaxfileupload.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<link rel="stylesheet" type="text/css" href="~/content/scripts/plugins/city-picker/css/city-picker.css">
+<style type="text/css">
+    .file {
+        position: relative;
+        display: inline-block;
+        overflow: hidden;
+        text-decoration: none;
+        text-indent: 0;
+        cursor: pointer !important;
+    }
+
+        .file input {
+            position: absolute;
+            font-size: 100px;
+            right: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer !important;
+        }
+
+        .file:hover {
+            text-decoration: none;
+            cursor: pointer !important;
+        }
+</style>
+<script>
+    var keyValue = request('keyValue');
+    var type = request('type');//区分是否是历史记录
+    var mode = request('mode');
+    var OutEngineerName = request('OutEngineerName');
+    var OutEngineerId = request('OutEngineerId');
+    var peoplereviewid = request('peoplereviewid');
+    var currDeptName;
+    var currDeptId = request('outprojectid');
+    var OrgName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeName";
+    var OrgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var curruserid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    @*if (mode == "add")
+        currDeptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    else*@
+    currDeptName = request('outprojectname');
+    var EditFlag = true;
+    var isFirstEnter = true;
+    var isBC = '@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("白城版本", "BCVersionManager"))';
+    $(function () {
+        $('select').comboSelect();
+        if (mode == "view") {
+            EditFlag = false;
+            $("input").attr('disabled', 'disabled');
+            $("textarea").attr('disabled', 'disabled');
+            $(".ui-select").attr('disabled', 'disabled');
+            $("#addCard").attr('disabled', 'disabled');
+        }
+        else if (mode == "add") {
+            EditFlag = true;
+
+        } else if (mode == "edit") {
+            EditFlag = true;
+            file_upload.init({
+                keyValue: keyValue + "01",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader1',
+                fileDir: 'PeopleAudit'
+            });
+            file_upload.init({
+                keyValue: keyValue + "02",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader2',
+                fileDir: 'PeopleAudit'
+            });
+            file_upload.init({
+                keyValue: keyValue + "03",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader3',
+                fileDir: 'PeopleAudit'
+            });
+            file_upload.init({
+                keyValue: keyValue + "04",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader4',
+                fileDir: 'PeopleAudit'
+            });
+            file_upload.init({
+                keyValue: keyValue + "05",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader5',
+                fileDir: 'PeopleAudit'
+            });
+        }
+        InitCombobox();
+        InitDept();
+        InitUpload();
+        $("#OrganizeId").ComboBoxSetValue(OrgId);
+        $("#OrganizeId").trigger("change");
+        $("#OrganizeId").attr('readonly', 'readonly');
+        $("#DepartmentId").ComboBoxTreeSetValue(currDeptId);
+        $("#DepartmentId").trigger("change");
+        $("#DepartmentId").attr('readonly', 'readonly');
+        initControl();
+        GetGrid();
+
+
+    });
+    //加载人员证件表格
+    function GetGrid() {
+        var GetUrl = "";
+        if (type == "history")
+            GetUrl = "../../OutsourcingProject/Certificateinspectors/GetHistoryListJson";
+        else
+            GetUrl = "../../OutsourcingProject/Certificateinspectors/GetListJson"
+        var queryJson = {
+            UserId: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: "120px",
+            url: GetUrl,
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                  {
+                      label: '操作', name: 'oper', width: 120, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                          var html = "<a href=javascript:f_showCard('" + rowObject.ID + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                          //if ((roleNames.indexOf("负责人") >= 0 || roleNames.indexOf("安全管理员") >= 0) && roleNames.indexOf("承包商") >= 0 && mode != "view") {
+                          //    html += "<a href=javascript:f_editCard('" + rowObject.ID + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                          //    html += "<a href=javascript:f_delCard('" + rowObject.ID + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                          //}
+                          if (type == "history") return html;
+                          if (mode != "view") {
+                              html += "<a href=javascript:f_editCard('" + rowObject.ID + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                              html += "<a href=javascript:f_delCard('" + rowObject.ID + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                          }
+                          return html;
+                      }
+                  },
+                { label: '证件名称', name: 'CREDENTIALSNAME', index: 'CREDENTIALSNAME', width: 220, align: 'center', sortable: false },
+                { label: '证件编号', name: 'CREDENTIALSCODE', index: 'CREDENTIALSCODE', width: 180, align: 'center', sortable: false },
+                { label: '初领/发证日期', name: 'CREDENTIALSTIME', index: 'CREDENTIALSTIME', width: 180, align: 'center', sortable: false, formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } },
+                { label: '有效期(年)', name: 'VALIDTTIME', index: 'VALIDTTIME', width: 100, align: 'center', sortable: false },
+                { label: '发证机关', name: 'CREDENTIALSORG', index: 'CREDENTIALSORG', width: 220, align: 'center', sortable: false },
+                //{ label: '证件照片', name: 'CREDENTIALSFILE', index: 'CREDENTIALSFILE', width: 100, align: 'center', sortable: false },
+                { label: 'ID', name: 'ID', index: 'ID', width: 100, align: 'left', sortable: false, hidden: true }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+
+            }
+        });
+    }
+    function InitCombobox() {
+        //籍贯
+        $("#Native").ComboBox({
+            url: "../../SystemManage/Area/GetListJson",
+            param: { EnCode: "Native" },
+            id: "AreaName",
+            text: "AreaName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //人员类型
+        $("#UserType").ComboBox({
+            description: "==请选择==",
+            height: "200px"
+        });
+        //民族
+        $("#Nation").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "Nation" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //学历
+        $("#DegreesID").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "Degrees" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //用工方式
+        $("#WorkerType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "WorkerType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        ////四种人类别
+        //$("#FourPersonType").ComboBox({
+        //    description: "==请选择==",
+        //    height: "200px"
+        //});
+    }
+    function InitDept() {
+        //公司
+        $("#OrganizeId").ComboBoxTree({
+            url: top.contentPath + "/BaseManage/Organize/GetTreeJson",
+            description: "==请选择==",
+            height: "200px",
+        }).bind("change", function () {
+            //当公司选择发生变化的时候清空岗位和角色
+            ClearValue();
+            var value = $(this).attr('data-value');
+            //加载部门
+            $("#DepartmentId").ComboBoxTree({
+                url: top.contentPath + "/BaseManage/Department/GetTreeJson?organizeId=" + value ,
+                description: "==请选择==",
+                allowSearch: true
+            }).bind("change", function () {
+                ClearValue();
+                var deptvalue = $(this).attr('data-value');
+                //加载岗位
+                $("#DutyId").ComboBox({
+                    url: top.contentPath + "/BaseManage/Post/GetListJson?organizeId=" + OrgId + '&isOrg=' + deptvalue,
+                    id: "RoleId",
+                    text: "FullName",
+                    description: "==请选择=="
+                    , allowSearch: true,
+                    height:"300px"
+                }).bind("change", function () {
+                    var value = $(this).attr('data-value');
+                    var text = $(this).attr('data-text');
+                    if (value == "") return;
+                })
+            });
+        });
+    }
+    function InitUpload() {
+        $('#uploadFile').change(function () {
+            Upload($(this));
+        });
+    }
+    function Upload(self) {
+        var file = self.get(0).files[0];
+        if (file.type.indexOf("image") >= 0) {
+            var size = file.size;
+            var file_id = self.attr("id");
+            var img_id = self.attr("img_id");
+            //上传应用图标
+            $.ajaxFileUpload({
+                url: "../Aptitudeinvestigatepeople/UploadFile",
+                secureuri: false,
+                fileElementId: file_id,
+                dataType: 'json',
+                success: function (data) {
+                    document.getElementById('uploadPreview').src = top.contentPath + data.resultdata;
+                    $("#HeadIcon").val(data.resultdata);
+                    dialogMsg(data.message, 1);
+                },
+                complete: function () {
+                    $("#uploadFile").change(function () {
+                        Upload($(this), file_id, img_id);
+                    })
+                }
+            });
+        } else {
+            dialogMsg("仅支持上传图片！", 2);
+        }
+    }
+    //初始化控件
+    function initControl() {
+        var GetUrl = "";
+        if (type == "history")
+            GetUrl = "../../OutsourcingProject/Aptitudeinvestigatepeople/GetHistoryFormJson";
+        else
+            GetUrl = "../../OutsourcingProject/Aptitudeinvestigatepeople/GetFormJson"
+
+        $.ajax({
+            url: '../../BaseManage/BlackSet/GetAgeRange',
+            type: "get",
+            success: function (data) {
+                if (data != "null") {
+                    var result = eval("(" + data + ")");
+                    $("#AgeRemark").html(result.Remark);
+                }
+            }
+        });
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: GetUrl,
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+
+                    var location = "";
+                    if (data.QuickQuery != null) {
+                        location = data.QuickQuery;
+                    }
+                    if (data.Manager != null) {
+                        location += "/" + data.Manager;
+                    }
+                    if (data.District != null) {
+                        location += "/" + data.District;
+                    }
+                    if (data.Street != null) {
+                        location += "/" + data.Street;
+                    }
+                    if (location.length > 0) {
+                        $("#Location").val(location);
+                    }
+
+                    $("#Native").ComboBoxSetValue(data.NATIVE);
+                    $("#Nation").ComboBoxSetValue(data.NATION);
+                    $("#DegreesID").ComboBoxSetValue(data.DEGREESID);
+                    $("#UserType").ComboBoxSetValue(data.USERTYPE);
+                    $("#OrganizeId").ComboBoxSetValue(OrgId);
+                    $("#OrganizeId").trigger("change");
+                    $("#DepartmentId").ComboBoxTreeSetValue(data.OUTPROJECTID);
+                    $("#DepartmentId").trigger("change");
+                    if (type != "history") {
+                        $("#IDENTIFYID").trigger("change");
+                    }
+                    $("#ACCOUNTS").val(data.ACCOUNTS);
+                    //if (data.FOURPERSONTYPE != null && data.FOURPERSONTYPE != undefined) {
+                    //    $("#FourPersonType").find("option").each(function (i, dom) {
+                    //        if (data.FOURPERSONTYPE.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                    //            $(dom).attr("selected", "selected");
+                    //        }
+                    //    });
+                    //}
+
+                    //$("#FourPersonType").ComboBoxSetValue(data.FOURPERSONTYPE);
+                    $("#DutyId").ComboBoxTreeSetValue(data.DUTYID);
+                    $("#DegreesID").ComboBoxSetValue(data.DEGREESID);
+                    if (data.ISEPIBOLY == "0")
+                        $("#IsEpiboly2").attr("checked", true);
+                    else
+                        $("#IsEpiboly1").attr("checked", true);
+                    if (data.ISSPECIALEQU == "否")
+                        $("#IsSpecialEqu0").attr("checked", true);
+                    else
+                        $("#IsSpecialEqu1").attr("checked", true);
+                    if (data.ISSPECIAL == "否")
+                        $("#IsSpecial0").attr("checked", true);
+                    else
+                        $("#IsSpecial1").attr("checked", true);
+                    if (data.GENDER == "男")
+                        $("#man").attr("checked", true);
+                    else
+                        $("#woman").attr("checked", true);
+                    if (data.IsComtraindication == "是") {
+                        $(".four").show();
+                        $("#IsComtraindication1").attr("checked", true);
+                    }
+                    else {
+                        $(".four").hide();
+                        $("#IsComtraindication2").attr("checked", true);
+                    }
+
+                    if (data.SpecialtyType != null && data.SpecialtyType != undefined) {
+                        $("#SpecialtyType").val(data.SpecialtyType);
+
+                        $("#SpecialtyType").find("option").each(function (i, dom) {
+                            if (("," + data.SpecialtyType + ",").indexOf("," + $(dom).val() + ",") >= 0 && dom.value.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+                    }
+
+                    //照片
+                    if (data.HEADICON) {
+                        document.getElementById('uploadPreview').src = top.contentPath + data.HEADICON;
+                    }
+                    $("#IDENTIFYID").attr("disabled", "disabled");
+                    //$("#ACCOUNTS").attr("disabled", "disabled");
+                    if (data.IDENTIFYID != null && data.IDENTIFYID != undefined) {
+                        if (data.IDENTIFYID.length > 0) {
+                            var value = $("#IDENTIFYID").val();
+                            var sta = value.substring(0, 4);
+                            var end = value.substring(value.length - 4, value.length);
+                            $("#IDENTIFYID").attr("idcard", data.IDENTIFYID);
+                            $("#IDENTIFYID").val(sta + "**********" + end);
+                        }
+                    }
+                    if (mode == "view") {
+                        var value = $("#IDENTIFYID").val();
+                        var sta = value.substring(0, 4);
+                        var end = value.substring(value.length - 4, value.length);
+                        $("#IDENTIFYID").val(sta + "**********" + end);
+                        $("#spanCard").remove();
+                        $("#IDENTIFYID").parent().removeClass("input-group");
+                    }
+                    file_upload.bindFiles(EditFlag, false, keyValue + "01", 'uploader1', EditFlag);
+                    file_upload.bindFiles(EditFlag, false, keyValue + "02", 'uploader2', EditFlag);
+                    file_upload.bindFiles(EditFlag, false, keyValue + "03", 'uploader3', EditFlag);
+                    file_upload.bindFiles(EditFlag, false, keyValue + "04", 'uploader4', EditFlag);
+                    file_upload.bindFiles(EditFlag, false, keyValue + "05", 'uploader5', EditFlag);
+                    //document.getElementById('uploadPreview').src = data.HEADICON;
+                }
+            })
+        } else {
+            $("#spanCard").remove();
+            $("#IDENTIFYID").parent().removeClass("input-group");
+            keyValue = newGuid();
+
+            document.getElementById("IsEpiboly1").checked = true;
+            $("input[name='IsEpiboly']").on('ifChecked', function (event) {
+                var checkValue = $(this).val();
+                if (checkValue == "1") {
+                    $("#OutEngineerName").show();
+                    $("#OutEngineerName").parent().prev().show();
+                    $("#OutEngineerName").attr("isvalid", "yes");
+                }
+                else {
+                    $("#OutEngineerName").parent().prev().hide();
+                    $("#OutEngineerName").hide();
+                    $("#OutEngineerName").removeAttr("isvalid");
+                }
+            });
+            //document.getElementById("IsFourPerson1").checked = true;
+            file_upload.init({
+                keyValue: keyValue + "01",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader1',
+                fileDir: 'PeopleAudit'
+            });
+            file_upload.init({
+                keyValue: keyValue + "02",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader2',
+                fileDir: 'PeopleAudit'
+            });
+            file_upload.init({
+                keyValue: keyValue + "03",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader3',
+                fileDir: 'PeopleAudit'
+            });
+            file_upload.init({
+                keyValue: keyValue + "04",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader4',
+                fileDir: 'PeopleAudit'
+            });
+            file_upload.init({
+                keyValue: keyValue + "05",
+                extensions: '',
+                isImage: false,
+                multiple: true,
+                el: '#uploader5',
+                fileDir: 'PeopleAudit'
+            });
+        }
+
+        var isPresence = $("input[name='IsEpiboly']:checked").val();
+        if (isPresence == "1") {
+            $("#OutEngineerName").parent().prev().show();
+            $("#OutEngineerName").show();
+            $("#OutEngineerName").attr("isvalid", "yes");
+            $("#OutEngineerName").val(OutEngineerName);
+            $("#OutEngineerId").val(OutEngineerId);
+        }
+        else {
+            $("#OutEngineerName").parent().prev().hide();
+            $("#OutEngineerName").hide();
+            $("#OutEngineerName").removeAttr("isvalid");
+            $("#OutEngineerName").val("");
+            $("#OutEngineerId").val("");
+        }
+        $('.icheck input').iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%'
+        });
+
+        $("input[name='IsComtraindication']").on('ifChecked', function (event) {
+            var checkValue = $(this).val();
+            if (checkValue == "是") {
+                $(".four").show();
+            }
+            else {
+                $(".four").hide();
+            }
+        });
+        var IsComtraindication = $("input[name='IsComtraindication']:checked").val();
+        if (IsComtraindication == "是") {
+            $(".four").show();
+        }
+        else {
+            $(".four").hide();
+        }
+
+        $(".WORKOFTYPE").change(function () {
+            var value = $(this).val();
+            if (value == "架子工" || value == "电焊工") {
+                $("#IsSpecial1").iCheck("check");
+            }
+            else if (value == "起重工" || value == "电工") {
+                $("#IsSpecialEqu1").iCheck("check");
+            }
+        })
+        $("#SpecialtyType").change(function () {
+            if (($(this).val() + ",").indexOf('7,') >= 0) {
+                $("#IsSpecial1").iCheck("check");
+            }
+        })
+    }
+    function ClearValue() {
+        //清空岗位
+        $("#DutyId").attr('data-value', '').attr('data-text', '');
+        $("#DutyId").find("div").html("");
+
+    }
+    //保存表单;
+    function AcceptClick() {
+        var idCard = $("#IDENTIFYID").val();
+        if (idCard.length > 0) {
+            if (idCard.indexOf("**********") >= 0) {
+                $("#IDENTIFYID").removeAttr("isvalid");
+            }
+        }
+
+        //AccountOnblur();//验证账号
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if (!!isBC) {
+            var imageurl = $("#HeadIcon").val();
+            if (imageurl == "" || imageurl == "null" || imageurl == undefined) {
+                dialogMsg('请上传头像照片！', 0);
+                return;
+            }
+        }
+
+        var postData = $("#form1").formSerialize(keyValue);
+        //postData["HEADICON"] = document.getElementById('uploadPreview').src;
+        if (!!$("#DepartmentId").attr('data-value') == false) {
+            postData["DepartmentCode"] = $("#OrganizeId").attr('data-code');
+        } else {
+            postData["DepartmentCode"] = $("#DepartmentId").attr('data-code');
+        }
+        postData["ORGANIZECODE"] = $("#OrganizeId").attr('data-code');
+        postData["OUTENGINEERID"] = OutEngineerId;
+        postData["OUTPROJECTID"] = $("#DepartmentId").attr('data-value');
+        postData["PEOPLEREVIEWID"] = peoplereviewid;
+        postData.Birthday = postData.Birthday == "&nbsp;" ? null : postData.Birthday;
+        postData["DutyName"] = $("#DutyId").attr('data-text');
+        var isEpiboly = $("input[name='IsEpiboly']:checked").val();
+        postData["IsEpiboly"] = isEpiboly;
+        //性别
+        if (document.getElementById("man").checked) {
+            postData["Gender"] = "男";
+        }
+        if (document.getElementById("woman").checked) {
+            postData["Gender"] = "女";
+        }
+        //特种作业人员
+        if (document.getElementById("IsSpecial1").checked) {
+            postData["IsSpecial"] = "是";
+        }
+        if (document.getElementById("IsSpecial0").checked) {
+            postData["IsSpecial"] = "否";
+        }
+        //特种设备操作人员
+        if (document.getElementById("IsSpecialEqu1").checked) {
+            postData["IsSpecialEqu"] = "是";
+        }
+        if (document.getElementById("IsSpecialEqu0").checked) {
+            postData["IsSpecialEqu"] = "否";
+        }
+
+        if (document.getElementById("IsComtraindication1").checked) {
+            postData["IsComtraindication"] = "是";
+        }
+        if (document.getElementById("IsComtraindication2").checked) {
+            postData["IsComtraindication"] = "否";
+        }
+        if ($("#IDENTIFYID").val().length > 0) {
+            postData["IDENTIFYID"] = $.trim($("#IDENTIFYID").attr("idcard"));
+        } else {
+            postData["IDENTIFYID"] = "";
+        }
+        postData["ACCOUNTS"] = $.trim($("#ACCOUNTS").val());
+        if ($("button[data-id='SpecialtyType']").attr("title") != undefined) {
+            var title = "";
+            $("#td_value_specialtytype").find("li[class='selected']").each(function (i, dom) {
+                title += $("#SpecialtyType").find("option").eq($(dom).attr("data-original-index")).val() + ",";
+            });
+            postData["SpecialtyType"] = title.substring(0, title.length - 1);
+        }
+
+        var arr = $("#Location").parent().find(".select-item");
+        if (arr.length > 0) {
+            postData["QuickQuery"] = arr.eq(0).text();
+            postData["SimpleSpelling"] = arr.eq(0).data("code");
+        }
+        if (arr.length > 1) {
+            postData["Manager"] = arr.eq(1).text();
+            postData["ManagerId"] = arr.eq(1).data("code");
+        }
+        if (arr.length > 2) {
+            postData["District"] = arr.eq(2).text();
+            postData["DistrictCode"] = arr.eq(2).data("code");
+        }
+        if (arr.length > 3) {
+            postData["Street"] = arr.eq(3).text();
+        }
+        $.SaveForm({
+            url: "../Aptitudeinvestigatepeople/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                top.frames["PeopleForm"].window.$("#gridTable").trigger("reloadGrid")
+            }
+        })
+    }
+    function addCertificate() {
+        dialogOpen({
+            id: 'CertificateForm',
+            title: '添加证件信息',
+            url: '/OutsourcingProject/Certificateinspectors/Form?action=Add&UserId=' + keyValue,
+            width: "800px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    function f_showCard(cardId) {
+        var keyValue = cardId;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'CertificateForm',
+                title: '查看证件信息',
+                url: '/OutsourcingProject/Certificateinspectors/Form?action=Show&keyValue=' + keyValue + '&type=' + type,
+                width: "800px",
+                height: "500px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+    function f_editCard(id) {
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: 'CertificateForm',
+                title: '编辑证件信息',
+                url: '/OutsourcingProject/Certificateinspectors/Form?action=Edit&keyValue=' + id + "&UserId=" + keyValue,
+                width: "800px",
+                height: "500px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    function f_delCard(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../OutsourcingProject/Certificateinspectors/RemoveForm?keyValue=' + keyValue,
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除人员证件！', 0);
+        }
+    }
+    //function IsfourPerson(obj) {
+    //    if ($(obj).val() == "是") {
+    //        $("#szr").show();
+    //        $("#szrval").show();
+    //    } else {
+    //        $("#szr").hide();
+    //        $("#szrval").hide();
+    //    }
+    //}
+    function IsDate(sBirthday) {
+        var d = new Date(sBirthday.replace(/-/g, "/"));
+        var newday = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+        if (sBirthday != (d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate())) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+    function IdCardonblur() {
+        //$.ExistField('IDENTIFYID', '../../BaseManage/User/ExistIdentifyID');
+        var value = $.trim($("#IDENTIFYID").val());
+        if (value.indexOf("*") >= 0) {
+            value = $.trim($("#IDENTIFYID").attr("idcard"));
+        }
+        $.ajax({
+            url: "IsExistIdentifyID",
+            data: { IdentifyID: value, keyValue: keyValue },
+            type: "get",
+            dataType: "json",
+            async: false,
+            success: function (data) {
+                if (data.type == 3) {
+                    $("#IDENTIFYID").val("");
+                    dialogMsg(data.message, -1);
+                }
+                else
+                { 
+                    $("#IDENTIFYID").attr("idcard", value);
+                    if (data.IsOk.toLocaleLowerCase() == 'false') {
+                        //ValidationMessage($("#ACCOUNTS"), '身份证号已存在,账号将使用原账号,不能修改.');
+                        $("#message").text("身份证号已存在,账号将使用原账号,不能修改.");
+                        $("#ACCOUNTS").attr("readonly", "readonly");
+                        $("#ACCOUNTS").val(data.Account);
+                    } else {
+                        $("#ACCOUNTS").removeAttr("readonly");
+                        if (!isFirstEnter) {
+                            $("#ACCOUNTS").val("");
+                        }
+                        $("#message").text("");
+                    }
+                }
+                isFirstEnter = false;
+            },
+            error: function (XMLHttpRequest, textStatus, errorThrown) {
+                dialogMsg(errorThrown, -1);
+            }
+        });
+        var idc = $("#IDENTIFYID").val();
+        var year = idc.substring(6, 10);
+        var month = idc.substring(10, 12);
+        var day = idc.substring(12, 14);
+        //如果没有填写生日则自动生成生日
+        //if ($("#Birthday").val() == "") {
+
+        if (IsDate(year + "-" + Number(month) + "-" + Number(day)))
+            $("#BIRTHDAY").val(year + "-" + month + "-" + day);
+        //}
+        if (IsDate(year + "-" + Number(month) + "-" + Number(day))) {
+            //如果没有填写年龄 则自动生成年龄
+            var Age = GetAge(year + "-" + month + "-" + day);
+            $("#Age").val(Age);
+        }
+    }
+    function showCard(obj) {
+        //if ($("#IDENTIFYID").attr("disabled") == "disabled") {
+        //    var idCard = $("#IDENTIFYID").attr("idcard");
+        //    $("#IDENTIFYID").val(idCard);
+        //}
+        //else
+        //{ 
+        //    var idCard = $("#IDENTIFYID").attr("idcard");
+        //    $("#IDENTIFYID").val(idCard);
+        //    $("#IDENTIFYID").removeAttr("disabled");
+        //}
+        var idCard = $("#IDENTIFYID").attr("idcard");
+        $("#IDENTIFYID").val(idCard);
+        $("#IDENTIFYID").removeAttr("disabled");
+    }
+    function setCard(obj) {
+        $("#IDENTIFYID").attr("idcard", obj.value);
+    }
+    function GetAge(strBirthday) {
+        var returnAge;
+        var strBirthdayArr = strBirthday.split("-");
+        var birthYear = strBirthdayArr[0];
+        var birthMonth = strBirthdayArr[1];
+        var birthDay = strBirthdayArr[2];
+        if (birthYear == "") {
+            return "";
+        }
+        d = new Date();
+        var nowYear = d.getFullYear();
+        var nowMonth = d.getMonth() + 1;
+        var nowDay = d.getDate();
+
+        if (nowYear == birthYear) { //出生日期和当前同一年
+            returnAge = 0;
+        } else {
+            var ageDiff = nowYear - birthYear;
+            if (ageDiff > 0) {
+                if (nowMonth == birthMonth) {
+                    var dayDiff = nowDay - birthDay;
+                    if (dayDiff < 0) {
+                        returnAge = ageDiff - 1;
+                    } else {
+                        returnAge = ageDiff;
+                    }
+                } else {
+                    var monthDiff = nowMonth - birthMonth;
+                    if (monthDiff < 0) {
+                        returnAge = ageDiff - 1;
+                    } else {
+                        returnAge = ageDiff;
+                    }
+                }
+            } else {
+                returnAge = -1;
+            }
+        }
+        return returnAge;
+    }
+    function clearAddr(obj) {
+        $("#Location").citypicker("reset");
+    }
+
+    function AccountOnblur() {
+        if (!!$("#IDENTIFYID").val()) {
+            $.ajax({
+                url: "../../OutsourcingProject/Aptitudeinvestigatepeople/ExistAccount",
+                data: { Accounts: $.trim($("#ACCOUNTS").val()), keyValue: keyValue },
+                type: "get",
+                dataType: "text",
+                async: false,
+                success: function (data) {
+                    if (data.toLocaleLowerCase() == 'false') {
+                        ValidationMessage($("#ACCOUNTS"), '已存在,请重新输入');
+                        $("#ACCOUNTS").val("");
+                        $("#ACCOUNTS").attr('fieldexist', 'yes');
+                    } else {
+                        $("#ACCOUNTS").attr('fieldexist', 'no');
+                    }
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    dialogMsg(errorThrown, -1);
+                }
+            });
+        }
+        else
+        { 
+            $("#ACCOUNTS").val("");
+            dialogMsg("请先输入身份证。", -2);
+        }
+    }
+</script>
+<div style=" margin-right: 30px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;人员信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle" style="width:130px;">姓名<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="REALNAME" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                    <td align="right" rowspan="5">
+                        <div style="margin-top: 10px; text-align: right;">
+                            <div class="file" title="点击上传照片">
+                                <img id="uploadPreview" style="width: 115px; height: 115px;" src="~/Content/images/App.png" />
+                                <input type="file" name="uploadFile" id="uploadFile">
+                                <input type="hidden" id="HeadIcon" />
+                            </div>
+                            <div style="line-height: 14px; color: #75777A; text-align: right;">
+                                点击图片可上传新的照片
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">身份证号<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group">
+                            <input id="IDENTIFYID" length="18" type="text" class="form-control" isvalid="yes" checkexpession="IDCard" onchange="IdCardonblur();" />
+                            <span class="input-group-addon" onclick="showCard(this)" title="查看完整身份证号" id="spanCard"><i class="fa fa-eye"></i></span>
+                        </div>
+                        <div id="AgeRemark" style="color:red"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width:130px;">账号<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ACCOUNTS" type="text" class="form-control" isvalid="yes" placeholder="可用姓名全拼或手机号" checkexpession="NotNull" onchange="AccountOnblur()"/>
+                        <span id="message" style="color:red"></span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">性别<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="男" id="man" checked="checked" name="Gender" />&nbsp;<label for="man">男</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="女" id="woman" name="Gender" />&nbsp;<label for="woman">女</label>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">公司<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="OrganizeId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="formTitle">部门</td>
+                    <td class="formValue">
+                        <div id="DepartmentId" type="selectTree" class="ui-select"></div>
+                    </td>
+                    <td class="formTitle">岗位<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="DutyId" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">人员类型<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="UserType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull">
+                            <ul>
+                                <li data-value="" class="" style="padding: 0px 5px;">==请选择==</li>
+                                <li data-value="公司领导" title="" class="" style="padding: 0px 5px;">公司领导</li>
+                                <li data-value="部门负责人" title="" class="" style="padding: 0px 5px;">部门负责人</li>
+                                <li data-value="专业负责人" title="" class="" style="padding: 0px 5px;">专业负责人</li>
+                                <li data-value="一般管理人员" title="" style="padding: 0px 5px;" class="">一般管理人员</li>
+                                <li data-value="班组负责人" title="" class="" style="padding: 0px 5px;">班组负责人</li>
+                                <li data-value="安全管理人员" title="" class="" style="padding: 0px 5px;">安全管理人员</li>
+                                <li data-value="普通员工" title="" class="" style="padding: 0px 5px;">普通员工</li>
+                                <li data-value="项目负责人" title="" style="padding: 0px 5px;" class="">项目负责人</li>
+                                <li data-value="现场负责人" title="" style="padding: 0px 5px;" class="">现场负责人</li>
+                                <li data-value="一般作业人员" title="" style="padding: 0px 5px;" class="">一般作业人员</li>
+                                <li data-value="监理人员" title="" style="padding: 0px 5px;" class="">监理人员</li>
+                            </ul>
+                        </div>
+                    </td>
+                    <td class="formTitle">原始学历</td>
+                    <td class="formValue">
+                        <div id="DegreesID" type="select" class="ui-select"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">籍贯</td>
+                    <td class="formValue">
+                        <div id="Native" type="select" class="ui-select"></div>
+                    </td>
+                    <td class="formTitle">民族</td>
+                    <td class="formValue">
+                        <div id="Nation" type="select" class="ui-select"></div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="formTitle">出生日期</td>
+                    <td class="formValue">
+                        <input id="BIRTHDAY" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                    </td>
+                    <td class="formTitle">年龄</td>
+                    <td class="formValue">
+                        <input id="Age" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">手机号码</td>
+                    <td class="formValue">
+                        <input id="MOBILE" type="text" class="form-control" isvalid="yes" checkexpession="MobileOrPhoneOrNull" />
+                    </td>
+                    <td class="formTitle">健康状况</td>
+                    <td class="formValue">
+                        <select id="STATEOFHEALTH" class="form-control">
+                            <option value="">请选择或者输入</option>
+                            <option value="良好">良好</option>
+                            <option value="一般">一般</option>
+                            <option value="不良">不良</option>
+
+                        </select>
+                        @*<input id="STATEOFHEALTH" type="text" class="form-control" />*@
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">是否为特种作业人员</td>
+                    <td class="formValue icheck tzzy">
+                        <input type="radio" value="是" id="IsSpecial1" name="IsSpecial" />&nbsp;<label for="IsSpecial1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="否" id="IsSpecial0" name="IsSpecial" checked="checked" />&nbsp;<label for="IsSpecial0">否</label>
+                    </td>
+                    <td class="formTitle">是否为特种设备作业人员</td>
+                    <td class="formValue icheck tzsb">
+                        <input type="radio" value="是" id="IsSpecialEqu1" name="IsSpecialEqu" />&nbsp;<label for="IsSpecialEqu1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="否" id="IsSpecialEqu0" name="IsSpecialEqu" checked="checked" />&nbsp;<label for="IsSpecialEqu0">否</label>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">是否外包</td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="1" id="IsEpiboly1" disabled="disabled" name="IsEpiboly" />&nbsp;<label for="IsEpiboly1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="0" id="IsEpiboly2" disabled="disabled" name="IsEpiboly" />&nbsp;<label for="IsEpiboly2">否</label>
+                    </td>
+                    <td class="formTitle">外包工程</td>
+                    <td class="formValue">
+                        <input id="OutEngineerName" readonly="readonly" type="text" class="form-control" />
+                        <input id="OutEngineerId" type="hidden" class="form-control" />
+                    </td>
+                </tr>
+                @*<tr>
+                <td class="formTitle">是否为三种人<font face="宋体">*</font></td>
+                <td class="formValue icheck">
+                    <input type="radio" value="1" id="IsFourPerson1"  name="IsFourPerson" />&nbsp;<label for="IsFourPerson1" >是</label>&nbsp;&nbsp;&nbsp;
+                    <input type="radio" value="0" id="IsFourPerson2"  name="IsFourPerson" />&nbsp;<label for="IsFourPerson2" >否</label>
+                </td>
+                <td id="szr" class="formTitle four">三种人类别<font face="宋体">*</font></td>
+                <td id="szrval" class="formValue four">
+                    <select class="selectpicker show-menu-arrow form-control" multiple placeholder="请选择类别" id="FourPersonType" checkexpession="NotNull">
+                        <option value="工作负责人">工作负责人</option>
+                        <option value="工作许可人">工作许可人</option>
+                        <option value="工作票签发人">工作票签发人</option>
+                    </select>
+                   <div id="FourPersonType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull">
+            <ul>
+                <li data-value="" class="" style="padding: 0px 5px;">==请选择==</li>
+                <li data-value="工作负责人" title="" class="" style="padding: 0px 5px;">工作负责人</li>
+                <li data-value="工作许可人" title="" class="" style="padding: 0px 5px;">工作许可人</li>
+                <li data-value="工作票签发人" title="" style="padding: 0px 5px;" class="">工作票签发人</li>
+                <li data-value="高压设备巡视" title="" style="padding: 0px 5px;" class="">高压设备巡视</li>
+            </ul>
+        </div>
+                </td>
+            </tr>*@
+                <tr>
+                    <td class="formTitle">工种</td>
+                    <td class="formValue">
+                        <select id="WORKOFTYPE" class="form-control WORKOFTYPE">
+                            <option value="">请选择或者输入</option>
+                            @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetDataItemListOption("PersonWrokType"))
+                            @*<option value="木工">木工</option>
+                    <option value="架子工">架子工</option>
+                    <option value="电焊工">电焊工</option>
+                    <option value="电工">电工</option>
+                    <option value="气焊工">气焊工</option>
+                    <option value="焊工">焊工</option>
+                    <option value="起重工">起重工</option>*@
+                        </select>
+                        @*<input id="WORKOFTYPE" type="text"  class="form-control" />*@
+                        @* <div id="WORKOFTYPEDIV" type="select" hidden class="ui-select"></div>*@
+                    </td>
+                    <td class="formTitle">工种工龄</td>
+                    <td class="formValue">
+                        <input id="WORKYEAR" type="text" class="form-control" checkexpession="PositiveNumOrNull" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">用工方式</td>
+                    <td class="formValue">
+                        <div id="WorkerType" type="select" class="ui-select"></div>
+                    </td>
+                    <td class="formTitle" id="td_title_specialtytype">专业类别</td>
+                    <td class="formValue" id="td_value_specialtytype">
+                        <select id="SpecialtyType" class="form-control selectpicker show-menu-arrow" multiple placeholder="请选择专业类别" >
+                            @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("SpecialtyType"))
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">地址(<a onclick="clearAddr(obj)" title="清除地址" id="btnClearAddr" style="cursor:pointer;">Ⅹ</a>)</td>
+                    <td class="formValue">
+                        <input id="Location" readonly type="text" class="form-control" data-toggle="city-picker" placeholder="点击从下拉面板中选择省/市/区(县)/镇(街道)">
+                    </td>
+                    <td class="formTitle">详细地址</td>
+                    <td class="formValue">
+                        <input id="Address" type="text" class="form-control" maxlength="64" />
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="formTitle">劳动合同</td>
+                    <td class="formValue" colspan="3">
+                        <div id="uploader2" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 200px; margin-bottom: 10px;">
+                            <div class="queueList">
+                                <div id="File2" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle">工伤保险</td>
+                    <td class="formValue" colspan="3">
+                        <div id="uploader3" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 200px; margin-bottom: 10px; ">
+                            <div class="queueList">
+                                <div id="File3" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle">人身意外伤害保险</td>
+                    <td class="formValue" colspan="3">
+                        <div id="uploader5" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 200px; margin-bottom: 10px; ">
+                            <div class="queueList">
+                                <div id="File5" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle" style="white-space:normal">其他附件(如培训教育资料等)</td>
+                    <td class="formValue" colspan="3">
+                        <div id="uploader4" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 200px; margin-bottom: 10px; ">
+                            <div class="queueList">
+                                <div id="File4" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle" valign="top" style="padding-top: 4px;">
+                        备注
+                    </td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="DESCRIPTION" class="form-control" style="height: 40px;"></textarea>
+                    </td>
+                </tr>
+
+                <!--以下信息隐藏不显示-->
+
+                <tr style="display:none;">
+                    <td class="formTitle">邮箱</td>
+                    <td class="formValue">
+                        <input id="Email" type="text" class="form-control" isvalid="yes" checkexpession="EmailOrNull" />
+                    </td>
+
+                    <td class="formTitle">微信</td>
+                    <td class="formValue">
+                        <input id="WeChat" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr style="display:none;">
+                    <td class="formTitle">QQ</td>
+                    <td class="formValue">
+                        <input id="OICQ" type="text" class="form-control" />
+                    </td>
+                    <td class="formTitle">MSN</td>
+                    <td class="formValue">
+                        <input id="MSN" type="text" class="form-control" />
+                    </td>
+                </tr>
+
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;体检信息</strong>
+            <span class="tools pull-right">
+             <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle" style="width:140px;">体检单位</td>
+                    <td class="formValue">
+                        <input id="PhysicalUnit" type="text" class="form-control "  />
+                    </td>
+                    <td class="formTitle">体检时间</td>
+                    <td class="formValue">
+                        <input id="PhysicalTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">是否有从事职业的禁忌症</td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="是" id="IsComtraindication1" name="IsComtraindication" />&nbsp;<label for="IsComtraindication1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="否" id="IsComtraindication2" name="IsComtraindication" checked="checked" />&nbsp;<label for="IsComtraindication2">否</label>
+                    </td>
+                    <td class="formTitle four">禁忌症名称</td>
+                    <td class="formValue four">
+                        <input id="ComtraindicationName" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">体检材料</td>
+                    <td class="formValue" colspan="3">
+                        <div id="uploader1" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 200px; margin-bottom: 10px;">
+                            <div class="queueList">
+                                <div id="File1" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;证件信息</strong>
+            <span class="tools pull-right">
+                <a id="addCard" href="javascript:addCertificate(this)" class="btn btn-primary btn-xs">新增证件</a>&nbsp;&nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+
+            </div>
+        </div>
+    </div>
+</div>
+<script src="~/content/scripts/plugins/city-picker/js/city-picker.data.js"></script>
+<script type="text/javascript" src="~/content/scripts/plugins/city-picker/js/city-picker.js"></script>

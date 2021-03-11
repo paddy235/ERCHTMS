@@ -1,0 +1,156 @@
+﻿@{
+    ViewBag.Title = "积分恢复";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script src="~/Content/scripts/business/Grid.js"></script>
+<script>
+    var Year = request("Year");
+    var keyValue = "";
+    //加载页面
+    $(function () {
+        //页面初始化
+        InitialPage();
+        //加载列表
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 141.5);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../LllegalManage/LllegalRegister/GetPersonWzInfo?Year=" + Year + "&mode=recover",
+            datatype: "json",
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'userid', hidden: true },
+                { label: '单位', name: 'deptname', index: 'deptname', align: 'center', sortable: true },
+                { label: '姓名', name: 'realname', index: 'realname', align: 'center', sortable: true },
+                { label: '违章次数', name: 'wznum', index: 'wznum', align: 'center', sortable: true },
+                { label: '违章扣分', name: 'lllegalpoint', index: 'lllegalpoint', align: 'center', sortable: true },
+                {
+                    label: '违章积分', name: 'personscore', index: 'personscore', align: 'center', sortable: true
+                }
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [10, 20, 30],
+            pager: "#gridPager",
+            sortname: 'realname',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            multiselect: true,
+            gridview: true,
+            onSelectRow: function (rowid, status) {
+                var rowObject = $gridTable.jqGrid('getRowData', rowid);
+                if (status) {
+                    $("#users").append("<li id='div" + rowObject.userid + "' class='SortItem' ><input type='checkbox' value='" + rowObject.userid + "'  checked='checked' title='" + rowObject.realname + "'/>" + rowObject.realname + "</li>");
+                }
+                else {
+                    var divId = "#div" + rowObject.userid;
+                    $(divId).remove();
+                }
+                $("#lblselect").html("已选中用户(" + $("#users").find("input:checked").length + "人)");
+            },
+            onSelectAll: function (aRowids, status) {
+                $("#users li").remove();
+                if (status) {
+                    $(aRowids).each(function (i, item) {
+                        var rowObject = $gridTable.jqGrid('getRowData', item);
+                        $("#users").append("<li id='div" + rowObject.userid + "' class='SortItem' ><input type='checkbox' value='" + rowObject.userid + "' checked='checked' title='" + rowObject.realname + "'/>" + rowObject.realname + "</li>");
+                    });
+                }
+                $("#lblselect").html("已选中用户(" + $("#users").find("input:checked").length + "人)");
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+    }
+
+    //提交到违章积分恢复记录表
+    function AcceptClick() {
+        var array = new Array();
+        $("#users input:checked").each(function (index, ele) {
+            array.push({ "userid": ele.value, "username": ele.title, "year": Year });
+        });
+        var postData = $("#form1").formSerialize(keyValue);
+        if (array.length > 0) {
+            //用户集合
+            postData["userset"] = JSON.stringify(array);
+            var dlg = dialogConfirm("提示:所选择人员的积分恢复至初始积分,确定后此操作不可撤销,请谨慎操作!", function (isSure) {
+                if (isSure) {
+                    //提交
+                    $.SaveForm({
+                        url: "../../LllegalManage/LllegalPointRecover/SaveForm?keyValue=" + keyValue,
+                        param: postData,
+                        loading: "正在保存数据...",
+                        success: function () {
+
+                        }
+                    });
+                }
+            });
+        }
+        else {
+            dialogMsg('请选择要恢复积分的人员！', 0);
+        }
+
+    }
+
+</script>
+
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-right: 0px;">
+            <div class="panel-Title">用户信息</div>
+            <div class="titlePanel">
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="lr-replace" class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-east" style="margin-left: 0px;width:200px;">
+        <div class="west-Panel" style="margin-left: 0px; width: 200px;">
+            <div class="panel-Title">
+                <lable id="lblselect">已选中的用户</lable>
+                <input type="hidden" id="RECOVERNUMBER" />
+            </div>
+            <div id="users" style="overflow: auto; height: 450px; margin-left: 5px;">
+            </div>
+        </div>
+    </div>
+</div>

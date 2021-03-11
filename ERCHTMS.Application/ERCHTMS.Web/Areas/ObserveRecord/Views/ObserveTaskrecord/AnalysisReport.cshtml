@@ -1,0 +1,255 @@
+﻿@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/content/scripts/plugins/dialog/dialog.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/layout/jquery.layout.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    var mode = request('mode');
+    var IsCommit = request('IsCommit');
+    $(function () {
+        $("#quarter").hide();
+        initControl();
+        if (mode == "view") {
+            $("#btngroup").hide();
+            $("input").attr("disabled", "disabled");
+            $("textarea").attr("disabled", "disabled");
+            $("select").attr("disabled", "disabled");
+            if (IsCommit == 1) {
+                $("#btnexport").show();
+            } else {
+                $("#btnexport").hide();
+            }
+        } else {
+            $("#btnexport").hide();
+        }
+    })
+    function changeType(obj) {
+        switch ($(obj).val()) {
+            case "year":
+                $("#quarter").hide();
+                $("#Year").show();
+                $("#quarter").attr("isvalid", "").attr("checkexpession", "");
+                break;
+            case "quarter":
+                $("#quarter").show();
+                $("#Year").show();
+                $("#quarter").attr("isvalid", "yes").attr("checkexpession", "NotNull");
+                break;
+            default:
+                break;
+        }
+    }
+    function initControl() {
+        $("#WorkUnit").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName");
+        $("#WorkUnitId").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId");
+        $("#WorkUnitCode").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode");
+
+        $("#WorkZy").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "SpecialtyType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../Observerecord/ObserveTaskrecord/GetReportEntity",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#quarter").find("option").each(function (i, item) {
+                        if ($(item).val() == data.Quarter) {
+                            item.selected = true;
+                        }
+                    })
+                    $("#Year").val(formatDate(data.Year, 'yyyy'));
+                    $("#ReportType").trigger("change");
+                }
+            })
+        }
+    }
+    //function getZy() {
+    //    var workunitid = $("#WorkUnitId").val();
+    //    if (workunitid != "" && workunitid != undefined) {
+    //        selectDept(workunitid, 0, 200, '选择专业', window.document.body, 'WorkZy,WorkZyCode,WorkZyId');
+    //    } else {
+    //        dialogMsg("请先选择部门！", 0);
+    //    }
+    //}
+    function AcceptClick(IsCommit) {
+        if (IsCommit == 1) {
+            if (!$('#form1').Validform()) {
+                return false;
+            }
+        } else {
+            if ($("#WorkUnit").val() == "" || $("#WorkUnit").val() == undefined) {
+                dialogMsg("部门不能为空！", 0);
+                return;
+            }
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["IsCommit"] = IsCommit;
+        postData["WorkZy"] = $("#WorkZy").attr("data-text");
+        postData["WorkZyCode"] = $("#WorkZy").attr("data-value");
+        //postData["WorkZy"]=$("")
+        $.SaveForm({
+            url: "../../Observerecord/ObserveTaskrecord/SaveAnalysisReport?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    function ExportData() {
+        if (!!keyValue) {
+            window.location.href = "../../Observerecord/ObserveTaskrecord/ExportAnalysisReport?keyValue=" + keyValue;
+        } else {
+            dialogMsg("数据异常！", 0);
+        }
+
+    }
+</script>
+<div style="padding-top: 50px; margin-right: 30px;">
+    <div id="obsInfo" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input type="hidden" id="WorkUnitCode" />
+                        <input type="hidden" id="WorkUnitId" />
+                        <input id="WorkUnit" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" onclick="selectDept('', 0, 0, '选择单位', window.document.body, 'WorkUnit,WorkUnitCode,WorkUnitId');" />
+                    </td>
+                    <td class="formTitle">专业</td>
+                    <td class="formValue">
+                        <div id="WorkZy" type="select" class="ui-select"></div>
+
+                    </td>
+                    @*<td class="formTitle">专业</td>
+                        <td class="formValue">
+                            <input type="hidden" id="WorkZyCode" />
+                            <input type="hidden" id="WorkZyId" />
+                            <input id="WorkZy" type="text" class="form-control" onclick="getZy()" />
+                        </td>*@
+                </tr>
+                <tr>
+                    <td class="formTitle">报告类型<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <select id="ReportType" onchange="changeType(this)" style="width: 260px">
+                            <option value="year">年度</option>
+                            <option value="quarter">季度</option>
+                        </select>
+                    </td>
+                    <td class="formTitle">时间范围<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="Year" type="text" style="width: 260px; float: left;" isvalid="yes" checkexpession="NotNull" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy' })" />
+                        <select id="quarter" style="width: 260px;float:left">
+                            <option value="">全部</option>
+                            <option value="1">第一季度</option>
+                            <option value="2">第二季度</option>
+                            <option value="3">第三季度</option>
+                            <option value="4">第四季度</option>
+                        </select>
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle">分析人</td>
+                    <td class="formValue">
+                        <input id="AnalysisPeople" readonly value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" type="text" class="form-control" />
+                        <input id="AnalysisPeopleId" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" type="hidden" />
+                    </td>
+                    <td class="formTitle">分析时间</td>
+                    <td class="formValue">
+                        <input id="AnalysisTime" type="text" readonly value="@DateTime.Now.ToString("yyyy-MM-dd")" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">分析内容<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="AnalysisContent" type="text" maxlength="500" class="form-control" isvalid="yes" checkexpession="NotNull"></textarea>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+
+    <div id="linkupInfo" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;安全行为观察七个层面分析及改善</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">员工的反应</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="ygfy" type="text" maxlength="500" class="form-control"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">个人防护装备</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="grfhzb" type="text" maxlength="500" class="form-control"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">程序与标准</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="cxbz" type="text" maxlength="500" class="form-control"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">员工的位置</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="ygwz" type="text" maxlength="500" class="form-control"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">工具和设备</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="gjsb" type="text" maxlength="500" class="form-control"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">人体工效学</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="rtgxx" type="text" maxlength="500" class="form-control"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">环境整洁</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="hjzj" type="text" maxlength="500" class="form-control"></textarea>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div id="btngroup" class="form-button" style=" top:40px;  text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+        <a onclick="AcceptClick(0)" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+        &nbsp;&nbsp;
+        <a onclick="AcceptClick(1)" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp;&nbsp;
+    </div>
+    <div id="btnexport" class="form-button" style=" top:40px;  text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+        <a onclick="ExportData()" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;导出分析报告</a>
+        &nbsp;&nbsp;
+    </div>
+</div>

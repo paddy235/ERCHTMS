@@ -1,0 +1,363 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+
+<script>
+    var mode = request("mode");
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName"; //当前用户角色
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId"; //当前用户部门ID
+    var useraccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account"; //当前用户账号
+    var type = request("type");
+    $.ajaxSetup({ async: false });
+    $(function () {
+        if (!type) {
+            type = 3;
+        }
+        ComBoxForData("SGTYPE", "AccidentEventType"); //事故事件类型
+        ComBoxForData("SGPROPERTY", "AccidentEventProperty"); //事故事件性质
+        InitialPage();
+        GetGrid();
+
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            keyword: $("#txt_Keyword").val(),
+            sgtype: $("#SGTYPE").attr('data-text') == "==请选择==" ? "" : $("#SGTYPE").attr('data-value'),
+            sgproperty: $("#SGPROPERTY").attr('data-text') == "==请选择==" ? "" : $("#SGPROPERTY").attr('data-value'),
+            happentimestart: $("#HAPPENTIMES").val(),
+            happentimeend: $("#HAPPENTIMEE").val(),
+            type: type //0:整改 1:验收 2:签收 3 整改+签收
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../PowerPlantInside/Powerplantreform/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                { label: '事故时间处理记录ID', name: 'powerplanthandleid', hidden: true },
+                { label: '事故事件处理记录整改ID', name: 'powerplantreformid', hidden: true },
+                { label: '创建用户id', name: 'createuserid', index: 'createuserid',align: 'left',sortable: true, hidden: true },
+                { label: '创建时间',name: 'createdate',index: 'createdate',align: 'left',sortable: true,hidden: true },
+                { label: '创建用户',name: 'createusername',index: 'createusername',align: 'left',sortable: true,hidden: true },
+                { label: '修改用户id',name: 'modifyuserid',index: 'modifyuserid',align: 'left',sortable: true,hidden: true },
+                { label: '修改时间',name: 'modifydate',index: 'modifydate',align: 'left',sortable: true,hidden: true },
+                { label: '修改用户',name: 'modifyusername',index: 'modifyusername',align: 'left',sortable: true,hidden: true },
+                { label: '创建用户所属部门编码',name: 'createuserdeptcode',index: 'createuserdeptcode',align: 'left',sortable: true,hidden: true },
+                { label: '创建用户所属机构编码',name: 'createuserorgcode',index: 'createuserorgcode',align: 'left',sortable: true,hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        var html = "<a href=javascript:show('" + rowObject.powerplanthandleid + "','" + rowObject.id + "','" + rowObject.powerplantreformid + "','" + rowObject.applystate + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                        if (!!rowObject.rectificationdutypersonid) {
+                            if (parseStrEmpty(rowObject.outtransferuseraccount).indexOf(useraccount + ',') < 0 && (rowObject.rectificationdutypersonid.indexOf(userId) >= 0 || parseStrEmpty(rowObject.intransferuseraccount).indexOf(useraccount + ',') >= 0)) {
+                                html += "<a href=javascript:btn_approve('" + rowObject.powerplanthandleid + "','" + rowObject.id + "','" + rowObject.powerplantreformid + "')  title='整改'><i class='fa fa-pencil-square-o'></i></a>&nbsp;";
+                                html += "<a href=javascript:TransferAction('" + rowObject.id + "')  title='转交'><i class='fa fa-share'></i></a>&nbsp;";
+                            }
+                        }
+                        else {
+                            html += "<a href=javascript:btn_sign('" + rowObject.powerplanthandleid + "','" + rowObject.id + "','" + rowObject.powerplantreformid + "')  title='签收'><i class='fa fa-sign-in'></i></a>&nbsp;";
+                        }
+                        
+                        return html;
+                    }
+                },
+                {
+                    label: '流程状态', name: 'applystate', index: 'applystate', width: 180, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var content = "申请中";
+                        var applystate = rowObject.applystate;
+                            switch (applystate) {
+                                case 0:
+                                    content = "申请中";
+                                    break;
+                                case 1:
+                                    content = "审核中";
+                                    break;
+                                case 2:
+                                    content = "审核不通过";
+                                    break;
+                                case 3:
+                                    content = "整改中";
+                                    break;
+                                case 4:
+                                    content = "验收中";
+                                    break;
+                                case 5:
+                                    content = "已完成";
+                                    break;
+                                case 6:
+                                    content = "签收中";
+                                    break;
+                                default:
+                                    content = "申请中";
+                                    break;
+                            }
+                        return content;
+                    }
+                },
+                { label: '事故/事件名称', name: 'accidenteventname', index: 'accidenteventname', align: 'center', sortable: true },
+                { label: '事故或事件类型', name: 'accidenteventtype', index: 'accidenteventtype', align: 'center', sortable: true },
+                { label: '事故或事件性质', name: 'accidenteventproperty', index: 'accidenteventproperty', align: 'center', sortable: true },
+                {
+                    label: '发生时间', name: 'happentime', index: 'happentime', align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '整改期限', name: 'rectificationtime', index: 'rectificationtime', align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 'd.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            //multiselect: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                ////隐藏搜索框
+                var title = $(".ui-filter-text");
+
+                title.trigger("click");
+            }
+            var queryJson = {
+                keyword: $("#txt_Keyword").val(),
+                sgtype: $("#SGTYPE").attr('data-text') == "==请选择==" ? "" : $("#SGTYPE").attr('data-value'),
+                sgproperty: $("#SGPROPERTY").attr('data-text') == "==请选择==" ? "" : $("#SGPROPERTY").attr('data-value'),
+                happentimestart: $("#HAPPENTIMES").val(),
+                happentimeend: $("#HAPPENTIMEE").val(),
+                type: type //0:整改 1:验收 2:签收 3:整改+签收
+            }
+
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+
+    }
+
+    //导出
+    function exported() {
+        var queryJson = {
+            keyword: $("#txt_Keyword").val(),
+            sgtype: $("#SGTYPE").attr('data-text') == "==请选择==" ? "" : $("#SGTYPE").attr('data-value'),
+            sgproperty: $("#SGPROPERTY").attr('data-text') == "==请选择==" ? "" : $("#SGPROPERTY").attr('data-value'),
+            happentimestart: $("#HAPPENTIMES").val(),
+            happentimeend: $("#HAPPENTIMEE").val()
+        }
+        var code = _parentId;
+        location.href = "../../PowerPlantInside/PowerPlantInside/ExportBulletinList?queryJson=" + JSON.stringify(queryJson) + "&code=" + code;
+    }
+
+
+
+    //查看
+    function show(powerplanthandleid, powerplanthandledetailid, powerplantreformid,applystate) {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        var url = "";
+        var title = "";
+        if (applystate=="3") {
+            url = "/PowerPlantInside/Powerplantreform/Form?action=show&PowerInsideHandleId=" + powerplanthandleid + "&PowerInsideHandleDetailId=" + powerplanthandledetailid;
+            title = "事故事件整改";
+        }
+        else if (applystate == "6") {
+            url = "/PowerPlantInside/Powerplantreform/SignForm?action=show&PowerInsideHandleId=" + powerplanthandleid + "&PowerInsideHandleDetailId=" + powerplanthandledetailid;
+            title = "事故事件签收";
+        }
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: title,
+                url: url,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //整改
+    function btn_approve(powerplanthandleid, powerplanthandledetailid, powerplantreformid) {
+        var title = "事故事件整改";
+        var url = "/PowerPlantInside/Powerplantreform/Form?action=edit&PowerInsideHandleId=" + powerplanthandleid + "&PowerInsideHandleDetailId=" + powerplanthandledetailid;
+        var dlg = dialogOpen({
+            id: "ApproveForm",
+            title: title,
+            url: url,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //签收
+    function btn_sign(powerplanthandleid, powerplanthandledetailid, powerplantreformid) {
+        var title = "事故事件签收";
+        var url = "/PowerPlantInside/Powerplantreform/SignForm?action=edit&PowerInsideHandleId=" + powerplanthandleid + "&PowerInsideHandleDetailId=" + powerplanthandledetailid;
+        var dlg = dialogOpen({
+            id: "ApproveForm",
+            title: title,
+            url: url,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //转交
+    function TransferAction(powerplanthandledetailid) {
+        var url = '/HighRiskWork/HighRiskCommonApply/TransferForm?type=0&keyValue=' + powerplanthandledetailid;
+        idx = dialogOpen({
+            id: "Transfer",
+            title: '审批转交',
+            url: url,
+            width: ($(top.window).width() * 0.4) + "px",
+            height: ($(top.window).height() * 0.4) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                //top.layer.close(idx);
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            },
+            cancel: function (index) {
+            }
+        });
+    }
+
+</script>
+
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            <tr>
+                <td>查询条件</td>
+                <td style="padding-left: 10px;">
+                    <div class="ui-filter" style="width: 250px;">
+                        <div class="ui-filter-text">
+                            请选择过滤条件
+                        </div>
+                        <div class="ui-filter-list" style="width: 400px;">
+                            <table class="form" id="filter-form">
+                                <tr>
+                                    <td class="formTitle">发生时间起：</td>
+                                    <td class="formValue" style="padding-left:50px">
+                                        <input id="Category" type="hidden" value="1" />
+                                        <div>
+                                            <input id="HAPPENTIMES" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" />
+                                        </div>
+
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="formTitle">发生时间止：</td>
+                                    <td class="formValue" style="padding-left:50px">
+                                        <div>
+                                            <input id="HAPPENTIMEE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" />
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td class="formTitle">
+                                        事故事件类型：
+                                    </td>
+                                    <td class="formValue" style="padding-left:50px">
+                                        <div id="SGTYPE" type="select" class="ui-select"></div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="formTitle">
+                                        事故事件类型：
+                                    </td>
+                                    <td class="formValue" style="padding-left:50px">
+                                        <div id="SGPROPERTY" type="select" class="ui-select"></div>
+                                    </td>
+                                </tr>
+
+
+                                <tr>
+                                    <td class="formTitle">事故事件名称：</td>
+                                    <td class="formValue" style="padding-left:50px">
+                                        <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" />
+                                    </td>
+                                </tr>
+
+                            </table>
+                            <div class="ui-filter-list-bottom">
+                                <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+
+
+    <div class="toolbar">
+
+        <div class="btn-group">
+            <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+        </div>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

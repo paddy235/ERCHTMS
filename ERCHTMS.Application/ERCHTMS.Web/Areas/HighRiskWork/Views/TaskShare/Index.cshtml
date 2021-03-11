@@ -1,0 +1,431 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    ;
+    var curuserid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var curdeptid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var currolenames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var indexdeal = request('indexdeal');//首页待办跳转
+    var isstart = "@ViewBag.IsTeams";
+    var searchtype = "";
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        $("#btn_Search").click(function () {
+            $('#gridTable').jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+        //待办
+        if (!!indexdeal) {
+            searchtype = "1";
+        }
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../HighRiskWork/TaskShare/GetDataTableJson",
+            postData: { queryJson: getQueryJson() },
+            datatype: "json",
+            colModel: [
+               { label: '主键', name: 'id', width: 10, align: 'left', sortable: true, hidden: true },
+                 {
+                     label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:show('" + rowObject.id + "','" + rowObject.tasktype + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                         if (rowObject.issubmit == "0" && curuserid == rowObject.createuserid && (rowObject.flowrolename == "" || rowObject.flowrolename == null)) {
+                             html += "<a href=javascript:edit('" + rowObject.id + "','" + rowObject.tasktype + "','" + rowObject.flowstep + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>&nbsp;";
+                             html += "<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>&nbsp;";
+                         }
+                         else {
+                             //公司管理员有删除的权限
+                             if (currolenames.indexOf("公司管理员") >= 0) {
+                                 html += "<a href=javascript:managedel('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>&nbsp;";
+                             }
+                             //创建人有任务结束按钮【任务结束,将flowrolename,flowdept清空,更改流程状态】
+                             if (curuserid == rowObject.createuserid && rowObject.flowstep != "3") {
+                                 html += "<a href=javascript:finishtask('" + rowObject.id + "')  title='分配完成'><i class='fa fa-cog'></i></a>&nbsp;";
+                             }
+                             //提交
+                             if (!!currolenames) {
+                                 //申请审核/批
+                                 var roleArr = currolenames.split(','); //当前人员角色
+
+                                 var sendname = ""; //分配角色
+                                 if (!!rowObject.flowrolename) {
+                                     sendname = rowObject.flowrolename.split(',');
+                                 }
+                                 var senddept = ""; //分配部门
+                                 if (!!rowObject.flowdept) {
+                                     senddept = rowObject.flowdept.split(',');
+                                 }
+                                 var isApprove1 = false;
+                                 for (var j = 0; j < senddept.length; j++) {
+                                     if (senddept[j] == curdeptid) {
+                                         isApprove1 = true;
+                                     }
+                                 }
+                                 for (var i = 0; i < roleArr.length; i++) {
+                                     var isApprove = false;
+                                     for (var j = 0; j < sendname.length; j++) {
+                                         if (sendname[j].indexOf(roleArr[i]) >= 0) {
+                                             isApprove = true;
+                                         }
+                                     }
+                                     //满足审核部门同当前人部门id一致，切当前人角色存在与审核角色中
+                                     if (isApprove && isApprove1) {
+                                         html += "<a href=javascript:send('" + rowObject.id + "','" + rowObject.tasktype + "','" + rowObject.flowstep + "')  title='分配'><i class='fa fa-check'></i></a>";
+                                         break;
+                                     }
+                                 }
+                             }
+                             if (rowObject.flowstep == "2" || rowObject.flowstep == "3")//监督员已收到任务
+                             {
+                                 html += "<a href=javascript:showTask('" + rowObject.id + "','" + rowObject.tasktype + "')  title='监督任务'><i class='fa fa-mixcloud'></i></a>&nbsp;";
+                             }
+                         }
+                         return html;
+                     }
+                 },
+               {
+                   label: '任务类型', name: 'tasktype', width: 150, align: 'center', sortable: false,
+                   formatter: function (cellvalue, options, rowObject) {
+                       switch (cellvalue) {
+                           case "0":
+                               cellvalue = "部门任务";
+                               break;
+                           case "1":
+                               cellvalue = "班组任务";
+                               break;
+                           case "2":
+                               cellvalue = "人员任务";
+                               break;
+                           default:
+                       }
+                       return cellvalue;
+                   }
+               },
+               //{ label: '旁站监督单位', name: 'supervisedeptname', width: 150, align: 'center', sortable: false },
+               { label: '创建单位', name: 'fullname', width: 150, align: 'center', sortable: false },
+               { label: '创建人', name: 'createusername', width: 150, align: 'center', sortable: false },
+               { label: '创建时间', name: 'createdate', width: 150, align: 'center', sortable: true, formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } },
+               { label: '分配单位', name: 'flowdeptname', width: 350, align: 'center', sortable: false },
+                {
+                    label: '任务分配', name: 'flowstep', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        switch (cellvalue) {
+                            case "0":
+                                cellvalue = "厂级分配中";
+                                break;
+                            case "1":
+                                cellvalue = "部门分配中";
+                                break;
+                            case "2":
+                                if (rowObject.tasktype != "2") {
+                                    cellvalue = "班组分配中";
+                                }
+                                else {
+                                    cellvalue = "分配中";
+                                }
+                                break;
+                            case "3":
+                                cellvalue = "分配完成";
+                                break;
+                            default:
+                        }
+                        return cellvalue;
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 30, 40],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var query = {
+            CreateUserDeptCode: $("#SuperviseDeptCode").val(),
+            searchtype: searchtype
+        }
+        return JSON.stringify(query);
+    }
+    //新增
+    function add(tasktype) {
+        var url = "";
+        var typestr = "";
+        if (tasktype == 0) {
+            url = "/HighRiskWork/TaskShare/FormOne";
+            typestr = "部门";
+        }
+        if (tasktype == 1) {
+            url = "/HighRiskWork/TaskShare/FormTwo";
+            typestr = "班组";
+        }
+        if (tasktype == 2) {
+            url = "/HighRiskWork/TaskShare/FormThree";
+            typestr = "人员";
+        }
+        dialogOpen({
+            id: 'Form',
+            title: '新增' + typestr + '任务',
+            url: url + '?mode=add&tasktype=' + tasktype,
+            width: ($(top.window).width() - 150) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit(keyValue, tasktype, flowstep) {
+        var url = "";
+        var typestr = "";
+        if (tasktype == 0) {
+            url = "/HighRiskWork/TaskShare/FormOne";
+            typestr = "部门";
+        }
+        if (tasktype == 1) {
+            url = "/HighRiskWork/TaskShare/FormTwo";
+            typestr = "班组";
+        }
+        if (tasktype == 2) {
+            url = "/HighRiskWork/TaskShare/FormThree";
+            typestr = "人员";
+        }
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑' + typestr + '任务',
+                url: url + '?mode=edit&keyValue=' + keyValue + '&tasktype=' + tasktype,
+                width: ($(top.window).width() - 150) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../HighRiskWork/TaskShare/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的任务分配！', 0);
+        }
+    }
+
+    //公司管理员删除【因需要记录日志】
+    function managedel() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                msg: '此操作会删除该任务关联的所有数据，是否确认删除？',
+                url: '../../HighRiskWork/TaskShare/ManageRemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的任务分配！', 0);
+        }
+    }
+
+    //查看
+    function show(keyValue, tasktype, flowstep) {
+        var url = "";
+        var typestr = "";
+        if (tasktype == 0) {
+            url = "/HighRiskWork/TaskShare/FormOne";
+            typestr = "部门";
+        }
+        if (tasktype == 1) {
+            url = "/HighRiskWork/TaskShare/FormTwo";
+            typestr = "班组";
+        }
+        if (tasktype == 2) {
+            url = "/HighRiskWork/TaskShare/FormThree";
+            typestr = "人员";
+        }
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看' + typestr + '任务',
+                url: url + '?mode=view&keyValue=' + keyValue + '&tasktype=' + tasktype,
+                width: ($(top.window).width() - 150) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //选择单位
+    function selectCompany() {
+        selectDept('', 0, 0, '选择创建单位', document.body, 'SuperviseDeptName,SuperviseDeptCode,SuperviseDeptId');
+    }
+
+
+    //分配任务
+    function send(keyValue, tasktype, flowstep) {
+        var url = "";
+        var typestr = "";
+        if (tasktype == 0) {
+            url = "/HighRiskWork/TaskShare/FormOne";
+            typestr = "部门";
+        }
+        if (tasktype == 1) {
+            url = "/HighRiskWork/TaskShare/FormTwo";
+            typestr = "班组";
+        }
+        if (tasktype == 2) {
+            url = "/HighRiskWork/TaskShare/FormThree";
+            typestr = "人员";
+        }
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '分配任务',
+                url: url + '?mode=send&keyValue=' + keyValue + '&tasktype=' + tasktype,
+                width: ($(top.window).width() - 150) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //监督任务列表(多人)
+    function showTask(keyValue, tasktype) {
+        var idx = dialogOpen({
+            id: "Form",
+            title: "查看旁站监督记录",
+            url: '/HighRiskWork/StaffInfo/TaskIndex?taskshareid=' + keyValue + "&tasktype=" + tasktype,
+            width: ($(top.window).width() - 150) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //导出
+    function exportResult() {
+        var queryJson = getQueryJson();
+        location.href = "../../HighRiskWork/TaskShare/ExportData?queryJson=" + queryJson;
+    }
+
+    //结束任务
+    function finishtask() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            $.ConfirmAjax({
+                msg: "注：您确定要结束此任务分配吗？",
+                url: "../../HighRiskWork/TaskShare/FinishTask",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            });
+        } else {
+            dialogMsg('请选择需要操作的任务分配！', 0);
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title">旁站监督任务</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <input id="SuperviseDeptName" type="text" class="form-control" placeholder="请选择创建单位" isvalid="yes" checkexpession="NotNull" readonly onclick="selectCompany()" />
+                                <input type="hidden" id="SuperviseDeptId" />
+                                <input type="hidden" id="SuperviseDeptCode" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="adddept" class="btn btn-default" onclick="add(0)"><i class="fa fa-plus"></i>新增部门任务</a>
+                        <a id="addteam" class="btn btn-default" onclick="add(1)"><i class="fa fa-plus"></i>新增班组任务</a>
+                        <a id="addstaff" class="btn btn-default" onclick="add(2)"><i class="fa fa-plus"></i>新增人员任务</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download"></i>&nbsp;导出</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+            

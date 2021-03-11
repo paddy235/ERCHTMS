@@ -1,0 +1,276 @@
+﻿@{
+    ViewBag.Title = "IndexView";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+
+<script>
+    var ctype = request('ctype');//检查表类型
+    var curym = request('curym');  //首页安全检查趋势图参数
+    var code = request('code');
+    var qdeptcode = request("qdeptcode"); //单位编码
+    var deptId = request("HidDepart"); //单位Id
+    var qyearmonth = request("qyearmonth"); //检查年月
+    var qyear = request("qyear");  //检查年度
+    var t1 = request("t1");  //开始时间
+    var t2 = request("t2");  //结束时间
+    var mode = request("mode");  //如果mode=2则统计下发的检查任务数量
+    var pfrom = request("pfrom");  //不为空则统计单位内部检查和省级下发的检查任务
+    var querytype = request("querytype");
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 108.5);
+            }, 200);
+            e.stopPropagation();
+        });
+        //所有操作按钮禁用
+    }
+
+    //查看登记的违章
+    function showWz(objId) {
+        var url = '/LllegalManage/LllegalRegister/SdIndex?safetycheck=0&reseverone=' + objId;
+        var idx = dialogOpen({
+            id: 'Details',
+            title: '违章信息',
+            url: url,
+            width: ($(top.window).width() - 300) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //查看登记的问题
+    function showWt(objId) {
+        var url = '/QuestionManage/QuestionInfo/SdIndex?safetycheck=0&checkid=' + objId + '& relevanceid =';
+        var idx = dialogOpen({
+            id: 'Details',
+            title: '问题信息',
+            url: url,
+            width: ($(top.window).width() - 80) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            ctype: ctype,
+            curym: curym,
+            code:code,
+            qdeptcode: qdeptcode,
+            qyearmonth: qyearmonth,
+            qyear: qyear,
+            //dataType: mode,
+            startDate: t1,
+            endDate: t2,
+            querytype: querytype,
+            deptId: deptId,
+            pfrom: pfrom
+        };
+        var isShow = true;
+        if (!!ctype)
+            isShow = false;
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var url = "";
+        if(pfrom==1){
+            url = "../../SaftyCheck/SaftyCheckDataRecord/GetAllData";
+        }
+        else {
+            url = mode == 2 ? "../../SaftyCheck/SaftyCheckDataRecord/GetDataForTask" : "../../SaftyCheck/SaftyCheckDataRecord/GetIndexData";
+        }
+        url += "?queryYear=" + qyear;
+        $gridTable.jqGrid({
+            autowidth: true,
+            postData: { queryJson: JSON.stringify(queryJson) },
+            height: $(window).height()-100,
+            url: url,
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'ID', hidden: true },
+                 {
+                     label: '操作', name: 'Oper', index: 'ID', width: 120, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:funcAction('view','" + rowObject.ID + "','" + rowObject.CheckDataType + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                         return html;
+                     }
+                 },
+                {
+                    label: '检查时间', name: 'CheckBeginTime', index: 'CheckBeginTime', width: 200, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.CheckDataType == "1") {
+                            return formatDate(cellvalue, 'yyyy-MM-dd');
+                        }
+                        else {
+                            return formatDate(cellvalue, 'yyyy-MM-dd') + "至" + formatDate(rowObject.CheckEndTime, 'yyyy-MM-dd');
+                        }
+                    }
+                },
+                { label: '检查名称', name: 'CheckDataRecordName', index: 'CheckDataRecordName', width: 250, align: 'center', sortable: true },
+                {
+                    label: '不符合项', name: 'Count', index: 'Count', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var innerText = "";
+                        if (cellvalue > 0) {
+                            innerText = "隐患数量：<a href=javascript:funcAction('count','" + rowObject.ID + "') style='color:blue; text-decoration:underline;color:red;'  title='查看隐患'>" + cellvalue + "项</a><br />";
+                        } else {
+                            innerText += "隐患数量：" + cellvalue + "项<br />";
+                        }
+                        if (top.window.isWz == "1") {
+                            if (rowObject.WzCount > 0) {
+                                innerText += "违章数量：<a onclick=\"showWz('" + rowObject.ID + "')\" style='text-decoration:underline;cursor:pointer;color:red;'>" + rowObject.WzCount + "项</a><br />";
+                            } else {
+                                innerText += "违章数量：" + rowObject.WzCount + "项<br />";
+                            }
+                        }
+                        if (top.window.isWt == "1") {
+                            if (rowObject.WtCount > 0) {
+                                innerText += "问题数量：<a onclick=\"showWt('" + rowObject.ID + "')\" style='text-decoration:underline;cursor:pointer;color:red;'>" + rowObject.WtCount + "项</a>";
+                            } else {
+                                innerText += "问题数量：" + rowObject.WtCount + "项";
+                            }
+                        }
+                        return innerText;
+                    }
+                }
+            ,{
+            label: '处理进度', name: 'Count1', index: 'Count', align: 'left', sortable: true,headerAlign:'center',
+        formatter: function (cellvalue, options, rowObject) {
+                                      
+            var innerText = "";
+            if (cellvalue > 0) {
+                innerText = "<div style='width: " + (rowObject.Count1) + "%; background-color:green;color:black;'>隐患处理进度：" + rowObject.Count1 + "%" + "</div>";
+            } else {
+                if (rowObject.Count == 0) {
+                    innerText += "隐患处理进度：-<br />";
+                } else {
+                    innerText += "隐患处理进度：" + cellvalue + "%<br />";
+                }
+
+            }
+            if (top.window.isWz == "1") {
+                if (rowObject.WzCount1 > 0) {
+                    innerText += "<div style='width: " + (rowObject.WzCount1) + "%; background-color:green;color:black;margin-top:2px;'>违章处理进度：" + rowObject.WzCount1 + "%" + "</div>";
+                } else {
+                    if (rowObject.WzCount == 0) {
+                        innerText += "违章处理进度：-<br />";
+                    } else {
+                        innerText += "违章处理进度：" + rowObject.WzCount1 + "%<br />";
+                    }
+
+                }
+            }
+            if (top.window.isWt == "1") {
+                if (rowObject.WtCount1 > 0) {
+                    innerText += "<div style='width: " + (rowObject.WtCount1) + "%; background-color:green;color:black;'>问题处理进度：" + rowObject.WtCount1 + "%" + "</div>";
+                } else {
+                    if (rowObject.WtCount == 0) {
+                        innerText += "问题处理进度：-<br />";
+                    } else {
+                        innerText += "问题处理进度：" + rowObject.WtCount1 + "%";
+                    }
+
+
+                }
+            }
+
+            return innerText;
+        }
+    }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+
+    //操作显示
+    function funcAction(action, val,checkType) {
+        if (action == "view") {
+            var url = '/SaftyCheck/SaftyCheckDataRecord/Form?recid=' + val + '&ctype=' + ctype + "&action=view";
+            var title = "安全检查";
+            switch (checkType) {
+                case "1":
+                    title = "日常"+title;
+                    break;
+                case "2":
+                    title = "专项" + title;
+                    break;
+                case "3":
+                    title = "节假日前后" + title;
+                    break;
+                case "4":
+                    title = "季节性" + title;
+                    break;
+                case "5":
+                    title = "综合" + title;
+                    break;
+                default:
+            }
+            if (checkType != "1") {
+                var url = '/SaftyCheck/SaftyCheckDataRecord/ZXForm?recid=' + val + '&ctype=' + ctype + "&action=view&cname="+title;
+            }
+            var idx = dialogOpen({
+                id: "win0",
+                title: title,
+                url: url,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(idx);
+                }
+            });
+        } else if (action == "count") {
+            var url = '/HiddenTroubleManage/HTBaseInfo/Index?mode=safetycheck&SAFETYCHECKOBJECTID=' + val;
+            if (checkedRow(val)) {
+                var idx = dialogOpen({
+                    id: 'HTWindow',
+                    title: '隐患列表',
+                    url: url,
+                    btns: 1,
+                    btn: ["关闭"],
+                    width: ($(top.window).width() - 200) + "px",
+                    height: ($(top.window).height() - 100) + "px",
+                    callBack: function (iframeId) {
+                        top.layer.close(idx);
+                    }
+                });
+            }
+        }
+    }
+</script>
+
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>
+

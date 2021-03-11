@@ -1,0 +1,342 @@
+@{
+    ViewBag.Title = "流程设计器";
+    Layout = "~/Views/Shared/_FlowForm.cshtml";
+}
+<script>
+    var keyValue = request('keyValue');
+    var schemeContent;
+    var flowData = {};
+    $(function () {
+        LoadData();
+        initFlowInfo();
+        initialPage();
+    });
+
+    //初始化页面
+    function initialPage() {
+        if (!!keyValue) {
+            $("#Code").attr("disabled", "disabled");
+            $.post("../../SystemManage/Process/LoadWorkFlowDesign", { keyValue: keyValue }, function (data) {
+                schemeContent = JSON.parse(data);
+                setFlowInfo(schemeContent.flow);
+            });
+        }
+        //加载导向
+        $('#wizard').wizard().on('change', function (e, data) {
+            var $finish = $("#btn_finish");
+            var $next = $("#btn_next");
+
+            if (data.direction == "next") {
+                if (!$('#form1').Validform()) {
+                    return false;
+                }
+
+                switch (data.currentStep) {
+                    case 1:
+                        LoadData();
+                        break;
+                    case 2://绑定表单
+                        GetGrid();
+                        break;
+                    case 3://流程设计
+                        $finish.removeAttr('disabled');
+                        $next.attr('disabled', 'disabled');
+                        break;
+                    default:
+                        break;
+                }
+
+            } else {
+                $finish.attr('disabled', 'disabled');
+                $next.removeAttr('disabled');
+            }
+        });
+
+
+    }
+
+
+    //验证编码是否重复
+    function ValidateCode(obj) {
+        $.post("../../SystemManage/Process/ValidateHavaCode", { code: $("#Code").val() }, function (data) {
+            if (parseInt(data) > 0) {
+                dialogMsg("当前编码已存在，请重新填写", 0);
+                $(obj).val("");
+            }
+        });
+    }
+
+    /*=========流程信息（begin）==================================================================*/
+    function LoadData() {
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../SystemManage/Process/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            });
+        }
+    }
+    /*=========流程信息（end）====================================================================*/
+
+
+    /*=========流程节点信息（begin）==============================================================*/
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            width: $(window).width() - 35,
+            height: $(window).height() - 300,
+            url: "../../SystemManage/Process/GetActionListJson?keyValue=" + keyValue,
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                { label: '节点类型', name: 'Kind', index: 'Kind', width: 300, align: 'center' },
+                { label: '节点名称', name: 'Name', index: 'Name', width: 300, align: 'center' },
+                { label: '创建时间', name: 'CreateDate', index: 'CreateDate', width: 200, align: 'center' },
+                { label: "创建人", name: "CreateUser", index: "CreateUser", width: 100, align: "center" }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //新增流程节点信息
+    function btn_add() {
+        dialogOpen({
+            id: 'AddActivity',
+            title: "新增流程节点信息",
+            url: "/SystemManage/Process/ActivityForm?processId=" + keyValue,
+            width: $(top.window).width() / 2 + "px",
+            height: $(top.window).height() / 2 + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    //编辑流程节点信息
+    function btn_edit() {
+        var keyId = $("#gridTable").jqGridRowValue("Id");
+        dialogOpen({
+            id: 'EditActivity',
+            title: "编辑流程节点信息",
+            url: "/SystemManage/Process/ActivityForm?keyValue=" + keyId + "&processId=" + keyValue,
+            width: $(top.window).width() / 2 + "px",
+            height: $(top.window).height() / 2 + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    //删除流程节点信息
+    function btn_delete() {
+        var keyId = $("#gridTable").jqGridRowValue("Id");
+        if (!!keyId) {
+            $.RemoveForm({
+                url: "../../SystemManage/Process/RemoveActivityForm",
+                param: { keyValue: keyId },
+                success: function (data) {
+                    $("#gridTable").resetSelection();
+                    $("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的流程节点！', 0);
+        }
+    }
+    //刷新流程节点信息
+    function btn_reload() {
+        $("#gridTable").resetSelection();
+        $("#gridTable").trigger("reloadGrid");
+    }
+    /*=========流程节点信息（end）================================================================*/
+
+
+
+    /*=========流程设计图（begin）================================================================*/
+    var FlowDesignPanel;
+    var FlowDesignObject;//
+    var LineId;
+    var nodePramData = [];
+    function initFlowInfo() {
+        FlowDesignPanel = $('#FlowPanel').flowdesign({
+            toolBtns: ["startround", "endround", "stepnode"],
+            haveGroup: false,
+            height: ($(window).height() - 87),
+            widht: 1000,
+            OpenNode: function (object) {
+                FlowDesignObject = object;
+                dialogOpen({
+                    id: "FlowNodeForm",
+                    title: '节点设置【' + object.$nodeData[object.$focus].name + '】',
+                    url: '/SystemManage/Process/ActivityForm?keyValue=' + object.$nodeDom[object.$focus][0].id + "&processId=" + keyValue + "&name=" + object.$nodeData[object.$focus].name + "&type=" + object.$nodeData[object.$focus].type,
+                    width: "750px",
+                    height: "330px",
+                    callBack: function (iframeId) {
+                        var nodename = top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                        object.$nodeData[object.$focus].name = nodename;
+                    }
+                });
+            },
+            OpenLine: function (id, object) {
+                FlowDesignObject = object;
+                LineId = id;
+                var _line = object.$lineData[id];
+                var _fromNode = object.$nodeData[_line.from];
+                //if (_fromNode.type == "shuntnode") {
+                //    dialogTop("前一个节点是分流节点无法设置流转条件", "error");
+                //    return false;
+                //}
+                dialogOpen({
+                    id: "FlowNodeForm",
+                    title: '流转条件设置',
+                    url: '/SystemManage/Process/LineForm?lineid=' + id + "&processid=" + keyValue,
+                    width: "750px",
+                    height: "430px",
+                    callBack: function (iframeId) {
+                        top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                    }
+                });
+            }
+        });
+    }
+    function setFlowInfo(data) {
+        FlowDesignPanel.loadData(data);
+    }
+    function callBackNode(id, data, _nodePramData) {
+        nodePramData = _nodePramData;
+        FlowDesignPanel.SetNodeEx(id, data);
+    }
+    function callBackLine(id, data) {
+        FlowDesignPanel.SetLineEx(id, data);
+    }
+    function bindingFlow() {
+        var _content = FlowDesignPanel.exportDataEx();
+        if (_content == -1) {
+            return false;
+        }
+        //flowData["SchemeContent"] = JSON.stringify({ "Frm": frmData, "Flow": _content });
+        return true;
+    }
+    /*=========流程设计图（end）==================================================================*/
+
+
+    /***********保存并完成***********/
+    function finishbtn() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var queryJson = JSON.stringify({ "Flow": FlowDesignPanel.exportData(), "Process": $("#form1").formSerialize(keyValue) });//获取控件数据,绑定控件数据
+        $.SaveForm({
+            url: "../../SystemManage/Process/SaveWorkFlowData?keyValue=" + keyValue,
+            param: { queryJson: queryJson },
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    function OpenLine(id, obj) {
+        alert(id);
+    }
+</script>
+
+<div class="widget-body">
+    <div id="wizard" class="wizard" data-target="#wizard-steps">
+        <ul class="steps">
+            <li data-target="#step-1" class="active"><span class="step">1</span>流程信息<span class="chevron"></span></li>
+            <li data-target="#step-2"><span class="step">2</span>流程节点信息<span class="chevron"></span></li>
+            <li data-target="#step-3"><span class="step">3</span>流程设计<span class="chevron"></span></li>
+        </ul>
+    </div>
+    <div class="step-content wizard-step-content" id="wizard-steps">
+        <div class="step-pane wizard-step-pane active" id="step-1">
+            <div class="alert alert-danger" style="text-align: left; margin-bottom: 10px;">
+                <i class="fa fa-warning alert-dismissible" style="position: relative; top: 1px; font-size: 15px; padding-right: 5px;"></i>
+                请你创建流程信息，用于创建或修改流程！
+            </div>
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">流程基本信息配置</h3>
+                </div>
+                <div class="panel-body">
+                    <table class="form" id="form1">
+                        <tr>
+                            <td class="formTitle">流程编号<font face="宋体">*</font></td>
+                            <td class="formValue">
+                                <input type="hidden" id="Id" />
+                                <input id="Code" type="text" class="form-control" placeholder="请输入流程编号" isvalid="yes" checkexpession="NotNull" onblur="ValidateCode(this)" onchange="ValidateCode(this)" onkeyup="ValidateCode(this)" />
+                            </td>
+                            <td class="formTitle">流程名称<font face="宋体">*</font></td>
+                            <td class="formValue">
+                                <input id="Name" type="text" class="form-control" placeholder="请输入流程名称" isvalid="yes" checkexpession="NotNull" />
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="step-pane" id="step-2">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">流程节点信息配置</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="titlePanel">
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <a id="replace" class="btn btn-default" onclick="btn_reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gridPanel">
+                        <table id="gridTable"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="step-pane" id="step-3">
+            <div id="FlowPanel" style="margin: 0px;">
+            </div>
+        </div>
+        <div id="sysbackground" class="drag-tip" style="position: absolute; top:47px; left: 0px; z-index: 10000;   background: #fff;text-align: center; padding-top: 100px;display:none; ">
+            <i class="fa fa-warning" style="color: #f0ad4e;"></i>
+            <p>系统表单流程,无这一步</p>
+        </div>
+    </div>
+    <div class="form-button" id="wizard-actions">
+        <a id="btn_last" disabled class="btn btn-default btn-prev">上一步</a>
+        <a id="btn_next" class="btn btn-default btn-next">下一步</a>
+        <a id="btn_finish" disabled class="btn btn-success" onclick="finishbtn();">保存</a>
+    </div>
+</div>
+<style>
+    .editviewtitle {
+        position: fixed !important;
+        top: 117px;
+        right: 11px;
+        width: 50px;
+        z-index: 1000;
+    }
+
+    .standtab-pane {
+        width: 224px;
+        border-right: 1px solid #ccc;
+        float: left;
+    }
+
+    .SchemeAuthorizePanel {
+        width: 828px;
+        float: left;
+        display: none;
+    }
+
+    .card-box.active {
+        background: url(../../Content/Images/item_close.png) right top no-repeat !important;
+    }
+</style>

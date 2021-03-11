@@ -1,0 +1,269 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script>
+    var keyValue = request('keyValue');
+    var action = request('action');
+    var WorkTask = "";//重点工作任务
+    var DutyDeptName = "";//责任单位名称
+    var DutyDeptId = "";//责任单位ID
+    var DutyDeptCode = "";
+    var DutyPerson = "";
+    var DutyPersonId = "";
+    var SupervisePerson = "";
+    var SupervisePersonId = "";
+    var FinishDate = "";
+    var Remark = "";
+    var SuperviseDeptName = "";
+    var SuperviseDeptId = "";
+    var SuperviseDeptCode = "";
+    var selectedRowIndex;
+    $(function () {
+        initControl();
+        GetGrid();
+    });
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../SafetyWorkSupervise/Safetyworksupervise/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+        //保存
+        $("#btn_Save").click(function () {
+            AcceptClick("0");
+        });
+        //发送
+        $("#btn_Submit").click(function () {
+            AcceptClick("1");
+            top.refreshWork();
+        });
+    }
+    //保存表单;
+    function AcceptClick(type) {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if ($("#gridTable").jqGrid('getRowData').length == 0) {
+            dialogMsg('请先新增督办信息！', 0);
+            return false
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        var data = $("#gridTable").jqGrid('getRowData');
+        var planData = "";
+        var arr = [];
+        var SuperviseDate = postData["SuperviseDate"];
+
+        if (data.length > 0) {
+            $(data).each(function (i, dom) {
+                arr.push({
+                    WorkTask: dom.WorkTask, DutyDeptName: dom.DutyDeptName, DutyDeptId: dom.DutyDeptId,
+                    DutyPerson: dom.DutyPerson, DutyPersonId: dom.DutyPersonId, SupervisePerson: dom.SupervisePerson,
+                    SupervisePersonId: dom.SupervisePersonId, FinishDate: dom.FinishDate, Remark: dom.Remark,
+                    Id: dom.Id, flowstate: type, SuperviseDate: SuperviseDate, DutyDeptCode: dom.DutyDeptCode,
+                    SuperviseDeptName: dom.SuperviseDeptName, SuperviseDeptId: dom.SuperviseDeptId, SuperviseDeptCode: dom.SuperviseDeptCode
+                });
+            });
+        }
+        planData = JSON.stringify(arr);
+        postData["dataJson"] = planData;
+        $.SaveForm({
+            url: "../../SafetyWorkSupervise/Safetyworksupervise/SaveFormY",
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                var queryJson = {
+                    supervisedate: $.currentIframe().$("#supervisedate").val()//督办时间
+                }
+                $.currentIframe().$("#gridTable").jqGrid('setGridParam', {
+                    postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+                }).trigger('reloadGrid');
+                //$.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    function addsupervise() {
+        var url = "/SafetyWorkSupervise/Safetyworksupervise/SuperviseDetail";
+        WorkTask = ""; DutyDeptName = ""; DutyDeptId = ""; DutyPerson = "";
+        DutyPersonId = ""; SupervisePerson = ""; SupervisePersonId = "";
+        FinishDate = ""; Remark = ""; DutyDeptCode = "";
+        SuperviseDeptName = ""; SuperviseDeptId = ""; SuperviseDeptCode = "";
+        idx = dialogOpen({
+            id: "SuperviseDetail",
+            title: "新增安全重点工作",
+            url: url,
+            width: "777px",
+            height: "560px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            },
+            btn: false
+        });
+    }
+    function GetGrid() {
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../SafeReward/Saferewarddetail/GetDataListJson",
+            postData: { rewardId: keyValue },
+            datatype: "json",
+            height: 390,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        var id = rowObject.Id == undefined ? "-1" : rowObject.Id;
+                        if (action != "show") {
+                            html += "<a href=javascript:edit('" + id + "','0') title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:del('" + rowObject.Id + "','#gridTable') title='删除'><i class='fa fa-trash-o'></i></a>";
+                            html += "<a href=javascript:edit('" + id + "','1') title='复制'><i class='fa fa-clone'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '重点工作任务', name: 'WorkTask', width: 250, align: 'center', sortable: false },
+                { label: '责任部门(单位)', name: 'DutyDeptName', width: 400, align: 'center', sortable: false },
+                { label: '责任人', name: 'DutyPerson', width: 150, align: 'center', sortable: false },
+                { label: '督办人', name: 'SupervisePerson', width: 150, align: 'center', sortable: false },
+                { label: '完成时间', name: 'FinishDate', width: 150, align: 'center', sortable: false },
+                { label: '备注', name: 'Remark', width: 150, align: 'center', sortable: false },
+                { label: '单位id', name: 'DutyDeptId', width: 150, align: 'center', sortable: false, hidden: true },
+                { label: '单位code', name: 'DutyDeptCode', width: 150, align: 'center', sortable: false, hidden: true },
+                { label: '责任人id', name: 'DutyPersonId', width: 150, align: 'center', sortable: false, hidden: true },
+                { label: '督办人id', name: 'SupervisePersonId', width: 150, align: 'center', sortable: false, hidden: true },
+                { label: '督办单位名称', name: 'SuperviseDeptName', width: 150, align: 'center', sortable: false, hidden: true },
+                { label: '督办单位id', name: 'SuperviseDeptId', width: 150, align: 'center', sortable: false, hidden: true },
+                { label: '督办单位code', name: 'SuperviseDeptCode', width: 150, align: 'center', sortable: false, hidden: true }
+            ],
+            viewrecords: true,
+            rowNum: 300,
+            //sortname: 'CreateDate',
+            //sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+            }
+        });
+    }
+    //编辑
+    function edit(id, type) {
+        debugger;
+        var worktask = $('#gridTable').jqGridRowValue('WorkTask');
+        var dutyDeptName = $('#gridTable').jqGridRowValue('DutyDeptName');
+        var dutyPerson = $('#gridTable').jqGridRowValue('DutyPerson');
+        var supervisePerson = $('#gridTable').jqGridRowValue('SupervisePerson');
+        var finishDate = $('#gridTable').jqGridRowValue('FinishDate');
+        var remark = $('#gridTable').jqGridRowValue('Remark');
+        var dutyDeptId = $('#gridTable').jqGridRowValue('DutyDeptId');
+        var dutyDeptCode = $('#gridTable').jqGridRowValue('DutyDeptCode');
+        var dutyPersonId = $('#gridTable').jqGridRowValue('DutyPersonId');
+        var supervisePersonId = $('#gridTable').jqGridRowValue('SupervisePersonId');
+        var superviseDeptName = $('#gridTable').jqGridRowValue('SuperviseDeptName');
+        var superviseDeptId = $('#gridTable').jqGridRowValue('SuperviseDeptId');
+        var superviseDeptCode = $('#gridTable').jqGridRowValue('SuperviseDeptCode');
+        var id = $('#gridTable').jqGridRowValue('Id');
+
+        WorkTask = worktask; DutyDeptName = dutyDeptName; DutyDeptId = dutyDeptId;
+        DutyPerson = dutyPerson; DutyPersonId = dutyPersonId; SupervisePerson = supervisePerson;
+        SupervisePersonId = supervisePersonId; FinishDate = finishDate; Remark = remark;
+        SuperviseDeptName = superviseDeptName; SuperviseDeptId = superviseDeptId; SuperviseDeptCode = superviseDeptCode;
+        DutyDeptCode = dutyDeptCode;
+        idx = dialogOpen({
+            id: "SuperviseDetail",
+            title: "修改安全重点工作",
+            url: '/SafetyWorkSupervise/Safetyworksupervise/SuperviseDetail?keyValue=' + id + '&copy=' + type,
+            width: "777px",
+            height: "560px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            btn: false
+        });
+    };
+
+    //删除
+    function del(id, gId) {
+        var jqTable = $(gId);
+        if (id != "undefined" && $("#SendStatus").val() != "") {
+            $.RemoveForm({
+                url: "../../SafeReward/Saferewarddetail/RemoveForm",
+                param: { keyValue: id },
+                success: function (data) {
+                    jqTable.delRowData(jqTable.getGridParam('selrow'));
+                }
+            })
+        } else {
+            var idx = dialogConfirm("确认删除吗？", function (isSure) {
+                if (isSure) {
+                    jqTable.delRowData(jqTable.getGridParam('selrow'));
+                    top.layer.close(idx);
+                } else {
+                    top.layer.close(idx);
+                }
+            });
+        }
+    };
+</script>
+<div class="center-Panel">
+    <div class="panel panel-default" style="margin-top:50px;">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">督办时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SuperviseDate" type="text" isvalid="yes" checkexpession="NotNull" value="@DateTime.Now.ToString("yyyy-MM ")" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM' })" />
+                        </td>
+                        <td class="formTitle">创建人</td>
+                        <td class="formValue">
+                            <input id="Publisher" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" disabled="disabled" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" />
+                        </td>
+                        <td class="formTitle">创建时间</td>
+                        <td class="formValue">
+                            <input id="ReleaseTime" type="text" disabled="disabled" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd ' })" isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default" style="margin-top: 20px;">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;督办信息信息&nbsp;&nbsp;</strong>
+            <span class="tools" style="text-align:right">
+                <a href="javascript:addsupervise()" class="btn btn-primary btn-xs" id="addsupervise">新增</a>&nbsp;&nbsp;
+            </span>
+        </div>
+        <div class="panel-body">
+            <table id="gridTable"></table>
+            @*<div id="gridPager"></div>*@
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+    </div>
+</div>

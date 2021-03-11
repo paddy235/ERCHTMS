@@ -1,0 +1,163 @@
+﻿@{
+    ViewBag.Title = "Stat";
+    Layout = "~/Views/Shared/_Index.cshtml";
+    var user = ERCHTMS.Code.OperatorProvider.Provider.Current();
+    var di = new ERCHTMS.Busines.SystemManage.DataItemDetailBLL();
+    string val=di.GetItemValue(user.OrganizeId, "SafetyDept");
+}
+<style type="text/css">
+    th {
+        height:25px;
+    }
+</style>
+<script type="text/javascript">
+    var idx = null;
+    var isFirst = true;
+    var itemValue = "@val";
+    $(function () {
+        initData("");
+    });
+  
+    function initData(deptType) {
+        if (deptType.length == 0 && isFirst) {
+            $("#info").html("正在统计……");
+        }
+        $("#con").html('<center style="margin-top: 50px;color:white;color:black;font-size:16px;"><img src="../../content/images/loading1.gif" border="0" />&nbsp;请稍候，正在加载数据……</center>');
+        $.get("GetEnterRecordList", {deptName: $("#deptName").val(),userName: $("#userName").val(), deptType: deptType}, function (data) {
+            var json = $.parseJSON(data);
+            var html = "";
+            var cxNum = 0;
+            var lsNum = 0;
+            $(json.data).each(function (j, item) {
+                html += '<div class="panel panel-default"><div class="panel-heading" style="background-color:white;"><strong>' + (j + 1) + "." + item.deptName + '(' + item.deptType +')</strong><span class="tools pull-right" > <b>当前在厂人数：' + item.count + '人</b>&nbsp;&nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>';
+                html += '</span><div class="panel-body">';
+                html += setTableInfo(item.users, item.deptName,j);
+                html += "</div></div></div>";
+                if (item.deptType=="长协") {
+                    cxNum += item.users.length;
+                }
+                if (item.deptType == "临时") {
+                    lsNum += item.users.length;
+                }
+            });
+            $("#con").html(html);
+            if (deptType.length == 0 && isFirst) {
+                var statInfo = "<div class='col-md-3' style='font-size:18px;'>在厂外包人数：" + json.count+"</div>";
+                statInfo += "<div class='col-md-3' style='font-size:18px;'>在厂外包单位数：" + json.data.length + "</div>";
+                statInfo += "<div class='col-md-3' style='font-size:18px;'>在厂长协外包人数：" + cxNum + "</div>";
+                statInfo += "<div class='col-md-3' style='font-size:18px;'>在厂临时外包人数：" + lsNum + "</div>";
+                $("#info").html(statInfo)
+            }
+            jQuery('.panel .tools .fa-chevron-down').click(function () {
+                var el = jQuery(this).parent().parent().children(".panel-body");
+                if (jQuery(this).hasClass("fa-chevron-down")) {
+                    jQuery(this).removeClass("fa-chevron-down").addClass("fa-chevron-up");
+                    el.slideUp(200);
+                } else {
+                    jQuery(this).removeClass("fa-chevron-up").addClass("fa-chevron-down");
+                    el.slideDown(200);
+                }
+            });
+            $(".fa-chevron-down").trigger("click");
+            
+            if (idx != null) {
+                var pal = $(".panel-body").eq(idx);
+                pal.removeClass("fa-chevron-up").addClass("fa-chevron-down");
+                pal.slideDown(200);
+                idx = null;
+            }
+            isFirst = false;
+        });
+    }
+    //查看
+    function show(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看人员档案',
+                url: '/PersonManage/Person/Form?action=show&keyValue=' + keyValue,
+                width: "900px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //出厂
+    function outFactory(idCard, name, way, deptName, index) {
+        var time = formatDate(new Date(), 'yyyy-MM-dd hh:mm:ss');
+        way = way.replace("→", "").replace("入", "出");
+        var content = '<div style="padding:10px;"><div>出厂人员：' + name + '</div><div style="padding-top:10px;">进出通道：' + way + '</div><div style="padding-top:10px;">出厂时间<font color="red">*</font>：<input id="OutTime" type="text" class="form-control input-wdatepicker" value="' + time+'" onfocus="WdatePicker({dateFmt:\'yyyy-MM-dd HH:mm:ss\'})" isvalid="yes" checkexpession="NotNull"  style="display:inline;width:200px;"></div></div>';
+        var dlg = dialogContent({
+            id: "Form",
+            title: '人员出厂',
+            content: content,
+            width: "400px",
+            height: "300px",
+            callBack: function (iframeId) {
+                if (top.window.$("#OutTime").val().length == 0) {
+                    dialogAlert("请填写出厂时间!", 0);
+                    return false;
+                } else {
+                    top.layer.close(dlg);
+                    $.post("InsertEnterRecord", { idCard: idCard, userName: name, way: way, deptName: deptName, time: top.window.$("#OutTime").val() }, function (data) {
+                        var json = $.parseJSON(data);
+                        if (json.type == 1) {
+                            idx = index;
+                            initData('');
+                           
+                        } else {
+                            dialogMsg(json.message);
+                        }
+                    });
+                }
+                
+            }
+        });
+    }
+    function setTableInfo(data, deptName,idx) {
+        var html = '<table cellpadding="0" cellspacing="0" class="table1" border="1" style="width:100%; "><tr><th>序号</th><th>姓名</th><th>性别</th><th>身份证</th><th>岗位</th><th>门禁进出通道</th><th>进出时间</th><th>逗留时间(小时)</th></tr>';
+        $(data).each(function (j, item) {
+            var idcard = "";
+            if(item.idcard.length>0){
+                var value = item.idcard;
+                var sta = value.substring(0, 4);
+                var end = value.substring(value.length - 4, value.length);
+                idcard=sta + "**********" + end;
+            }
+            var oper = "";
+            if (item.hours > 24 && (top.currUserRoleName.indexOf("公司管理员") >= 0 || itemValue.indexOf(top.currUserDeptId)>=0)) {
+                oper = '&nbsp;&nbsp;<a style="cursor:pointer;" title="出厂" onclick="outFactory(\'' + item.idcard + '\',\'' + item.name + '\',\'' + item.way + '\',\'' + deptName + '\',' + idx+')"><i class="fa fa-share-square-o"></i></a>';
+            }
+            html += '<tr><td style="width:60px;">' + (j + 1) + '</td><td style="width:100px;"><a title="点击查看更多信息" href="javascript:show(\'' + item.userid + '\')" style="text-decoration:underline;color:blue;">' + item.name + '</a>' + oper+'</td><td style="width:80px;">' + item.sex + '</td><td style="width:180px;">' + idcard + '</td><td style="width:180px;">' + (item.dutyname == null ? "" : item.dutyname) + '</td><td>' + item.way + '</td><td style="width:300px;">' + item.time + '</td><td style="width:120px;">' + item.hours + '</tr></tr>';
+        });
+        html += "</table>";
+        return html;
+    }
+    function stat(deptType, btn) {
+        $(".btn0").removeClass("btn-primary");
+        $(btn).addClass("btn-primary");
+        initData(deptType);
+    }
+</script>
+<div>
+    <div class="row">
+        <div id="info" style="padding-left: 10px;  font-size: 16px; position: fixed; left: 10px; top: 0px; width: 100%; text-align: left; background-color: #f5f5f5; z-index: 10001; padding-top: 7px; height:40px; "></div>
+       
+    </div>
+    <div style="margin-top:50px;">
+        <div>
+            单位名称：<input type="text" id="deptName" class="form-control" style="width:200px; display:inline;" placeholder="请输入单位名称进行搜索" />&nbsp;&nbsp;
+            姓名：<input type="text" id="userName" class="form-control" style="width:200px; display:inline;" placeholder="请输入姓名进行搜索" />&nbsp;&nbsp;<a class="btn btn-primary" onclick="initData('');$('.btn0').removeClass('btn-primary');$('#btnAll').addClass('btn-primary');">查询</a>&nbsp;&nbsp;<a class="btn btn-primary" onclick="$('#deptName,#userName').val('');isFirst = true;initData('')">刷新</a>
+        </div>
+        <div style="margin-top:10px;">
+            <a class="btn btn-default btn-primary btn0" onclick="stat('',this)" id="btnAll">全部</a><a class="btn btn-default  btn0" onclick="stat('长协',this)">长协外包单位</a><a class="btn btn-default btn0" onclick="stat('临时',this)">临时外包单位</a>
+        </div>
+    </div>
+    <div id="con" style="margin-top:0px;">
+        
+    </div>
+</div>

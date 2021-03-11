@@ -1,0 +1,485 @@
+﻿@{;
+ViewBag.Title = "登记检查结果列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<style type="text/css">
+    .ui-jqgrid tr.jqgrow td {
+        white-space: normal !important;
+        height: auto;
+        vertical-align: middle;
+    }
+</style>
+
+<script>
+    var recid = request('recid');//检查表类型
+    var selectedRowIndex = 0;
+    var ctype = request('ctype');
+    var hiddepart = request('hiddepart');
+    var contentlength = "";
+    var risklength = "";
+    var userAccount = request('userAccount');
+    var mode = request('mode');
+    var isEdit = true;
+    var checkName = request('checkName');
+    $(function () {
+        InitialPage();
+        GetGrid();
+        file_upload.init({
+            keyValue: recid, extensions: '', isImage: false, el: '#uploader', extensions: 'doc,docx,pdf,png,jpg,jpeg', fileSingleSizeLimit: 500 * 1024 * 1024
+        });
+        file_upload.bindFiles(isEdit, false, recid, "uploader", isEdit);
+    });
+    //初始化页面
+    function InitialPage() {
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 136.5);
+
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    function refreshGrid() {
+        $("#gridTable").trigger("reloadGrid");
+    }
+    //加载表格(检查表详情项)
+    function GetGrid() {
+        var queryJson = {
+            recid: recid,
+            userAccount: userAccount
+        }
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../SaftyCheck/SaftyCheckDataDetail/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },//绑定grid加参数
+            datatype: "json",
+            height: 550,
+            autowidth: true,
+            rowNum: 100000,
+            colModel: [
+                { label: '主键', name: 'ID', index: 'ID', hidden: true },
+                { label: '检查对象id', name: 'CheckObjectId', index: 'BelongDistrictID', hidden: true },
+                { label: '检查对象type', name: 'CheckObjectType', index: 'BelongDistrictID', hidden: true },
+                {
+                    label: '检查对象', name: 'CheckObject', index: 'CheckObject', width: 300, align: 'left', sortable: false, headerAlign: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        return cellvalue.replace(/？/g, "");
+                    }
+                }
+                ,{
+                    label: '检查内容', name: 'CheckContent', index: 'CheckContent', width: 450, align: 'left', sortable: false, headerAlign: 'center'                    
+                    //, formatter: function (cellvalue, options, rowObject) {
+                    //    var html = " <input type='text' value='" + cellvalue + "' style='border:none;width:60%;height:30px;' title='"+cellvalue+"' id='"+rowObject.ID+"' class='checkcontent'/>";
+                    //    html += "&nbsp;&nbsp;<i class='btn btn-success' style='border:none;width:60px;height:30px;' title='登记隐患' onclick=addHt('" + rowObject.CheckContent + "','" + (rowObject.RiskName == null ? "" : rowObject.RiskName) + "','" + rowObject.CheckObjectId + "','" + rowObject.CheckObjectType + "','" + rowObject.ID + "')>登记隐患</i>";
+                    //    html += "&nbsp;&nbsp;<i class='btn btn-success' style='border:none;width:60px;height:30px;' title='登记隐患' onclick=addWz('" + rowObject.ID + "','" + rowObject.CheckContent + "','" + rowObject.RiskName + "','" + rowObject.CheckObjectType + "')>登记违章</i>";
+                    //    return html;
+                    //}
+                },
+               {
+                label: '操作', name: 'oper', index: 'oper', align: 'center', sortable: false, headerAlign: 'center', width: 120
+                 , formatter: function (cellvalue, options, rowObject) {
+                     
+                     var html = "<i class='btn btn-success' style='border:none;width:60px;height:30px;' title='登记隐患' onclick=addHt('" + encodeURIComponent(rowObject.CheckContent) + "','" + (rowObject.RiskName == null ? "" : encodeURIComponent(rowObject.RiskName)) + "','" + rowObject.CheckObjectId + "','" + rowObject.CheckObjectType + "','" + rowObject.ID + "',this)>登记隐患</i>";
+                     html += "&nbsp;&nbsp;<i class='btn btn-success' style='border:none;width:60px;height:30px;' title='登记违章' onclick=addWz('" + rowObject.ID + "','" + encodeURIComponent(rowObject.CheckContent) + "','" + (rowObject.RiskName == null ? "" : encodeURIComponent(rowObject.RiskName)) + "','" + rowObject.CheckObjectType + "','" + rowObject.CheckObjectId + "',this)>登记违章</i>";
+                          return html;
+
+                    //var html = "<a class='btn btn-default btn-xs' onclick=\"addHt(this)\" id='"+rowObject.ID+"'  ctype='"+rowObject.CheckObjectType+"'  objId='"+rowObject.CheckObjectId+"' desc='"+rowObject.RiskName+"' measure='"+rowObject.CheckContent+"'>登记隐患</a>&nbsp;&nbsp;";
+                    // html += "<a class='btn btn-default btn-xs' onclick=\"addWz(this)\" id='" + rowObject.ID + "' ctype='" + rowObject.CheckObjectType + "'objId='" + rowObject.CheckObjectId + "' desc='" + rowObject.RiskName + "'  measure='" + rowObject.CheckContent + "'>登记违章</a>";
+                    //return html;
+                    }
+                 }
+                ,{
+                    label: '检查结果', name: 'IsSure', headerAlign: 'center', align: 'center'
+                   , formatter: function (cellvalue, options, rowObject) {
+                       var html = "";
+                       if (cellvalue=="0") {
+                           html = "<input type='radio' value='1' id='rad0" + rowObject.ID + "' class='result' name='rad" + rowObject.ID + "' disabled='disabled' /><label for='rad0" + rowObject.ID + "'>符合</label>&nbsp;&nbsp;<input type='radio' value='0' id='rad1" + rowObject.ID + "' class='result' name='rad" + rowObject.ID + "' checked='true' /><label  for='rad1" + rowObject.ID + "'>不符合</label>";
+                       }
+                       else if (cellvalue == "1") {
+                           html = "<input type='radio' value='1' id='rad0" + rowObject.ID + "' class='result' name='rad" + rowObject.ID + "'  checked='true' /><label for='rad0" + rowObject.ID + "'>符合</label>&nbsp;&nbsp;<input type='radio' value='0' id='rad1" + rowObject.ID + "' class='result' name='rad" + rowObject.ID + "' /><label  for='rad1" + rowObject.ID + "'>不符合</label>";
+                       } else {
+                           html = "<input type='radio' value='1' id='rad0" + rowObject.ID + "' class='result' name='rad" + rowObject.ID + "' /><label for='rad0" + rowObject.ID + "'>符合</label>&nbsp;&nbsp;<input type='radio' value='0' id='rad1" + rowObject.ID + "' class='result' name='rad" + rowObject.ID + "' /><label  for='rad1" + rowObject.ID + "'>不符合</label>";
+                       }
+                       return html;
+                   }
+                }
+                ,{
+                    label: '备注', name: 'Remark', headerAlign: 'center'
+                   , formatter: function (cellvalue, options, rowObject) {
+                       if (cellvalue==undefined) {
+                           var html = "<textarea style='width:100%;border-style:none;height:40px;' rows='2' class='form-control'></textarea>";
+                           return html;
+                       }else{
+                           var html = "<textarea style='width:100%;border-style:none;height:40px;' rows='2' class='form-control'>" + cellvalue + "</textarea>";
+                            return html;
+                       }
+                   }
+                }
+            ],
+            viewrecords: true,
+            gridComplete: function () {
+                Merger('gridTable', new Array('CheckObject'));
+                $("input[type='text']").attr("readonly", "readonly");
+                $('.result').iCheck({
+                    checkboxClass: 'icheckbox_square-blue',
+                    radioClass: 'iradio_square-blue',
+                    increaseArea: '20%'
+                });
+
+            }
+        });
+    }
+    //获取检查内容
+    function getContents() {
+        var arr = new Array();
+        $("#gridTable").find("td[aria-describedby='gridTable_CheckContent']").each(function (j, dom) {
+            if ($(dom).next().next().find("input:checked").length>0) {
+                  var id = $(dom).prev().prev().prev().prev().text();
+                  var isSure = $(dom).next().next().find("input:checked").val();
+                  var remark = $(dom).next().next().next().find("textarea").val();
+                 arr.push({
+                   ID: id,
+                   RecID: recid,
+                   CheckContent: $(dom).text(),
+                   CheckObject: $(dom).prev().text(),
+                   CheckObjectType: $.trim($(dom).prev().prev().text()),
+                   CheckObjectId: $(dom).prev().prev().prev().text(),
+                   IsSure: isSure,
+                   Remark: remark
+                });
+            }
+          
+        });
+        return arr;
+    }
+
+ 
+    //保存表单;
+    function AcceptClick() {
+        if ($("#gridTable").find("input:checked").length == 0) {
+            dialogMsg("请至少登记一项检查结果！", 0);
+            return false;
+        } else {
+            $.ConfirmAjax({
+                url: "../../HiddenTroubleManage/HTBaseInfo/CheckHiddenForm?saftycheckdatarecordid=" + recid,
+                msg: "确认提交吗？提交后信息将不能再修改！",
+                loading: "正在保存数据...",
+                success: function () {
+                    var arr = getContents();
+                    $.ajax({
+                        url: "../../SaftyCheck/SaftyCheckDataRecord/SaveContent",
+                        data: { jsonContent: JSON.stringify(arr) },
+                        type: "post",
+                        dataType: "JSON",
+                        async: false,
+                        success: function (result) {
+                        }
+                    });
+                    $.ajax({
+                        url: "../../LllegalManage/LllegalRegister/CheckLllegalForm",
+                        data: { checkid: recid },
+                        type: "post",
+                        dataType: "JSON",
+                        async: false,
+                        success: function (result) {
+                        }
+                    });
+                    //提交完隐患之后，会吧当前人记录在已登记人中
+                    $.ajax({
+                        url: "../../SaftyCheck/SaftyCheckDataRecord/RegisterPer",
+                        data: { userAccount: "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account", id: recid },
+                        type: "get",
+                        dataType: "JSON",
+                        async: false,
+                        success: function (result) {
+
+                        }
+                    });
+
+                    $.ajax({
+                        url: "../../SaftyCheck/SaftyCheckDataDetail/RegisterPer",
+                        data: { userAccount: "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account", id: recid },
+                        type: "get",
+                        dataType: "JSON",
+                        async: false,
+                        success: function (result) {
+
+                        }
+                    });
+                    var param = { ctype: ctype, indexData: 1, mode: mode };
+                    if (!!$.currentIframe().$('#gridTable').attr("id") == false) {
+                        $.currentIframe().window.frames[0].$('#gridTable').trigger('reloadGrid');
+                    } else {
+                        $.currentIframe().$('#gridTable').trigger('reloadGrid');
+                    }
+                    dialogClose();
+                }
+            })
+        }
+       
+    }
+   
+    function setRadioStatus(obj) {
+        $(obj).parent().next().find("input:radio").iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%'
+        });
+        $(window.node).parent().next().find("input:radio").eq(1).iCheck('check');
+        $(obj).parent().next().find("input:radio").iCheck('disable');
+    }
+    var node = null;
+    //登记隐患
+    function addHt(measure, desc, objId, type, id, obj) {
+        node = obj;
+      
+        var Devicename = "";
+        var Devicecode = "";
+        var Deviceid = "";
+        desc = desc == null ? "" : desc;
+        var dataType = "";
+        var areaId = "";
+        var areaName = "";
+        if (type == "0") {//如果对象是设备的时候
+            dataType = "Equiment";
+            $.ajax({
+                url: top.contentPath + "/SaftyCheck/SaftyCheckDataRecord/GetSbJson",
+                data: { keyValue: objId },
+                type: "Get",
+                async: false,
+                dataType: "Json",
+                success: function (data) {
+                    if (data.length > 0) {
+                        Devicename = data[0].equipmentname;
+                        Devicecode = data[0].equipmentno;
+                        Deviceid = data[0].id;
+                        areaId = data[0].districtcode;
+                        areaName = data[0].district;
+                    }
+                }
+            });
+        }
+        if (type == "1") {
+            dataType = "DangerSource";
+        } else {
+            dataType = "standard";
+        }
+        var url = '/HiddenTroubleManage/HTBaseInfo/CForm?saftycheckdatarecordid=' + recid + '&districtid=' + areaId + '&districname=' + encodeURIComponent(areaName) + '&checkcontent=' + measure + '&ctype=' + ctype + '&actionDo=CheckIn&hiddescribe=' + desc + '&devicename=' + encodeURIComponent(Devicename) + '&devicecode=' + Devicecode + '&deviceid=' + Deviceid + '&relevanceId=' + id + "&relevanceType=" + dataType + "&hiddepart=" + hiddepart + "&safetycheckname=" + encodeURIComponent(checkName);
+        dialogOpen({
+            id: 'HTWindow',
+            title: '登记隐患',
+            url: url,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    //登记违章
+    function addWz(id, measure, desc, type,objId,obj) {
+            node = obj;
+            var dataType = "";
+            if (type == "0") {//如果对象是设备的时候
+                dataType = "Equiment";
+            } 
+            if (type == "1") {
+                dataType = "DangerSource";
+            } else {
+                dataType = "standard";
+            }
+            var url = '/LllegalManage/LllegalRegisterGrp/Form?safetycheck=0&reseverone=' + recid + '&reformmeasure=' + measure + '&ctype=1&lllegaldescribe=' + desc + '&resevertwo=' + id + "&reseverthree=" + dataType + "&reseverid=" + objId + "&hiddepart=" + hiddepart + "&safetycheckname=" + encodeURIComponent(checkName);
+            dialogOpen({
+                id: 'WZWindow',
+                title: '登记违章',
+                url: url,
+                width: ($(top.window).width() - 100) + 'px',
+                height: ($(top.window).height() - 100) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+       
+    }
+    //隐患登记
+    //参数描述：操作类型(登记或者查看)，区域ID(这里是code),检查内容，区域名称,风险描述
+    function regHidTroublr(action, districtid, checkcontent, districname, riskdescribe, sbid, objtype) {
+        if (action == "count") {
+            var url = '/HiddenTroubleManage/HTBaseInfo/Index?saftycheckdatarecordid=' + recid + '&districtid=' + districtid;
+            if (checkedRow(districtid)) {
+                dialogOpen({
+                    id: 'Details',
+                    title: '隐患列表',
+                    url: url,
+                    width: '800px',
+                    height: ($(top.window).height() - 100) + "px",
+                    callBack: function (iframeId) {
+                        top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                    }
+                });
+            }
+        } else if (action == "reg") {
+            var event = window.event || arguments.callee.caller.arguments[0];
+            var obj = event.srcElement || event.target;
+            var domCheckContent = $(obj).parent().find("textarea");
+            checkcontent = "";
+            var objid = "";
+            sbid = "";
+            var indexs = "";//需要取数据的索引
+            var index = 0;
+            if (domCheckContent.length > 0) {
+                $(domCheckContent).each(function (m, res) {
+                    checkcontent += $(res).val() + "|";
+                    indexs += index + ",";
+                });
+            }
+            //根据索引获取选中的检查对象
+            if (index != "") {
+                indexs = indexs.substr(0, indexs.length - 1);
+                var ind = indexs.split(',');
+                var domCheckContent = $(obj).parent().next().next().next().next().find("li");
+                if (domCheckContent.length > 0) {
+                    var i = 0;
+                    $(domCheckContent).each(function (m, res) {
+                        for (var j = 0; j < ind.length; j++) {
+                            if (i == ind[j] && ind[j] != "") {
+                                if ($(res).find("input[type='hidden']").eq(1).val() == "0") {
+                                    sbid += "'" + $(res).find("input[type='hidden']").eq(0).val() + "',";
+                                } else {
+                                    objid = $(res).find("input[type='hidden']").eq(0).val() + ",";
+                                }
+                            }
+                        }
+                        i++;
+                    });
+                }
+
+            }
+
+            if (objid.length > 0) {
+                objid = objid.substr(0, objid.length - 1);
+                //数组取重复再重新赋值
+                var objs = objid.split(',');
+                var objs2 = RemoveItem(objs);
+                for (var i = 0; i < objs2.length; i++) {
+                    objid = objs2[i] + ",";
+                }
+                objid = objid.substr(0, objid.length - 1);
+            }
+            if (sbid.length > 0) {
+                sbid = sbid.substr(0, sbid.length - 1);
+            }
+            checkcontent = contentlength = checkcontent.substr(0, checkcontent.length - 1);
+            risklength = riskdescribe;
+            //如果没有保存检查表就不能登记隐患
+            if (!!recid) {
+                var Devicecode = "";
+                var Deviceid = "";
+                var Devicename = "";
+
+                //var types = objtype.split('|');
+                var flag = false;//是否有设备
+                if (sbid != "") {//如果对象是设备的时候
+                    $.ajax({
+                        url: top.contentPath + "/SaftyCheck/SaftyCheckDataRecord/GetSbJson",
+                        data: { keyValue: sbid },
+                        type: "Get",
+                        async: false,
+                        dataType: "Json",
+                        success: function (data) {
+                            if (data != "") {
+                                for (var i = 0; i < data.length; i++) {
+                                    if (i == 0) {
+                                        Devicename = data[i].EquipmentName;
+                                        Devicecode = data[i].EquipmentNo;
+                                        Deviceid = data[i].Id;
+                                    } else {
+                                        Devicename += "," + data[i].EquipmentName;
+                                        Devicecode += "," + data[i].EquipmentNo;
+                                        Deviceid += "," + data[i].Id;
+                                    }
+                                }
+
+                            }
+                        }
+                    });
+                }
+                var url = '/HiddenTroubleManage/HTBaseInfo/Form?saftycheckdatarecordid=' + recid + "&districtid=" + districtid + '&districname=' + districname + '&checkcontent=1&ctype=' + ctype + '&actionDo=CheckIn' + '&riskdescribe=1&devicename=' + encodeURIComponent(Devicename) + '&devicecode=' + Devicecode + '&deviceid=' + Deviceid + '&relevanceId=' + objid + "&relevanceType=DangerSource";
+                if (checkedRow(districtid)) {
+                    dialogOpen({
+                        id: 'HTWindow',
+                        title: '登记隐患',
+                        url: url,
+                        width: '900px',
+                        height: ($(top.window).height() - 100) + "px",
+                        btn: null,
+                        callBack: function (iframeId) {
+                            top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                        }
+                    });
+                }
+
+            } else {
+                dialogMsg('请选保存检查表！', 0);
+            }
+        }
+
+    }
+
+    //数组去重
+    function RemoveItem(arr) {
+        for (var i = 0; i < arr.length - 1; i++) {
+            for (var j = i + 1; j < arr.length; j++) {
+                if (arr[i] == arr[j]) {
+                    arr.splice(j, 1);
+                    j--;
+                }
+            }
+        }
+        return arr;
+    }
+</script>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+
+    <div class="panel panel-default" style="padding-top:10px; ">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;检查报告</strong>
+            <span class="tools pull-right">
+
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                <div class="queueList">
+                    <div id="uploaderFile" class="placeholder">
+                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                    </div>
+                </div>
+                <div class="statusBar" style="display:none;">
+                    <div class="progress">
+                        <span class="text">0%</span>
+                        <span class="percentage"></span>
+                    </div>
+                    <div class="info"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

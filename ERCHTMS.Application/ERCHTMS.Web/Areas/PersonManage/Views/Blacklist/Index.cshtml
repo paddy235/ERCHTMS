@@ -1,0 +1,225 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    ;
+    var deptCode = request("deptCode");
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 140);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            rownumbers: true,
+            autowidth: true,
+            rowNum: 20,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'realname,deptname',
+            sortorder: 'desc',
+            shrinkToFit: true,
+            height: $(window).height() - 140,
+            url: "../../PersonManage/Blacklist/GetPageListJson",
+            postData: { queryJson: JSON.stringify({ departmentCode: deptCode }) },
+            datatype: "json",
+            colModel: [
+                { label: 'ID', name: 'id', hidden: true }, { label: 'userid', name: 'userid', hidden: true },
+                {
+                    label: '姓名', name: 'realname', index: 'realname', align: 'center', sortable: true, width: 80, formatter: function (value, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.userid + "')  title='查看详情' style='color:blue; text-decoration:underline' >"+value+"</a>";
+                        return html;
+                    }
+                },
+                { label: '性别', name: 'gender', index: 'gender', align: 'center', sortable: true, width: 60 },
+                {
+                    label: '身份证号', name: 'identifyid', index: 'identifyid', align: 'center', width: 150, sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != null) {
+                            var value = cellvalue.toString();
+                            var sta = value.substring(0, 4);
+                            var end = value.substring(value.length - 4, value.length);
+                            return sta + "**********" + end;
+                        }
+                        return cellvalue;
+
+
+                    }
+                },
+                { label: '单位/部门', name: 'deptname', index: 'deptname', align: 'center', sortable: true, width: 200 },
+                { label: '加入黑名单时间', name: 'jointime', index: 'jointime', align: 'center', sortable: true, width: 150 },
+                { label: '加入黑名单原因', name: 'reason', index: 'reason', align: 'left', sortable: true, headerAlign: 'center',width:200 }
+            ]
+        });
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword").val()),
+
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val("");
+            $("#queryCondition .dropdown-text").html("选择条件").attr("data-value", "");
+            var queryJson = {
+                condition: '',
+                keyword: '',
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '加入黑名单',
+            url: '/PersonManage/Blacklist/Form',
+            width: '600px',
+            height: '400px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //查看
+    function show(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看人员档案',
+                url: '/PersonManage/Person/Form?action=show&keyValue=' + keyValue,
+                width: "900px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //编辑
+    function edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑信息',
+                url: '/PersonManage/Blacklist/Form?keyValue=' + keyValue,
+                width: '600px',
+                height: '400px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../PersonManage/Blacklist/RemoveForm',
+                msg: "确定移除黑名单吗？",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要操作的记录！', 0);
+        }
+    }
+
+    //导出
+    function exported() {
+        var queryJson = {
+            condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+            keyword: $.trim($("#txt_Keyword").val()),
+
+        }
+        location.href = "../../PersonManage/Blacklist/Export?queryJson=" + JSON.stringify(queryJson);
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center" style="padding-left:10px;">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a data-value="RealName">姓名</a></li>
+                                        <li><a data-value="identifyid">身份证号</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="delete" class="btn btn-default" onclick="del()"><i class="fa fa-trash-o"></i>&nbsp;移除黑名单</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

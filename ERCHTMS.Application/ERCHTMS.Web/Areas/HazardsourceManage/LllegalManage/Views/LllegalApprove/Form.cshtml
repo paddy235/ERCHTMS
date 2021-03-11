@@ -1,0 +1,881 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+<script>
+    var keyValue = request("keyValue"); //主键 违章信息主键
+    var actiontype = request("actiontype"); //操作动作
+    var applianceClass = ""; //装置类
+    var curMark = ""; //标记类
+    var isPrincipal = ""; //标记是否非普通员工
+    //初始方法
+    $(function () {
+
+        $(".form:eq(0)  tr:eq(7)").css("display", "none");
+        $.SetForm({
+            url: "../../LllegalManage/LllegalRegister/GetInitDataJson",
+            success: function (data) {
+                applianceClass = data.ApplianceClass;//装置类
+                curMark = data.Mark; //安全管理部门 或 装置部门判断
+                isPrincipal = data.IsPrincipal;//非普通员工标记对象
+                //安全部门、装置部门
+                if (!!curMark) {
+                    $(".form:eq(0) tr:eq(2)").css("display", "none");
+                }
+
+                $("#APPROVEPERSON").val(data.User.UserName);
+                $("#APPROVEPERSONID").val(data.User.UserId);
+                $("#APPROVEDEPTCODE").val(data.User.DeptCode);
+                $("#APPROVEDEPTNAME").val(data.User.DeptName);
+                var curDate = "@DateTime.Now.ToString("yyyy-MM-dd")";
+                $("#APPROVEDATE").val(curDate); //当前时间
+                //违章类型
+                $("#LLLEGALTYPE").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.LllegalType
+                });
+
+                //违章级别
+                $("#LLLEGALLEVEL").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.LllegalLevel
+                });
+
+                //流程状态
+                $("#FLOWSTATE").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.FlowState
+                });
+            }
+        });
+        //提交流程
+        $("#btn_Submit").click(function () {
+            SubmitAction();
+        });
+
+        if (actiontype == "view") {
+            $("#btn_Submit").attr("disabled", "disabled");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+
+            $("#btn_Submit").attr("readonly", "readonly");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("readonly", "readonly");
+            });
+        }
+
+
+
+        //通过选择类型确定是否需要填写考核内容
+        $("#LLLEGALTYPE").change(function (ele) {
+            var lllegalTypename = $(ele.target).attr("data-text");
+            //装置性违章
+            if (lllegalTypename.indexOf(applianceClass) >= 0) {
+                //如果当前人是装置部门，且为装置类违章时
+                if (curMark.indexOf("2") >= 0) {
+                    $("#LLLEGALTYPE").attr("disabled", "disabled");
+                }
+                    /*****控制必填字段*****/
+                    //当前人是安全管理部门，且为装置类违章
+                else if (curMark.indexOf("1") >= 0) {
+                    HiddenValid();
+
+                    $("#APPROVEPERSON").removeAttr("isvalid");
+                    $("#APPROVEDATE").removeAttr("isvalid");
+                    $("#PERSONINCHARGENAME").removeAttr("isvalid");
+                    $(".form:eq(0) tr:eq(0) span").remove();
+                    $(".form:eq(0) tr:eq(4) span").remove();
+                }
+                else {
+                    HiddenValid();
+
+                    $("#APPROVEPERSON").removeAttr("isvalid");
+                    $("#APPROVEDATE").removeAttr("isvalid");
+                    $("#PERSONINCHARGENAME").removeAttr("isvalid");
+                    $(".form:eq(0) tr:eq(0) span").remove();
+                    $(".form:eq(0) tr:eq(4) span").remove();
+                    //如果是一级核准人，则上报必选中
+                    $("input[name='ISUPSAFETY']").attr("disabled", "disabled");
+                    $("input[name='ISUPSAFETY']:eq(0)").prop("checked", "checked");  //上报必填
+                }
+            }
+            else {
+
+                $("input[name='ISUPSAFETY']").removeAttr("disabled");
+                var isUpsafety = $("input[name='ISUPSAFETY']:checked").val();
+                //针对一级核准上报，二级不适用
+                if (isUpsafety == "1" && !curMark) {
+                    $("#APPROVEPERSON").removeAttr("isvalid");
+                    $("#APPROVEDATE").removeAttr("isvalid");
+                    $("#PERSONINCHARGENAME").removeAttr("isvalid");
+                    $(".form:eq(0) tr:eq(0) span").remove();
+                    $(".form:eq(0) tr:eq(4) span").remove();
+
+                    HiddenValid();
+                }
+                else {
+                    $("#APPROVEPERSON").attr("isvalid", "yes");
+                    $("#APPROVEDATE").attr("isvalid", "yes");
+                    $("#PERSONINCHARGENAME").attr("isvalid", "yes");
+                    $(".form:eq(0) tr:eq(0) td:eq(0)").html("核准人<span style=\"color:red;\">*</span>");
+                    $(".form:eq(0) tr:eq(0) td:eq(2)").html("核准时间<span style=\"color:red;\">*</span>");
+                    $(".form:eq(0) tr:eq(4) td:eq(0)").html("违章责任人<span style=\"color:red;\">*</span>");
+                    ShowValid();
+                }
+            }
+
+            //是否核准通过
+            var approveResult = $("input[name='APPROVERESULT']:checked").val();
+            if (approveResult == "1") {
+                $("#APPROVEREASON").removeAttr("isvalid");
+                $(".form:eq(0) tr:eq(3) td:eq(0)").html("核准意见"); //验收日期
+                $("#APPROVEREASON").attr("errormsg", "核准意见");
+            }
+            else {
+                $(".form:eq(0) tr:eq(3) td:eq(0)").html("不通过原因<span style=\"color:red;\">*</span>"); //验收日期
+                $("#APPROVEREASON").attr("isvalid", "yes");
+                $("#APPROVEREASON").attr("errormsg", "不通过原因");
+            }
+
+        });
+
+        //核准是否通过
+        $("input[name='APPROVERESULT']").click(function () {
+            var checkValue = $(this).val();
+
+            //是否核准通过
+            //核准通过
+            if (checkValue == "1") {
+
+                var lllegalTypename = $("#LLLEGALTYPE").attr("data-text");
+                //非装置性违章
+                if (lllegalTypename.indexOf(applianceClass) < 0) {
+                    ShowValid();
+
+                    $("#APPROVEPERSON").attr("isvalid", "yes");
+                    $("#APPROVEDATE").attr("isvalid", "yes");
+                    $("#PERSONINCHARGENAME").attr("isvalid", "yes");
+                    $(".form:eq(0) tr:eq(0) td:eq(0)").html("核准人<span style=\"color:red;\">*</span>");
+                    $(".form:eq(0) tr:eq(0) td:eq(2)").html("核准时间<span style=\"color:red;\">*</span>");
+                    $(".form:eq(0) tr:eq(4) td:eq(0)").html("违章责任人<span style=\"color:red;\">*</span>");
+                }
+
+                $("#APPROVEREASON").removeAttr("isvalid");
+                $(".form:eq(0) tr:eq(3) td:eq(0)").html("核准意见"); //验收日期
+                $("#APPROVEREASON").attr("errormsg", "核准意见");
+
+            }
+            else {//核准不通过
+
+                HiddenValid();
+
+                $("#APPROVEPERSON").removeAttr("isvalid");
+                $("#APPROVEDATE").removeAttr("isvalid");
+                $("#PERSONINCHARGENAME").removeAttr("isvalid");
+                $(".form:eq(0) tr:eq(0) span").remove();
+                $(".form:eq(0) tr:eq(4) span").remove();
+
+                $(".form:eq(0) tr:eq(3) td:eq(0)").html("不通过原因<span style=\"color:red;\">*</span>"); //验收日期
+                $("#APPROVEREASON").attr("isvalid", "yes");
+                $("#APPROVEREASON").attr("errormsg", "不通过原因");
+            }
+        });
+
+
+        //是否上报点击
+        $("input[name='ISUPSAFETY']").click(function () {
+            var checkValue = $(this).val();
+            //是否核准通过
+            var approveResult = $("input[name='APPROVERESULT']:checked").val();
+            //上报
+            if (checkValue == "1") {
+                $("#APPROVEPERSON").removeAttr("isvalid");
+                $("#APPROVEDATE").removeAttr("isvalid");
+                $("#PERSONINCHARGENAME").removeAttr("isvalid");
+                $(".form:eq(0) tr:eq(0) span").remove();
+                $(".form:eq(0) tr:eq(4) span").remove();
+
+                HiddenValid();
+            }
+            else //不上报
+            {
+                if (approveResult == "1") {
+                    $("#APPROVEPERSON").attr("isvalid", "yes");
+                    $("#APPROVEDATE").attr("isvalid", "yes");
+                    $("#PERSONINCHARGENAME").attr("isvalid", "yes");
+                    $(".form:eq(0) tr:eq(0) td:eq(0)").html("核准人<span style=\"color:red;\">*</span>");
+                    $(".form:eq(0) tr:eq(0) td:eq(2)").html("核准时间<span style=\"color:red;\">*</span>");
+                    $(".form:eq(0) tr:eq(4) td:eq(0)").html("违章责任人<span style=\"color:red;\">*</span>");
+
+                    ShowValid();
+                }
+
+            }
+
+            if (approveResult == "1") {
+                $("#APPROVEREASON").removeAttr("isvalid");
+                $(".form:eq(0) tr:eq(3) td:eq(0)").html("核准意见"); //验收日期
+                $("#APPROVEREASON").attr("errormsg", "核准意见");
+            }
+            else {
+                $(".form:eq(0) tr:eq(3) td:eq(0)").html("不通过原因<span style=\"color:red;\">*</span>"); //验收日期
+                $("#APPROVEREASON").attr("isvalid", "yes");
+                $("#APPROVEREASON").attr("errormsg", "不通过原因");
+            }
+        });
+
+
+        //获取表单数据
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../LllegalManage/LllegalRegister/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    //违章基本信息
+                    if (null != data.baseInfo) {
+
+                        $("#form1").formDeserialize(data.baseInfo);
+                        //存在回退数据
+                        if (data.baseInfo.RESEVERFOUR == "是")
+                        {
+                             $(".form:eq(0)  tr:eq(7)").css("display", "");
+                        }
+
+                        $("#LLLEGALTYPE").ComboBoxSetValue(data.baseInfo.LLLEGALTYPE); //违章类型
+                        $("#LLLEGALLEVEL").ComboBoxSetValue(data.baseInfo.LLLEGALLEVEL);  //违章级别
+
+                        if (!!data.baseInfo.ISEXPOSURE) {
+                            //是否曝光
+                            if (data.baseInfo.ISEXPOSURE == "1") {
+                                $("input[name='ISEXPOSURE']:eq(0)").prop("checked", "checked");  //是
+                            }
+                            else {
+                                $("input[name='ISEXPOSURE']:eq(1)").prop("checked", "checked"); //否
+                            }
+                        }
+                        if (!!data.baseInfo.ISUPSAFETY) {
+                            //是否上报
+                            if (data.baseInfo.ISUPSAFETY == "1") {
+                                $("input[name='ISUPSAFETY']:eq(0)").prop("checked", "checked");  //是
+                            }
+                            else {
+                                $("input[name='ISUPSAFETY']:eq(1)").prop("checked", "checked"); //否
+                            }
+                        }
+
+                        var lllegalType = data.baseInfo.LLLEGALTYPE;
+                        var lllegalTypename = ""; //此值为文本 违章类型
+                        if (!!lllegalType) {
+                            lllegalTypename = $("#LLLEGALTYPE").attr("data-text");
+                        }
+
+                        //装置性违章
+                        if (lllegalTypename.indexOf(applianceClass) >= 0) {
+                            //如果当前人是装置部门，且为装置类违章时
+                            if (curMark.indexOf("2") >= 0) {
+                                $("#LLLEGALTYPE").attr("disabled", "disabled");
+                            }
+                                /*****控制必填字段*****/
+                                //当前人是安全管理部门，且为装置类违章
+                            else if (curMark.indexOf("1") >= 0) {
+                                HiddenValid();
+
+                                $("#APPROVEPERSON").removeAttr("isvalid");
+                                $("#APPROVEDATE").removeAttr("isvalid");
+                                $("#APPROVEREASON").removeAttr("isvalid");
+                                $("#PERSONINCHARGENAME").removeAttr("isvalid");
+                                $(".form:eq(0) tr:eq(0) span").remove();
+                                $(".form:eq(0) tr:eq(3) span").remove();
+                                $(".form:eq(0) tr:eq(4) span").remove();
+                            }
+                            else {  //if (!!isPrincipal)
+                                HiddenValid();
+
+                                $("#APPROVEPERSON").removeAttr("isvalid");
+                                $("#APPROVEDATE").removeAttr("isvalid");
+                                $("#APPROVEREASON").removeAttr("isvalid");
+                                $("#APPROVEREASON").removeAttr("isvalid");
+                                $("#PERSONINCHARGENAME").removeAttr("isvalid");
+                                $(".form:eq(0) tr:eq(0) span").remove();
+                                $(".form:eq(0) tr:eq(3) span").remove();
+                                $(".form:eq(0) tr:eq(4) span").remove();
+                                //如果是一级核准人，则上报必选中
+                                $("input[name='ISUPSAFETY']").attr("disabled", "disabled");
+                                $("input[name='ISUPSAFETY']:eq(0)").prop("checked", "checked");  //上报必填
+                            }
+                        }
+                        else {
+                            $("#APPROVEPERSON").attr("isvalid", "yes");
+                            $("#APPROVEDATE").attr("isvalid", "yes");
+                            $("#PERSONINCHARGENAME").attr("isvalid", "yes");
+                            $(".form:eq(0) tr:eq(0) td:eq(0)").html("核准人<span style=\"color:red;\">*</span>");
+                            $(".form:eq(0) tr:eq(0) td:eq(2)").html("核准时间<span style=\"color:red;\">*</span>");
+                            $(".form:eq(0) tr:eq(3) td:eq(0)").html("核准意见<span style=\"color:red;\">*</span>");
+                            $(".form:eq(0) tr:eq(4) td:eq(0)").html("违章责任人<span style=\"color:red;\">*</span>");
+                        }
+                    }
+
+                    //违章核准  查看时可以看
+                    if (null != data.approveInfo && actiontype == "view") {
+                        $("#form1").formDeserialize(data.approveInfo);
+                    }
+                    //违章整改
+                    if (null != data.reformInfo) {
+                        $("#form1").formDeserialize(data.reformInfo);
+                        $("#REFORMID").val(data.reformInfo.ID);
+                    }
+                    //违章考核内容
+                    if (null != data.punishInfo) {
+                        $("#form1").formDeserialize(data.punishInfo);
+                        $("#PUNISHID").val(data.punishInfo.ID);
+                    }
+                    //违章验收
+                    if (null != data.acceptInfo) {
+                        $("#form1").formDeserialize(data.acceptInfo);
+                        $("#ACCEPTID").val(data.acceptInfo.ID);
+                    }
+
+                }
+            });
+        }
+        uploadify(); //违章图片
+    });
+
+
+    function HiddenValid() {
+        //违章编号
+        $(".form:eq(1) tr:eq(0) td:eq(0) span").remove();
+        $(".form:eq(1) tr:eq(0) td:eq(1) input").removeAttr("isvalid");
+        //违章人员
+        $(".form:eq(1) tr:eq(0) td:eq(2) span").remove();
+        $(".form:eq(1) tr:eq(0) td:eq(3) input").removeAttr("isvalid");
+        //违章类型
+        $(".form:eq(1) tr:eq(1) td:eq(0) span").remove();
+        $(".form:eq(1) tr:eq(1) td:eq(1) div").removeAttr("isvalid");
+        //违章单位
+        $(".form:eq(1) tr:eq(1) td:eq(2) span").remove();
+        $(".form:eq(1) tr:eq(1) td:eq(3) input").removeAttr("isvalid");
+        //违章级别
+        $(".form:eq(1) tr:eq(2) td:eq(0) span").remove();
+        $(".form:eq(1) tr:eq(2) td:eq(1) div").removeAttr("isvalid");
+        //整改要求
+        $(".form:eq(1) tr:eq(6) td:eq(0) span").remove();
+        $(".form:eq(1) tr:eq(6) td:eq(1) textarea").removeAttr("isvalid");
+        /*整改必填验证*/
+        //整改责任人
+        $(".form:eq(2) tr:eq(0) td:eq(0) span").remove();
+        $(".form:eq(2) tr:eq(0) td:eq(1) input").removeAttr("isvalid");
+        //整改截止日期
+        $(".form:eq(2) tr:eq(1) td:eq(0) span").remove();
+        $(".form:eq(2) tr:eq(1) td:eq(1) input").removeAttr("isvalid");
+        /*验收必填验证*/
+        //验收人
+        $(".form:eq(3) tr:eq(0) td:eq(0) span").remove();
+        $(".form:eq(3) tr:eq(0) td:eq(1) input").removeAttr("isvalid");
+        //验收日期
+        $(".form:eq(3) tr:eq(1) td:eq(0) span").remove();
+        $(".form:eq(3) tr:eq(1) td:eq(1) input").removeAttr("isvalid");
+    }
+
+    function ShowValid() {
+        //违章编号
+        $(".form:eq(1) tr:eq(0) td:eq(0)").html("违章编号<span style='color:red;'>*</span>");
+        $("#LLLEGALNUMBER").attr("isvalid", "yes");
+        //违章人员
+        $(".form:eq(1) tr:eq(0) td:eq(2)").html("违章人员<span style='color:red;'>*</span>");
+        $("#LLLEGALPERSON").attr("isvalid", "yes");
+        //违章类型
+        $(".form:eq(1) tr:eq(1) td:eq(0)").html("违章类型<span style='color:red;'>*</span>");
+        $("#LLLEGALTYPE").attr("isvalid", "yes");
+        //违章单位
+        $(".form:eq(1) tr:eq(1) td:eq(2)").html("违章单位<span style='color:red;'>*</span>");
+        $("#LLLEGALTEAM").attr("isvalid", "yes");
+        //违章级别
+        $(".form:eq(1) tr:eq(2) td:eq(0)").html("违章级别<span style='color:red;'>*</span>");
+        $("#LLLEGALLEVEL").attr("isvalid", "yes");
+        //整改要求
+        $(".form:eq(1) tr:eq(6) td:eq(0)").html("整改要求<span style='color:red;'>*</span>");
+        $("#REFORMREQUIRE").attr("isvalid", "yes");
+        /*整改必填验证*/
+        //整改责任人
+        $(".form:eq(2) tr:eq(0) td:eq(0)").html("整改责任人<span style='color:red;'>*</span>");
+        $("#REFORMPEOPLE").attr("isvalid", "yes");
+        //整改截止日期
+        $(".form:eq(2) tr:eq(1) td:eq(0)").html("整改截止日期<span style='color:red;'>*</span>");
+        $("#REFORMDEADLINE").attr("isvalid", "yes");
+        /*验收必填验证*/
+        //验收人
+        $(".form:eq(3) tr:eq(0) td:eq(0)").html("验收人<span style='color:red;'>*</span>");
+        $("#ACCEPTPEOPLE").attr("isvalid", "yes");
+        //验收日期
+        $(".form:eq(3) tr:eq(1) td:eq(0)").html("验收日期<span style='color:red;'>*</span>");
+        $("#ACCEPTTIME").attr("isvalid", "yes");
+    }
+
+    //违章历史核准记录
+    function GetHistoryApprove() {
+        dialogOpen({
+            id: 'HistoryForm',
+            title: '违章历史核准记录',
+            url: '/LllegalManage/LllegalApprove/DetailList?keyValue=' + keyValue,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: null
+        });
+    }
+
+    //上传文件
+    function uploadify(objId) {
+        var fileType = 'bmp,ico,gif,jpeg,jpg,png,psd';
+        var isImage = true;
+        var folderId = $("#LLLEGALPIC").val();
+        if (!folderId) {
+            folderId = "@Guid.NewGuid().ToString()";
+            $("#LLLEGALPIC").val(folderId);
+        }
+        if (actiontype != "view") {
+            file_upload.init({
+                keyValue: folderId, extensions: 'jpg,gif,bmp,png', isImage: true, el: '#uploader'
+            });
+        }
+        $.ajax({
+            url: '../../PublicInfoManage/ResourceFile/GetFilesByRecId',
+            data: { recId: folderId },
+            type: "post",
+            success: function (data) {
+                var isdelete = actiontype == "view" ? false : true;
+                var objdata = eval("(" + data + ")"); //转化为对象类型
+                file_upload.bind(objdata, isdelete, isImage, folderId, "uploader");
+            }
+        });
+    }
+
+    //提交流程
+    function SubmitAction() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        var postData = $("#form1").formSerialize(keyValue);
+        //核准结果
+        var approveResult = $("input[name='APPROVERESULT']:checked").val();
+        postData["APPROVERESULT"] = approveResult;
+        //是否曝光违章
+        var isExposure = $("input[name='ISEXPOSURE']:checked").val();
+        postData["ISEXPOSURE"] = isExposure;
+
+        //是否上报安全部门
+        var isUpsafety = $("input[name='ISUPSAFETY']:checked").val();
+        postData["ISUPSAFETY"] = isUpsafety;
+
+        //整改ID
+        postData["REFORMID"] = $("#REFORMID").val();
+        //考核ID
+        postData["PUNISHID"] = $("#PUNISHID").val();
+        //验收ID
+        postData["ACCEPTID"] = $("#ACCEPTID").val();
+
+        $("#btn_Submit").attr("disabled", "disabled");
+        $.SaveForm({
+            url: "../../LllegalManage/LllegalApprove/SubmitForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        });
+        $("#btn_Submit").removeAttr("disabled");
+
+    }
+
+
+
+</script>
+
+<div class="center-Panel">
+    <div style="margin-top:42px;"></div>
+    <div class="panel panel-default" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章核准信息&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#" onclick="GetHistoryApprove()">历史核准记录</a></strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">核准人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="APPROVEPERSON" class="form-control" placeholder="请选择核准人" errormsg="核准人" isvalid="yes" checkexpession="NotNull" disabled="disabled" />
+                            <input id="APPROVEPERSONID" type="hidden" />
+                            <input id="APPROVEID" type="hidden" />
+                            <input id="APPROVEDEPTCODE" type="hidden" />
+                            <input id="APPROVEDEPTNAME" type="hidden" />
+                        </td>
+                        <td class="formTitle">核准时间<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="APPROVEDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="核准时间" disabled="disabled" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">核准结果</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="APPROVERESULT" id="APPROVERESULT1" value="1" checked="checked" />通过
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="APPROVERESULT" id="APPROVERESULT2" value="0" />不通过
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">是否曝光</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISEXPOSURE" id="ISEXPOSURE1" value="1" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISEXPOSURE" id="ISEXPOSURE2" value="0" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">是否上报安全部门</td>
+                        <td class="formValue" colspan="3">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISUPSAFETY" id="ISUPSAFETY1" value="1" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISUPSAFETY" id="ISUPSAFETY2" value="0" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">核准意见</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="APPROVEREASON" class="form-control" checkexpession="NotNull" length="1000" errormsg="核准意见"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章责任人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="PERSONINCHARGENAME" class="form-control" placeholder="请选择违章责任人" errormsg="违章责任人" isvalid="yes" checkexpession="NotNull" readonly onclick="selectMuchUser({ deptId:'',checkMode:0,mode:2,winObject:window.document.body,domId:'PERSONINCHARGENAME|0,PERSONINCHARGEID|2'});" />
+                            <input id="PERSONINCHARGEID" type="hidden" />
+                            <input id="PUNISHID" type="hidden" />
+                        </td>
+                        <td class="formTitle">考核内容</td>
+                        <td class="formValue">
+                            <table>
+                                <tr>
+                                    <td>
+                                        经济处罚
+                                    </td>
+                                    <td style="padding-left:5px;"><input id="ECONOMICSPUNISH" type="number" style="margin:0px auto; width: 80px" class="form-control" /></td>
+                                    <td style="padding-left:5px;">元</td>
+                                    <td style="padding-left:10px;"></td>
+                                    <td>
+                                        违章扣分
+                                    </td>
+                                    <td style="padding-left:5px;"><input id="LLLEGALPOINT" type="number" style="margin:0px auto; width: 80px" class="form-control" /></td>
+                                    <td style="padding-left:5px;">分</td>
+                                    <td style="padding-left: 10px;"></td>
+                                    <td>
+                                        待岗
+                                    </td>
+                                    <td style="padding-left:5px;"><input id="AWAITJOB" type="number" style="margin:0px auto; width: 80px" class="form-control" /></td>
+                                    <td style="padding-left:5px;">月</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">
+                            <span style="white-space:pre-wrap;">违章第一联责任人</span>
+                        </td>
+                        <td class="formValue">
+                            <input id="FIRSTINCHARGENAME" class="form-control" placeholder="请选择违章第一联责任人" errormsg="违章第一联责任人" checkexpession="NotNull" readonly onclick="selectMuchUser({ deptId: '', checkMode: 0, mode: 2, winObject: window.document.body, domId: 'FIRSTINCHARGENAME|0,FIRSTINCHARGEID|2' });" />
+                            <input id="FIRSTINCHARGEID" type="hidden" />
+                        </td>
+                        <td class="formTitle">考核内容</td>
+                        <td class="formValue">
+                            <table>
+                                <tr>
+                                    <td>
+                                        经济处罚
+                                    </td>
+                                    <td style="padding-left:5px;"><input id="FIRSTECONOMICSPUNISH" type="number" style="margin:0px auto; width: 80px" class="form-control" /></td>
+                                    <td style="padding-left:5px;">元</td>
+                                    <td style="padding-left:10px;"></td>
+                                    <td>
+                                        违章扣分
+                                    </td>
+                                    <td style="padding-left:5px;"><input id="FIRSTLLLEGALPOINT" type="number" style="margin:0px auto; width: 80px" class="form-control" /></td>
+                                    <td style="padding-left:5px;">分</td>
+                                    <td style="padding-left: 10px;"></td>
+                                    <td>
+                                        待岗
+                                    </td>
+                                    <td style="padding-left:5px;"><input id="FIRSTAWAITJOB" type="number" style="margin:0px auto; width: 80px" class="form-control" /></td>
+                                    <td style="padding-left:5px;">月</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">
+                            <span style="white-space:pre-wrap;">违章第二联责任人</span>
+                        </td>
+                        <td class="formValue">
+                            <input id="SECONDINCHARGENAME" class="form-control" placeholder="请选择违章第二联责任人" errormsg="违章第二联责任人" checkexpession="NotNull" readonly onclick="selectMuchUser({ deptId: '', checkMode: 0, mode: 2, winObject: window.document.body, domId: 'SECONDINCHARGENAME|0,SECONDINCHARGEID|2' });" />
+                            <input id="SECONDINCHARGEID" type="hidden" />
+                        </td>
+                        <td class="formTitle">考核内容</td>
+                        <td class="formValue">
+                            <table>
+                                <tr>
+                                    <td>
+                                        经济处罚
+                                    </td>
+                                    <td style="padding-left:5px;"><input id="SECONDECONOMICSPUNISH" type="number" style="margin:0px auto; width: 80px" class="form-control" /></td>
+                                    <td style="padding-left:5px;">元</td>
+                                    <td style="padding-left:10px;"></td>
+                                    <td>
+                                        违章扣分
+                                    </td>
+                                    <td style="padding-left:5px;"><input id="SECONDLLLEGALPOINT" type="number" style="margin:0px auto; width: 80px" class="form-control" /></td>
+                                    <td style="padding-left:5px;">分</td>
+                                    <td style="padding-left: 10px;"></td>
+                                    <td>
+                                        待岗
+                                    </td>
+                                    <td style="padding-left:5px;"><input id="SECONDAWAITJOB" type="number" style="margin:0px auto; width: 80px" class="form-control" /></td>
+                                    <td style="padding-left:5px;">月</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">回退原因</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="RESEVERFIVE" class="form-control" length="2000" readonly></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">违章编号<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="LLLEGALNUMBER" type="text" class="form-control" disabled="disabled" />
+                            <input id="ADDTYPE" type="hidden" value="1" />
+                        </td>
+                        <td class="formTitle">违章人员<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="LLLEGALPERSON" type="text" class="form-control" placeholder="请选择违章人员" isvalid="yes" checkexpession="NotNull" errormsg="违章人员" readonly onclick="selectMuchUser({ deptId:'',checkMode:0,mode:2,winObject:window.document.body,domId:'LLLEGALPERSON|0,LLLEGALPERSONID|2,LLLEGALTEAMCODE|4,LLLEGALTEAM|5,PERSONINCHARGENAME|0,PERSONINCHARGEID|2,REFORMPEOPLE|0,REFORMPEOPLEID|2,REFORMDEPTNAME|5,REFORMDEPTCODE|4'});" />
+                            <input id="LLLEGALPERSONID" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章类型<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="LLLEGALTYPE" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="违章类型" />
+                        </td>
+                        <td class="formTitle">违章单位<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="LLLEGALTEAM" type="text" class="form-control" placeholder="请选择违章单位" readonly />
+                            <input id="LLLEGALTEAMCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章级别<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="LLLEGALLEVEL" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="违章级别" />
+                        </td>
+                        <td class="formTitle">违章责任单位</td>
+                        <td class="formValue">
+                            <input id="LLLEGALDEPART" type="text" class="form-control" placeholder="请选择违章责任单位" readonly onclick="selectDept('', 0, 2, '违章责任单位', window.document.body, 'LLLEGALDEPART,LLLEGALDEPARTCODE,,,', '')" />
+                            <input id="LLLEGALDEPARTCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">登记人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            @**用户名称,用户账号，用户Id,部门Id,部门Code,部门名称,手机号**@
+                            <input id="CREATEUSERNAME" type="text" class="form-control" readonly />
+
+                        </td>
+                        <td class="formTitle">违章时间<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="LLLEGALTIME" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="违章时间" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章地点<span style="color:red;">*</span></td>
+                        <td class="formValue" colspan="3">
+                            <input id="LLLEGALADDRESS" type="text" class="form-control" errormsg="违章地点" placeholder="请输入违章地点" isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章描述<span style="color:red;">*</span></td>
+                        <td class="formValue" colspan="3">
+                            <div>
+                                <div style="float:left; width:90%">
+                                    <textarea id="LLLEGALDESCRIBE" class="form-control" style="width: 98%; height: 80px;" errormsg="违章描述" isvalid="yes" checkexpession="LenStr" length="2000"></textarea>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改要求<span style="color:red;">*</span></td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REFORMREQUIRE" class="form-control" isvalid="yes" checkexpession="NotNull" length="2000" errormsg="整改要求"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章照片</td>
+                        <td class="formValue" colspan="3">
+                            <input id="LLLEGALPIC" type="hidden" /><!--违章照片-->
+                            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="lllegalpic_place" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel3">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章整改信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">整改责任人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="REFORMPEOPLE" class="form-control" placeholder="请选择整改责任人" errormsg="整改责任人" isvalid="yes" checkexpession="NotNull"
+                                   readonly onclick="selectDifferentUser('', 0, 2, window.document.body, 'REFORMPEOPLE,,REFORMPEOPLEID,,REFORMDEPTCODE,REFORMDEPTNAME,REFORMTEL', 'ACCEPTPEOPLEID', '验收人');" />
+                            <input id="REFORMPEOPLEID" type="hidden" />
+                            <input id="REFORMID" type="hidden" />
+                        </td>
+                        <td class="formTitle">整改责任单位</td>
+                        <td class="formValue">
+                            <input id="REFORMDEPTNAME" type="text" class="form-control" readonly errormsg="整改责任单位" disabled="disabled" />
+                            <input id="REFORMDEPTCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改截至时间<span style="color:red;">*</span></td>
+                        <td class="formValue" >
+                            <input id="REFORMDEADLINE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="整改截至时间" />
+                        </td>
+                        <td class="formTitle"></td>
+                        <td class="formValue">
+                           
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel4">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章验收信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">验收人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="ACCEPTPEOPLE" class="form-control" placeholder="请选择验收人" errormsg="验收人" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDifferentUser('', 0, 2, window.document.body, 'ACCEPTPEOPLE,,ACCEPTPEOPLEID,,ACCEPTDEPTCODE,ACCEPTDEPTNAME', 'REFORMPEOPLEID', '整改责任人');" />
+                            <input id="ACCEPTPEOPLEID" type="hidden" />
+                            <input id="ACCEPTID" type="hidden" />
+                        </td>
+                        <td class="formTitle">验收单位</td>
+                        <td class="formValue">
+                            <input id="ACCEPTDEPTNAME" type="text" class="form-control" disabled="disabled" disabled="disabled" />
+                            <input id="ACCEPTDEPTCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">验收日期<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="ACCEPTTIME" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="验收日期" />
+                        </td>
+                        <td class="formTitle"></td>
+                        <td class="formValue"></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+
+    </div>
+    <div id="HidMessage" style="width:360px; margin-left:20px; float:left;"></div>
+</div>

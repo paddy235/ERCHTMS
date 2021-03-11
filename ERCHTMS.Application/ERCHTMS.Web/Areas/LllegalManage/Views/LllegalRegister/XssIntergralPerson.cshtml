@@ -1,0 +1,194 @@
+﻿@{
+    ViewBag.Title = "违章人员扣分信息";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+
+<script>
+    var _parentId = "";
+    var _isOrg = "";
+    var _deptId = "";
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+        $("#itemTree").height($(window).height() - 90);
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var mode = 0;
+        if (rolename.indexOf("承包商级用户") >= 0) {
+            mode = 20;
+        }
+        var json = JSON.stringify({ SelectMode: 0, Mode: mode });
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.Code;
+                _isOrg = item.Sort;
+                _deptId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        }
+        else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../LllegalManage/LllegalRegister/GetXssWzPersonInfo",
+            postData: { queryJson: GetQueryJson() },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'userid', index: 'userid', align: 'center', sortable: true, hidden: true },
+                 { label: '单位', name: 'deptname', index: 'deptname', align: 'center', sortable: true },
+                { label: '姓名', name: 'realname', index: 'realname', align: 'center', sortable: true },
+                {
+                    label: '违章次数', name: 'wznum', index: 'wznum', align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = cellvalue;
+                        if (cellvalue > 0) {
+                            html = '<a style=\"text-decoration: underline;color: blue;\"  href=javascript:openLllegalList("' + rowObject.userid + '")>' + cellvalue + '</a>';
+                        }
+                        return html;
+                    }
+                },
+                { label: '违章扣分', name: 'lllegalpoint', index: 'lllegalpoint', align: 'center', sortable: true },
+                {
+                    label: '违章积分', name: 'lllegaljf', index: 'lllegaljf', align: 'center', sortable: true
+                    //, formatter: function (cellvalue, options, rowObject) {
+                    //    return (12 - parseFloat(rowObject.lllegalpoint));
+                    //}
+                }],
+            viewrecords: true,
+            rowNum: 30,
+            pager: "#gridPager",
+            sortname: 'deptname',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            multiselect: false,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: GetQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //加载搜索条件
+    function GetQueryJson() {
+        var queryJson = {
+            TimeScope: $("#TimeScope").val(),
+            Code: _parentId,
+            DeptId: _deptId,
+            isOrg: _isOrg
+        }
+        return  JSON.stringify(queryJson);
+    }
+
+    //
+    //打开链接
+    //
+    function openLllegalList(userid) {
+        dialogOpen({
+            id: 'LllegalList',
+            title: '违章列表',
+            url: '/LllegalManage/LllegalRegister/SdIndex?Qtype=1&year=' + $("#TimeScope").val() + "&wzkhuserid=" + userid,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px"
+        });
+    }
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">积分档案</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table class="queryform">
+                        <tr>
+                            <td style="padding-left: 10px;">时间范围：</td>
+                            <td class="formValue">
+                                <div style="float: left; ">
+                                    <input id="TimeScope" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy' })" />
+                                </div>
+                            </td>
+                            <td style="padding-left: 20px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>&nbsp;&nbsp;
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

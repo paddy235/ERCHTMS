@@ -1,0 +1,1110 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<style>
+    .form .formTitle {
+        width: 110px;
+    }
+
+    .combo-select {
+        max-width: initial;
+    }
+
+    .EngineeringName {
+        width: 100%;
+    }
+
+    .form .formValue select {
+        padding: 0px;
+    }
+</style>
+<script>
+    var keyValue = request('keyValue');
+    var mode = request('mode');
+    var tasktype = request('tasktype');//任务类型
+    var flagwork = false;
+    var flagteam = false;
+    var flagstaff = false;
+    var rownum = 1; //行数
+    var selectRowCurIndex; //当前选中行下标
+    var teamid = "";//班组id
+    var curdeptid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var currolenames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var curuserid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户id
+    var delids = "";
+    var ismanage = "";
+    var isstart = "";//是否推送
+
+    //作业信息参数
+    var parmworkname = "", parmworkinfotype = "", parmworkdepttype = "", parmworkdeptname = "", parmengineeringname = "", parmengineeringid = "", parmworkstarttime = "", parmworkendtime = "", parmworkareaname = "", parmworkplace = "", parmworkcontent = "", parmworkticketno = "";
+    var parmworkdeptid = "", parmworkdeptcode = ""; parmworkusernames = ""; parmworkinfotypeid = ""; parmhandtype = "", parmworkprojectname = "";
+
+    //班组分配信息
+    var parmteamname = ""; parmteamstarttime = ""; parmteamendtime = ""; parmworkinfoname = ""; parmworkinfoid = "";
+
+    //人员分配信息
+    var staffpteamname = ""; staffpteamid = ""; stafftaskusername = ""; stafftaskuserid = ""; staffpstarttime = ""; staffpendtime = ""; staffworkinfoname = ""; staffspecialtytype = "";
+
+    $(function () {
+        initControl();
+        //加载作业信息
+        GetWorkInfo();
+        //加载班组信息
+        GetTeamInfo();
+        //加载人员信息
+        GetStaffInfo();
+    });
+
+    //初始化控件
+    function initControl() {
+        //任务类型赋值
+        $("#TaskType").val(tasktype);
+
+        if (currolenames.indexOf("班组") >= 0) {
+            teamid = curdeptid;
+        }
+
+        if (currolenames.indexOf("公司管理员") >= 0) {
+            ismanage = "1";
+        }
+        //是否自动推送
+        isstart = $("#isstart").val();
+        //if (isstart == "1")//启动自动推送
+        //{
+        //    $("#btnAddStaff").attr("style", "display:none");
+        //}
+
+        //选择作业单位类别时，控制工程名称显示
+        $("input[name='DeptType']").click(function () {
+            //0:单位内部,1:外包单位
+            if ($(this).val() == "0") {
+                $("#td_title_projectname").hide();
+                $("#td_value_projectname").hide();
+                $("#td_title_projecttime").hide();
+                $("#td_value_projecttime").hide();
+                $("#ProjectName,#ProjectWorkTime").removeAttr("checkexpession").removeAttr("isvalid");
+
+            } else {
+                $("#td_title_projectname").show();
+                $("#td_value_projectname").show();
+                $("#td_title_projecttime").show();
+                $("#td_value_projecttime").show();
+                $("#ProjectWorkTime").attr("checkexpession", "NotNull").attr("isvalid", "yes");
+
+                //给工程名称赋验证
+                $("#ProjectName").attr("checkexpession", "NotNull").attr("isvalid", "yes");
+
+            }
+            //清空文本框(作业单位,工程,工程开工时间)
+            $("#DeptName,#DeptId,#DeptCode,#ProjectWorkTime,#ProjectId,#ProjectName").val("");
+            //清空作业信息
+            clearworkinfo();
+        });
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../HighRiskWork/TaskShare/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.DeptType == "0") {//单位内部
+                        $("#td_title_projectname").hide();
+                        $("#td_value_projectname").hide();
+                        $("#td_title_projecttime").hide();
+                        $("#td_value_projecttime").hide();
+                        $("input[name='DeptType']:eq(0)").prop("checked", "checked");
+                    }
+                    if (data.DeptType == "1") {//外包单位
+                        $("input[name='DeptType']:eq(1)").prop("checked", "checked");
+                        $("#td_title_projectname").show();
+                        $("#td_value_projectname").show();
+                        $("#td_title_projecttime").show();
+                        $("#td_value_projecttime").show();
+                        $("#ProjectName").attr("checkexpession", "NotNull").attr("isvalid", "yes");
+                    }
+                }
+            })
+        }
+        else {
+            //默认选中外包单位
+            $("input[name='DeptType']:eq(1)").prop("checked", "checked");
+            //工程开工时间验证
+            $("#ProjectWorkTime").attr("checkexpession", "NotNull").attr("isvalid", "yes");
+        }
+
+        switch (mode) {
+            case "view":
+                $("#group_btn").attr("style", "display:none");
+                $("#btnAddWork").attr("style", "display:none");
+                $("#form1 input,textarea,select, .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                    $(this).attr("disabled", "disabled");
+                });
+                $("#btnAddTeam").attr("style", "display:none");
+                $("#btnAddStaff").attr("style", "display:none");
+                flagwork = true;
+                flagteam = true;
+                flagstaff = true;
+                break;
+            case "add":
+                $("#btnAddTeam").attr("style", "display:none");
+                $("#btnAddStaff").attr("style", "display:none");
+                flagteam = true;
+                flagstaff = true;
+                break;
+            case "edit":
+                $("#btnAddTeam").attr("style", "display:none");
+                $("#btnAddStaff").attr("style", "display:none");
+                flagteam = true;
+                flagstaff = true;
+                break;
+            case "send":
+                $("#form1 input,textarea,select, .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                    $(this).attr("disabled", "disabled");
+                });
+                var flowstep = $("#FlowStep").val();
+                if (flowstep == "1")//部门分配中
+                {
+                    $("#btnAddStaff").attr("style", "display:none");
+                    flagstaff = true;
+                }
+                else if (flowstep == "2")//班组分配中
+                {
+                    flagwork = true;
+                    flagteam = true;
+                    $("#btnAddWork").attr("style", "display:none");
+                    $("#btnAddTeam").attr("style", "display:none");
+                }
+                break;
+            default:
+                break;
+        }
+
+        //保存
+        $("#btn_Save").click(function () {
+            $("#IsSubmit").val("0");
+            AcceptClick();
+        });
+
+        //提交
+        $("#btn_Submit").click(function () {
+            $("#IsSubmit").val("1");
+            AcceptClick();
+        });
+
+    }
+
+    //选择单位
+    function selectCompany() {
+        /**
+            旁站监督单位不包含班组，专业以及承包商
+         **/
+        selectDept('', 0, 16, '选择旁站监督单位', document.body, 'SuperviseDeptName,SuperviseDeptCode,SuperviseDeptId', "1", function () {
+            ////清空作业单位
+            //$("#DeptName,#DeptCode,#DeptId").val("");
+            //清空作业信息
+            clearworkinfo();
+        });
+    }
+
+    //选择作业单位
+    function selectWorkDept() {
+        var DeptType = $("input[type=radio]:checked").val();
+        /**
+        1.选择单位内部时，工程名称隐藏,作业单位为所有单位不包含承包商。
+        2.选择外包单位时，工程名称显示,作业单位为所有外包单位。
+        **/
+        if (DeptType == "0")//单位内部
+        {
+            selectDept('', 0, 21, '选择作业单位', document.body, 'DeptName,DeptCode,DeptId', "1", function () {
+                //清空作业信息
+                clearworkinfo();
+            });
+
+        }
+        else {
+            selectDept('', 0, 22, '选择作业单位', document.body, 'DeptName,DeptCode,DeptId', "1", function () {
+                //清空作业信息
+                clearworkinfo();
+                $("#ProjectId,#ProjectName").val("");
+            });
+        }
+    }
+
+    //获取作业信息
+    function GetWorkInfo() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#WorkSpec');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 'auto',
+            url: "../../HighRiskWork/SuperviseWorkInfo/GetWorkSpecToJson?taskshareid=" + keyValue,
+            postData: {},
+            datatype: "json",
+            colModel: [
+                {
+                    label: '操作', name: 'operat', width: '100', sortable: false, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:showSpec('" + options.rowId + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (!flagwork) {
+                            html += "<a href=javascript:editSpec('" + options.rowId + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:delSpec('" + options.rowId + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '作业信息ID', name: 'Id', hidden: true, align: 'center' },
+                { label: '任务分配ID', name: 'TaskShareId', hidden: true, align: 'center' },
+                { label: '作业名称', name: 'WorkName', width: '100', align: 'center', sortable: false },
+                {
+                    label: '作业类别', name: 'infotype', width: '100', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var val = "";
+                        if (!!rowObject.WorkInfoType && !!rowObject.HandType) {
+                            val = rowObject.WorkInfoType + "," + rowObject.HandType;
+                        }
+                        else if (!!rowObject.WorkInfoType) {
+                            val = rowObject.WorkInfoType;
+                        }
+                        else if (!!rowObject.HandType) {
+                            val = rowObject.HandType;
+                        }
+                        return val;
+                    }
+                },
+                { label: '作业单位类别', name: 'WorkDeptType', width: '100', hidden: true, align: 'center', sortable: false },
+                {
+                    label: '作业单位类别', name: 'CreateUserId', width: '100', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var val = cellvalue;
+                        if (!!rowObject.WorkDeptType) {
+                            if (rowObject.WorkDeptType == "0") {
+                                val = "单位内部";
+                            }
+                            else if (rowObject.WorkDeptType == "1") {
+                                val = "外包单位";
+                            }
+                        }
+                        return val;
+                    }
+                },
+                { label: '作业单位', name: 'WorkDeptName', width: '100', align: 'center', sortable: false },
+                { label: '作业单位id', name: 'WorkDeptId', hidden: true, align: 'center' },
+                { label: '作业单位code', name: 'WorkDeptCode', hidden: true, align: 'center' },
+                { label: '工程名称', name: 'EngineeringName', width: '100', align: 'center', sortable: false },
+                { label: '工程id', name: 'EngineeringId', hidden: true, align: 'center' },
+                {
+                    label: '作业开始时间', name: 'WorkStartTime', width: '100', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                {
+                    label: '作业结束时间', name: 'WorkEndTime', width: '100', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                { label: '作业区域', name: 'WorkAreaName', width: '100', align: 'center', sortable: false },
+                { label: '作业地点', name: 'WorkPlace', align: 'center', hidden: true },
+                { label: '作业内容', name: 'WorkContent', width: '100', align: 'center', sortable: false },
+                { label: '工作票号', name: 'WorkTicketNo', align: 'center', hidden: true },
+                { label: '作业人员', name: 'WorkUserNames', align: 'center', hidden: true },
+                { label: '作业类别id', name: 'WorkInfoTypeId', align: 'center', hidden: true },
+                { label: '作业类别', name: 'WorkInfoType', align: 'center', hidden: true },
+                { label: '手动输入作业类别', name: 'HandType', align: 'center', hidden: true },
+                { label: '项目名称', name: 'WorkProjectName', align: 'center', hidden: true }
+            ],
+            rowNum: 100000,
+            cellsubmit: 'clientArray',
+            multiselect: false,
+            viewrecords: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                selectRowCurIndex = $('#' + this.id).getInd(selectedRowIndex);
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                if (!rownum) {
+                    rownum = $gridTable.jqGrid('getRowData').length;
+                }
+            }
+        });
+    }
+
+    //查看作业信息
+    function showSpec(rowId) {
+
+        clearworkdata();
+
+        var jqTable = $('#WorkSpec');
+        var workname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkName']").attr("title");
+        var workinfotype = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkInfoType']").attr("title");
+        var workdepttype = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkDeptType']").attr("title");
+        var workdeptname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkDeptName']").attr("title");
+        var engineeringname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_EngineeringName']").attr("title");
+        var engineeringid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_EngineeringId']").attr("title");
+        var workstarttime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkStartTime']").attr("title");
+        var workendtime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkEndTime']").attr("title");
+        var workareaname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkAreaName']").attr("title");
+        var workplace = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkPlace']").attr("title");
+        var workcontent = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkContent']").attr("title");
+        var workticketno = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkTicketNo']").attr("title");
+        var workusernames = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkUserNames']").attr("title");
+        var workinfotypeid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkInfoTypeId']").attr("title");
+        var handtype = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_HandType']").attr("title");
+        var workprojectname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkProjectName']").attr("title");
+
+        parmworkname = workname; parmworkinfotype = workinfotype; parmworkdepttype = workdepttype; parmworkdeptname = workdeptname; parmengineeringid = engineeringid; parmengineeringname = engineeringname; parmworkstarttime = workstarttime; parmworkendtime = workendtime; parmworkareaname = workareaname; parmworkplace = workplace; parmworkcontent = workcontent; parmworkticketno = workticketno; parmworkusernames = workusernames; parmworkinfotypeid = workinfotypeid; parmhandtype = handtype; parmworkprojectname = workprojectname;
+
+        if (checkedRow(rowId)) {
+            var dlg = dialogOpen({
+                id: "WorkForm",
+                title: '查看作业信息',
+                url: '/HighRiskWork/SuperviseWorkInfo/Form?tasktype=' + tasktype + "&mode=view",
+                width: ($(window).width() - 400) + "px",
+                height: "500px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //添加作业信息
+    function addSpec() {
+
+        clearworkdata();
+
+        var deptid = $("#DeptId").val();//作业单位
+        if (!!deptid) {
+            var depttype = $("input[name='DeptType']:checked").val();//作业单位类别
+            if (depttype == "1") {//当选择外包单位时,工程名称必须选择后,方可添加作业信息
+                var engineeringname = $("#ProjectName").val();//工程名称
+                if (engineeringname == "") {
+                    dialogMsg('请先选择工程名称！', 0);
+                    return;
+                }
+            }
+            var deptname = $("#DeptName").val();//作业单位
+            var deptcode = $("#DeptCode").val();//作业单位
+            var engineeringid = $("#ProjectId").val();
+            parmworkdeptname = deptname; parmworkdeptid = deptid; parmworkdeptcode = deptcode; parmworkdepttype = depttype; parmengineeringname = engineeringname; parmengineeringid = engineeringid;
+            dialogOpen({
+                id: "WorkForm",
+                title: '新增作业信息',
+                url: '/HighRiskWork/SuperviseWorkInfo/Form?tasktype=' + tasktype + "&mode=add",
+                width: ($(window).width() - 400) + "px",
+                height: "500px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick(function (options) {
+                        var $gridTable = $('#WorkSpec');
+                        rownum = rownum + 1;
+                        $gridTable.addRowData(rownum, { Id: newGuid(), TaskShareId: '', WorkName: options.workname, WorkInfoType: options.workinfotype, WorkDeptType: options.workdepttype, WorkDeptName: options.workdeptname, WorkDeptId: options.workdeptid, WorkDeptCode: options.workdeptcode, EngineeringName: options.engineeringname, EngineeringId: options.engineeringid, WorkStartTime: options.workstarttime, WorkEndTime: options.workendtime, WorkAreaName: options.workareaname, WorkPlace: options.workplace, WorkContent: options.workcontent, WorkTicketNo: options.workticketno, WorkUserNames: options.workusernames, WorkInfoTypeId: options.workinfotypeid, HandType: options.handtype, WorkProjectName: options.workprojectname });
+                        $("#gbox_WorkSpec .unwritten:eq(0)").css("display", "none");
+                    });
+                    //清除班组分配信息
+                    //clearteaminfo();
+                }
+            });
+        }
+        else {
+            dialogMsg('请先选择作业单位！', 0);
+        }
+    }
+
+    //改
+    function editSpec(rowId) {
+
+        clearworkdata();
+
+        var jqTable = $('#WorkSpec');
+        var workname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkName']").attr("title");
+        var workinfotype = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkInfoType']").attr("title");
+        var workdepttype = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkDeptType']").attr("title");
+        var workdeptname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkDeptName']").attr("title");
+        var engineeringname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_EngineeringName']").attr("title");
+        var engineeringid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_EngineeringId']").attr("title");
+        var workstarttime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkStartTime']").attr("title");
+        var workendtime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkEndTime']").attr("title");
+        var workareaname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkAreaName']").attr("title");
+        var workplace = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkPlace']").attr("title");
+        var workcontent = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkContent']").attr("title");
+        var workticketno = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkTicketNo']").attr("title");
+        var workusernames = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkUserNames']").attr("title");
+        var workinfotypeid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkInfoTypeId']").attr("title");
+        var handtype = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_HandType']").attr("title");
+        var workprojectname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='WorkSpec_WorkProjectName']").attr("title");
+
+
+        parmworkname = workname; parmworkinfotype = workinfotype; parmworkdepttype = workdepttype; parmworkdeptname = workdeptname; parmengineeringname = engineeringname; parmengineeringid = engineeringid; parmworkstarttime = workstarttime; parmworkendtime = workendtime; parmworkareaname = workareaname; parmworkplace = workplace; parmworkcontent = workcontent; parmworkticketno = workticketno; parmworkusernames = workusernames; parmworkinfotypeid = workinfotypeid; parmhandtype = handtype; parmworkprojectname = workprojectname;
+        dialogOpen({
+            id: "WorkForm",
+            title: '编辑作业信息',
+            url: '/HighRiskWork/SuperviseWorkInfo/Form?tasktype=' + tasktype + "&mode=edit",
+            width: ($(window).width() - 400) + "px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(function (options) {
+                    var $gridTable = $('#WorkSpec');
+                    //给作业信息赋值
+                    $gridTable.jqGrid('setCell', rowId, 'operat', '', '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkName', options.workname, '');//作业名称
+                    $gridTable.jqGrid('setCell', rowId, 'WorkInfoType', options.workinfotype, '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkDeptType', options.workdepttype, '');
+                    $gridTable.jqGrid('setCell', rowId, 'CreateUserId', options.workdepttype == "0" ? "单位内部" : "外包单位", '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkDeptName', options.workdeptname, '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkDeptId', options.workdeptid, '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkDeptCode', options.workdeptcode, '');
+                    $gridTable.jqGrid('setCell', rowId, 'EngineeringName', options.engineeringname, '');
+                    $gridTable.jqGrid('setCell', rowId, 'EngineeringId', options.engineeringid, '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkStartTime', options.workstarttime, '');//作业开始时间
+                    $gridTable.jqGrid('setCell', rowId, 'WorkEndTime', options.workendtime, '');//作业结束时间
+                    $gridTable.jqGrid('setCell', rowId, 'WorkAreaName', options.workareaname, '');//作业区域
+                    $gridTable.jqGrid('setCell', rowId, 'WorkPlace', options.workplace, '');//作业地点
+                    $gridTable.jqGrid('setCell', rowId, 'WorkContent', options.workcontent, '');//作业内容
+                    $gridTable.jqGrid('setCell', rowId, 'WorkTicketNo', options.workticketno, '');//工作票号
+                    $gridTable.jqGrid('setCell', rowId, 'WorkUserNames', options.workusernames, '');//作业人员
+                    $gridTable.jqGrid('setCell', rowId, 'WorkInfoTypeId', options.workinfotypeid, '');//作业类别id
+                    $gridTable.jqGrid('setCell', rowId, 'HandType', options.handtype, '');//手动输入作业类别
+                    $gridTable.jqGrid('setCell', rowId, 'WorkProjectName', options.workprojectname, '');//项目名称
+                });
+                //清除班组分配信息
+                clearteaminfo();
+            }
+        });
+
+    }
+
+    //删
+    function delSpec(rowId) {
+        $('#WorkSpec').delRowData(rowId);
+        var measures = $('#WorkSpec').jqGrid('getRowData');
+        if (measures.length == 0) {
+            $("#gbox_WorkSpec .unwritten:eq(0)").css("display", "");
+        } else {
+            $("#gbox_WorkSpec .unwritten:eq(0)").css("display", "none");
+        }
+        //清除班组分配信息
+        clearteaminfo();
+    }
+
+    //清除作业信息
+    function clearworkinfo() {
+        $("#WorkSpec").find("tr:gt(0)").remove();
+        $("#gbox_WorkSpec .unwritten:eq(0)").css("display", "");
+    }
+
+    //清除班组分配信息
+    function clearteaminfo() {
+        $("#TeamSpec").find("tr:gt(0)").remove();
+        $("#gbox_TeamSpec .unwritten:eq(0)").css("display", "");
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        var flowstep = $("#FlowStep").val();//流程步骤
+        var measures = $('#WorkSpec').jqGrid('getRowData');//作业信息
+        var teams = $('#TeamSpec').jqGrid('getRowData');//班组信息
+        var staff = $('#StaffSpec').jqGrid('getRowData');//人员信息
+        var issubmit = $("#IsSubmit").val();//当前步骤是否提交
+        if (flowstep == "0" || flowstep == "") {
+            if (!$('#form1').Validform()) {
+                return false;
+            }
+        }
+        else if (flowstep == "1") {
+            //若为提交
+            if (issubmit == "1") {
+                //作业信息
+                if (measures.length == 0) {
+                    dialogMsg('请添加作业信息！', 0);
+                    return;
+                }
+                //班组任务分配信息
+                if (teams.length == 0) {
+                    dialogMsg('请添加班组任务分配！', 0);
+                    return;
+                }
+            }
+        }
+        else if (flowstep == "2")//人员分配中
+        {
+            if (issubmit == "1") {
+                //人员分配信息
+                if (staff.length == 0) {
+                    dialogMsg('请添加人员任务分配！', 0);
+                    return;
+                }
+            }
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        //存储作业单位类别
+        var depttype = $("input[name='DeptType']:checked").val();
+        postData["DeptType"] = depttype;
+        for (var i = 0; i < measures.length; i++) {
+            measures[i].TaskShareId = keyValue;
+            delete measures[i].operat;
+            delete measures[i].CreateUserId;
+        }
+        for (var i = 0; i < teams.length; i++) {
+            teams[i].TaskShareId = keyValue;
+            delete teams[i].operat;
+        }
+        //var flag = true
+        for (var i = 0; i < staff.length; i++) {
+            staff[i].TaskShareId = keyValue;
+            delete staff[i].operat;
+            //if (staff[i].TaskUserId == "" || staff[i].TaskUserId == "null") {
+            //    flag = false;
+            //    break;
+            //}
+        }
+        postData["WorkSpecs"] = measures;
+        postData["TeamSpec"] = teams;
+        postData["StaffSpec"] = staff;
+        if (!!delids) {
+            delids = delids.substring(0, delids.length - 1);
+        }
+        postData["DelIds"] = delids;
+        //if (flag) {
+        $.SaveForm({
+            url: "../../HighRiskWork/TaskShare/SaveForm?keyValue=" + keyValue,
+            param: { jsonData: JSON.stringify(postData) },
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                if (issubmit == "1") {
+                    top.refreshWork();//刷新首页待办事项
+                }
+            }
+        })
+        //}
+        //else {
+        //    dialogMsg('旁站监督人员未分配完成！', 0);
+        //    return;
+        //}
+
+    }
+
+    function getQueryJson() {
+        var query = {
+            taskshareid: keyValue,
+            tasklevel: 1,
+            teamid: teamid
+        }
+        return JSON.stringify(query);
+    }
+
+    //获取班组任务分配信息
+    function GetTeamInfo() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#TeamSpec');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 'auto',
+            url: "../../HighRiskWork/TeamsInfo/GetTeamSpecToJson",
+            postData: { queryJson: getQueryJson() },
+            datatype: "json",
+            colModel: [
+                {
+                    label: '操作', name: 'operat', width: '100', sortable: false, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:showTeamSpec('" + options.rowId + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (!flagteam) {
+                            html += "<a href=javascript:editTeamSpec('" + options.rowId + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:delTeamSpec('" + options.rowId + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        if (!!ismanage && mode == "view") {
+                            html += "<a href=javascript:manageDelTeam('" + rowObject.Id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        if (mode == "view" && !!rowObject.ModifyUserId) {
+                            if (rowObject.ModifyUserId.indexOf(curuserid) >= 0 && rowObject.IsAccomplish != "1") {
+                                html += "<a href=javascript:finishteamtask('" + rowObject.Id + "')  title='任务完成'><i class='fa fa-cog'></i></a>&nbsp;";
+                            }
+                        }
+                        return html;
+                    }
+                },
+                { label: '班组分配ID', name: 'Id', hidden: true, align: 'center' },
+                { label: '任务分配ID', name: 'TaskShareId', hidden: true, align: 'center' },
+                { label: '旁站监督班组', name: 'TeamName', width: '100', align: 'center', sortable: false },
+                { label: '监督班组id', name: 'TeamId', hidden: true, align: 'center' },
+                { label: '监督班组code', name: 'TeamCode', hidden: true, align: 'center' },
+                {
+                    label: '班组旁站开始时间', name: 'TeamStartTime', width: '150', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                {
+                    label: '班组旁站结束时间', name: 'TeamEndTime', width: '150', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                { label: '作业信息', name: 'WorkInfoName', width: '500', align: 'center', sortable: false },
+                { label: '作业信息id', name: 'WorkInfoId', align: 'center', hidden: true }
+            ],
+            rowNum: 100000,
+            cellsubmit: 'clientArray',
+            multiselect: false,
+            viewrecords: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                selectRowCurIndex = $('#' + this.id).getInd(selectedRowIndex);
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                if (!rownum) {
+                    rownum = $gridTable.jqGrid('getRowData').length;
+                }
+            }
+        });
+    }
+    //查看班组分配信息
+    function showTeamSpec(rowId) {
+
+        clearteamdata();
+
+        var workdeptid = $("#SuperviseDeptId").val();
+        var jqTable = $('#TeamSpec');
+        var teamname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_TeamName']").attr("title");
+        var teamstarttime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_TeamStartTime']").attr("title");
+        var teamendtime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_TeamEndTime']").attr("title");
+        var workinfoname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_WorkInfoName']").attr("title");
+        var workinfoid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_WorkInfoId']").attr("title");
+
+        parmteamname = teamname; parmteamstarttime = teamstarttime; parmteamendtime = teamendtime; parmworkinfoname = workinfoname; parmworkinfoid = workinfoid;
+
+        if (checkedRow(rowId)) {
+            var dlg = dialogOpen({
+                id: "TeamForm",
+                title: '查看班组任务分配信息',
+                url: '/HighRiskWork/TeamsInfo/Form?taskshareid=' + keyValue + "&tasktype=" + tasktype + "&workdeptid=" + workdeptid + "&mode=view",
+                width: ($(window).width() - 400) + "px",
+                height: "500px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //添加班组任务分配信息
+    function addTeam() {
+
+        clearteamdata();
+
+        var workdeptid = $("#SuperviseDeptId").val();
+        //作业信息
+        var measures = $('#WorkSpec').jqGrid('getRowData');
+        if (measures.length == 0) {
+            dialogMsg('请添加作业信息！', 0);
+            return;
+        }
+        for (var i = 0; i < measures.length; i++) {
+            measures[i].TaskShareId = keyValue;
+            delete measures[i].operat;
+            delete measures[i].CreateUserId;
+        }
+        var postData = measures;
+        dialogOpen({
+            id: "TeamForm",
+            title: '新增班组任务分配',
+            url: '/HighRiskWork/TeamsInfo/Form?tasktype=' + tasktype + "&taskshareid=" + keyValue + "&workdeptid=" + workdeptid + "&mode=add",
+            width: ($(window).width() - 400) + "px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(function (options) {
+                    var $gridTable = $('#TeamSpec');
+                    rownum = rownum + 1;
+                    $gridTable.addRowData(rownum, { Id: '', TaskShareId: '', TeamName: options.teamname, TeamId: options.teamid, TeamCode: options.teamcode, TeamStartTime: options.teamstarttime, TeamEndTime: options.teamendtime, WorkInfoName: options.workinfoname, WorkInfoId: options.workinfoid });
+                    $("#gbox_TeamSpec .unwritten:eq(0)").css("display", "none");
+                });
+            }
+        });
+    }
+
+    //改
+    function editTeamSpec(rowId) {
+
+        clearteamdata();
+
+        var workdeptid = $("#SuperviseDeptId").val();
+        var jqTable = $('#TeamSpec');
+        var teamname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_TeamName']").attr("title");
+        var teamstarttime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_TeamStartTime']").attr("title");
+        var teamendtime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_TeamEndTime']").attr("title");
+        var workinfoname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_WorkInfoName']").attr("title");
+        var workinfoid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='TeamSpec_WorkInfoId']").attr("title");
+
+        parmteamname = teamname; parmteamstarttime = teamstarttime; parmteamendtime = teamendtime; parmworkinfoname = workinfoname; parmworkinfoid = workinfoid;
+
+        dialogOpen({
+            id: "TeamForm",
+            title: '编辑班组任务分配信息',
+            url: '/HighRiskWork/TeamsInfo/Form?taskshareid=' + keyValue + "&tasktype=" + tasktype + "&workdeptid=" + workdeptid + "&mode=edit",
+            width: ($(window).width() - 400) + "px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(function (options) {
+                    var $gridTable = $('#TeamSpec');
+                    //给班组任务分配信息赋值
+                    $gridTable.jqGrid('setCell', rowId, 'operat', '', '');
+                    $gridTable.jqGrid('setCell', rowId, 'TeamName', options.teamname, '');
+                    $gridTable.jqGrid('setCell', rowId, 'TeamId', options.teamid, '');
+                    $gridTable.jqGrid('setCell', rowId, 'TeamCode', options.teamcode, '');
+                    $gridTable.jqGrid('setCell', rowId, 'TeamStartTime', options.teamstarttime, '');
+                    $gridTable.jqGrid('setCell', rowId, 'TeamEndTime', options.teamendtime, '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkInfoName', options.workinfoname, '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkInfoId', options.workinfoid, '');
+                });
+            }
+        });
+
+    }
+
+    //删
+    function delTeamSpec(rowId) {
+        $('#TeamSpec').delRowData(rowId);
+        var measures = $('#TeamSpec').jqGrid('getRowData');
+        if (measures.length == 0) {
+            $("#gbox_TeamSpec .unwritten:eq(0)").css("display", "");
+        } else {
+            $("#gbox_TeamSpec .unwritten:eq(0)").css("display", "none");
+        }
+    }
+
+
+    //获取人员任务分配信息
+    function GetStaffInfo() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#StaffSpec');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 'auto',
+            url: "../../HighRiskWork/StaffInfo/GetStaffSpecToJson",
+            postData: { queryJson: getQueryJson() },
+            datatype: "json",
+            colModel: [
+                {
+                    label: '操作', name: 'operat', width: '100', sortable: false, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:showStaffSpec('" + options.rowId + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (rowObject.DataIsSubmit != "1" && !flagstaff && rowObject.IsSynchronization != "1") {
+                            html += "<a href=javascript:editStaffSpec('" + options.rowId + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:delStaffSpec('" + options.rowId + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '人员分配ID', name: 'Id', hidden: true, align: 'center' },
+                { label: '任务分配ID', name: 'TaskShareId', hidden: true, align: 'center' },
+                { label: '旁站监督单位', name: 'PTeamName', hidden: true, align: 'center' },
+                { label: '旁站单位id', name: 'PTeamId', hidden: true, align: 'center' },
+                { label: '旁站单位code', name: 'PTeamCode', hidden: true, align: 'center' },
+                { label: '旁站监督人员', name: 'TaskUserName', width: '150', align: 'center', sortable: false },
+                { label: '旁站监督人员id', name: 'TaskUserId', hidden: true, align: 'center' },
+                {
+                    label: '旁站计划开始时间', name: 'PStartTime', width: '150', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                {
+                    label: '旁站计划结束时间', name: 'PEndTime', width: '150', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                { label: '作业信息', name: 'WorkInfoName', width: '500', align: 'center', sortable: false },
+                { label: '作业信息id', name: 'WorkInfoId', align: 'center', hidden: true },
+                { label: '数据是否提交过', name: 'DataIsSubmit', align: 'center', hidden: true },//因班组一直可操作人员分配
+                { label: '数据是否是同步的数据', name: 'IsSynchronization', align: 'center', hidden: true },
+                { label: '专业类别', name: 'SpecialtyType', align: 'center', hidden: true }
+            ],
+            rowNum: 100000,
+            cellsubmit: 'clientArray',
+            multiselect: false,
+            viewrecords: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                selectRowCurIndex = $('#' + this.id).getInd(selectedRowIndex);
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                if (!rownum) {
+                    rownum = $gridTable.jqGrid('getRowData').length;
+                }
+            }
+        });
+    }
+
+    //查看人员分配
+    function showStaffSpec(rowId) {
+        clearstaffdata();
+        var jqTable = $('#StaffSpec');
+        var pteamname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_PTeamName']").attr("title");
+        var pteamid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_PTeamId']").attr("title");
+        var taskusername = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_TaskUserName']").attr("title");
+        var taskuserid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_TaskUserId']").attr("title");
+        var pstarttime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_PStartTime']").attr("title");
+        var pendtime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_PEndTime']").attr("title");
+        var workinfoname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_WorkInfoName']").attr("title");
+        var specialtytype = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_SpecialtyType']").attr("title");
+
+
+
+        staffpteamname = pteamname; staffpteamid = pteamid; stafftaskusername = taskusername; stafftaskuserid = taskuserid; staffpstarttime = pstarttime; staffpendtime = pendtime; staffworkinfoname = workinfoname; staffspecialtytype = specialtytype;
+
+        if (checkedRow(rowId)) {
+            var dlg = dialogOpen({
+                id: "StaffForm",
+                title: '查看人员任务分配信息',
+                url: '/HighRiskWork/StaffInfo/Form?taskshareid=' + keyValue + "&tasktype=" + tasktype + "&mode=view",
+                width: ($(window).width() - 400) + "px",
+                height: "500px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //新增人员任务分配
+    function addStaff() {
+        clearstaffdata();
+        dialogOpen({
+            id: "StaffForm",
+            title: '新增人员任务分配信息',
+            url: '/HighRiskWork/StaffInfo/Form?tasktype=' + tasktype + "&taskshareid=" + keyValue + "&mode=add",
+            width: ($(window).width() - 400) + "px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(function (options) {
+                    var $gridTable = $('#StaffSpec');
+                    rownum = rownum + 1;
+                    $gridTable.addRowData(rownum, { Id: newGuid(), TaskShareId: '', PTeamName: options.pteamname, PTeamId: options.pteamid, PTeamCode: options.pteamcode, TaskUserName: options.taskusername, TaskUserId: options.taskuserid, PStartTime: options.pstarttime, PEndTime: options.pendtime, WorkInfoName: options.workinfoname, WorkInfoId: options.workinfoid, SpecialtyType: options.specialtytype });
+                    $("#gbox_StaffSpec .unwritten:eq(0)").css("display", "none");
+                });
+            }
+        });
+    }
+
+    //改
+    function editStaffSpec(rowId) {
+        clearstaffdata();
+        var jqTable = $('#StaffSpec');
+        var pteamname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_PTeamName']").attr("title");
+        var pteamid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_PTeamId']").attr("title");
+        var taskusername = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_TaskUserName']").attr("title");
+        var taskuserid = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_TaskUserId']").attr("title");
+        var pstarttime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_PStartTime']").attr("title");
+        var pendtime = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_PEndTime']").attr("title");
+        var workinfoname = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_WorkInfoName']").attr("title");
+        var issynchronization = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_IsSynchronization']").attr("title");
+        var specialtytype = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_SpecialtyType']").attr("title");
+
+        staffpteamname = pteamname; staffpteamid = pteamid; stafftaskusername = taskusername; stafftaskuserid = taskuserid; staffpstarttime = pstarttime; staffpendtime = pendtime; staffworkinfoname = workinfoname; staffspecialtytype = specialtytype;
+
+        dialogOpen({
+            id: "StaffForm",
+            title: '编辑人员任务分配信息',
+            url: '/HighRiskWork/StaffInfo/Form?taskshareid=' + keyValue + "&tasktype=" + tasktype + "&issynchronization=" + issynchronization + "&mode=edit",
+            width: ($(window).width() - 400) + "px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(function (options) {
+                    var $gridTable = $('#StaffSpec');
+                    //给人员任务分配信息赋值
+                    $gridTable.jqGrid('setCell', rowId, 'operat', '', '');
+                    $gridTable.jqGrid('setCell', rowId, 'PTeamName', options.pteamname, '');
+                    $gridTable.jqGrid('setCell', rowId, 'PTeamId', options.pteamid, '');
+                    $gridTable.jqGrid('setCell', rowId, 'PTeamCode', options.pteamcode, '');
+                    $gridTable.jqGrid('setCell', rowId, 'TaskUserName', options.taskusername, '');
+                    $gridTable.jqGrid('setCell', rowId, 'TaskUserId', options.taskuserid, '');
+                    $gridTable.jqGrid('setCell', rowId, 'PStartTime', options.pstarttime, '');
+                    $gridTable.jqGrid('setCell', rowId, 'PEndTime', options.pendtime, '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkInfoName', options.workinfoname, '');
+                    $gridTable.jqGrid('setCell', rowId, 'WorkInfoId', options.workinfoid, '');
+                    $gridTable.jqGrid('setCell', rowId, 'SpecialtyType', options.specialtytype, '');
+                });
+            }
+        });
+
+    }
+
+    //删
+    function delStaffSpec(rowId) {
+        var jqTable = $('#StaffSpec');
+        var issynchronization = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_IsSynchronization']").attr("title");
+        var id = jqTable.find("tr").eq(selectRowCurIndex).find("td[aria-describedby='StaffSpec_Id']").attr("title");
+        $('#StaffSpec').delRowData(rowId);
+        var staffs = $('#StaffSpec').jqGrid('getRowData');
+        if (staffs.length == 0) {
+            $("#gbox_StaffSpec .unwritten:eq(0)").css("display", "");
+        } else {
+            $("#gbox_StaffSpec .unwritten:eq(0)").css("display", "none");
+        }
+        delids = delids + id + ",";
+    }
+
+    //清除信息
+    function clearworkdata() {
+        parmworkname = "", parmworkinfotype = "", parmworkdepttype = "", parmworkdeptname = "", parmengineeringname = "", parmengineeringid = "", parmworkstarttime = "", parmworkendtime = "", parmworkareaname = "", parmworkplace = "", parmworkcontent = "", parmworkticketno = "";
+        parmworkdeptid = "", parmworkdeptcode = ""; parmworkusernames = ""; parmworkinfotypeid = ""; parmhandtype = ""; parmworkprojectname = "";
+    }
+
+    //清除信息
+    function clearteamdata() {
+        parmteamname = ""; parmteamstarttime = ""; parmteamendtime = ""; parmworkinfoname = ""; parmworkinfoid = "";
+    }
+
+    //清除信息
+    function clearstaffdata() {
+        staffpteamname = ""; staffpteamid = ""; stafftaskusername = ""; stafftaskuserid = ""; staffpstarttime = ""; staffpendtime = ""; staffworkinfoname = ""; staffspecialtytype = "";
+    }
+
+    //公司管理员
+    function manageDelTeam(teamid) {
+        keyValue = teamid;
+        if (keyValue) {
+            $.RemoveForm({
+                msg: "注：删除后不可恢复,您确定要删除吗？",
+                url: '../../HighRiskWork/TaskShare/ManageDelForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#TeamSpec').trigger('reloadGrid');
+                    $('#StaffSpec').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的班组任务分配！', 0);
+        }
+    }
+
+    //选择工程
+    function chooseProject() {
+        if (!!$("#DeptName").val()) {
+            SelectOutProject(window.document.body, 'ProjectName,ProjectId', $("#DeptId").val(), function () { }, "1");
+
+        }
+        else {
+            dialogMsg('请先选择作业单位！', 0);
+        }
+
+    }
+
+    //结束任务
+    function finishteamtask(rid) {
+        var keyValue = rid;
+        if (checkedRow(keyValue)) {
+            $.ConfirmAjax({
+                msg: "注：您确定要结束此任务吗？",
+                url: "../../HighRiskWork/TeamsInfo/FinishTeamTask",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#TeamSpec').trigger('reloadGrid');
+                }
+            });
+        } else {
+            dialogMsg('请选择需要操作的任务！', 0);
+        }
+    }
+</script>
+<div style="margin: 0px; margin-top: 40px; background-color: white;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">部门旁站开始时间<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input type="hidden" id="isstart" value="@ViewBag.IsTeams" />
+                <!--任务类型-->
+                <input type="hidden" id="FlowStep" />
+                <input type="hidden" id="TaskType" />
+                <input type="hidden" id="IsSubmit" />
+                <input id="DeptStartTime" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm', maxDate: '#F{$dp.$D(\'DeptEndTime\')}' })">
+            </td>
+            <td class="formTitle">部门旁站结束时间<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="DeptEndTime" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm', minDate: '#F{$dp.$D(\'DeptStartTime\')}' })">
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">旁站监督部门<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="SuperviseDeptName" type="text" class="form-control" placeholder="请选择旁站监督部门" isvalid="yes" checkexpession="NotNull" readonly onclick="selectCompany()" />
+                <input type="hidden" id="SuperviseDeptId" />
+                <input type="hidden" id="SuperviseDeptCode" />
+            </td>
+            <td class="formTitle" id="tddept">作业单位类别<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="DeptType" id="DeptType1" value="0" />单位内部
+                    </label>
+                </div>
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="DeptType" id="DeptType2" value="1" />外包单位
+                    </label>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业单位<font face="宋体">*</font></td>
+            <td class="formValue" colspan="5">
+                <input id="DeptName" type="text" class="form-control" placeholder="请选择作业单位" isvalid="yes" checkexpession="NotNull" readonly onclick="selectWorkDept()" />
+                <input type="hidden" id="DeptId" />
+                <input type="hidden" id="DeptCode" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" id="td_title_projectname">工程名称<font face="宋体">*</font></td>
+            <td class="formValue" id="td_value_projectname" colspan="2">
+                <input id="ProjectName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly placeholder="请选择工程" onclick="chooseProject();" />
+                <input id="ProjectId" type="hidden" />
+            </td>
+            <td class="formTitle" id="td_title_projecttime">工程开工时间<font face="宋体">*</font></td>
+            <td class="formValue" id="td_value_projecttime" colspan="2">
+                <input id="ProjectWorkTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+            </td>
+        </tr>
+    </table>
+</div>
+<div class="panel panel-default" id="WorkInfo">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;作业信息</strong>
+    </div>
+    <div class="panel-body">
+        <button id="btnAddWork" type="button" class="btn btn-primary" onclick="addSpec()">新  增</button>
+        <table id="WorkSpec"></table>
+    </div>
+</div>
+<div class="panel panel-default" id="TeamInfo">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;旁站监督任务分配</strong>
+    </div>
+    <div class="panel-body">
+        <button id="btnAddTeam" type="button" class="btn btn-primary" onclick="addTeam()">班组任务分配</button>
+        <table id="TeamSpec"></table>
+    </div>
+</div>
+<div class="panel panel-default" id="TeamInfo">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;人员任务分配</strong>
+    </div>
+    <div class="panel-body">
+        <button id="btnAddStaff" type="button" class="btn btn-primary" onclick="addStaff()">人员任务分配</button>
+        <table id="StaffSpec"></table>
+    </div>
+</div>
+<div class="form-button" style="top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;" id="group_btn">
+    <div style="float: left;">
+        <a id="btn_Save" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+    </div>
+</div>

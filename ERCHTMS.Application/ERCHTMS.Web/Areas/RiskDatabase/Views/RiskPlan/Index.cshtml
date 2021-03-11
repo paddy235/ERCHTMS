@@ -1,0 +1,332 @@
+﻿@{
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js"></script>
+<link href="~/Content/scripts/plugins/jqgrid/jqgrid.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/jqgrid/jqgrid.min.js"></script>
+
+<script>
+
+    var keyValue = request('keyValue');
+    var dCode = "";
+    var dName = "";
+    var uId = "";
+    var uName = "";
+    var aId = "";
+    var aName = "";
+    var areaId = "";
+    var dId = "";
+    var selectedRowIndex = -1;
+    var mode = request("mode");
+    var  dType= -1;
+    $(function () {
+        initControl();
+        GetGrid();
+    });
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!keyValue) {
+            
+            $.SetForm({
+                url: "../../RiskDatabase/RiskPlan/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    areaId = data.AreaId;  
+                }
+            })
+        }
+        if (!!mode) {
+            $("#btnSave").remove();
+        }
+        var deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+        if (deptName.length==0) {
+            $("#DeptName").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeName");
+        } else {
+            $("#DeptName").val(deptName);
+        }
+    }
+    //保存表单
+    function AcceptClick() {
+       
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if (Date.parse(new Date().toLocaleDateString())>Date.parse($("#StartDate").val())) {
+            dialogAlert("计划开始时间大于或等于当前时间！", 2);
+            return;
+        }
+        if (Date.parse($("#StartDate").val()) >= Date.parse($("#EndDate").val())) {
+            dialogAlert("计划开始时间必须小于计划结束时间！", 2);
+            return;
+        }
+        var data = $("#gridTable").jqGrid('getRowData');
+        var planData = "";
+        var arr = [];
+        var areaIds = "";
+        var userIds = "";
+        if (data.length > 0) {
+            $(data).each(function (i, dom) {
+                areaIds += dom.AreaId + ",";
+                userIds += dom.UserId + ",";
+                arr.push({ DeptCode: dom.DeptCode, DeptName: dom.DeptName, UserId: dom.UserId, UserName: dom.UserName, AreaId: dom.AreaId, AreaName: dom.AreaName, DataType: 0,PlanId:$("#Id").val(),DeptId:dom.DeptId });
+            });
+        }
+        else {
+            dialogAlert("请填写辨识记录！",2);
+            return;
+        }
+        data = $("#gridTable1").jqGrid('getRowData');
+        if (data.length > 0) {
+            $(data).each(function (i, dom) {
+                areaIds += dom.AreaId + ",";
+                userIds += dom.UserId + ",";
+                arr.push({ DeptCode: dom.DeptCode, DeptName: dom.DeptName, UserId: dom.UserId, UserName: dom.UserName, AreaId: dom.AreaId, AreaName: dom.AreaName, DataType: 1, PlanId: $("#Id").val(), DeptId: dom.DeptId });
+            });
+        }
+        else {
+            dialogAlert("请填写评估记录！", 2);
+            return;
+        }
+        if (areaIds.length>0) {
+            areaIds = areaIds.substring(0, areaIds.length - 1); userIds = userIds.substring(0, userIds.length - 1);
+        }
+        $("#AreaId").val(areaIds);  
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["UserIds"] = userIds; 
+        if (arr.length > 0) {
+            planData = JSON.stringify(arr);
+            postData["dataJson"] = planData;
+            $.SaveForm({
+                url: "../../RiskDatabase/RiskPlan/SaveForm?keyValue=" + keyValue, //+ "&dataJson=" + planData,
+                param: postData,
+                loading: "正在保存数据...",
+                success: function () {
+                    $.currentIframe().window.$("#gridTable").trigger("reloadGrid");
+                }
+            })
+        }
+    }
+   
+    //编辑
+    function edit(deptCode, deptName,deptId, userId, userName, areaId1, areaName, dataType, id) {
+        dType = dataType;
+        if (dataType == 1) {
+
+            areaId = "";
+            var data = $('#gridTable').jqGrid("getRowData");
+            if (data.length > 0) {
+                $(data).each(function (i, item) {
+                    areaId += item.AreaId + ",";
+                });
+                areaId = areaId.substring(0, areaId.length - 1);
+            }
+        }
+        dCode = deptCode; dName = deptName; dId = deptId; uId = userId; uName = userName; aId = areaId1; aName = areaName;
+        var title = dataType == 0 ? "修改辨识信息" : "修改评估信息";
+        idx = dialogOpen({
+            id: "Risk",  
+            title: title,
+            url: '/RiskDatabase/RiskPlan/Form?dataType=' + dataType + "&keyValue="+id,
+            width: "500px",
+            height: "350px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    //删除
+    function del(id,gId) {
+        var jqTable = $(gId);
+        if (id!="undefined") {
+            $.RemoveForm({
+                url: "../../RiskDatabase/RiskPlan/Remove",
+                param: { keyValue: id },
+                success: function (data) {
+                    jqTable.delRowData(jqTable.getGridParam('selrow'));
+                }
+            })
+        } else {
+            var idx = dialogConfirm("确认删除吗？", function (isSure) {
+                if (isSure) {
+                    jqTable.delRowData(jqTable.getGridParam('selrow'));
+                    top.layer.close(idx);
+                } else {
+                    top.layer.close(idx);
+                }
+            });
+        }
+    }
+    var jsonData = null;
+    //加载表格
+    function GetGrid() {
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/RiskPlan/GetDataListJson",
+            postData: { dataType: 0, planId: keyValue },
+            datatype: "json",
+            height: 200,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true }, { label: '', name: 'UserId', hidden: true }, { label: '', name: 'DeptCode', hidden: true }, { label: '', name: 'AreaId', hidden: true }, { label: '', name: 'DeptId', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        var id = rowObject.Id == undefined ? "-1" : rowObject.Id;
+                        html += "<a href=javascript:edit('" + rowObject.DeptCode + "','" + encodeURIComponent(rowObject.DeptName) + "','" + rowObject.DeptId + "','" + rowObject.UserId + "','" + encodeURIComponent(rowObject.UserName) + "','" + rowObject.AreaId + "','" + encodeURIComponent(rowObject.AreaName) + "',0,'" + id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        html += "<a href=javascript:del('" + rowObject.Id + "','#gridTable')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        return html;
+                    }
+                },
+                { label: '组织机构', name: 'DeptName', width: 100, align: 'center' },
+                { label: '辨识人', name: 'UserName', width: 200, align: 'center' },  
+                {
+                    label: '辨识范围', name: 'AreaName', width: 250, align: 'center'
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            //rowList: [30, 50, 100],
+            //pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+        });
+
+        $gridTable = $('#gridTable1');
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/RiskPlan/GetDataListJson",
+            postData: { dataType: 1, planId: keyValue },
+            datatype: "json",
+            height: 200,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true }, { label: '', name: 'UserId', hidden: true }, { label: '', name: 'DeptCode', hidden: true }, { label: '', name: 'AreaId', hidden: true }, { label: '', name: 'DeptId', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        var id = rowObject.Id == undefined ? "-1" : rowObject.Id;
+                        html += "<a href=javascript:edit('" + rowObject.DeptCode + "','" + encodeURIComponent(rowObject.DeptName) + "','" + rowObject.DeptId + "','" + rowObject.UserId + "','" + encodeURIComponent(rowObject.UserName) + "','" + rowObject.AreaId + "','" + encodeURIComponent(rowObject.AreaName) + "',1,'" + id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        html += "<a href=javascript:del('" + rowObject.Id + "','#gridTable1')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        return html;
+                    }
+                },
+                { label: '组织机构', name: 'DeptName', width: 100, align: 'center' },
+                { label: '评估人', name: 'UserName', width: 200, align: 'center' },
+                {
+                    label: '评估范围', name: 'AreaName', width: 250, align: 'center'
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            //rowList: [30, 50, 100],
+            //pager: "#gridPager1",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+        });
+    }
+    var idx = null;
+    function add(dataType) {
+        dType = dataType; 
+        dCode = ""; dName = ""; dId = ""; uId = ""; uName = "";aId = "";aName = "";
+       var title = dataType == 0 ? "新增辨识信息" : "新增评估信息";
+       if (dataType == 1) {
+           areaId = "";
+           var data = $('#gridTable').jqGrid("getRowData");
+           if (data.length > 0) {
+               $(data).each(function (i,item) {
+                   areaId += item.AreaId + ",";
+               });
+               areaId = areaId.substring(0, areaId.length - 1);
+           }
+           else {
+               dialogMsg("请先填写辨识信息！",2);
+               return;
+           }
+       }
+       var url = "/RiskDatabase/RiskPlan/Form?keyValue=&dataType=" + dataType;
+       idx = dialogOpen({
+            id: "Risk",
+            title: title,
+            url: url,
+            width: "600px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+</script>
+<div style="margin:0px; background-color:white;">
+    <div style="padding-top:5px;">
+        <div class="col-lg-10 col-md-10 col-sm-10 ">
+
+        </div>
+        <div class="pull-right" style="margin-right:10px;">
+            <button class="btn btn-primary" onclick="AcceptClick()" id="btnSave">保 存</button>
+        </div>
+     
+    </div>
+    <table class="form" id="form1">
+        <tr>
+            <td class="formTitle" style="width:150px;">计划名称<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="PlanName" type="text" class="form-control" placeholder="请填写计划名称" isvalid="yes" checkexpession="NotNull" />
+               <input type="hidden" id="Id" value="@Guid.NewGuid().ToString()" /><input id="AreaId" type="hidden" /><input type="hidden" id="Status" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">部门<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="DeptName" type="text" class="form-control" placeholder="请选择部门" isvalid="yes" checkexpession="NotNull" readonly />
+                <input id="DeptCode" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode" />  
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">开始时间<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="StartDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" />
+            </td>
+            <td class="formTitle">结束时间<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="EndDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+
+    </table>
+    <div class="ibox">
+        <div class="ibox-title">
+            <h5>计划实施组织机构及人员</h5>
+            <div class="ibox-tools">
+
+            </div>
+        </div>
+        <div class="ibox-content">
+            <div style="margin-bottom:10px;"><a href="javascript:add(0)" class="btn btn-primary">新增辨识</a></div>
+            <table id="gridTable"></table>
+            <div id="gridPager"></div>
+            <div style="margin-top:20px;">
+                <div style="margin-bottom:10px;"><a href="javascript:add(1)" class="btn btn-primary">新增评估</a></div>
+                <table id="gridTable1"></table>
+                <div id="gridPager1"></div>
+            </div>
+
+        </div>
+    </div>
+
+
+</div>

@@ -1,0 +1,154 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+
+<script>
+    var mode = request("mode");
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName"; //当前用户角色
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId"; //当前用户部门ID
+    var PowerInsideHandleDetailId = request('PowerInsideHandleDetailId');
+    $.ajaxSetup({ async: false });
+    $(function () {
+        InitialPage();
+        GetGrid();
+
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../PowerPlantInside/Powerplantcheck/GetHistoryPageListJson",
+            datatype: "json",
+            postData: { PowerInsideHandleDetailId: PowerInsideHandleDetailId },
+            colModel: [
+                {
+                    label: '验收结论', name: 'auditresult', index: 'auditresult', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = rowObject.auditresult == "0" ? "验收通过" : "验收不通过";
+                        return html;
+                    }
+                },
+                {
+                    label: '验收意见', name: 'auditopinion', index: 'auditopinion', width: 150, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.auditopinion) {
+                            var content = rowObject.auditopinion.length > 20 ? rowObject.auditopinion.substring(0, 20) + "......" : rowObject.auditopinion;
+
+                            html = "<div title=" + content + ">" + content + "</div>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '验收人', name: 'auditpeople', index: 'auditpeople', width: 120, align: 'center' },
+                {
+                    label: '验收时间', name: 'audittime', index: 'audittime', width: 120, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm:ss');
+                    }
+                },
+                {
+                    label: '验收人签字', name: 'auditsignimg', index: 'auditsignimg', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var content = !!rowObject.auditsignimg ? rowObject.auditsignimg : "";
+                        var html = "";
+                        if (content == "" || content == undefined) {
+                            var html = "<img  style=\"height:50px;\" />&nbsp;";
+                        } else {
+                            html = "<img style=\"height:50px;\"  src=\"../.." + content + "\"/>&nbsp;";
+                        }
+
+                        return html;
+                    }
+                },
+                {
+                    label: '是否有验收图片', name: 'filenum', index: 'filenum', width: 200, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        if (rowObject.filenum == 0) {
+                            html = "否";
+                            return html;
+
+                        } else if (rowObject.filenum > 0) {
+                            html = "<a href=javascript:btn_Annex('" + rowObject.id + "') style='color:blue; text-decoration:underline;padding-left:0px;' title='修改'>是</a>";
+                            return html;
+
+                        }
+
+
+                    }
+
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            //multiselect: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //查看
+    function btn_Annex(occid) {
+        var keyValue = occid;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Annex',
+                title: '附件列表',
+                url: '/OccupationalHealthManage/Occupatioalstaff/FileList?keyValue=' + keyValue,
+                width: '600px',
+                height: '550px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+
+</script>
+
+<div class="titlePanel">
+    <div class="toolbar">
+
+        <div class="btn-group">
+            <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+        </div>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

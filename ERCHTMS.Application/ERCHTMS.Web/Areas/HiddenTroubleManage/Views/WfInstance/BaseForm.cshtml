@@ -1,0 +1,290 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+    var keyValue = request("keyValue"); //主键 隐患信息主键
+    var actiontype = request("actiontype"); //操作动作
+    $(function () {
+
+        //查看下
+        if (actiontype == "view") {
+            $("#btn_Save").attr("disabled", "disabled");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("readonly", "readonly");
+            });
+        }
+
+        if (!keyValue) { $("#btn_addcondition").css("display", "none"); }
+
+        $.SetForm({
+            url: "../../HiddenTroubleManage/WfInstance/GetProcessJson",
+            success: function (data) {
+                //详情
+                if (null != data) {
+                    $("#PROCESSID").ComboBox({
+                        id: "id",
+                        text: "name",
+                        description: "==请选择==",
+                        allowSearch: false,
+                        height: '200px',
+                        data: data
+                    });
+                }
+            }
+        });
+
+        //列表
+        GetGrid();
+
+        //获取表单数据
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../HiddenTroubleManage/WfInstance/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    //详情
+                    if (null != data) {
+                        $("#form1").formDeserialize(data);
+                        //是否启用
+                        if (data.ISENABLE == "是") {
+                            $("input[name='ISENABLE']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISENABLE']:eq(1)").prop("checked", "checked");
+                        }
+
+                        $("#PROCESSID").ComboBoxSetValue(data.PROCESSID);
+                    }
+                }
+            });
+        }
+    });
+
+    //新增参数说明配置
+    function add() {
+        var rqUrl = '/HiddenTroubleManage/WfInstance/ConditionForm?InstanceId=' + keyValue;
+        var title = "新增参数配置信息";
+        dialogOpen({
+            id: 'InstanceConditionForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 300) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //新增参数说明配置
+    function edit(obj) {
+        var rqUrl = '/HiddenTroubleManage/WfInstance/ConditionForm?keyValue=' + obj + "&actiontype=edit";
+        var title = "编辑参数配置信息";
+        dialogOpen({
+            id: 'InstanceConditionForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 300) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //新增参数说明配置
+    function view(obj) {
+        var rqUrl = '/HiddenTroubleManage/WfInstance/ConditionForm?keyValue=' + obj + "&actiontype=view";
+        var title = "查看参数配置信息";
+        dialogOpen({
+            id: 'InstanceConditionForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 300) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: null
+        });
+    }
+
+
+    //新增参数说明配置
+    function remove(obj) {
+        $.RemoveForm({
+            url: '../../HiddenTroubleManage/WfInstance/RemoveConditionForm',
+            param: { keyValue: obj },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+
+        var queryJson = {
+            instanceid: !!keyValue ? keyValue : newGuid(), //实例id
+        };
+
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 220,
+            url: "../../HiddenTroubleManage/WfInstance/GetInstanceConditionInfoList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', index: 'id', width: 100, align: 'center', hidden: true },
+                 {
+                     label: '操作', name: 'oper', index: 'id', width: 160, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:view('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                         html += "&nbsp;&nbsp;&nbsp;<a href=javascript:remove('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                         return html;
+                     }
+                 },
+                { label: '条件序号', name: 'serialnumbers', index: 'serialnumbers', width: 120, align: 'center', sortable: true },
+                { label: '条件代码', name: 'conditioncode', index: 'conditioncode', width: 200, align: 'center', sortable: true },
+                { label: '条件类型', name: 'conditiontype', index: 'conditiontype', width: 150, align: 'center', sortable: true },
+                { label: '条件执行函数', name: 'conditionfunc', index: 'conditionfunc', width: 350, align: 'center', sortable: true },
+                { label: '备注', name: 'remarks', index: 'remarks', width: 150, align: 'center', sortable: true },
+                { label: '描述', name: 'describes', index: 'describes', width: 150, align: 'center', sortable: true }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [15, 30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'serialnumbers',
+            sortorder: 'asc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        //是否启用
+        var isEnable = $("input[name='ISENABLE']:checked").val();
+        postData["ISENABLE"] = isEnable;
+
+        $.SaveForm({
+            url: "../../HiddenTroubleManage/WfInstance/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable0").trigger("reloadGrid");
+            }
+        });
+    }
+
+</script>
+
+<div class="center-Panel">
+    <div style="margin-top: 5px;"></div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;流程配置信息&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">序号</td>
+                        <td class="formValue">
+                            <input id="SERIALNUMBER" type="text" class="form-control" />
+                            <input id="ID" type="hidden" />
+                            <input id="INSTANCETYPE" type="hidden" value="基础流程" />
+                        </td>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">流程配置实例名称</span></td>
+                        <td class="formValue">
+                            <input id="INSTANCENAME" type="text" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">流程实例对象</span></td>
+                        <td class="formValue">
+                            <div id="PROCESSID" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="流程实例对象" width="98%"></div>
+                        </td>
+                        <td class="formTitle">级别</td>
+                        <td class="formValue">
+                            <input id="RANKNAME" type="text" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">所属单位名称识别代码</span></td>
+                        <td class="formValue">
+                            <input id="ORGANIZENAME" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" errormsg="所属单位名称识别代码" />
+                        </td>
+                        <td class="formTitle"><span style="white-space:pre-wrap;">所属单位ID识别代码</span></td>
+                        <td class="formValue">
+                            <input id="ORGANIZEID" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" errormsg="所属单位ID识别代码" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">是否启用</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISENABLE" id="ISENABLE1" value="是" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISENABLE" id="ISENABLE2" value="否" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">流程标记</td>
+                        <td class="formValue">
+                            <input id="MARK" type="text" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">备注</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REMARKS" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000" rows="6"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel0">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;条件参数配置信息</strong>
+            <span class="tools pull-right">
+                <a class="btn btn-primary btn-xs" onclick='javascript: $("#gridTable").trigger("reloadGrid")'>&nbsp;刷新</a>&nbsp;&nbsp;
+                <a id="btn_addcondition" href="javascript:add()" class="btn btn-primary btn-xs">新 增</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div>
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

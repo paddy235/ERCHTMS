@@ -1,0 +1,165 @@
+@{
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var userRole = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName"; //当前用户角色
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var currentdate = '@DateTime.Now.ToString("yyyy-MM-dd")';
+    //页面代理
+    var lagc = null;
+    //
+    //页面加载完成
+    //
+    $(function () {
+        var winHeight = $(window).height();
+        //
+        //创建页面代理
+        //
+        lagc = new listAgency({
+            gridId: "gridTable",
+            gridHeight: winHeight - 143,
+            gridOptions: {
+                height: winHeight - 143,
+                url: "../../WorkPlan/PlanDetails/GetListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'planfindate',
+                sortorder: 'asc,createdate asc'
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'id', hidden: true },                
+                { label: '工作内容', name: 'contents', index: 'contens', width: 300, align: 'center', sortable: true },
+                { label: '责任部门', name: 'dutydepartname', index: 'dutydepartname', width: 240, align: 'center', sortable: true },
+                { label: '责任人', name: 'dutyusername', index: 'dutyusername', width: 220, align: 'center', sortable: true },
+                {
+                    label: '计划完成时间', name: 'planfindate', index: 'planfindate', width: 120, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM');
+                    }
+                },
+                {
+                    label: '实际完成时间', name: 'realfindate', index: 'realfindate', width: 120, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '管理标准', name: 'stdname', index: 'stdname', width: 200, align: 'center', sortable: true },
+                {
+                    label: '完成情况', name: 'state', index: 'state', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return buidState(rowObject);
+                    }
+                },
+            ],
+            hasPowerOper: false,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            }
+        });
+        //
+        //绑定页面控件
+        //
+        lagc.bindPageControls({
+            refreshId: "refresh"
+        });
+        //
+        //添加页面事件
+        //
+        lagc.addPageEvents({
+            onBuildQuery: buidQuery
+        });        
+        //
+        //初始化
+        //
+        lagc.initialPage();        
+    });    
+    //
+    //重新定义查询条件
+    //
+    function buidQuery() {
+        var cdt = new Date(currentdate.replace(/\-/g, "\/"));  //当前时间
+        var rnd = Math.random();
+        var data = { starttime: cdt.getFullYear() + '-01-01', endtime: cdt.getFullYear() + '-12-01', deptid: deptCode, applychecked: 1, isavailable: 1, rnd: rnd };
+        return JSON.stringify(data);
+    }    
+    //
+    //完成情况
+    //
+    function buidState(rowObject) {
+        html = "";
+
+        var cdt = new Date(currentdate.replace(/\-/g, "\/"));  //当前时间
+        var pdt = !!rowObject.planfindate ? new Date(rowObject.planfindate.replace(/\-/g, "\/")) : null;//计划完成时间
+        var rdt = !!rowObject.realfindate ? new Date(rowObject.realfindate.replace(/\-/g, "\/")) : null;//实际完成时间
+        if (!rdt && cdt > pdt)
+            html = "<div style='background-color:red;'>未完成</div>";
+        else if (!!rdt && rdt > pdt) {
+            html = "<div style='background-color:orange;'>超期完成</div>";
+        }
+        else if (!!rdt && rdt <= pdt) {
+            html = "<div style='background-color:green;'>按时完成</div>";
+        }
+        else if (!rdt && cdt <= pdt) {
+            html = "<div style='background-color:white;'>待完成</div>";
+        }
+
+        return html;
+    }
+</script>
+<style type="text/css">
+    .ui-select {
+        width: 200px;
+    }
+
+    .formTitle {
+        padding-left: 10px;
+    }
+</style>
+<div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+    <div class="panel-Title" style="height:0px;"></div>
+    <div class="titlePanel">
+        <div class="title-search" id="queryArea">
+            <table>
+                <tr>
+                    <td style="padding-left:10px">
+                        <div id="queryCondition" class="btn-group">
+                            <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                            <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                            <ul class="dropdown-menu">
+                                <li style="width:200px;"><a style="float:left" data-value="未完成">未完成</a><div style="float: left; margin-left:12px; background-color: red; height: 22px; width: 80px;"></div></li>
+                                <li style="width:200px;"><a style="float:left" data-value="超期完成">超期完成</a><div style="float: left; background-color: orange; height: 22px; width: 80px;"></div></li>
+                                <li style="width:200px;"><a style="float:left" data-value="按期完成">按时完成</a><div style="float: left; background-color: green; height: 22px; width: 80px;"></div></li>
+                                <li style="width:200px;"><a style="float:left" data-value="待完成">待完成</a><div style="float: left; background-color: white; margin-left: 12px; height: 22px; width: 80px;"></div></li>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <a id="refresh" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+            </div>
+        </div>
+    </div>
+    <div class="gridPanel">
+        <table id="gridTable"></table>
+        <div id="gridPager"></div>
+    </div>
+</div>

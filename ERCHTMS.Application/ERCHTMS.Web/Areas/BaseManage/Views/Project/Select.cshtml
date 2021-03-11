@@ -1,0 +1,113 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script type="text/javascript">
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var orgid = request("orgid");
+    var controlObj = request("controlObj");
+    var selectedRowIndex = -1;
+    var deptid = request("deptid");
+    var showtype = request("showtype");
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 136.5);
+
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            orgid: orgid,
+            engineerstate: "002",//在建工程
+            OutProjectId: deptid,
+            showview: showtype
+        }
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 136.5,
+            autowidth: true,
+            url: "../../OutsourcingProject/Outsouringengineer/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                { label: "外包工程名称", name: "engineername", width: 300, align: "center" },
+                { label: "外包单位", name: "outprojectname", width: 300, align: "center" },
+                { label: "工程状态", name: "engineerstate", width: 150, align: "center" },
+                { label: '工程类型', name: 'engineertype', index: 'engineertype', width: 120, align: 'center' },
+                { label: '工程风险等级', name: 'engineerlevel', index: 'engineerlevel', width: 150, align: 'center' },
+                { label: '实际开工时间', name: 'planenddate', index: 'PLANENDDATE', width: 150, align: 'center', sortable: false, formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } },
+                { label: '实际完工时间', name: 'actualenddate', index: 'ACTUALENDDATE', width: 150, align: 'center', sortable: false, formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } }
+
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+
+    //返回选择后的结果并赋值到dom控件
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序依次为区域名称，区域Code ,区域负责人，区域负责人ID,（多选用逗号分隔）
+    function AcceptClick(winObject, domId, callback) {
+        if (selectedRowIndex <= 0) {
+            dialogAlert("请选择工程项目!", 2);
+            return;
+        }
+        else {
+            var projectname = $("#" + selectedRowIndex + " td:eq(2)").attr("title");
+
+            var projectid = $("#" + selectedRowIndex + "  td:eq(1)").attr("title");
+
+            var arr = domId.split(',');
+
+            if (!!controlObj) {
+                if (controlObj == arr[0]) {
+                    $(winObject).find("#" + arr[0]).attr("disabled", "disabled");
+                }
+            }
+
+            $(winObject).find("#" + arr[0]).val(projectname);
+
+            $(winObject).find("#" + arr[1]).val(projectid);
+            if (winObject.ownerDocument.defaultView.callBack) {
+                winObject.ownerDocument.defaultView.callBack();
+            }
+        }
+        if (callback) {
+            callback();
+        }
+        dialogClose();
+    }
+</script>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

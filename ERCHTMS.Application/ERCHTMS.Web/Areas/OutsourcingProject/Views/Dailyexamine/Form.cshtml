@@ -1,0 +1,330 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var contractid = request('contractid'); //关联ID
+    var username = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    var userid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var safeids = request('safeids'); // 安全检查过来的id
+    $(function () {
+        
+        initControl();
+
+        //登记
+        $("#btn_Save").click(function () {
+            AcceptClick();
+        });
+
+        //提交流程
+        $("#btn_Submit").click(function () {
+            SubmitAction();
+        });
+
+        //如果是查看记录过来的请求，隐藏当前的历史记录
+        if (!!contractid) {
+            $("#historyRecord").css("display", "none");
+        }
+
+        safeCheck();
+    });
+
+    function safeCheck() {
+        if (safeids) {
+            $.SetForm({
+                url: "../../HiddenTroubleManage/Fivesafetycheckaudit/GeDataTableByIds",
+                param: { ids: safeids },
+                success: function (data) {
+                    console.log(data)
+                    var conten = "";
+                    $(data).each(function (e) {
+                        conten += (e + 1)+"," + this.findquestion+'\n';
+                    });
+                    $('#ExamineContent').val(conten);
+                }
+            })
+        }
+    }
+    //初始化控件
+    function initControl() {
+        //工程
+        $("#ProjectId").ComboBox({
+            description: "==请选择==",
+            height: "200px"
+        })
+        $('select').comboSelect();
+        //查看
+        if (actiontype == "view") {
+            $("#btn_Save").css("display", "none");
+            $("#btn_Submit").css("display", "none");
+            $(".center-Panel").removeAttr("style");
+            $(".form-button").css("display", "none");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+
+
+        var isDel = actiontype == "view" ? false : true;
+        //获取表单
+        if (!!keyValue) {
+            //当前详情
+            var formUrl = "../../OutsourcingProject/Dailyexamine/GetFormJson";
+            //历史记录
+            if (!!contractid) {
+                var formUrl = "../../OutsourcingProject/Dailyexamine/GetHistoryFormJson";
+            }
+            $.SetForm({
+                url: formUrl,
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data.data);
+                    if (data.iscbs == true) {
+                        $("#trPro").show();
+                        $("#ProjectId").ComboBox({
+                            url: "../../OutsourcingProject/Outsouringengineer/GetEngineerDataByWBId?deptId=" + data.data.ExamineToDeptId + "&mode=1",
+                            id: "engineerid",
+                            text: "engineername",
+                            description: "==请选择==",
+                            height: "200px"
+                        })
+                        $("#ProjectId").ComboBoxSetValue(data.data.ProjectId);
+                    } else {
+                        $("#trPro").hide();
+                    }
+                }
+            })
+        }
+        keyValue = keyValue.length == 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+        //日常考核附件
+        file_upload.init({
+            keyValue: keyValue, extensions: 'doc,docx,pdf,xls,xlsx,ico,icon,raw,jpg,jpeg,gif,bmp,png,psd',isImage: false, el: '#uploader'
+        });
+
+        file_upload.bindFiles(isDel, false, keyValue, "uploader", isDel);
+    }
+
+
+    //获取历史记录信息
+    function GetHistoryInfo() {
+        dialogOpen({
+            id: 'HistoryIndexFrm',
+            title: '查看历史记录信息',
+            url: '/OutsourcingProject/Dailyexamine/HistoryIndex?contractid=' + keyValue,
+            width: ($(top.window).width() - 150) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var obj = $("#ExamineType").val();
+        obj = $.trim(obj);
+        if (obj.length == 0 || obj == null || obj == undefined) {
+            ValidationMessage($("#ExamineType"), "不能为空!");
+            return false;
+        }
+        if (obj.length > 64) {
+            ValidationMessage($("#ExamineType"), "必须小于64位字符!");
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["ProjectId"] = $("#ProjectId").attr("data-value");
+        postData["Project"] = $("#ProjectId").attr("data-text");
+        $.SaveForm({
+            url: "../../OutsourcingProject/Dailyexamine/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+
+    //提交到审核
+    function SubmitAction() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var obj = $("#ExamineType").val();
+        obj = $.trim(obj);
+        if (obj.length == 0 || obj == null || obj == undefined) {
+            ValidationMessage($("#ExamineType"), "不能为空!");
+            return false;
+        }
+        if (obj.length > 64)
+        {
+            ValidationMessage($("#ExamineType"), "必须小于64位字符!");
+            return false;
+        }
+            
+
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["ProjectId"] = $("#ProjectId").attr("data-value");
+        postData["Project"] = $("#ProjectId").attr("data-text");
+        $.SaveForm({
+            url: "../../OutsourcingProject/Dailyexamine/SubmitForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //单位选择承包商时显示工程字段
+    function chooseExamineDept() {
+        $.SetForm({
+            url: "../../BaseManage/Department/GetFormJson",
+            param: { keyValue: $("#ExamineToDeptId").val() },
+            success: function (data) {
+                if (data != null && data.Nature == "承包商") {
+                    $("#trPro").show();
+                    $("#ProjectId").ComboBox({
+                        url: "../../OutsourcingProject/Outsouringengineer/GetEngineerDataByWBId?deptId=" + $("#ExamineToDeptId").val()+"&mode=1",
+                        id: "engineerid",
+                        text: "engineername",
+                        description: "==请选择==",
+                        height: "200px"
+                    })
+                } else {
+                    $("#trPro").hide();
+                }
+            
+            }
+        })
+    }
+</script>
+<div class="center-Panel" style="margin-top:42px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;考核信息</strong>
+            <span class="tools pull-right">
+                <a href="#" id="historyRecord" style="font-weight: bold;" onclick="GetHistoryInfo()" class="btn btn-primary btn-xs">历史记录信息</a>
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-top: 5px; margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">考核编号<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ExamineCode" type="text" value="@ViewBag.Code" class="form-control" isvalid="yes" checkexpession="NotNull" readonly="readonly" />
+                        </td>
+                        <td class="formTitle">被考核单位<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ExamineToDept" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDept('', 0, 0, '被考核单位', document.body, 'ExamineToDept,ExamineToDeptCode,ExamineToDeptId', '', chooseExamineDept)" />
+                            <input type="hidden" id="ExamineToDeptId" />
+                            <input type="hidden" id="ExamineToDeptCode" />
+                        </td>
+                    </tr>
+                    <tr id="trPro" style="display:none">
+                        <td class="formTitle">被考核工程</td>
+                        <td class="formValue">
+                            <div id="ProjectId" type="select" class="ui-select" ></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">考核类别<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <select id="ExamineType" style="width:100%" class="form-control" >
+                                <option value="">请选择或者输入</option>
+                                <option value="安全管理">安全管理</option>
+                                <option value="文明生产">文明生产</option>
+                                <option value="生产管理">生产管理</option>
+                                <option value="技术监督">技术监督</option>
+                                <option value="缺陷管理">缺陷管理</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </td>
+                        <td class="formTitle">考核金额（元）<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ExamineMoney" type="text" class="form-control" isvalid="yes" checkexpession="PositiveDoubleNotNull" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">考核人</td>
+                        <td class="formValue">
+                            <input id="ExaminePerson" type="text" class="form-control" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"  readonly  />
+                            <input id="ExaminePersonId" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" />
+                        </td>
+                        <td class="formTitle">考核单位</td>
+                        <td class="formValue">
+                            <input id="ExamineDept" type="text" class="form-control" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName"  readonly/>
+                            <input id="ExamineDeptId" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">考核时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ExamineTime" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">考核内容</td>
+                        <td class="formValue" colspan="3">
+                            <textarea class="form-control" rows="4" id="ExamineContent" maxlength="500"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">考核依据</td>
+                        <td class="formValue" colspan="3">
+                            <textarea class="form-control" rows="4" id="ExamineBasis"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">备注</td>
+                        <td class="formValue" colspan="3">
+                            <textarea class="form-control" rows="4" id="Remark"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">附件信息</td>
+                        <td class="formValue" colspan="3">
+                            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="uploaderFile" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div> 
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <a id="btn_Save" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+    &nbsp;&nbsp;
+    <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+    &nbsp;&nbsp;
+</div>

@@ -1,0 +1,348 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var _deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户部门ID
+    var _deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户部门编码
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户ID
+    var role = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//获取当前用户权限集合
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var _deptCodeLogin = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户部门编码(权限判断使用)
+    //var SearchType = 0;//0仅查看本人及本部门数据 1查看所有部门数据
+    var ehsDeptCode = "@ViewBag.ehsDepartCode";//EHS部门Code
+    var ShowType = 0;//0全部 1本人
+    $(function () {
+        //if (roleName.indexOf("厂领导") >= 0 || roleName.indexOf("负责人") >= 0) {
+        //    SearchType = 1;
+        //}
+        InitialPage();
+        //GetGrid();
+        getDataAuthority();
+        //加载树
+        GetTree();
+        if (roleName.indexOf("厂领导") >= 0 || _deptCodeLogin == ehsDeptCode) {
+            ShowType = 0;
+        }
+        else {
+            ShowType = 1;
+        }
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载组织机构树
+    function GetTree() {
+        var json;
+        if (roleName.indexOf("厂领导") >= 0 || _deptCodeLogin == ehsDeptCode) {
+            json = JSON.stringify(
+                {
+                    SelectMode: 0,
+                    Mode: 44
+                }
+            );
+        } else {
+            json = JSON.stringify(
+                {
+                    SelectMode: 0,
+                    Mode: 3
+                }
+            );
+        }
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _deptCode = item.Code;
+                _parentId = item.value;
+                _isOrg = item.Sort;
+                _deptId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 170);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+        $('#itemTree').setNodeChecked(_deptId);
+    }
+    function getDataAuthority() {
+        $.post(top.contentPath + "/AuthorizeManage/PermissionJob/GetDataAuthority", { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val() }, function (data) {
+            var jsonArr = eval("(" + data + ")");
+            GetGrid(jsonArr);
+        });
+    }
+    //加载表格
+    function GetGrid(jsonArr) {
+        var queryJson = {
+            CreateUserDeptCode: _deptCode,//部门
+            ShowType: ShowType
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../FireManage/FireTroops/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'id', width: 100, align: 'left', sortable: true, hidden: true  },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        html = "<a href=javascript:show('" + rowObject.id + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                        //if (userId == rowObject.createuserid || roleName.indexOf("厂级部门用户") >= 0 || (rowObject.createuserdeptcode == _deptCodeLogin && (roleName.indexOf("负责人") >= 0 || roleName.indexOf("专工") >= 0))){
+                        //html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        //html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        //}
+                        $(jsonArr).each(function (j, item1) {
+                            var authType = item1.authorizetype;//获取数据操作权限范围.1：本人,2：本部门，3：本部门及下属部门，4：本机构，5：全部
+                            switch (authType) {
+                                //本用户
+                                case 1:
+                                    if (top.currUserId == rowObject.createuserid) {
+                                        if (item1.encode == "edit") {
+                                            html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                                        }
+                                        if (item1.encode == "delete") {
+                                            html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                                        }
+                                    }
+                                    break;
+                                //本部门
+                                case 2:
+                                    if (rowObject.createuserdeptcode == top.currUserDeptCode) {
+                                        if (item1.encode == "edit") {
+                                            html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                                        }
+                                        if (item1.encode == "delete") {
+                                            html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                                        }
+                                    }
+                                    break;
+                                //本子部门
+                                case 3:
+                                    if ((rowObject.createuserdeptcode).indexOf(top.currUserDeptCode) >= 0) {
+                                        if (item1.encode == "edit") {
+                                            html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                                        }
+                                        if (item1.encode == "delete") {
+                                            html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                                        }
+                                    }
+                                    break;
+                                //本机构
+                                case 4:
+                                    if (rowObject.createuserorgcode == top.currUserOrgCode) {
+                                        if (item1.encode == "edit") {
+                                            html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                                        }
+                                        if (item1.encode == "delete") {
+                                            html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                                        }
+                                    }
+                                    break;
+                            }
+                        });
+                        return html;
+                    }
+                },
+                { label: '姓名', name: 'username', index: 'username', width: 100, align: 'center', sortable: true },
+                { label: '职务', name: 'quarters', index: 'quarters', width: 100, align: 'center', sortable: true },
+                { label: '性别', name: 'sex', index: 'sex', width: 100, align: 'center', sortable: true },
+                { label: '身份证号', name: 'identitycard', index: 'identitycard', width: 150, align: 'center', sortable: true },
+                { label: '学历', name: 'degreesid', index: 'degreesid', width:100, align: 'center', sortable: true },
+                { label: '持证情况', name: 'certificates', index: 'certificates', width: 200, align: 'center', sortable: true },
+                { label: '户籍所在地', name: 'placedomicile', index: 'placedomicile', width: 200, align: 'center',sortable: true  },
+                { label: '联系方式', name: 'phone', index: 'phone', width: 200, align: 'center', sortable: true },
+                { label: '所属部门', name: 'dept', index: 'dept', width: 200, align: 'center', sortable: true }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: '',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                //Type: SearchType,
+                sTime: $("#sTime").val(),
+                eTime: $("#eTime").val(),
+                Name: $("#Name").val(),
+                CreateUserDeptCode: _deptCode, //上传部门
+                ShowType: ShowType
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    //查看
+    function show(keyValue) {
+        var idx0 = dialogOpen({
+            id: 'Form',
+            title: '查看专职消防队伍',
+            url: '/FireManage/FireTroops/Form?actiontype=view&keyValue=' + keyValue,
+            width: '70%',
+            height: '60%',
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(idx0);
+            }
+        });
+
+    }
+    //新增
+    function btn_add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加专职消防队伍',
+            url: '/FireManage/FireTroops/Form',
+            width: '70%',
+            height: '60%',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_edit(keyValue) {
+        //var keyValue = $('#gridTable').jqGridRowValue('ID');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑专职消防队伍',
+                url: '/FireManage/FireTroops/Form?keyValue=' + keyValue,
+                width: '70%',
+                height: '60%',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_delete(keyValue) {
+        //var keyValue = $('#gridTable').jqGridRowValue('ID');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../FireManage/FireTroops/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的专职消防队伍！', 0);
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">消防管理—专职消防队伍</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                名称&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                <input id="Name" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                上传时间&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                <input id="sTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'eTime\')}' })">
+                            </td>
+                            <td style="padding-left: 5px;">至</td>
+                            <td style="padding-left: 5px;">
+                                <input id="eTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'sTime\')}' })">
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                        @*<a id="edit" class="btn btn-default" onclick="btn_edit()"><i class="fa fa-pencil-square-o"></i>编辑</a>
+                          <a id="delete" class="btn btn-default" onclick="btn_delete()"><i class="fa fa-trash-o"></i>删除</a>*@
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+

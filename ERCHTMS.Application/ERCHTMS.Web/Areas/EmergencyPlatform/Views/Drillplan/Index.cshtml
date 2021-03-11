@@ -1,0 +1,865 @@
+@{;
+ViewBag.Title = "应急演练计划";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<link href="~/Content/scripts/plugins/combo-select/combo.select.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<style type="text/css">
+    .combo-select select {
+        left: -1px;
+        top: -1px;
+        width: 0;
+        height: 0;
+        margin: 0;
+    }
+</style>
+<script>
+    var _parentId = "";
+    var _isOrg = "";
+    var currUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var DeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var OrganizeId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构Code
+    var typeAction = "";
+    var ishavasave = 0;
+
+    $(function () {
+        //演练预案类型
+        ComBoxForData("DrillType", "MAE_DirllPlanType");
+        //方式
+        ComBoxForData("DrillMode", "MAE_DirllMode");
+        InitialPage();
+        GetTree();
+        GetGrid();
+        $("#btn_Save").hide();
+        if ($("#add").html() != undefined) {
+            $("#btn_Save").show();
+        }
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    $.ajaxSetup({ async: false });
+    var keyValue = 0;
+    var selectedRowIndex = 0;
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+                  {
+                      SelectMode: 0,
+                      Mode: 0
+                  }
+                );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = item.Sort;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //var item = {
+        //    height: $(window).height() - 50,
+        //    url: "../../BaseManage/User/GetDepartTreeJson",
+        //    onnodeclick: function (item) {
+        //        _parentId = item.EnCode;
+        //        _isOrg = item.Sort;
+        //        $('#btn_Search').trigger("click");
+        //    }
+        //};
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+    //加载表格
+    function GetGrid() {
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../EmergencyPlatform/Drillplan/GetPageListJson",
+            datatype: "json",
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+                    { label: '预案Id', name: 'rplanid', index: 'rplanid', align: 'left', sortable: true, hidden: true },
+                    { label: '主键', name: 'id', index: 'id', align: 'left', sortable: true, hidden: true },
+                    { label: '创建人', name: 'createuserid', index: 'createuserid', align: 'center', sortable: true, hidden: true },
+                    { label: '创建人部门code', name: 'createuserdeptcode', index: 'createuserdeptcode', align: 'center', sortable: true, hidden: true },
+                    { label: '创建人组织code', name: 'createuserorgcode', index: 'createuserorgcode', align: 'center', sortable: true, hidden: true },
+                    { label: '演练预案类型', name: 'drilltype', index: 'drilltype', align: 'left', sortable: true, hidden: true },
+                    { label: '演练方式', name: 'drillmode', index: 'drillmode', align: 'left', sortable: true, hidden: true },
+                    { label: '演练部门', name: 'departid', index: 'departid', align: 'left', sortable: true, hidden: true },
+                    { label: '执行人', name: 'executepersonid', index: 'executepersonid', align: 'left', sortable: true, hidden: true },
+                    { label: '操作', name: 'Oper', index: 'Oper', align: 'center', sortable: false },
+                    { label: '组织部门', name: 'orgdeptid', hidden: true }, { label: '组织部门code', name: 'orgdeptcode', hidden: true },
+                    {
+                        label: '组织部门', width: 200, name: 'orgdept', align: 'center', sortable: false, editable: true
+                             , formatter: function (cellvalue, options, rowObject) {
+                                 if (cellvalue == "") {
+                                     var html = '<span style="color:Red">*</span><input id="OrgDept_' + rowObject.Id + '" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" onclick="selectDept(\'\', 0, 0, \'组织部门\', document.body, \'OrgDept_' + rowObject.Id + ',OrgDeptCode_' + rowObject.Id + ',OrgDeptId_' + rowObject.Id + '\')" ReadOnly /> ';
+                                     html += '<input id="OrgDeptId_' + rowObject.Id + '" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId" type="hidden" class="form-control" /><input id="OrgDeptCode_' + rowObject.Id + '" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode" type="hidden" class="form-control" />';
+                                     return html;
+                                 }
+                                 else {
+                                     return (rowObject.orgdept == undefined ? "" : rowObject.orgdept);
+                                 }
+                             }
+                    },
+                    {
+                        label: '演练部门', width: 200, name: 'departname', align: 'center', sortable: false, editable: true
+                     , formatter: function (cellvalue, options, rowObject) {
+                         if (cellvalue == "") {
+                             var html = '<span style="color:Red">*</span><input id="DeptName_' + rowObject.Id + '"  type="text" class="form-control" isvalid="yes" checkexpession="NotNull" onclick="selectDept(\'\', 1, 0, \'演练部门\', document.body, \'DeptName_' + rowObject.Id + ',,DeptId_' + rowObject.Id + '\')" ReadOnly /> ';
+                             html += '<input id="DeptId_' + rowObject.Id + '" type="hidden" class="form-control" />';
+                             html += '<input id="PKId_' + rowObject.Id + '" type="hidden" class="form-control" />';
+                             return html;
+                         }
+                         else {
+                             return rowObject.departname;
+                         }
+                     }
+                    },
+                {
+                    label: '演练预案名称', name: 'name', index: 'name', width: 250, align: 'center', sortable: false, editable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "") {
+                            var html = "";
+                            var html = '<span style="color:Red">*</span><input id="Name_' + rowObject.Id + '" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" /> ';
+                            html += '<input id="RplanId_' + rowObject.Id + '"  type="hidden" class="form-control" />';
+                            html += "<a style='cursor: pointer;' onclick=SelectRplanName(" + rowObject.Id + ");>选择</a>";
+                            return html;
+
+                        }
+                        else {
+                            return rowObject.name;
+                        }
+                    }
+                },
+                {
+                    label: '演练预案类型', name: 'drilltypename', index: 'drilltypename', align: 'center', sortable: false, editable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "") {
+                            var html = '<div style="float:left"><font face="宋体">*</font></div><div style="top:2px;float:left;width:90%" id="DrillType_' + rowObject.Id + '" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull">' + cellvalue + '</div>';
+
+                            return html;
+                        }
+                        else {
+                            return rowObject.drilltypename;
+                        }
+                    }
+                },
+                {
+                    label: '演练方式', name: 'drillmodename', index: 'drilltypename', align: 'center', sortable: false, editable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "") {
+                            var html = '<div style="float:left"><font face="宋体">*</font></div><div style="top:2px;float:left;width:90%" id="DrillMode_' + rowObject.Id + '" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull">' + cellvalue + '</div>';
+                            return html;
+                        }
+                        else {
+                            return rowObject.drillmodename;
+                        }
+                    }
+                },
+                {
+                    label: '演练计划费用（元）', width: 100, name: 'drillcost', align: 'center', sortable: false, editable: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "") {
+                            var html = '<input id="DrillCost_' + rowObject.Id + '"  type="text" class="form-control" isvalid="yes" checkexpession="TwoPositiveDoubleOrNull" />';
+                            return html;
+                        }
+                        else {
+                            return !!rowObject.drillcost ? rowObject.drillcost : "";
+                        }
+                    }
+                },
+                 {
+                     label: '执行人', width: 100, name: 'executepersonname', align: 'center', sortable: false, editable: true
+                     , formatter: function (cellvalue, options, rowObject) {
+                         if (cellvalue == "") {
+                             var html = '<input id="ExecutePersonName_' + rowObject.Id + '"  type="text" class="form-control"  onclick=\'selectUser({ deptId: "", checkMode: 0, mode: 0, winObject: document.body, domId: "ExecutePersonName_' + rowObject.Id + ',,ExecutePersonId_' + rowObject.Id + '"})\' ReadOnly />';
+                             html += '<input id="ExecutePersonId_' + rowObject.Id + '" type="hidden" class="form-control" />';
+                             return html;
+                         }
+                         else {
+                             return !!rowObject.executepersonname ? rowObject.executepersonname : "";
+                         }
+                     }
+                 },
+                {
+                    label: ' 计划时间', name: 'plantime', index: 'plantime', align: 'center', editable: true, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "") {
+                            var html = '<div style="float:left">';
+                            html += '<font face="宋体">*</font></div>';
+                            html += '<input id="PlanTime_' + rowObject.Id + '"  class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:\'yyyy-MM\'})" isvalid="yes" checkexpession="NotNull" ReadOnly/>';
+                            return html;
+                        }
+                        else {
+                            return rowObject.plantime.substring(0, 10);
+                        }
+                    }
+                }, {
+                    label: ' 查看演练记录', name: 'recordnum', index: 'recordnum', align: 'center', editable: true, formatter: function (cellvalue, options, rowObject) {
+                        var key = rowObject.id;
+                        if (cellvalue > 0) {
+                            return "<a href='#' onclick='openRecord(\"" + key + "\")' style='color:blue; text-decoration:underline'  title='查看'>查看</a>";
+                        } else {
+                            return "暂无";
+                        }
+                    }
+                }],
+            viewrecords: true,
+            rowNum: 30,
+            // rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'createdate desc,id',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                $('select').comboSelect();
+                var rows = $gridTable.jqGrid("getRowData");//获取当前页记录行数据
+                //查询用户对该模块的数据操作权限   //shit code
+                $.post(top.contentPath + "/AuthorizeManage/PermissionJob/GetDataAuthority", { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val() }, function (data) {
+                    var jsonArr = eval("(" + data + ")");
+                    var actionArray = new Array();
+                    $(rows).each(function (i, item) {
+                        var uId = item.createuserid;
+                        var uCode = item.orgdeptcode;
+                        var zzdeptid = item.orgdeptid; //组织部门id
+                        var executeuserid = item.executepersonid; //执行人id
+                        var keyValue = item.id;
+                        if (!uId) {
+                            html = "<a href=\"javascript:del(" + i + ",'')\"  title='删除'><i class='fa fa-trash-o'></i></a>";
+                            $("td[aria-describedby='gridTable_Oper']").eq(i).html(html);
+                            return;
+                        }
+                        //shit code
+                        //if (deptCode == uCode) {
+                        //    html = "<a href=\"javascript:edit(" + i + ",'" + keyValue + "')\"  title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                        //    $("td[aria-describedby='gridTable_Oper']").eq(i).html(html);
+                        //    return;
+                        //}
+                        if (item.recordnum == "暂无") {
+                            var endDate = new Date(item.plantime);
+                            var warnDate = new Date('@DateTime.Now.AddDays(5).ToString("yyyy-MM")');
+                            var dangerDate = new Date('@DateTime.Now.ToString("yyyy-MM")');
+                            if (warnDate > endDate) {
+                                $("td[aria-describedby='gridTable_plantime']").eq(i).css("background-color", "red");
+                            } else if (dangerDate > endDate) {
+                                $("td[aria-describedby='gridTable_plantime']").eq(i).css("background-color", "orange");
+                            }
+                        }
+                        var dCode = item.createuserdeptcode; //获取记录创建人的所属部门Code
+                        var oCode = item.createuserorgcode;  //获取记录创建人的所属机构Code
+                        var btns = $("td[aria-describedby='gridTable_Oper']").eq(i).children();//获取操作列中定义的操作按钮
+                        var html = "";
+                        //如果操作列中没有定义任何按钮则根据系统权限设置自动绑定操作按钮
+                        if (btns.length == 0) {
+                            $(jsonArr).each(function (j, item1) {
+                                var authType = parseInt(item1.authorizetype);//获取数据操作权限范围.1：本人,2：本部门，3：本部门及下属部门，4：本机构，5：全部
+
+                                switch (authType) {
+                                    //本用户
+                                    case 1:
+                                        if (top.currUserId == uId) {
+                                            actionArray.push(item1.actionname + i);
+                                            html += "<a id=" + item1.actionname + i + " href=\"javascript:" + item1.actionname + "('" + i + "','" + keyValue + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                        //本部门
+                                    case 2:
+                                        if (deptCode == dCode) {
+                                            actionArray.push(item1.actionname + i);
+                                            html += "<a id=" + item1.actionname + i + "  href=\"javascript:" + item1.actionname + "('" + i + "','" + keyValue + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                        //本子部门
+                                    case 3:
+                                        if (dCode.indexOf(deptCode) >= 0) {
+                                            actionArray.push(item1.actionname + i);
+                                            html += "<a id=" + item1.actionname + i + " href=\"javascript:" + item1.actionname + "('" + i + "','" + keyValue + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                        //本机构
+                                    case 4:
+                                        if (oCode == orgCode) {
+                                            actionArray.push(item1.actionname + i);
+                                            html += "<a id=" + item1.actionname + i + " href=\"javascript:" + item1.actionname + "('" + i + "','" + keyValue + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                    case 5:
+                                        actionArray.push(item1.actionname + i);
+                                        html += "<a id=" + item1.actionname + i + " href=\"javascript:" + item1.actionname + "('" + i + "','" + keyValue + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        break;
+                                }
+                            });
+
+
+                            if (zzdeptid.indexOf(DeptId) >= 0) {
+                                ishavasave += 1;
+                                if (actionArray.indexOf("edit" + i) < 0) {
+                                    html += "<a id=\"edit" + i + "\"  href=\"javascript:edit('" + i + "','" + keyValue + "')\" title=\"编辑\"><i class=\"fa fa-pencil-square-o\"></i></a>";
+                                }
+                                if (actionArray.indexOf("del" + i) < 0) {
+                                    html += "<a id=\"del" + i + "\"  href=\"javascript:del('" + i + "','" + keyValue + "')\" title=\"删除\"><i class=\"fa fa-trash-o\"></i></a>";
+                                }
+                            }
+                            //当前执行人可以进行更改
+                            if (executeuserid == top.currUserId) {
+                                if (actionArray.indexOf("edit" + i) < 0) {
+                                    html += "<a id=\"edit" + i + "\"  href=\"javascript:edit('" + i + "','" + keyValue + "')\" title=\"编辑\"><i class=\"fa fa-pencil-square-o\"></i></a>";
+                                }
+                            }
+                            $("td[aria-describedby='gridTable_Oper']").eq(i).html(html);
+                        } else {
+
+                            html = "";
+                            //遍历用户对该模块的数据操作权限
+                            $(jsonArr).each(function (j, item1) {
+                                html += item1.encode + ",";
+                                var authType = item1.authorizetype;//获取数据操作权限范围.1：本人,2：本部门，3：本部门及下属部门，4：本机构，5：全部
+                                switch (authType) {
+                                    //本用户
+                                    case 1:
+                                        if (currUserId != uId && zzdeptid.indexOf(DeptId) < 0) {
+                                            $(btns).find("a[name='" + item1.itemcode + "']").remove();
+                                        }
+                                        break;
+                                        //本部门
+                                    case 2:
+                                        if (deptCode != dCode && zzdeptid.indexOf(DeptId) < 0) {
+                                            $(btns).find("a[name='" + item1.itemcode + "']").remove();
+                                        }
+                                        break;
+                                        //本子部门
+                                    case 3:
+                                        if (dCode.indexOf(deptCode) < 0 && zzdeptid.indexOf(DeptId) < 0) {
+                                            $(btns).find("a[name='" + item1.itemcode + "']").remove();
+                                        }
+                                        break;
+                                        //本机构
+                                    case 4:
+                                        if (oCode != orgCode && zzdeptid.indexOf(DeptId) < 0) {
+                                            $(btns).find("a[name='" + item1.itemcode + "']").remove();
+                                        }
+                                        break;
+                                }
+                            });
+
+                            //$(btns).each(function (j, dom) {
+                            //    if (html.indexOf(dom.attr("name")) < 0) {
+                            //        $(dom).remove();
+                            //    }
+                            //});
+                        }
+
+
+                    });
+                });
+            }
+        });
+        //$gridTable.authorizeColModel()
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                ////隐藏搜索框
+                var title = $(".ui-filter-text");
+
+                title.trigger("click");
+            }
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                Name: $("#txt_Keyword").val(),
+                code: _parentId,
+                isOrg: _isOrg,
+                happentimestart: $("#HAPPENTIMES").val(),
+                happentimeend: $("#HAPPENTIMEE").val(),
+                DrillType: $("#DrillType").attr('data-value'),
+                DrillMode: $("#DrillMode").attr('data-value'),
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+        //保存事件
+        $("#btn_Save").click(function () {
+            if (!$('#gridTable').Validform()) {
+                return false;
+            }
+            var tab = $("#gridTable");
+            var rowId = $("#gridTable").jqGrid('getRowData').length;
+            var row = $('#gridTable').jqGrid('getRowData');
+            var arr = [];
+            var keyValue = "";
+            var msgerror = 0;
+            if (typeAction == "add") {
+                var list = $("#gridTable tr")
+                for (var i = 1; i < list.length; i++) {
+                    var num = parseInt(list[i].getAttribute("id")) + 1;
+                    var orgdeptid = $("#OrgDeptId_" + num).val();
+                    var orgdeptcode = $("#OrgDeptCode_" + num).val();
+                    var orgdeptname = $("#OrgDept_" + num).val();
+                    if (orgdeptname == null || orgdeptname == undefined || orgdeptname == "") {
+                        continue;
+                    }
+                    var deptid = $("#DeptId_" + num).val();
+                    var deptname = $("#DeptName_" + num).val();
+                    if (deptname == null || deptname == undefined || deptname == "") {
+                        continue;
+                    }
+                    var DrillType = $("#DrillType_" + num).attr('data-value');
+                    if (DrillType == null || DrillType == undefined || DrillType == "") {
+                        //dialogMsg('请选择演练预案类型！', 0);
+                        msgerror++;
+                        continue;
+                    }
+
+                    var DrillTypeName = $("#DrillType_" + num).attr('data-text');
+                    var DrillMode = $("#DrillMode_" + num).attr('data-value');
+                    if (DrillMode == null || DrillMode == undefined || DrillMode == "") {
+                        //dialogMsg('请选择演练预案方式！', 0);
+                        msgerror++;
+                        continue;
+                    }
+                    var DrillModeName = $("#DrillMode_" + num).attr('data-text');
+                    var name = $("#Name_" + num).val();
+                    if (name == null || name == undefined || name == "") {
+                        //dialogMsg('请选择填写演练预案名称！', 0);
+                        msgerror++;
+                        continue;
+                    }
+                    var DrillCost = $("#DrillCost_" + num).val();
+                    //执行人
+                    var ExecutePersonId = $("#ExecutePersonId_" + num).val();
+                    var ExecutePersonName = $("#ExecutePersonName_" + num).val();
+                   
+
+                    var RplanId = $("#RplanId_" + num).val();
+                    if (RplanId == null || RplanId == undefined || RplanId == "") RplanId = 0;
+                    var PlanTime = $("#PlanTime_" + num).val();
+                    if (PlanTime == null || PlanTime == undefined || PlanTime == "") {
+                        //dialogMsg('请选择计划时间！', 0);
+                        msgerror++;
+                        continue;
+                    }
+                    //主键Id
+                    keyValue = $("#PKId_" + num).val();
+                    arr.push({ OrgDeptCode: orgdeptcode, OrgDeptId: orgdeptid, OrgDept: orgdeptname, RPLANID: RplanId, DEPARTID: deptid, DEPARTNAME: deptname, ExecutePersonId: ExecutePersonId, ExecutePersonName: ExecutePersonName, DrillType: DrillType, DrillTypeName: DrillTypeName, DRILLMODENAME: DrillModeName, DrillMode: DrillMode, name: name, PlanTime: PlanTime, id: keyValue, DrillCost: DrillCost });
+                }
+            }
+            else {
+                var rowId = $("#gridTable").jqGrid('getRowData').length;
+                var row = $('#gridTable').jqGrid('getRowData');
+
+                for (var i = 1; i < (rowId + 1) ; i++) {
+                    var orgdeptid = $("#OrgDeptId_" + i).val();
+                    var orgdeptcode = $("#OrgDeptCode_" + i).val();
+                    var orgdeptname = $("#OrgDept_" + i).val();
+                    if (orgdeptname == null || orgdeptname == undefined || orgdeptname == "") {
+                        continue;
+                    }
+                    var deptid = $("#DeptId_" + i).val();
+                    var deptname = $("#DeptName_" + i).val();
+                    if (deptname == null || deptname == undefined || deptname == "") {
+                        continue;
+                    }
+                    var DrillType = $("#DrillType_" + i).attr('data-value');
+                    if (DrillType == null || DrillType == undefined || DrillType == "") {
+                        //dialogMsg('请选择演练预案类型！', 0);
+                        msgerror++;
+                        continue;
+                    }
+
+                    var DrillTypeName = $("#DrillType_" + i).attr('data-text');
+                    var DrillMode = $("#DrillMode_" + i).attr('data-value');
+                    if (DrillMode == null || DrillMode == undefined || DrillMode == "") {
+                        //dialogMsg('请选择演练预案方式！', 0);
+                        msgerror++;
+                        continue;
+                    }
+                    var DrillModeName = $("#DrillMode_" + i).attr('data-text');
+                    var name = $("#Name_" + i).val();
+                    if (name == null || name == undefined || name == "") {
+                        //dialogMsg('请选择填写演练预案名称！', 0);
+                        msgerror++;
+                        continue;
+                    }
+                    var DrillCost = $("#DrillCost_" + num).val();
+                    //执行人
+                    var ExecutePersonId = $("#ExecutePersonId_" + i).val();
+                    var ExecutePersonName = $("#ExecutePersonName_" + i).val();
+                  
+                    var RplanId = $("#RplanId_" + i).val();
+                    if (RplanId == null || RplanId == undefined || RplanId == "") RplanId = 0;
+                    var PlanTime = $("#PlanTime_" + i).val();
+                    if (PlanTime == null || PlanTime == undefined || PlanTime == "") {
+                        //dialogMsg('请选择计划时间！', 0);
+                        msgerror++;
+                        continue;
+                    }
+                    //主键Id
+                    keyValue = $("#PKId_" + i).val();
+                    arr.push({ OrgDeptCode: orgdeptcode, OrgDeptId: orgdeptid, OrgDept: orgdeptname, RPLANID: RplanId, DEPARTID: deptid, DEPARTNAME: deptname, ExecutePersonId: ExecutePersonId, ExecutePersonName: ExecutePersonName, DrillType: DrillType, DrillTypeName: DrillTypeName, DRILLMODENAME: DrillModeName, DrillMode: DrillMode, name: name, PlanTime: PlanTime, id: keyValue, DrillCost: DrillCost });
+                }
+            }
+            if (arr.length == 0) {
+                dialogMsg('请补全必填信息！', 0);
+                return;
+            }
+            if (msgerror > 0) {
+                dialogMsg('请补全必填信息！', 0);
+                return;
+            }
+            var postData = JSON.stringify(arr);
+            $.post("../../EmergencyPlatform/Drillplan/SaveListForm", { param: postData }, function (data) {
+                dialogMsg(JSON.parse(data).message, 0);
+                $("#gridTable").trigger("reloadGrid");
+            });
+            typeAction = "";
+        })
+    }
+
+
+
+
+    //查看记录
+    function lookRecord(cellvalue) {
+        $.ajax({
+            url: '../../EmergencyPlatform/Drillplanrecord/GetListCountByDrillplanId',
+            data: { drillplanId: cellvalue },
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                if (result == "" || result == undefined || result == null) {
+                    cellvalue = "&nbsp;&nbsp;暂无";
+                }
+                else {
+                    cellvalue = "<a href='#' onclick='openRecord(\"" + cellvalue + "\")' style='color:blue; text-decoration:underline'  title='查看'>查看</a>";
+                }
+            }
+        });
+        return cellvalue;
+    }
+
+
+    function SelectRplanName(rowIndex) {
+        selectCommon({ rowIndex: rowIndex, winObject: window.document.body, domId: "Name_" + rowIndex + ",RplanId_" + rowIndex, checkMode: 1 }, "/EmergencyPlatform/Reserverplan/Select", "选择应急预案名称");
+    }
+    function openRecord(keyValue) {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '应急演练记录',
+            url: '/EmergencyPlatform/Drillplanrecord/List?drillplanId=' + keyValue,
+            width: "1700px",
+            height: "800px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //新增
+    function add() {
+        if (typeAction == "edit") {
+            dialogMsg('请先保存编辑中的演练计划！', 0);
+            return;
+        }
+        var ids = "";
+        if (typeAction == "") {
+            ids = $("#gridTable").jqGrid('getRowData').length;
+        }
+        else {
+            ids = $("#gridTable").getDataIDs();
+            ids = parseInt(ids[0].toString()) + 1;
+        }
+        typeAction = "add";
+        var rowId = $("#gridTable").jqGrid('getRowData').length;
+        var check = 0;
+        var row = $('#gridTable').jqGrid('getRowData');
+        var id = "";
+        $("#gridTable").addRowData(ids, {
+            PKId: "", Id: ids + 1, orgdeptid: "", orgdeptcode: "", orgdept: "", departid: "", departname: "", name: "", drilltypename: "", drillmodename: "", executepersonname: "", executepersonid: "", plantime: "", postname: "", drillcost: ""
+        }, 'first');
+
+        //演练预案类型
+        ComBoxForData("DrillType_" + (ids + 1), "MAE_DirllPlanType");
+        //方式
+        ComBoxForData("DrillMode_" + (ids + 1), "MAE_DirllMode");
+
+    }
+
+    //编辑
+    function edit(rowId, keyvalue) {
+        if (typeAction == "add") {
+            dialogMsg('请先保存需要新增的演练计划！', 0);
+            return;
+        }
+        typeAction = "edit";
+        var tab = $("#gridTable");
+        var row = $('#gridTable').jqGrid('getRowData');
+        if (row[0].id == "") {
+            dialogMsg('请先保存记录！', 0);
+            return;
+        }
+        var rowLength = $("#gridTable").jqGrid('getRowData').length;
+
+        var IdPK = tab.jqGrid('getGridParam', 'selrow');
+        if (IdPK == null) {
+            dialogMsg('请选择要编辑的记录！', 0);
+            return;
+        }
+        $("#edit" + rowId).hide();
+        rowId = parseInt(rowId);
+        ////获取当前选中行
+        //加上_edit作为修改的特殊标志
+        tab.jqGrid('setRowData', IdPK, {
+            Id: (rowId + 1),
+            orgdeptid: "",
+            orgdept: "",
+            orgdeptcode: "",
+            departid: "",
+            departname: "",
+            id: (rowId + 1),
+            name: "", drilltypename: "", drillmodename: "", executepersonname: "", executepersonid: "", plantime: "", postname: "", drillcost: ""
+        });
+        //演练预案类型
+        ComBoxForData("DrillType_" + (rowId + 1), "MAE_DirllPlanType");
+        //方式
+        ComBoxForData("DrillMode_" + (rowId + 1), "MAE_DirllMode");
+        //赋值
+        $("#DrillType_" + (rowId + 1)).ComboBoxSetValue(row[rowId].drilltype);
+        $("#DrillMode_" + (rowId + 1)).ComboBoxSetValue(row[rowId].drillmode);
+        $('select').comboSelect();
+        $("#Name_" + (rowId + 1)).val(row[rowId].name);
+        $("#RplanId_" + (rowId + 1)).val(row[rowId].rplanid);
+
+        $("#PlanTime_" + (rowId + 1)).val(row[rowId].plantime);
+        $("#DeptId_" + (rowId + 1)).val(row[rowId].departid);
+        $("#DeptName_" + (rowId + 1)).val(row[rowId].departname);
+
+        $("#ExecutePersonId_" + (rowId + 1)).val(row[rowId].executepersonid);
+        $("#ExecutePersonName_" + (rowId + 1)).val(row[rowId].executepersonname);
+
+        $("#OrgDeptId_" + (rowId + 1)).val(row[rowId].orgdeptid);
+        $("#OrgDeptCode_" + (rowId + 1)).val(row[rowId].orgdeptcode);
+        $("#OrgDept_" + (rowId + 1)).val(row[rowId].orgdept);
+        $("#PKId_" + (rowId + 1)).val(IdPK);
+        $("#DrillCost_" + (rowId + 1)).val(row[rowId].drillcost);
+    }
+
+    //删除
+    function del(rowId, keyValue) {
+        var jqTable = $("#gridTable");
+        var rowLength = $("#gridTable").jqGrid('getRowData').length;
+        //alert(rowLength);
+        //var keyValue = $('#gridTable').jqGridRowValue('teamid');
+        rowId = jqTable.jqGrid("getGridParam", "selrow");
+        if (keyValue == "") {
+            $('#gridTable').jqGrid('delRowData', rowId);
+            //jqTable.delRowData(rowId);
+            if ($('#gridTable').find("input").length == 0) {
+                typeAction = "";
+            }
+            return;
+        }
+        if (keyValue) {
+            $.RemoveForm({
+                url: "../../EmergencyPlatform/Drillplan/RemoveForm",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的应急演练！', 0);
+        }
+        if ($('#gridTable').find("input").length == 0) {
+            typeAction = "";
+        }
+    }
+
+    //导出
+    function exported() {
+        var queryJson = {
+            condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+            Name: $("#txt_Keyword").val(),
+            code: _parentId,
+            isOrg: _isOrg,
+            happentimestart: $("#HAPPENTIMES").val(),
+            happentimeend: $("#HAPPENTIMEE").val(),
+            DrillType: $("#DrillType").attr('data-value'),
+            DrillMode: $("#DrillMode").attr('data-value'),
+        }
+        var condition = $("#queryCondition").find('.dropdown-text').attr('data-value');
+        var keyword = $("#txt_Keyword").val();
+        var code = _parentId;
+        location.href = "../../EmergencyPlatform/Drillplan/ExportDrillplanList?queryJson=" + JSON.stringify(queryJson) + "&condition=" + condition + "&keyword=" + keyword + "&code=" + code;
+    }
+
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入应急演练计划',
+            url: '/EmergencyPlatform/Drillplan/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    $("#gridTable").jqGrid('setGridParam', {
+                        postData: { keyWord: "" }
+                    }).trigger('reloadGrid');
+                }
+            }
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">应急演练计划</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="padding-left:2px">
+                                <div class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li style="width:300px;"><a style="float:left;width:120px;">逾期未完成</a><div style="float: left; background-color: red; height: 22px; width: 100px;"></div></li>
+                                        <li style="width:300px;"><a style="float: left; width: 120px;">即将到期未完成</a><div style="float: left; background-color: orange; height: 22px; width: 100px;"></div></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <th class="formTitle">计划时间：</th>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="HAPPENTIMES" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" />
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="HAPPENTIMEE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" />
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            <tr>
+                                                <td class="formTitle">演练方式：</td>
+                                                <td class="formValue">
+                                                    <div id="DrillMode" type="select" class="ui-select" style="width: 130px;"></div>
+                                                </td>
+                                            </tr>
+
+                                            <tr>
+                                                <td class="formTitle">预案类型：</td>
+                                                <td class="formValue">
+                                                    <div id="DrillType" type="select" class="ui-select" style="width: 130px;"></div>
+                                                </td>
+                                            </tr>
+
+                                            <tr>
+                                                <td class="formTitle">预案名称：</td>
+                                                <td class="formValue">
+                                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><a id="btn_Save" class="btn btn-default"><i class="fa fa-save"></i>&nbsp;保存</a></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        @*<a id="add" class="btn btn-default" onclick="javascript: addMeasure()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+                            <a id="import" class="btn btn-default" onclick="javascript: importData()"><i class="fa fa-save"></i>&nbsp;导入</a>
+                            <a id="export" class="btn btn-default" onclick="javascript: exported()"><i class="fa
+                             fa-download"></i>&nbsp;导出</a>*@
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript">
+    $(function () { if (ishavasave > 0) { $("#btn_Save").css("display", ""); } })
+</script>

@@ -1,0 +1,173 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script src="~/Content/scripts/business/detailAgency.js"></script>
+<script>
+    //=================
+    //用户信息
+    //=================
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户ID
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Id
+    var deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";//当前用户所属部门名称
+    //页面请求参数
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    $(function () {
+        keyValue = !!keyValue ? keyValue : newGuid();
+        //
+        //创建代理
+        //
+        var detailAgc = new detailAgency({
+            keyValue: keyValue,
+            actiontype: actiontype,
+            saveParam: {                
+                url: '../../NosaManage/Nosaele/SaveForm'
+            }
+        });
+        //
+        //绑定页面控件
+        //
+        detailAgc.bindPageControls({
+            saveId: "btn_Save"
+        });
+        //
+        //初始化数据
+        //
+        detailAgc.initialPage([
+            {
+                url: '../../NosaManage/Nosaele/GetFormJson',
+                param: { keyValue: keyValue },              
+                forms: [{ Id: 'form1', dataProName: 'data.data', extData: { DutyUserId: userId, DutyUserName: userName, DutyDepartId: deptId, DutyDepartName: deptName } }]
+            }
+        ]);
+        //
+        //定义并添加规则
+        //
+        detailAgc.addRule(new pageRule({ ruleId: 'valNewNo', ruleType: 'validate', onExecute: validateIsNewNo }));
+        detailAgc.addRule(new pageRule({ ruleId: 'selUser', ruleType: 'trigger', onExecute: selectUser }));
+        detailAgc.addRule(new pageRule({ ruleId: 'selEle', ruleType: 'trigger', onExecute: selectEle }));
+        detailAgc.bindTriggerRule([{ ctrlId: 'DutyUserName', evtName: 'click', ruleId: 'selUser' }]);
+        detailAgc.bindTriggerRule([{ ctrlId: 'ParentName', evtName: 'click', ruleId: 'selEle' }]);
+    })  
+    //
+    //选择责任人及部门
+    //
+    function selectUser() {
+        selectMuchUser({ deptId: '', checkMode: 0, mode: 0, userIds: $("#DutyUserId").val(), winObject: window.document.body, domId: 'DutyUserName|0,DutyUserId|2,DutyDepartId|3,DutyDepartName|5' });
+        
+    }
+    //
+    //弹出窗口选择上级要素
+    //
+    function selectEle() {
+        return dialogOpen({
+            id: "selectEle",
+            title: "选择要素",
+            url: '/NosaManage/Nosaele/Select',
+            width: ($(top.window).width() - 250) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick({
+                    winObject: window.document.body,
+                    domId: 'ParentId,ParentName',
+                    callBack: function () {
+                        if ($("#ParentId").val() == keyValue) {
+                            $("#ParentId,#ParentName").val("");
+                            dialogMsg("上级要素不能选择自己！", 0);
+                        }
+                    }
+                });
+            }
+        });
+    }
+    //
+    //验证是否为新编码
+    //
+    function validateIsNewNo() {
+        var r = false;
+
+        var no = $("#NO").val();
+        $.ajax({
+            url: "ExistEleNo",
+            type: "get",
+            dataType: "json",
+            async: false,
+            data: { keyValue: keyValue, No: no },
+            success: function (data) {
+                if (!!data && data.resultdata==false) {
+                    r = true;
+                } else {
+                    dialogMsg("要素编号已存在，请校正。", -1);
+                }
+            },
+            error: function (XMLHttpRequest, textStatus, errorThrown) {
+                dialogMsg(errorThrown, -1);
+            }
+        });
+
+        return r;
+    }
+</script>
+<div class="center-Panel" style="margin-top:42px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">编号<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="NO" type="text" class="form-control" errormsg="编号不能为空，" isvalid="yes" checkexpession="LenStr" length="50" />
+                        </td>
+                        <td class="formTitle">名称<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="Name" type="text" class="form-control" errormsg="名称不能为空，" isvalid="yes" checkexpession="LenStr" length="200" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">负责人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="DutyUserName" type="text" class="form-control" errormsg="责任人"  readonly="readonly" isvalid="yes" checkexpession="NotNull" />
+                            <input id="DutyUserId" type="hidden" />
+                        </td>                   
+                        <td class="formTitle">责任部门<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="DutyDepartName" type="text" class="form-control" readonly="readonly" errormsg="责任部门" isvalid="yes" checkexpession="NotNull"/>
+                            <input id="DutyDepartId" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">上级要素</td>
+                        <td class="formValue">
+                            <input id="ParentName" type="text" class="form-control" readonly="readonly" errormsg="上级要素" checkexpession="NotNull" />
+                            <input id="ParentId" type="hidden" />
+                        </td>
+                        <td class="formTitle">&nbsp;</td>
+                        <td class="formValue">&nbsp;</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style="top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+    </div>
+    <div id="HidMessage" style="width:360px; margin-left:20px; float:left;"></div>
+</div>

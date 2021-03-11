@@ -1,0 +1,167 @@
+﻿@model ERCHTMS.Entity.HseManage.WarningCardEntity
+
+@{
+    ViewBag.Title = "Edit";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/Content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/layui/layui.all.js"></script>
+<script src="~/Content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var lastSel, id = '@ViewBag.id';
+    jQuery(function () {
+        if (id)
+            jQuery('table.form tr:eq(2)').hide();
+
+        var json = JSON.parse('@Html.Raw(ViewBag.json)');
+        jQuery('#grid').jqGrid({
+            autowidth: true,
+            rownumbers: true,
+            multiselect: true,
+            multiboxonly: true,
+            height: 310,
+            editurl: 'clientArray',
+            datatype: 'local',
+            data: json,
+            pageNum: 500,
+            colModel: [
+                { name: 'CheckContentId', index: 'CheckContentId', hidden: true },
+                { label: '检查内容', name: 'Content', index: 'Content', width: 300, align: 'center', editable: true, edittype: 'text' },
+            ],
+            onSelectRow: function (rowid) {
+                if (rowid && rowid != lastSel) {
+                    jQuery('#grid').jqGrid('saveRow', lastSel);
+                    lastSel = rowid;
+                }
+                jQuery('#grid').jqGrid('editRow', rowid, true);
+            },
+        });
+
+        jQuery('#file').change(function () {
+            Loading(true, "解析中……");
+
+            var form1 = document.querySelector('#form1');
+            jQuery.ajax({
+                url: '@Url.Action("Import")',
+                type: 'POST',
+                dataType: 'json',
+                data: new FormData(form1),
+                processData: false,
+                contentType: false,
+                success: function (data, status) {
+                    Loading(false);
+                    if (data.success) {
+                        for (var i = 0; i < data.data.length; i++) {
+                            jQuery('.unwritten').remove();
+
+                            jQuery('#grid').jqGrid('addRowData', new Date().getTime(), { Content: data.data[i] });
+                        }
+                    } else {
+                        layer.msg(data.message);
+                    }
+                }
+            });
+        });
+    });
+
+    function addRow() {
+        jQuery('.unwritten').remove();
+
+        jQuery('#grid').jqGrid('addRowData', new Date().getTime(), { Content: '' });
+    }
+
+    function removeRow() {
+        var ary = jQuery('#grid').jqGrid('getGridParam', 'selarrrow');
+        while (ary.length > 0) {
+            jQuery('#grid').jqGrid('delRowData', ary[0]);
+        }
+    }
+
+    function AcceptClick() {
+        if (lastSel)
+            jQuery('#grid').jqGrid('saveRow', lastSel);
+
+        var data = jQuery('#grid').jqGrid('getRowData');
+        var valid = true;
+        jQuery.each(data, function (i, o) {
+            if (!o.Content) {
+                layer.msg('行 ' + (i + 1) + ' 请输入检查内容！');
+                valid = false;
+                return false;
+            }
+        });
+
+        if (!valid) return false;
+
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        var postData = $("#form1").formSerialize();
+        postData.CheckContents = data;
+
+        jQuery.SaveForm({
+            url: '/../@Url.Action("Edit")',
+            type: 'post',
+            contentType: 'application/json',
+            dataType: 'json',
+            param: JSON.stringify(postData),
+            success: function (data) {
+                $.currentIframe().reload();
+            }
+        });
+    }
+</script>
+<div style="margin: 10px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">名称<font face="宋体">*</font></td>
+            <td class="formValue">
+                @Html.TextBoxFor(x => x.CardName, new { @class = "form-control", placeholder = "请输入名称", isvalid = "yes", checkexpession = "NotNull", maxlength = 200 })
+                @*<input id="CardName" name="CardName" type="text" maxlength="50" class="form-control" isvalid="yes" checkexpession="NotNull" />*@
+            </td>
+            <td class="formTitle">类别<font face="宋体">*</font></td>
+            <td class="formValue">
+                @Html.DropDownListFor(x => x.Category, ViewData["Category"] as List<SelectListItem>, new { @class = "form-control selectpicker", maxlength = 500, placeholder = "请选择类别" })
+
+                @*<input id="Category" name="Category" type="text" maxlength="6" class="form-control" isvalid="yes" checkexpession="NotNull" />*@
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">提交人</td>
+            <td class="formValue">
+                @Html.TextBoxFor(x => x.SubmitUser, new { @class = "form-control", disabled = "disabled" })
+            </td>
+            <td class="formTitle">提交时间</td>
+            <td class="formValue">
+                @Html.TextBoxFor(x => x.SubmitTime, new { @class = "form-control", disabled = "disabled" })
+                @*<input id="SubmitTime" name="SubmitTime" type="text" class="form-control disabled" isvalid="yes" checkexpession="NotNull" disabled />*@
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">导入</td>
+            <td class="formValue">
+                <input type="file" value="选择导入文件" name="file" id="file" />
+            </td>
+            <td class="formTitle">模板</td>
+            <td>
+                <a style="color:blue;" href="@Url.Action("Download")">下载模板</a>
+                @*<a style="color:blue;" href="../../Resource/ExcelTemplate/指标卡检查内容导入模板.xlsx">下载模板</a>*@
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle"></td>
+            <td class="formValue">
+                <input type="button" value="新增" class="btn btn-default" onclick="addRow()" />
+                <input type="button" value="删除" class="btn btn-default" onclick="removeRow()" />
+            </td>
+            <td class="formTitle"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <td colspan="4">
+                <table id="grid"></table>
+            </td>
+        </tr>
+    </table>
+</div>

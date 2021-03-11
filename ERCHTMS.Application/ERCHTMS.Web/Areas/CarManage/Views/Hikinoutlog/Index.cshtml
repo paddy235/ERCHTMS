@@ -1,0 +1,507 @@
+@{
+    ViewBag.Title = "车辆进出厂统计";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+<style type="text/css">
+    .dropdown-menu > li > a:active {
+        color: rgb(38, 38, 38);
+        background-color: transparent;
+        text-decoration: none;
+    }
+    .Tj tr, .Tj td {
+        border: 1px solid #000000;
+    }
+
+    .Tj {
+        width: 100%;
+        min-height: 25px;
+        line-height: 25px;
+        text-align: center;
+        border-collapse: collapse;
+    }
+
+    .pop {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 100;
+        display: none;
+    }
+
+    .pop-conetnt {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-50%);
+        /*background: #fff;*/
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+    }
+</style>
+<script>
+    var state = 1;
+    var deptCode = "";
+    var CarType = "";
+    var InLog = "";
+    var KMHikImgIp = "@ViewBag.KMHikImgIp";//海康图片访问ip地址
+     var softName = "@BSFramework.Util.Config.GetValue("SoftName").ToLower()";
+    $(function () {
+        IniDownList();
+        GetGrid();
+        GetPersonNums();
+    });
+
+    function IniDownList() {
+        //$("#OutType").ComboBox({
+        //    url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+        //    param: { EnCode: "InOut" },
+        //    id: "ItemValue",
+        //    text: "ItemName",
+        //    description: "==请选择==",
+        //    height: "200px",
+        //    allowSearch: true
+        //});
+        $("#EventType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "HikEventType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        $("#AreaName").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "DoorPost" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+
+        if (softName == "gdhjb") {
+            $("#btnqs").hide();
+        }
+
+    }
+
+    function GetPersonNums() {
+        //初始化危险因素标准
+        $.ajax({
+            url: top.contentPath + "/CarManage/Hikinoutlog/GetPersonNums",
+            type: "get",
+            dataType: "json",
+            async: false,
+            success: function (data) {
+                var html = "<tr><td>人员/区域</td><td>生产区</td><td>三期区</td><td>码头区</td></tr>";
+                var area1 = 0, area2 = 0, area3 = 0;
+                for (var i = 0; i < data.PersonData.length; i++) {
+                    area1 = area1 + data.PersonData[i].stationCount1;
+                    area2 = area2 + data.PersonData[i].stationCount2;
+                    area3 = area3 + data.PersonData[i].stationCount3;
+                    if (data.PersonData[i].userType == 0) {                        
+                        html += "<tr><td>电厂（人）</td><td><a href=\"javascript:TodayPerson(\'一号岗\',0);\">" + data.PersonData[i].stationCount1 + "</a></td><td><a href=\"javascript:TodayPerson(\'三号岗\',0);\">" + data.PersonData[i].stationCount2 + "</a></td><td><a href=\"javascript:TodayPerson(\'码头岗\',0);\">" + data.PersonData[i].stationCount3 + "</a></td></tr>";
+                    } else if (data.PersonData[i].userType == 1) {
+                        html += "<tr><td>外委（人）</td><td><a href=\"javascript:TodayPerson(\'一号岗\',1);\">" + data.PersonData[i].stationCount1 + "</a></td><td><a href=\"javascript:TodayPerson(\'三号岗\',1);\">" + data.PersonData[i].stationCount2 + "</a></td><td><a href=\"javascript:TodayPerson(\'码头岗\',1);\">" + data.PersonData[i].stationCount3 + "</a></td></tr>";
+                    } else if (data.PersonData[i].userType == 2) {
+                        html += "<tr><td>临时（人）</td><td><a href=\"javascript:TodayPerson(\'一号岗\',2);\">" + data.PersonData[i].stationCount1 + "</a></td><td><a href=\"javascript:TodayPerson(\'三号岗\',2);\">" + data.PersonData[i].stationCount2 + "</a></td><td><a href=\"javascript:TodayPerson(\'码头岗\',2);\">" + data.PersonData[i].stationCount3 + "</a></td></tr>";
+                    }
+                   // allNums += data.PersonData[i].sums;
+                }
+
+                html += "<tr><td>统计（人）</td><td>"+area1+"</td><td>"+area2+"</td><td>"+area3+"</td></tr>";
+                $("#Tj").html(html);
+            }
+        });
+        
+    }
+
+    function TodayPerson(area,type) {
+        //查看图片
+        var w = 1200;
+        var h = 960;
+        dialogOpen({
+            id: "TodayPerson",
+            title: "人员清单",
+            url: '/CarManage/Hikinoutlog/Form?type=' + type + "&area=" + area,
+            shade: 0.5,
+            btn: null,
+            width: w + "px",
+            height: h + "px",
+            callBack: function (iframeId) {
+
+            }
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 300,
+            url: "../../CarManage/Hikinoutlog/GetListJson",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '姓名',
+                    name: 'username',
+                    index: 'username',
+                    width: 200,
+                    align: 'center'
+                },
+                {
+                    label: '部门',
+                    name: 'deptname',
+                    index: 'deptname',
+                    width: 200,
+                    align: 'center'
+                },
+                {
+                    label: '门禁点',
+                    name: 'devicename',
+                    index: 'devicename',
+                    width: 200,
+                    align: 'center'
+                },
+                {
+                    label: '门禁点区域',
+                    name: 'areaname',
+                    index: 'areaname',
+                    width: 200,
+                    align: 'center'
+                },
+                {
+                    label: '出\入',
+                    name: 'inout',
+                    index: 'inout',
+                    width: 200,
+                    align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        switch (cellvalue) {
+                            case 0:
+                                return "进门";
+                                break;
+                            case 1:
+                                return "出门";
+                                break;
+                        }
+                    }
+                },
+                {
+                    label: '事件类型',
+                    name: 'eventtype',
+                    index: 'eventtype',
+                    width: 200,
+                    align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        switch (cellvalue) {
+                            case 1:
+                                return "人脸通过事件";
+                                break;
+                            case 2:
+                                return "车辆放行事件";
+                                break;
+                            case 3:
+                                return "门禁刷卡事件";
+                                break;
+                            case 4:
+                                return "门禁指纹通过事件";
+                                break;
+                        }
+                    }
+                },
+                {
+                    label: '抓拍照片',
+                    name: 'screenshot',
+                    index: 'screenshot',
+                    width: 200,
+                    align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        var picpath = GetHikImgUrl(cellvalue);
+                        if (cellvalue) {
+                            html = "<img width='35'title='点击查看大图' height='35'  onclick=ShowImg('" + picpath +
+                                "') src='" + picpath +
+                                "'>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '时间',
+                    name: 'createdate',
+                    index: 'createdate',
+                    width: 200,
+                    align: 'center'
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            //multiboxonly: true,
+            //multiselect: true,
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            userdata: "userdata",
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value);
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                StartTime: $("#StartTime").val(),
+                EndTime: $("#EndTime").val(),
+                DeptName: $("#DeptName").val(),
+                Name: $("#Name").val(),
+                DeviceName: $("#DeviceName").val(),
+                AreaName: $("#AreaName").attr('data-value'),
+                EventType: $("#EventType").attr('data-value')
+
+            }
+            $gridTable.jqGrid('setGridParam',
+                {
+                    postData: { queryJson: JSON.stringify(queryJson) },
+                    page: 1
+                }).trigger('reloadGrid');
+        });
+        $("#btn_Reset").click(function () {
+            $("#StartTime").val("");
+            $("#EndTime").val("");
+            $("#DeptName").val("");
+            $("#Name").val("");
+            $("#DeviceName").val("");
+            $("#AreaName").attr("data-text", "===全部===");
+            $("#AreaName").attr("data-value", "");
+            $("#AreaName div:eq(0)").text("===全部===");
+            $("#EventType").attr("data-text", "===全部===");
+            $("#EventType").attr("data-value", "");
+            $("#EventType div:eq(0)").text("===全部===");
+            var queryJson = {
+                StartTime: "",
+                EndTime: ""
+            }
+            $gridTable.jqGrid('setGridParam',
+                {
+                    postData: { queryJson: JSON.stringify(queryJson) },
+                    page: 1
+                }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress',
+            function (event) {
+                if (event.keyCode == "13") {
+                    $('#btn_Search').trigger("click");
+                }
+            });
+    }
+
+    function ShowImg(url) {
+        ////查看图片
+        //var w = 1200;
+        //var h = 960;
+        //dialogOpen({
+        //    id: "DetailPrject",
+        //    title: "查看图片",
+        //    url: '/CarManage/Hikdevice/ImgShow?Url=' + url,
+        //    shade: 0.5,
+        //    btn: null,
+        //    width: w + "px",
+        //    height: h + "px",
+        //    callBack: function (iframeId) {
+
+        //    }
+        //});
+        $("#pop").show();
+        $("#imgShow").attr("src", url);
+
+
+    }
+
+    //导出
+    function exportResult() {
+
+        var queryJson = JSON.stringify({
+            StartTime: $("#StartTime").val(),
+            EndTime: $("#EndTime").val(),
+            DeptName: $("#DeptName").val(),
+            Name: $("#Name").val(),
+            DeviceName: $("#DeviceName").val(),
+            AreaName: $("#AreaName").attr('data-value'),
+            EventType: $("#EventType").attr('data-value')
+
+        })
+        location.href = "../../CarManage/Hikinoutlog/ExportData?queryJson=" + queryJson;
+    }
+    //判读是否是海康的图片路径不是则返回我们自己存储路径
+    function GetHikImgUrl(url) {
+        if (url) {
+            var start = url.indexOf("/Resource");
+            if (start == 0) {//是
+                return  top.contentPath + url;
+
+            } else {//否
+                return KMHikImgIp + url;
+            }
+        } else {
+            return '';
+        }
+    }
+</script>
+<div class="border" id="desktop" style=" background: #fff; overflow-y: auto;overflow-x:hidden; ">
+    <div style="margin-top:10px;">
+        <div class="row">
+            <table style="width: 100%;">
+                <tr>
+                    <td>
+                        <div style="margin-left: 10px;" class="toolbar">
+                            <div class="btn-group">
+                                <button id="btntj" class="btn btn-primary btn10" type="button" onclick="state = 1;$('#con1').show();$('#con2').hide();$('.btn10').removeClass('btn-primary');$('.btn10').addClass('btn-default');$(this).addClass('btn-primary');"><i class="fa fa fa-pie-chart"></i>&nbsp;进出事件</button>
+                                <button id="btnqs" class="btn btn-default btn10" type="button" onclick="state = 2;$('#con1').hide();$('#con2').show();$('.btn10').removeClass('btn-primary');$('.btn10').addClass('btn-default');$(this).addClass('btn-primary');"><i class="fa fa fa-area-chart"></i>&nbsp;人员实时统计</button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+
+    </div>
+
+    <div id="con1" style="margin-top: 10px;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;进出记录</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="width: 65px; font-weight: bold;" align="right">姓名：</td>
+                        <td style="width: 90px;">
+                            <input id="Name" type="text" class="form-control">
+                        </td>
+                        <td style="width: 65px; font-weight: bold;" align="right" class="area">所属部门：</td>
+                        <td style="width: 90px;" class="area">
+                            <input id="DeptName" type="text" class="form-control">
+                        </td>
+                        <td style="width: 65px; font-weight: bold;" align="right" class="area">门禁点：</td>
+                        <td style="width: 90px;" class="area">
+                            <input id="DeviceName" type="text" class="form-control">
+                        </td>
+                        <td style="width: 65px; font-weight: bold; " align="right" class="area">门禁区域：</td>
+                        <td style="width: 90px;" class="area">
+                            <div id="AreaName" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull">
+                            </div>
+                        </td>
+                        <td style="width: 65px; font-weight: bold;" align="right" class="area">事件类型：</td>
+                        <td style="width: 90px;" class="area">
+                            <div id="EventType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull">
+                            </div>
+                        </td>
+
+                        <td align="right" style="width: 140px;">
+                            <a id="btn_Search" class="btn btn-primary" onclick="query()"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            &nbsp;<a id="btn_Reset" class="btn btn-primary" onclick="reset()"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                            &nbsp;<a id="export" class="btn btn-primary" onclick="exportResult()">导出</a>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td style="width: 65px; font-weight: bold;" align="right">进入开始时间：</td>
+                        <td style="width: 90px;">
+                            <input id="StartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm:ss'})">
+                        </td>
+                        <td style="width: 10px; font-weight: bold;" align="center" class="area">-</td>
+                        <td style="width: 90px;" class="area">
+                            <input id="EndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })">
+                        </td>
+                        <td colspan="7"></td>
+                    </tr>
+                </table>
+                <div class="row" style="margin: 10px;">
+                    <table id="gridTable"></table>
+                    <div id="gridPager"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="con2" style="margin-top: 10px;display:none;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;人员实时统计</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div class="row" style="margin:10px;">
+                    <table class="Tj" id="Tj">
+                        @*<tr>
+                            <td>人员/区域</td>
+                            <td>生产区</td>
+                            <td>办公区</td>
+                            <td>总计</td>
+                        </tr>
+                        <tr>
+                            <td>电厂（人）</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td>外委（人）</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td>临时（人）</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td>统计（人）</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>*@
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="pop" id="pop" style="display:none;" onclick="$('#pop').hide()">
+    <div class="pop-conetnt" >
+        <img id="imgShow" width="800" height="600"/>
+    </div>
+</div>
+

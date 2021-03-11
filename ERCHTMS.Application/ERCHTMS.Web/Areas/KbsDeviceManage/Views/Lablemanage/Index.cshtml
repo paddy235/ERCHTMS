@@ -1,0 +1,465 @@
+@{;
+    ViewBag.Title = "标签管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link type="text/css" rel="stylesheet" href="~/Content/styles/kbscss/common.css">
+<link type="text/css" rel="stylesheet" href="~/Content/styles/kbscss/dilog.css">
+
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+<script src="~/Content/scripts/kbsjs/echarts.min.js"></script>
+<script src="~/Content/scripts/kbsjs/dilog.js"></script>
+
+
+
+<style type="text/css">
+    .btndiv {
+        float: left;
+        width: 58px;
+        height: 29px;
+        background: inherit;
+        border: none;
+        border-radius: 14px;
+        -moz-box-shadow: none;
+        -webkit-box-shadow: none;
+        box-shadow: none;
+        font-weight: 400;
+        font-style: normal;
+        font-size: 14px;
+        color: rgb(67, 67, 67);
+        text-align: center;
+        line-height: 25px;
+        cursor: pointer;
+    }
+
+    .activebtndiv {
+        float: left;
+        width: 58px;
+        height: 29px;
+        background: inherit;
+        background-color: rgba(24, 144, 255, 1);
+        border: none;
+        border-radius: 14px;
+        -moz-box-shadow: none;
+        -webkit-box-shadow: none;
+        box-shadow: none;
+        font-weight: 400;
+        font-style: normal;
+        font-size: 14px;
+        color: #FFFFFF;
+        text-align: center;
+        line-height: 25px;
+    }
+</style>
+<script>
+    var selectType = "";
+    var selectStatus = "";
+    var deptCode = "";
+    $(function () {
+
+        IniLableType("type");
+        GetTree();
+        InitialPage();
+        GetGrid();
+        stat();
+
+    });
+    
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 400
+            }
+        );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                deptCode = item.Code;
+                Search();
+                //$('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 226);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 226);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 226,
+            url: "../../KbsDeviceManage/Lablemanage/GetPageListJson",
+            datatype: "json",
+            loadonce: false,
+            colModel: [
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false
+                    //,formatter: function (cellvalue, options, rowObject) {
+                    //    var html = "<a onclick=\"btn_delete('" + rowObject.ID + "')\">解绑</a>";
+                    //    return html;
+                    //}
+                },
+                { label: '主键ID', name: 'ID', index: 'ID', width: 100, align: 'center', sortable: false, hidden: true },
+                { label: '标签ID', name: 'LableId', index: 'LableId', width: 200, align: 'center', sortable: false },
+                { label: '姓名/车牌', name: 'Name', width: 150, align: 'center', sortable: false },
+                { label: '部门', name: 'DeptName', width: 200, align: 'center', sortable: false },
+                {
+                    label: '标签电量', name: 'Power', width: 100, align: 'center', sortable: false
+                },
+                {
+                    label: '标签状态', name: 'State', width: 100, align: 'center', sortable: false
+                },
+                { label: '类型0人员 1车辆', name: 'Type', index: 'Type', width: 100, align: 'center', sortable: true, hidden: true },
+                { label: '标签类型', name: 'LableTypeName', index: 'LableTypeName', width: 150, align: 'center', sortable: true },
+                { label: '身份证号/驾驶员', name: 'IdCardOrDriver', index: 'IdCardOrDriver', width: 100, align: 'center', sortable: false, hidden: true },
+                { label: '电话', name: 'phone', index: 'phone', width: 100, align: 'center', sortable: false, hidden: true },
+                {
+                    label: '绑定时间', name: 'BindTime', index: 'BindTime', width: 200, align: 'center', sortable: true
+                    //,
+                    //formatter: function (cellvalue, options, rowObject) {
+                    //    return formatDate(cellvalue, 'yyyy-MM-dd');
+                    //}
+                },
+                { label: '操作人', name: 'OperUserId', index: 'OperUserId', width: 100, align: 'center', sortable: false }
+
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                kbsgridqx($gridTable);
+            }
+        });
+    }
+    //初始化标签类别
+    function IniLableType(divid) {
+        //初始化危险因素标准
+        $.ajax({
+            url: top.contentPath + "/OccupationalHealthManage/Occupationalstaffdetail/GetCmbJson?Code=LabelType",
+            type: "post",
+            dataType: "json",
+            async: false,
+            success: function (data) {
+                var html = "<div class=\"btndiv\" style=\"font-weight: bold; width: 86px;cursor: default\">标签类型:</div>";
+                html += "<div id=\"qbtype\" class=\"activebtndiv\" onclick=\"SelectFun('qbtype', '" + divid + "')\" sValue=\"\" >全部</div>";
+                for (var i = 0; i < data.length; i++) {
+                    var len = data[i].ItemName.length;
+                    var width = (len * 16) + 30;
+                    html += " <div id=\"" +
+                        data[i].ItemValue +
+                        "\" class=\"btndiv\" style=\"width: " + width + "px; \" onclick=\"SelectFun('" +
+                        data[i].ItemValue +
+                        "', '" + divid + "')\" sValue=\"" + data[i].ItemValue + "\" >" +
+                        data[i].ItemName +
+                        "</div>";
+                }
+                $("#" + divid).html(html);
+            }
+        });
+    }
+
+    function SelectFun(id, pid) {
+        var div = $("#" + pid).children('div');
+        for (var i = 0; i < div.length; i++) {
+            var ids = div.eq(i).attr("id");
+            if (ids != "undefined") {
+                $("#" + ids).removeClass();
+                if (id == ids) {
+                    $("#" + ids).addClass("activebtndiv");
+                } else {
+                    $("#" + ids).addClass("btndiv");
+                }
+            }
+        }
+        if (pid == "status") {
+            selectStatus = $("#" + id).attr("sValue");
+        } else {
+            selectType = $("#" + id).attr("sValue");
+        }
+        Search();
+    }
+
+    function Search() {
+        var queryJson = {
+            selectStatus: selectStatus,
+            selectType: selectType,
+            deptCode: deptCode,
+            Search: $("#txt_Keyword").val()
+        }
+        $("#gridTable").setGridParam({ url: top.contentPath + "/KbsDeviceManage/Lablemanage/GetPageListJson" });
+        $("#gridTable").setGridParam({ datatype: 'json', page: 1 })
+            .jqGrid('setGridParam', { page: 1, postData: { queryJson: JSON.stringify(queryJson) } })
+            .trigger("reloadGrid");
+        stat();
+        //$('#gridTable').jqGrid('setGridParam', {
+        //    postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        //}).trigger('reloadGrid');
+    }
+
+    //新增
+    function add() {
+        dialogOpen2({
+            id: 'Edit',
+            title: '人员标签绑定',
+            url: '@Url.Action("Edit")',
+            width: '800px',
+            height: '500px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //编辑
+    function btn_edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('ID');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑标签管理',
+                url: '/KbsDeviceManage/Lablemanage/Form?keyValue=' + keyValue,
+                width: 'px',
+                height: 'px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+
+    //查看标签信息
+    function Look(keyValue) {
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "LableForm",
+                title: '查看绑定信息',
+                url: '/KbsDeviceManage/Lablemanage/Form?action=show&keyValue=' + keyValue,
+                width: '450px',
+                height: '500px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //解绑
+    function btn_delete(keyValue) {
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../KbsDeviceManage/Lablemanage/Untie',
+                param: { keyValue: keyValue },
+                msg: "注：您确定要解绑吗？",
+                loading: "正在解绑数据...",
+                success: function (data) {
+                    Search();
+                }
+            })
+        } else {
+            dialogMsg('请选择需要解绑的标签！', 0);
+        }
+    }
+
+    function Test() {
+        var dlg = dialogOpen({
+            id: "LableForm",
+            title: '查看统计信息',
+            url: '/KbsDeviceManage/Lablemanage/Static',
+            width: '800px',
+            height: '500px',
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+</script>
+<div class="main">
+    <div class="main_top">
+        <div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+            <div class="ui-layout-west">
+                <div class="west-Panel">
+                    <div class="panel-Title">
+                        <div class="col-md-10">
+                            部门
+                        </div>
+                        <div class="col-md-2 text-right" style="padding-right: 8px;">
+                            <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor: pointer;" title="展开/收起"></i>
+                        </div>
+                    </div>
+                    <div id="itemTree"></div>
+                </div>
+            </div>
+            <div class="ui-layout-center">
+                <div class="center-Panel" style="height: 75px;">
+                    <div style="margin-top: 5px;">
+                        <div class="row">
+                            <div id="status" class="col-md-12">
+                                <div class="btndiv" style="font-weight: bold; width: 86px; cursor: default">标签状态:</div>
+                                <div id="qb" class="activebtndiv" onclick="SelectFun('qb', 'status')" svalue="">全部</div>
+                                <div id="zx" class="btndiv" onclick="SelectFun('zx', 'status')" svalue="在线">在线</div>
+                                <div id="lx" class="btndiv" onclick="SelectFun('lx', 'status')" svalue="离线">离线</div>
+                            </div>
+                        </div>
+                        <div class="row" style="margin-top: 5px; margin-bottom: 5px;">
+                            <div id="type" class="col-md-12">
+                                @*<div class="btndiv" style="font-weight: bold; width: 86px;">标签类型:</div>
+                                    <div id="glry" class="activebtndiv" style="width: 86px; " onclick="SelectFun('glry', 'type')">管理人员</div>
+                                    <div id="bzyg" class="btndiv" style="width: 86px; " onclick="SelectFun('bzyg', 'type')">班组员工</div>
+                                    <div id="wbry" class="btndiv" style="width: 86px; " onclick="SelectFun('wbry', 'type')">外包人员</div>
+                                    <div id="lsry" class="btndiv" style="width: 86px; " onclick="SelectFun('lsry', 'type')">临时人员</div>
+                                    <div id="wb" class="btndiv" onclick="SelectFun('wb', 'type')">外包</div>
+                                    <div id="qt" class="btndiv" onclick="SelectFun('qt', 'type')">其他</div>*@
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="center-Panel">
+                    <div class="titlePanel">
+                        <div class="title-search">
+                            <table>
+                                <tr>
+                                    <td>
+                                        <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                    </td>
+                                    <td style="padding-left: 5px;">
+                                        <a id="btn_Search" class="btn btn-primary" onclick="Search()"><i class="fa fa-search"></i>搜索</a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                        </div>
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i> 绑定</a>
+                                <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i> 刷新</a>
+                                @*<a id="replace" class="btn btn-default" onclick="Test()">统计</a>*@
+                            </div>
+                        </div>
+                        <script>$('.toolbar').authorizeButton()</script>
+                    </div>
+                    <div class="gridPanel">
+                        <table id="gridTable"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dilelog lg">
+        <div class="dilelog_box">
+            <div class="dilelog_top clearfix">
+                <h3 class="fl">标签数量统计</h3>
+                <div class="dilelog_right">
+                    <span>总数：<i id="ZNum"></i> 个</span>
+                    <span>在线：<i id="OnlineNum"></i> 个</span>
+                </div>
+            </div>
+            <div class="clearfix dilelog_chart">
+                <div id="chart4" class="fl dilelog_quan"></div>
+            </div>
+            <div class="tableDiv1" id="tabcontent">
+                @*<table class="table1">
+                        <thead>
+                            <tr>
+                                <th width="25%">标签类型<span class=""></span></th>
+                                <th width="25%">标签数量<span class=" active"></span></th>
+                                <th width="25%">标签占比<span class=""></span></th>
+                                <th width="25%">在线数量</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>管理人员</td>
+                                <td class="group_underline">126</td>
+                                <td class="group_underline">20%</td>
+                                <td class="group_underline">16</td>
+                            </tr>
+                            <tr>
+                                <td class="group_interal ">班组员工</td>
+                                <td class="group_interal group_underline">108</td>
+                                <td class="group_interal group_underline">30%</td>
+                                <td class="group_interal group_underline">18</td>
+                            </tr>
+                            <tr>
+                                <td>外包人员</td>
+                                <td class="group_underline">121</td>
+                                <td class="group_underline">40%</td>
+                                <td class="group_underline">11</td>
+                            </tr>
+                            <tr>
+                                <td class="group_interal">临时人员</td>
+                                <td class="group_interal group_underline">95</td>
+                                <td class="group_interal group_underline">44%</td>
+                                <td class="group_interal group_underline">5</td>
+                            </tr>
+                            <tr>
+                                <td>车辆</td>
+                                <td class="group_underline">85</td>
+                                <td class="group_underline">64%</td>
+                                <td class="group_underline">5</td>
+                            </tr>
+                            <tr>
+                                <td class="group_interal">其他</td>
+                                <td class="group_interal group_underline">115</td>
+                                <td class="group_interal group_underline">44%</td>
+                                <td class="group_interal group_underline">5</td>
+                            </tr>
+                        </tbody>
+                    </table>*@
+            </div>
+
+        </div>
+        <div class="table_left">
+            <span id="btn_left_lg" class="leftDownImg active"></span>
+        </div>
+    </div>
+</div>
+
+<script src="~/Content/scripts/business/LableStatic.js"></script>

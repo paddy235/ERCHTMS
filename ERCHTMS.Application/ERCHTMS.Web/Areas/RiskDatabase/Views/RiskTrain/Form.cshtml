@@ -1,0 +1,640 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<link href="~/Content/styles/framework-flowall.css" rel="stylesheet" />
+
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var IsCommit = request('iscommit');
+    var currUserName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    var currUserAccout = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+    var trainType = "1";//1代表 风险措施库 2 代表 危险预知训练库
+    var type = request('type');
+
+    $(function () {
+        initControl();
+        if (IsCommit == "1") {
+            $("#selRiskData").attr("disabled", "disabled");
+            $("#selTrainLibData").attr("disabled", "disabled");
+            $("#btnSave").hide();
+        } else {
+            $("#selRiskData").attr("disabled", false);
+            $("#selTrainLibData").attr("disabled", false);
+            $("#btnSave").show();
+        }
+    });
+    //初始化控件
+    function initControl() {
+        file_upload.init({
+            keyValue: keyValue + "01",
+            extensions: 'mp3,mp4,avi,wmv',
+            isImage: false,
+            el: '#uploader1',
+            fileSizeLimit: 500 * 1024 * 1024,
+            fileSingleSizeLimit: 100 * 1024 * 1024,
+            fileDir: 'RiskTrain'
+        });
+        file_upload.init({
+            keyValue: keyValue + "02",
+            extensions: 'jpg,jpeg,png,gif',
+            isImage: true,
+            el: '#uploader2',
+            fileDir: 'RiskTrain'
+        });
+        //加载岗位
+        var orgCode = top.currUserDeptCode;
+        var isOrg = orgCode.length > 3 ? orgCode : "true";
+
+        $("#AreaId").ComboBoxTree({
+            url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + top.currUserOrgId,
+            height: "300px",
+            description: "请选择",
+            allowSearch: true
+        })
+        if (type == "train") {
+            $("#TaskName").attr("disabled", "disabled");
+            $("#AreaId").attr("disabled", "disabled");
+            $("#AreaName").attr("disabled", "disabled");
+            $("#WorkFzr").attr("disabled", "disabled");
+            $("#WorkUsers").attr("disabled", "disabled");
+            $("#form").find("select").attr("disabled", "disabled");
+            $("#AreaId").hide(); $("#AreaName").show();
+            $("#WorkStartTime").attr("checkexpession", "NotNull").attr("isvalid", "yes");
+            $("#WorkEndTime").attr("checkexpession", "NotNull").attr("isvalid", "yes");
+            $("#start").html('作业开始时间<font face="宋体">*</font>');
+            $("#end").html('作业结束时间<font face="宋体">*</font>');
+        } else {
+            $("#WorkStartTime").attr("checkexpession", "").attr("isvalid", "");
+            $("#WorkEndTime").attr("checkexpession", "").attr("isvalid", "");
+            $("#start").html('作业开始时间');
+            $("#end").html('作业结束时间');
+        }
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../RiskDatabase/Risktrain/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    trainType = data.TrainType;
+                    if (data.Status == 1) {
+                        $("#divAdd").remove();
+                    }
+                   
+                    file_upload.bindFiles(true, true, keyValue + "02", 'uploader2', true);
+                    file_upload.bindFiles(true, false, keyValue + "01", 'uploader1', true);
+                }
+            })
+        } else {
+            keyValue = "@Guid.NewGuid().ToString()";
+        }
+        GetGrid();
+    }
+    //保存表单
+    function AcceptClick(IsCom) {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+
+        postData["AreaName"] = $("#AreaId").attr("data-text");
+        postData["IsCommit"] = IsCom;
+        postData["trainType"] = trainType;
+
+        var measures = $("#gridTable").jqGrid('getRowData');
+        if (measures.length > 0) {
+            var arr = [];
+            var flag = false;
+            for (var i = 0; i < measures.length; i++) {
+                var dom = measures[i];
+                if (IsCommit == "1") {
+                    if ($("#gridTable").find("textarea[name='riskcontent']").eq(i).length > 0) {
+                        if (($.trim($("#gridTable").find("textarea[name='riskcontent']").eq(i).val()).length == 0 || $.trim($("#gridTable").find("textarea[name='measure']").eq(i).val()).length == 0) && !flag) {
+                            flag = true;
+                        } else {
+                            var status = $("#gridTable").find("input:checkbox").eq(i).get(0).checked ? 1 : 0;
+                            var ls = "lsPeople_" + $("#gridTable").find("td[aria-describedby='gridTable_Id']").eq(i).attr("title");
+                            arr.push({
+                                RiskContent: $("#gridTable").find("textarea[name='riskcontent']").eq(i).val(),
+                                Measure: $("#gridTable").find("textarea[name='measure']").eq(i).val(),
+                                Status: status,
+                                WorkId: keyValue,
+                                Id: newGuid(),
+                                CreateDate: formatDate(new Date(), "yyyy-MM-dd hh:mm:ss"),
+                                LsPeople: $("#" + ls).val()
+                            });
+                        }
+                    } else {
+                        var status = $("#gridTable").find("input:checkbox").eq(i).get(0).checked ? 1 : 0;
+                        var ls = "lsPeople_" + $("#gridTable").find("td[aria-describedby='gridTable_Id']").eq(i).attr("title");
+                        arr.push({
+                            RiskContent: $("#gridTable").find("textarea[name='riskcontent']").eq(i).val(),
+                            Measure: $("#gridTable").find("textarea[name='measure']").eq(i).val(),
+                            Status: status,
+                            WorkId: keyValue,
+                            Id: newGuid(),
+                            CreateDate: formatDate(new Date(), "yyyy-MM-dd hh:mm:ss"),
+                            LsPeople: $("#" + ls).val()
+                        });
+                    }
+                } else {
+                    if ($("#gridTable").find("textarea[name='riskcontent']").eq(i).length > 0) {
+                        if ($.trim($("#gridTable").find("textarea[name='riskcontent']").eq(i).val()).length == 0 && !flag) {
+                            flag = true;
+                        } else {
+                            arr.push({
+                                RiskContent: $("#gridTable").find("textarea[name='riskcontent']").eq(i).val(),
+                                Measure: $("#gridTable").find("textarea[name='measure']").eq(i).val(),
+                                Status: 0,
+                                WorkId: keyValue,
+                                Id: newGuid(),
+                                CreateDate: formatDate(new Date(), "yyyy-MM-dd hh:mm:ss")
+                            });
+                        }
+                    } else {
+                        arr.push({
+                            RiskContent: $("#gridTable").find("textarea[name='riskcontent']").eq(i).val(),
+                            Measure: $("#gridTable").find("textarea[name='measure']").eq(i).val(),
+                            Status: 0,
+                            WorkId: keyValue,
+                            Id: newGuid(),
+                            CreateDate: formatDate(new Date(), "yyyy-MM-dd hh:mm:ss")
+                        });
+                    }
+                }
+
+            }
+            if (flag) {
+                dialogMsg("风险描述和控制措施都不能为空！", 2);
+                return false;
+            }
+            json = JSON.stringify(arr);
+            postData["measuresJson"] = json;
+        } else {
+            dialogMsg("风险描述和控制措施都不能为空！", 2);
+            return false;
+        }
+        if (IsCommit == "1") {
+            if ($("#WorkFzrId").val() == currUserAccout) {
+                postData["Status"] = 1;
+            }
+        }
+        $.SaveForm({
+            url: "../../RiskDatabase/Risktrain/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //加载表格
+    function GetGrid() {
+        var $gridTable = $('#gridTable');
+        var height = $(top.window).height() - 520;
+        height = height < 200 ? 200 : height;
+        var colArray = new Array();
+        if (IsCommit == "1") {
+            colArray = [
+           { label: '主键', name: 'Id', hidden: true },
+            { label: '是否可编辑', name: 'IsEdit', hidden: true },
+           {
+               label: '操作', name: 'Oper', width: 100, align: 'center',
+               formatter: function (cellvalue, options, rowObject) {
+                   var html = "";
+                   if ($("#WorkFzrId").val() == currUserAccout || rowObject.IsEdit == 1) {
+                       html += "&nbsp;&nbsp;<a href=javascript:del('" + rowObject.Id + "',this)  title='删除'><i class='fa fa-trash-o'></i></a>";
+                   } else {
+                       html += "";
+                   }
+                   return html;
+               }
+           },
+           {
+               label: '风险描述', name: 'RiskContent', width: 400, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                   var html = '<textarea type="text"  name="riskcontent" role="textbox" style="width: 100%;height:50px;" class="form-control" ';
+                   if ($("#WorkFzrId").val() != currUserAccout && rowObject.IsEdit != 1) {
+                       html += 'readonly="readonly"';
+                   }
+                   html += '>' + cellvalue + '</textarea>';
+                   return html;
+               }
+           },
+           {
+               label: '管控措施', name: 'Measure', width: 400, align: 'center'
+               , formatter: function (cellvalue, options, rowObject) {
+                   var html = '<textarea type="text"  name="measure" role="textbox" style="width: 100%;height:50px;" class="form-control" ';
+                   if ($("#WorkFzrId").val() != currUserAccout && rowObject.IsEdit != 1) {
+                       html += 'readonly="readonly"';
+                   }
+                   html += '>' + cellvalue + '</textarea>';
+                   return html;
+               }
+           },
+            {
+                label: '措施落实责任人', name: 'LsPeople', width: 400, align: 'center'
+                , formatter: function (cellvalue, options, rowObject) {
+                    var html = "<input type=\"text\" onclick=\"changePeople(this,'" + rowObject.Id + "')\"  id=\"lsPeople_" + rowObject.Id + "\"  style=\"width: 100%;\" class=\"form-control\" readonly=\"readonly\" value=\"" + (cellvalue == undefined ? "" : cellvalue) + "\"/>";
+                    html += "<input type=\"hidden\"   id=\"lsPeopleId_" + rowObject.Id + "\"  style=\"width: 100%;\" class=\"form-control\"  />";
+                    return html;
+                }
+            },
+           {
+               label: '措施是否落实', name: 'Status', align: 'center'
+               , formatter: function (cellvalue, options, rowObject) {
+                   var html = "";
+                   if (cellvalue == 1) {
+                       html = "<div ><input type=\"checkbox\" checked=\"true\" value=\"1\" ></div>";
+                   } else {
+                       html = "<div ><input type=\"checkbox\"  value=\"0\" ></div>";
+                   }
+
+                   return html;
+               }
+
+           }
+            ];
+        } else {
+            colArray = [
+           { label: '主键', name: 'Id', hidden: true },
+           {
+               label: '操作', name: 'Oper', width: 100, align: 'center',
+               formatter: function (cellvalue, options, rowObject) {
+                   var html = "";
+                   if (rowObject.Status == 1) {
+                       html = "已确认,无法修改";
+
+                   } else {
+                       html += "&nbsp;&nbsp;<a href=javascript:del('" + rowObject.Id + "',this)  title='删除'><i class='fa fa-trash-o'></i></a>";
+                   }
+                   return html;
+               }
+           },
+           {
+               label: '风险描述', name: 'RiskContent', width: 400, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                   var html = '<textarea type="text"  name="riskcontent" role="textbox" style="width: 100%;height:50px;" class="form-control" ';
+                   if (rowObject.Status == 1) {
+                       html += 'readonly="readonly"';
+                   }
+                   html += '>' + cellvalue + '</textarea>';
+                   return html;
+               }
+           },
+           {
+               label: '管控措施', name: 'Measure', width: 400, align: 'center'
+               , formatter: function (cellvalue, options, rowObject) {
+                   var html = '<textarea type="text"  name="measure" role="textbox" style="width: 100%;height:50px;" class="form-control" ';
+                   if (rowObject.Status == 1) {
+                       html += 'readonly="readonly"';
+                   }
+                   html += '>' + cellvalue + '</textarea>';
+                   return html;
+               }
+           }
+            ];
+        }
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/Risktrain/GetMeasures",
+            postData: { workId: keyValue },
+            datatype: "json",
+            height: height + "px",
+            autowidth: true,
+            colModel: colArray,
+            viewrecords: true,
+            rowNum: 30,
+            sortname: 'Seq',
+            sortorder: 'asc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+        });
+    }
+    function changePeople(obj, p_Id) {
+        var selectedRowIndex = 0;
+        var UserArray = new Array();
+        $("#PeopleId").val(p_Id);//记录控件ID为赋值使用
+        var array = new Array();//人员数据集合
+        var fzrid = $("#WorkFzrId").val();
+        var fzr = $("#WorkFzr").val();
+
+        var array = new Array();
+        var fzrid = $("#WorkFzrId").val();
+        var fzr = $("#WorkFzr").val();
+        if ($("#WorkUsers").val().indexOf(fzr) >= 0) {
+
+        } else {
+            array.push({ Id: fzrid, name: fzr });
+        }
+        var users = $("#WorkUsers").val().split(',');
+        var usersId = $("#UserIds").val().substring(1, $("#UserIds").val().length - 1).split(',');
+
+        for (var i = 0; i < users.length; i++) {
+            array.push({ Id: usersId[i], name: users[i] });
+        }
+        var html = "";
+        var num = 1;
+        $("#peoplegridTable").jqGrid("clearGridData");
+        var $gridTable = $("#peoplegridTable");
+        $gridTable.jqGrid({
+            datatype: "local",
+            data: array,
+            mtype: "post",
+            height: 500,
+            autoheight: true,
+            autowidth: true,
+            colModel: [
+                { label: 'Id', name: 'Id', hidden: true },
+                { label: '人员姓名', name: 'name', width: 400, align: 'center' }
+            ],
+            viewrecords: true,
+            rowNum: 100,
+            rownumbers: true,
+            multiselect: true,
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                var Indexs = $gridTable.jqGrid('getDataIDs');
+                for (var i = 0; i < Indexs.length; i++) {
+                    var row = $gridTable.jqGrid('getRowData', Indexs[i]);
+                    if ($("#lsPeople_" + $("#PeopleId").val()).val().indexOf(row.name) >= 0) {
+                        $("#" + this.id).setSelection(Indexs[i], false);
+                    }
+                }
+            }
+        });
+        $gridTable.jqGrid("setGridParam", {
+            datatype: "local",
+            data: array,
+            rowNums: array.length
+        }).trigger("reloadGrid");
+        $('#pop').show();
+    }
+
+    //动态新增风险及措施
+    var node = null;
+    function addMeasure(obj) {
+        tCode = ""; tName = ""; tContent = "";
+        var rowId = $("#gridTable").jqGrid('getRowData').length;
+
+        $("#gridTable").addRowData(rowId, { Id: newGuid(), RiskContent: "", Measure: '', Status: 0, IsEdit: 1 });
+    }
+    //从风险库中选择数据
+    function selRisk(obj, mode) {
+        trainType = "1";
+        node = obj;
+        mode == mode == 1 ? $(obj).parent().parent().children().eq(0).text() : 0;
+        dialogOpen({
+            id: 'SelectRisk',
+            title: '选择工作任务',
+            url: '/RiskDatabase/DangerSource/SelectNew',
+            width: ($(top.window).width() - 250) + 'px',
+            height: ($(top.window).height() - 50) + 'px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+    function selTrainLib() {
+        trainType = "2";
+        dialogOpen({
+            id: 'RiskTrianLib',
+            title: '选择工作任务',
+            url: '/RiskDatabase/Risktrainlib/SelectTrianLib',
+            width: ($(top.window).width() - 250) + 'px',
+            height: ($(top.window).height() - 50) + 'px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+    //删除数据行
+    function del(id, obj) {
+        var jqTable = $("#gridTable");
+        var idx = dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                jqTable.delRowData(jqTable.getGridParam('selrow'));
+                top.layer.close(idx);
+            } else {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //选择落实人
+    function btnchangePeople() {
+        var $gridTable = $("#peoplegridTable");
+        var indexs = $gridTable.jqGrid('getGridParam', 'selarrrow');
+        var Users = "";
+        var UsersId = "";
+        for (var i = 0; i < indexs.length; i++) {
+            var rows = $gridTable.jqGrid('getRowData', indexs[i]);
+            Users += rows.name + ",";
+            UsersId += rows.Id + ",";
+        }
+        Users = Users.substring(0, Users.length - 1);
+        UsersId = UsersId.substring(0, UsersId.length - 1);
+        var inputId = $("#PeopleId").val();
+        $("#lsPeople_" + inputId).val(Users);
+        $("#lsPeopleId_" + inputId).val(UsersId);
+        $('#pop').hide();
+    }
+
+ 
+  
+</script>
+<style>
+    .pop {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 100;
+        display:;
+    }
+
+    .pop-conetnt {
+        position: absolute;
+        top: 40%;
+        left: 40%;
+        transform: translateX(-50%) translateY(-50%);
+        background: #fff;
+        border-radius: 4px;
+    }
+
+    .pop_login {
+        width: 520px;
+        height: 500px;
+    }
+</style>
+<div style="margin-top: 20px; margin-right: 30px; padding-top:50px; ">
+    <table class="form" id="form">
+        <tr>
+            <td class="formTitle">工作任务<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="TaskName" style="width:75%;float:left;" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                <input id="selRiskData" type="button" class="btn btn-primary" onclick="selRisk(this, 0)" title="从风险库中选择工作任务" value="风险措施库" />
+                <input id="selTrainLibData" type="button" class="btn btn-primary" onclick="selTrainLib()" value="危险预知训练库" />
+            </td>
+            <td class="formTitle">工作票号</td>
+            <td class="formValue">
+                <input id="WorkNum" type="text" class="form-control" />
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle" id="start">作业开始时间</td>
+            <td class="formValue">
+                <input id="WorkStartTime" type="text" class="form-control input-datepicker fxtime" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm', maxDate: '#F{$dp.$D(\'WorkEndTime\')}' })" />
+            </td>
+            <td class="formTitle" id="end">作业结束时间</td>
+            <td class="formValue">
+                <input id="WorkEndTime" type="text" class="form-control input-datepicker fxtime" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm', minDate: '#F{$dp.$D(\'WorkStartTime\')}' })" />
+            </td>
+
+        </tr>
+        <tr>
+            <td class="formTitle">作业区域<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="AreaId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                <input id="AreaName" type="text" class="form-control" style="display:none;" /><input id="AreaICode" type="hidden" class="form-control" />
+            </td>
+            <td class="formTitle">作业地点</td>
+            <td class="formValue">
+                <input id="WorkPlace" type="text" class="form-control" />
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle">作业单位</td>
+            <td class="formValue">
+                <input type="hidden" id="WorkUnitCode" />
+                <input type="hidden" id="WorkUnitId" />
+                <input id="WorkUnit" type="text" class="form-control" placeholder="请选择单位" readonly onclick="selectDept('', 0, 2, '选择单位', window.document.body, 'WorkUnit,WorkUnitCode,WorkUnitId');" />
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle">作业负责人<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="WorkFzr" type="text" class="form-control" readonly onclick="selectUser({ deptId: '', deptCode: '', checkMode: 0, mode: 2, winObject: this.parentNode, domId: 'WorkFzr,WorkFzrId,' });" isvalid="yes" checkexpession="NotNull" />
+                <input type="hidden" id="WorkFzrId" />
+            </td>
+            <td class="formTitle">作业人员<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="WorkUsers" type="text" class="form-control" readonly onclick="selectUser({ deptId: '', deptCode: '', checkMode: 1, mode: 2, winObject: this.parentNode, domId: 'WorkUsers,UserIds', userIds: 'UserIds' });" isvalid="yes" checkexpession="NotNull" />
+                <input type="hidden" id="UserIds" />
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle">工作任务描述</td>
+            <td class="formValue" colspan="3">
+                <textarea id="TaskContent" class="form-control" rows="3" ></textarea>
+                <input type="hidden" id="TrainlibWorkId" />
+            </td>
+        </tr>
+    </table>
+    <div class="ibox">
+        <div class="ibox-title">
+            <h5>存在风险及管控措施</h5>
+            <div class="ibox-tools">
+
+            </div>
+        </div>
+        <div class="ibox-content">
+            <div style="margin-bottom:10px;" id="divAdd"><a href="javascript:addMeasure(this)" class="btn btn-primary">新增</a></div>
+            <table id="gridTable"></table>
+            <div id="gridPager"></div>
+        </div>
+
+    </div>
+    <div class="panel-body">
+        <div class="ibox">
+            <div class="ibox-title">
+                <h5>现场音频</h5>
+                <div class="ibox-tools">
+
+                </div>
+            </div>
+            <div class="ibox-content">
+                <div id="uploader1" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:80px; margin-bottom:10px;">
+                    <div class="queueList">
+                        <div id="File1" class="placeholder">
+                            <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display:none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <div class="ibox">
+            <div class="ibox-title">
+                <h5>现场图片</h5>
+                <div class="ibox-tools">
+
+                </div>
+            </div>
+            <div class="ibox-content">
+                <div id="uploader2" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:80px; margin-bottom:10px;">
+                    <div class="queueList">
+                        <div id="File1" class="placeholder">
+                            <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display:none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <div id="btngroup" class="form-button" style=" top:40px;  text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+        <a onclick="AcceptClick('0')" id="btnSave" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+        &nbsp;&nbsp;
+        <a onclick="AcceptClick('1')" id="btnCommit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp;&nbsp;
+    </div>
+    <div class="pop" id="pop" style="display: none; padding-top: 50px; " onclick="$('#pop').hide()">
+        <div class="pop-conetnt pop_login" onclick="event.stopPropagation();">
+            <div class="row" style="margin-left: -10px; margin-right: -10px;">
+                <div class="panel panel-default" style="margin:10px;">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;选择人员</strong>
+                    </div>
+                    <div class="panel-body" id="div0">
+                        <table class="tab" id="peoplegridTable"></table>
+                        <input type="hidden" id="PeopleId" />
+                    </div>
+                    <div  style=" text-align: right;  z-index: 1000;">
+                        <a onclick="btnchangePeople()" id="btnSave" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+                        &nbsp;&nbsp;
+                        <a onclick="$('#pop').hide()" id="btnCommit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;取&nbsp;&nbsp;消</a>
+                        &nbsp;&nbsp;
+                    </div>
+                </div>
+             
+            </div>
+        </div>
+    </div>
+</div>

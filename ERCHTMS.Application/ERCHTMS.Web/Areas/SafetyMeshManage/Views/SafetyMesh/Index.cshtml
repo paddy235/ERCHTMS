@@ -1,0 +1,674 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户ID
+    var _deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户部门ID
+    var orgCode = top.currUserOrgCode;
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户部门ID
+    var mode = 1;
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //加载组织机构树
+    function GetTree() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+
+            window.setTimeout(function () {
+                window.setTimeout(function () {
+                    $('#gridTable').setGridWidth(($('.gridPanel').width() - 220));
+                    $("#gridTable").setGridHeight($(window).height() - 220);
+                    $("#itemTree").setTreeHeight($(window).height() - 70);
+                }, 200);
+                e.stopPropagation();
+            }, 200);
+            e.stopPropagation();
+        });
+        if (top.currUserRoleName.indexOf("部门级用户") >= 0 || top.currUserRoleName.indexOf("专业级用户") >= 0 || top.currUserRoleName.indexOf("班组级用户") >= 0 || top.currUserRoleName.indexOf("承包商") >= 0 || top.currUserRoleName.indexOf("分包商") >= 0) {
+            $("#itemTree").hide();
+            $(".ui-layout-west").hide();
+            $(".ui-layout-center").css({ "padding-left": "10px", "left": "10px", "width": $(window).width() - 20 + "px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 140);
+
+        }
+        else {
+            var json = JSON.stringify(
+                {
+                    SelectMode: 0,
+                    Mode: 31
+                }
+            );
+            var item = {
+                height: $(window).height() - 70,
+                url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+                onnodeclick: function (item) {
+                    orgCode = item.OrgCode;
+                    deptCode = item.value;
+                    deptType = item.Sort;
+                    //$('#btn_Search').trigger("click");
+                    var $gridTable = $('#gridTable');
+                    $gridTable.jqGrid('setGridParam', {
+                        postData: { queryJson: JSON.stringify({ mode: 1, orgCode: orgCode, deptCode: deptCode, keyWord: $("#txt_Keyword").val() }) }
+                    }).trigger('reloadGrid');
+                }
+            };
+            //初始化
+            $("#itemTree").treeview(item);
+            if ($("#itemTree").find(".bbit-tree-node").length <= 1) {
+                $(".ui-layout-west").hide();
+                $(".ui-layout-center").css("padding-left", "10px");
+                $('#gridTable').setGridWidth(($('.gridPanel').width() - 220));
+                $("#gridTable").setGridHeight($(window).height() - 220);
+            } else {
+
+            }
+
+        }
+    }
+    //初始化页面
+    function InitialPage() {
+        $(".nav-tabs").find("li").click(function () {
+            mode = $(this).attr("mode");
+            if(mode==1){
+                $("#change").hide();
+            } else {
+                var btn = $("#change");
+                if (btn!=undefined) {
+                    btn.show();
+                }
+            }
+        });
+    }
+
+    //获取安全监督管理网络人员
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 130,
+            url: "../../SafetyMeshManage/SafetyMesh/GetTableJson",
+            postData: { queryJson: JSON.stringify({ mode:2, orgCode: orgCode, deptCode: deptCode, keyWord: $("#txt_Keyword").val() }) },
+            datatype: "json",
+            rowNum: 10000,
+            sortname: 'sortcode',
+            sortorder: 'asc',
+            shrinkToFit: true,
+            colModel: [
+                { name: "tid", hidden: true },
+                {
+                    label: '序号', name: 'sortcode', index: 'sortcode', width: 70, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<input type='hidden' value='" + rowObject.tid + "' />";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.tid + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                {
+                    label: '一级网格', name: 'meshname', index: 'meshname', width: 200, align: 'center', sortable: false
+                    ,formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (roleName.indexOf("厂级部门用户") >= 0 || roleName.indexOf("公司管理员") >= 0 || (roleName.indexOf("负责人") >= 0 && rowObject.createuserdeptcode.indexOf(deptCode) >= 0 && roleName.indexOf("承包商") == -1)) {
+                            html += "<input type='checkbox' value='" + rowObject.tid + "' style='display:none;' class='hideCol' />&nbsp;&nbsp;&nbsp;";
+                        }
+                        html += "<a href=javascript:show('" + rowObject.tid + "')  title='查看' name='show' style='text-decoration:underline;color:blue;'>" + (cellvalue == null ? "" : cellvalue) + "</a>";
+                        if (roleName.indexOf("厂级部门用户") >= 0 || roleName.indexOf("公司管理员") >= 0 || (roleName.indexOf("负责人") >= 0 && rowObject.createuserdeptcode.indexOf(deptCode) >= 0 && roleName.indexOf("承包商") == -1)) {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=\"javascript:edit('" + rowObject.tid + "')\" title=\"修改\" style='display:none;' class='btn0 hideCol'><i class=\"fa fa-pencil-square-o\"></i></a><a href=\"javascript:del('" + rowObject.tid + "')\" title=\"删除\" style='display:none;' class='btn0 hideCol'><i class=\"fa fa-trash-o\"></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '网格责任人', name: 'dutyuser', index: 'dutyuser', width: 100, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.tid + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                {
+                    label: '联系电话', name: 'dutytel', index: 'dutytel', width: 100, align: 'center', sortable: false, hidden: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.tid + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                { name: "id2", hidden: true },
+                {
+                    label: '序号', name: 'sortcode2', index: 'sortcode2', width: 70, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<input type='hidden' value='" + rowObject.id2 + rowObject.tid + "' />";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.id2 + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                {
+                    label: '二级网格名称', name: 'meshname2', index: 'meshname2', width: 200, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<input type='hidden' value='" + rowObject.id2 + rowObject.tid + "' />";
+                        if (cellvalue != null) {
+                            if (roleName.indexOf("厂级部门用户") >= 0 || roleName.indexOf("公司管理员") >= 0 || (roleName.indexOf("负责人") >= 0 && rowObject.createuserdeptcode2.indexOf(deptCode) >= 0 && roleName.indexOf("承包商") == -1)) {
+                            html += "<input type='checkbox' value='" + rowObject.id2 + "' style='display:none;' class='hideCol' />&nbsp;&nbsp;&nbsp;";
+                            }
+                            html += "<a href=javascript:show('" + rowObject.id2 + "')  title='查看' name='show' style='text-decoration:underline;color:blue;'>" + (cellvalue == null ? "" : cellvalue) + "</a>";
+                            if (roleName.indexOf("厂级部门用户") >= 0 || roleName.indexOf("公司管理员") >= 0 || (roleName.indexOf("负责人") >= 0 && rowObject.createuserdeptcode2.indexOf(deptCode) >= 0 && roleName.indexOf("承包商") == -1)) {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=\"javascript:edit('" + rowObject.id2 + "')\" title=\"修改\" style='display:none;' class='btn0 hideCol'><i class=\"fa fa-pencil-square-o\"></i></a><a href=\"javascript:del('" + rowObject.id2 + "')\" title=\"删除\" style='display:none;' class='btn0 hideCol'><i class=\"fa fa-trash-o\"></i></a>";
+                            }
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '网格责任人', name: 'dutyuser2', index: 'dutyuser2', width: 100, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<input type='hidden' value='" + rowObject.id2 + rowObject.tid + "' />";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.id2 + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                {
+                    label: '联系电话', name: 'dutytel2', index: 'dutytel2', width: 100, align: 'center', sortable: false, hidden: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<input type='hidden' value='" + rowObject.id2 + rowObject.tid + "' />";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.id2 + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                { name: "id3", hidden: true },
+                {
+                    label: '序号', name: 'sortcode3', index: 'sortcode3', width: 70, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<input type='hidden' value='" + rowObject.id3 + rowObject.id2 + rowObject.tid + "' />";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.id3 + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                {
+                    label: '三级网格', name: 'meshname3', index: 'meshname3', width: 200, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<input type='hidden' value='" + rowObject.id3 + rowObject.id2 + rowObject.tid + "' />";
+                        if (cellvalue != null) {
+                            if (roleName.indexOf("厂级部门用户") >= 0 || roleName.indexOf("公司管理员") >= 0 || (roleName.indexOf("负责人") >= 0 && rowObject.createuserdeptcode3.indexOf(deptCode) >= 0 && roleName.indexOf("承包商") == -1)) {
+                            html += "<input type='checkbox' value='" + rowObject.id3 + "' style='display:none;' class='hideCol' />&nbsp;&nbsp;&nbsp;";
+                             }
+                            html += "<a href=javascript:show('" + rowObject.id3 + "')  title='查看' name='show' style='text-decoration:underline;color:blue;'>" + (cellvalue == null ? "" : cellvalue) + "</a>";
+                            if (roleName.indexOf("厂级部门用户") >= 0 || roleName.indexOf("公司管理员") >= 0 || (roleName.indexOf("负责人") >= 0 && rowObject.createuserdeptcode3.indexOf(deptCode) >= 0 && roleName.indexOf("承包商") == -1)) {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=\"javascript:edit('" + rowObject.id3 + "')\" title=\"修改\" style='display:none;' class='btn0 hideCol'><i class=\"fa fa-pencil-square-o\"></i></a><a href=\"javascript:del('" + rowObject.id3 + "')\" title=\"删除\" style='display:none;' class='btn0 hideCol'><i class=\"fa fa-trash-o\"></i></a>";
+                            }
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '网格责任人', name: 'dutyuser3', index: 'dutyuser3', width: 100, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<input type='hidden' value='" + rowObject.id3 + rowObject.id2 + rowObject.tid + "' />";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.id3 + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                {
+                    label: '联系电话', name: 'dutytel3', index: 'dutytel3', width: 100, align: 'center', sortable: false, hidden: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<input type='hidden' value='" + rowObject.id3 + rowObject.id2 + rowObject.tid + "' />";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.id3 + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                { name: "id4", hidden: true },
+                {
+                    label: '序号', name: 'sortcode4', index: 'sortcode4', width: 70, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.id4 + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                {
+                    label: '微级网格', name: 'meshname4', index: 'meshname4', width: 200, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue != null) {
+                            if (roleName.indexOf("厂级部门用户") >= 0 || roleName.indexOf("公司管理员") >= 0 || (roleName.indexOf("负责人") >= 0 && rowObject.createuserdeptcode4.indexOf(deptCode) >= 0 && roleName.indexOf("承包商") == -1)) {
+                            html += "<input type='checkbox' value='" + rowObject.id4 + "' style='display:none;' class='hideCol' />&nbsp;&nbsp;&nbsp;";
+                            }
+                            html += "<a href=javascript:show('" + rowObject.id4 + "')  title='查看' name='show' style='text-decoration:underline;color:blue;'>" + (cellvalue == null ? "" : cellvalue) + "</a>";
+                            if (roleName.indexOf("厂级部门用户") >= 0 || roleName.indexOf("公司管理员") >= 0 || (roleName.indexOf("负责人") >= 0 && rowObject.createuserdeptcode4.indexOf(deptCode) >= 0 && roleName.indexOf("承包商") == -1)) {
+                            html += "&nbsp;&nbsp;&nbsp<a href=\"javascript:edit('" + rowObject.id4 + "')\" title=\"修改\" style='display:none;' class='btn0 hideCol'><i class=\"fa fa-pencil-square-o\"></i></a><a href=\"javascript:del('" + rowObject.id4 + "')\" title=\"删除\" style='display:none;' class='btn0 hideCol'><i class=\"fa fa-trash-o\"></i></a>";
+                             }
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '网格责任人', name: 'dutyuser4', index: 'dutyuser4', width: 100, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.id4 + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                },
+                {
+                    label: '联系电话', name: 'dutytel4', index: 'dutytel4', width: 100, align: 'center', sortable: false, hidden: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<span style='display:none;' class='hideCol'>" + rowObject.id4 + "</span>" + (cellvalue == null ? "" : cellvalue);
+                        return html;
+                    }
+                }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $gridTable.setGridWidth(($('.gridPanel').width()));
+                var arr = new Array("sortcode","meshname","dutyuser", "sortcode2","meshname2","dutyuser2","sortcode3","meshname3","dutyuser3");
+                Merger("gridTable", arr);
+                $gridTable.find("td[aria-describedby='gridTable_meshname'],td[aria-describedby='gridTable_meshname2'],td[aria-describedby='gridTable_meshname3'],td[aria-describedby='gridTable_meshname4']").bind("mouseover", function () {
+                    $(this).find(".btn0").show();
+                    $(this).find("input:checkbox").show();
+                });
+                $gridTable.find("td[aria-describedby='gridTable_meshname'],td[aria-describedby='gridTable_meshname2'],td[aria-describedby='gridTable_meshname3'],td[aria-describedby='gridTable_meshname4']").bind("mouseout", function () {
+                    $(this).find(".btn0").hide();
+                    var chk = $(this).find("input:checkbox");
+                    if (chk.length>0) {
+                        chk.get(0).style.display = chk.get(0).checked ? "" : "none";
+                    }
+
+                });
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            var $gridTable = $('#gridTable');
+            $gridTable.jqGrid('setGridParam', {
+                postData: {
+                    queryJson: JSON.stringify({
+                        orgCode: orgCode,
+                        condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                        keyword: $.trim($("#txt_Keyword").val()) }) }
+            }).trigger('reloadGrid');
+        });
+        //查询事件
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val('');
+            var $gridTable = $('#gridTable');
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ orgCode: orgCode, condition: "", keyword: "" }) }
+            }).trigger('reloadGrid');
+        });
+        //查询回车事件
+        $('#txtKeyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    //新增
+    function btn_add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加安全网格',
+            url: '/SafetyMeshManage/SafetyMesh/Form?mode='+mode,
+            width: '800px',
+            height: '500px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //查看
+    function show(id) {
+        var dlg=dialogOpen({
+            id: 'Form',
+            title: '查看安全网格信息',
+            url: '/SafetyMeshManage/SafetyMesh/Form?actiontype=show&keyValue='+id+'&mode='+mode,
+            width: '800px',
+            height: '500px',
+            btn:["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //编辑
+    function edit(keyValue) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑安全网格',
+                url: '/SafetyMeshManage/SafetyMesh/Form?actiontype=edit&keyValue=' + keyValue + '&mode=' + mode,
+                width: '800px',
+                height: '500px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+    }
+    //删除
+    function del(keyValue) {
+        $.RemoveForm({
+            msg: "确定删除吗?本条记录后面相关联的记录也将同时删除且不可恢复！",
+            url: '../../SafetyMeshManage/SafetyMesh/RemoveForm',
+            param: { keyValue: keyValue },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        })
+    }
+    //批量删除
+    function btn_delete() {
+        var arr = $("#gridTable").find("input:checked");
+        if (arr.length == 0) {
+            dialogMsg("请至少选择一条记录！", 0);
+        } else {
+            var ids = "";
+            $(arr).each(function (j, dom) {
+                ids += $(dom).val() + ",";
+            });
+            if (ids.length > 0) {
+                ids = ids.substring(0, ids.length - 1);
+            }
+            $.RemoveForm({
+                msg: "确定删除吗?本条记录后面相关联的记录也将同时删除且不可恢复！",
+                url: '../../SafetyMeshManage/SafetyMesh/RemoveForm',
+                param: { keyValue: ids },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        }
+    }
+    function mergeCell(gridName,arr) {
+        //数据总行数
+        var table = $("#divTable").find("table");
+        var length = $("#divTable").find("table").find("tr").length;
+        //定义合并行数
+        var rowSpanTaxCount = 1;
+        $(arr).each(function (i,name) {
+            for (var i = 0; i < length; i += rowSpanTaxCount) {
+                //从当前行开始比对下面的信息
+                var before = table.find("td[aria-describedby='"+gridName+"_"+name+"']").eq(i);
+                rowSpanTaxCount = 1;
+                for (j = i + 1; j <= length; j++) {
+                    //和上边的信息对比 如果值一样就合并行数+1 然后设置rowspan 让当前单元格隐藏
+                    //alert(mya[j]);
+                    var end = table.find("td[aria-describedby='"+gridName+"_"+name+"']").eq(j);
+                    if (before.text() == end.text()) {
+                        rowSpanTaxCount++;
+                        end.css("display", "none");
+                        end.addClass("duty1");
+                    }
+                    else {
+                        break;
+                    }
+                }
+                if (rowSpanTaxCount > 1) {
+                    before.attr("rowspan", rowSpanTaxCount);
+                }
+            }
+        });
+
+    }
+    //导出
+    function exp() {
+        //var queryJson = {
+        //    orgCode: orgCode,
+        //    condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+        //    keyword: $.trim($("#txt_Keyword").val())
+        //}
+        //location.href = "../../SafetyMeshManage/SafetyMesh/Export?queryJson=" + JSON.stringify(queryJson);
+        var json;
+        var table = $($(".ui-jqgrid-bdiv").html());
+        var header = $(".ui-jqgrid-htable").html();
+        table.find("#gridTable").css({ "background": "black" });
+        table.find("#gridTable").attr("cellpadding", "0");
+        table.find("#gridTable").attr("cellspacing", "0");
+        table.find("#gridTable").attr("border", "1");
+        table.find("#gridTable").attr("width", "100%");
+        table.find("#gridTable").css({ "width": "100%" });
+        table.find("td,th").css({ "background": "white" });
+
+        table.find("tbody").before(header);
+        table.find("#gridTable").find("tr[class ='jqgfirstrow']").remove();
+        table.find("#gridTable").find("th[id='gridTable_tid']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_meshname']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_sortcode']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_dutyuser']").remove();
+        table.find("#gridTable").find("th[id='gridTable_id2']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_sortcode2']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_meshname2']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_dutyuser2']").remove();
+        table.find("#gridTable").find("th[id='gridTable_id3']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_sortcode3']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_meshname3']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_dutyuser3']").remove();
+        table.find("#gridTable").find("th[id='gridTable_id4']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_sortcode4']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_meshname4']").remove();
+        //table.find("#gridTable").find("th[id='gridTable_dutyuser4']").remove();
+
+        table.find("#gridTable").find("td[aria-describedby='gridTable_tid']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_sortcode']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_meshname']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_dutyuser']").remove();
+        table.find("#gridTable").find("td[aria-describedby='gridTable_id2']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_sortcode2']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_meshname2']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_dutyuser2']").remove();
+        table.find("#gridTable").find("td[aria-describedby='gridTable_id3']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_sortcode3']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_meshname3']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_dutyuser3']").remove();
+        table.find("#gridTable").find("td[aria-describedby='gridTable_id4']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_sortcode4']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_meshname4']").remove();
+        //table.find("#gridTable").find("td[aria-describedby='gridTable_dutyuser4']").remove();
+
+        table.find("#gridTable").find("td[aria-describedby='gridTable_meshname'],td[aria-describedby='gridTable_meshname2'],td[aria-describedby='gridTable_meshname3'],td[aria-describedby='gridTable_meshname4']").each(function (i, dom) {
+            $(dom).html($(dom).attr("title"));
+            if ($(dom).attr("style").indexOf("none") >= 0) {
+                $(dom).remove();
+            }
+        });
+        table.find("#gridTable").find("td[aria-describedby='gridTable_sortcode'],td[aria-describedby='gridTable_sortcode2'],td[aria-describedby='gridTable_sortcode3'],td[aria-describedby='gridTable_sortcode4']").each(function (i, dom) {
+            //$(dom).html($(dom).attr("title"));
+            if ($(dom).attr("style").indexOf("none") >= 0) {
+                $(dom).remove();
+            }
+        });
+        table.find("#gridTable").find("td[aria-describedby='gridTable_dutyuser'],td[aria-describedby='gridTable_dutyuser2'],td[aria-describedby='gridTable_dutyuser3'],td[aria-describedby='gridTable_dutyuser4']").each(function (i, dom) {
+            //$(dom).html($(dom).attr("title"));
+            if ($(dom).attr("style").indexOf("none") >= 0) {
+                $(dom).remove();
+            }
+        });
+        table.find("th[role='columnheader']").find("span").remove();
+        table.find("td,th").css({ "background-color": "white" });
+        $("#divTable").html(table.html());
+        var arr = new Array("sortcode", "meshname", "dutyuser", "dutytel", "sortcode2", "meshname2", "dutyuser2", "dutytel2", "sortcode3", "meshname3", "dutyuser3", "dutytel3");
+        Merger("gridTable", arr);
+        $("#divTable").find(".duty1").remove();
+        $("#divTable").find(".hideCol").remove();
+        json = JSON.stringify($("#divTable").html());
+        //document.write($("#divTable").html());
+        Loading(true, "正在导出...");
+        $.ajax({
+            url: "ExpInfo",
+            data: { json: encodeURIComponent(json) },
+            type: "post",
+            dataType: "JSON",
+            async: false,
+            success: function (json) {
+                Loading(false);
+                if (json.type == 1) {
+                    window.location.href = "../../Utility/DownloadFile?filePath=~/Resource/temp/" + json.resultdata + "&speed=1024000";
+                } else {
+                    dialogMsg(json.message);
+                }
+
+            }
+        });
+    }
+
+    var isImport = false;
+    function imp() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入人员',
+            url: '/SafetyMeshManage/SafetyMesh/Import',
+            width: "500px",
+            height: "450px",
+            btn: ["确认", "关闭"],
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    $("#gridTable").jqGrid('setGridParam', {
+                        postData: { keyWord: "" }
+                    }).trigger('reloadGrid');
+                }
+
+            }
+        });
+    }
+</script>
+@*<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+        <div class="ui-layout-center" style="padding-left:10px;">
+            <div class="center-Panel">
+                <div class="titlePanel">
+                    <div class="title-search">
+                        <table>
+                            <tr>
+                                <td>
+                                    <div id="queryCondition" class="btn-group">
+                                        <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                        <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                        <ul class="dropdown-menu">
+                                            <li><a data-value="meshname">网格名称</a></li>
+                                            <li><a data-value="dutyuser">网格责任人</a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                                <td>
+                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                </td>
+                                <td style="padding-left: 5px;">
+                                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                    <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="toolbar">
+                        <div class="btn-group">
+                            <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                            <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+                            <a id="delete" class="btn btn-default" onclick="btn_delete()"><i class="fa fa-trash-o"></i>&nbsp;批量删除</a>
+                            <a id="exp" class="btn btn-default" onclick="exp()"><i class="fa fa-upload"></i>&nbsp;导出</a>
+                            <a id="imp" class="btn btn-default" onclick="imp()"><i class="fa fa-download"></i>&nbsp;导入</a>
+                        </div>
+                        <script>
+                            $('.toolbar').authorizeButton()
+                            if (roleName.indexOf("承包商") >= 0 && roleName.indexOf("负责人") >= 0) {
+                                $("#add,#delete,#imp").css("display", "none");
+                            }
+                        </script>
+                    </div>
+                </div>
+                <div class="gridPanel">
+                    <table id="gridTable"></table>
+                    <div id="gridPager"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="divTable" style="display:none;width:0px;"></div>*@
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div>
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">安全网格管理</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a data-value="meshname">网格名称</a></li>
+                                        <li><a data-value="dutyuser">网格责任人</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+                        <a id="delete" class="btn btn-default" onclick="btn_delete()"><i class="fa fa-trash-o"></i>&nbsp;批量删除</a>
+                        <a id="exp" class="btn btn-default" onclick="exp()"><i class="fa fa-upload"></i>&nbsp;导出</a>
+                        <a id="imp" class="btn btn-default" onclick="imp()"><i class="fa fa-download"></i>&nbsp;导入</a>
+                    </div>
+                    <script>
+                        $('.toolbar').authorizeButton()
+                        if (roleName.indexOf("承包商") >= 0 && roleName.indexOf("负责人") >= 0) {
+                            $("#add,#delete,#imp").css("display", "none");
+                        }
+                    </script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="divTable" style="display:none;width:0px;"></div>

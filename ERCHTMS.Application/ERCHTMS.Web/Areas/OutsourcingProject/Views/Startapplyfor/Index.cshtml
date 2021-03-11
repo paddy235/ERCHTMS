@@ -1,0 +1,406 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/plugins/dialog/mobile/layer.js"></script>
+<script>
+    ;
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var currDeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var currUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var indexState = request('indexState');//首页代办
+    var projectid = request('projectid');//工程管理流程图跳转
+
+    $(function () {
+        OutConfigAjax(roleNames);
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //function compareRole(currRoleId, roleId) {
+    //    if (roleId != null) {
+    //        var arr = currRoleId.split(',');
+    //        for (var j = 0; j < arr.length; j++) {
+    //            if (roleId.indexOf(arr[j]) >= 0) {
+    //                return true;
+    //            }
+    //        }
+    //    }
+    //    return false;
+    //}
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            orgCode: orgCode, indexState: indexState,
+            projectid: projectid
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../OutsourcingProject/Startapplyfor/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                  { label: 'ID', name: 'id', index: 'id', align: 'left', hidden: true }, { label: '', name: 'createuserid', hidden: true }, { label: '', name: 'senddeptid', hidden: true },
+                  { label: '创建时间', name: 'createdate', index: 'createdate', width: 100, align: 'center', hidden: true },
+                 {
+                     label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                         var state = "";
+                         if (rowObject.iscommit == "1") {
+                             if (rowObject.isinvestover == 0) {
+                                 state = "1";
+                             } else {
+                                 state = "2";
+                             }
+                         } else {
+                             state = "0";
+                         }
+                         var html = "<a href=javascript:f_view('" + rowObject.id + "','" + state + "','" + rowObject.outengineerid + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                         //if (rowObject.isover==0 && rowObject.iscommit=="1") {
+                         //    if (rowObject.checkdeptcode == "-1") {
+                         //        if (compareRole(top.currUserRoleId, rowObject.checkroleid) && rowObject.senddeptid == top.currUserDeptId) {
+                         //            html += "<a href=javascript:f_audit('" + rowObject.id + "')  title='审核'><i class='fa fa-check'></i></a>";
+                         //        }
+                         //    } else {
+                         //        if (compareRole(top.currUserRoleId, rowObject.checkroleid) && top.currUserDeptCode == rowObject.checkdeptcode) {
+                         //            html += "<a href=javascript:f_audit('" + rowObject.id + "')  title='审核'><i class='fa fa-check'></i></a>";
+                         //        }
+                         //    }
+                         //}
+                         if (rowObject.iscommit == "1" && rowObject.isover == 0 && rowObject.isinvestover == 0) {
+                             if (rowObject.approveuserids.indexOf(currUserId + ",") >= 0) {
+                                 html += "<a href=javascript:approve('" + rowObject.id + "','" + 1 + "','" + rowObject.outengineerid + "')  title='审查'><i class='fa fa-check'></i></a>";
+                             }
+                         }
+                         if (rowObject.iscommit == "1" && rowObject.isover == 0 && rowObject.isinvestover == 1) {
+                             if (rowObject.approveuserids.indexOf(currUserId + ",") >= 0) {
+                                 html += "<a href=javascript:approve('" + rowObject.id + "','" + 2 + "','" + rowObject.outengineerid + "')  title='审核'><i class='fa fa-check'></i></a>";
+                             }
+                         }
+                         if (rowObject.createuserid == top.currUserId && rowObject.iscommit != "1") {
+                             html += "<a href=javascript:f_apply('" + rowObject.id + "','" + rowObject.outengineerid + "','" + state + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                         }
+                         if (rowObject.createuserid == top.currUserId && rowObject.iscommit == "0") {
+                             html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         }
+                         return html;
+                     }
+                 },
+                  {
+                      label: '流程状态', name: 'auditresult', index: 'auditresult', align: 'center'
+                      , formatter: function (cellvalue, options, rowObject) {
+                          var content = "申请中";
+                          if (rowObject.iscommit == "0") {
+                              content = "申请中";
+                          } else if (rowObject.iscommit == "2") {
+                              content = "审核未通过";
+                          } else {
+                              if (rowObject.isover == 0) {
+                                  if (rowObject.isinvestover == 0) {
+                                      content = "待审查";
+                                  } else {
+                                      content = "待审核";
+                                  }
+                              } else {
+                                  content = "审核完成";
+                              }
+                          }
+                          return '<a style="text-decoration:underline;color:blue"  href="javascript:btn_viewflow(\'' + rowObject.id + '\',\'7\')">' + content + '</a>';
+                      }
+                  },
+                { label: '外包工程', name: 'engineername', index: 'engineername', width: 300, align: 'center' },
+                { label: '外包单位', name: 'fullname', index: 'fullname', width: 280, align: 'center' },
+                { label: '工程类型', name: 'engineertype', index: 'engineertype', width: 150, align: 'center', sortable: true },
+                { label: '工程风险等级', name: 'engineerlevel', index: 'engineerlevel', width: 150, align: 'center', sortable: true },
+                { label: '所属区域', name: 'districtname', index: 'districtname', width: 180, align: 'center', sortable: true },
+                { label: '责任部门', name: 'engineerletdept', index: 'engineerletdept', width: 220, align: 'center' },
+                { label: '申请单号', name: 'applyno', index: 'applyno', width: 180, align: 'center' },
+                { label: '申请开工时间', name: 'applyreturntime', index: 'applyreturntime', width: 180, align: 'center', formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } },
+                { label: '申请人', name: 'applypeople', index: 'applypeople', width: 150, align: 'center' }
+                //{ label: '审核/审查部门', name: 'flowdeptname', index: 'flowdeptname', width: 150, align: 'center' },
+                //{ label: '审核/审查用户', name: 'flowrolename', index: 'flowrolename', width: 150, align: 'center' },
+
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                name: $.trim($("#txt_Keyword").val()),
+                orgCode: orgCode,
+                StartTime: $("#StartTime").val(),
+                EndTime: $("#EndTime").val(), indexState: indexState,
+                projectid: projectid
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询全部事件
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val('');
+            $("#StartTime").val('');
+            $("#EndTime").val('');
+            var queryJson = {
+                name: $.trim($("#txt_Keyword").val()),
+                orgCode: orgCode, indexState: indexState
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //流程图
+    function btn_viewflow(id, urltype) {
+        if (id) {
+            var title = "开工申请审核流程图";
+            var rqUrl = "/OutsourcingProject/Aptitudeinvestigateinfo/Flow?keyValue=" + id + "&urltype=" + urltype;
+            dialogOpen({
+                id: 'FlowForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 50) + "px",
+                btn: null
+            });
+        } else {
+            dialogMsg('请选择查看行！', 0);
+        }
+    }
+    //新增
+    function btn_add() {
+        dialogOpen({
+            id: 'Form',
+            title: '开工申请',
+            url: '/OutsourcingProject/Startapplyfor/Form',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //查看
+    function f_view(id, state, engineerid) {
+        var keyValue = id;
+        //登记情况下查看审核的详情
+        if (state == "0") {
+            url = '/OutsourcingProject/Startapplyfor/Form?keyValue=' + keyValue + "&actiontype=view&state=" + state + "&engineerid=" + engineerid;
+
+        } else {  //非登记状态下查看
+            url = "/OutsourcingProject/Startapplyfor/AppForm?keyValue=" + keyValue + "&actiontype=view&state=" + state + "&engineerid=" + engineerid;
+        }
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看开工申请',
+                url: url,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+    ////审核
+    //function f_audit(id) {
+    //    var keyValue = id;
+    //    if (checkedRow(keyValue)) {
+    //        var dlg = dialogOpen({
+    //            id: 'Form',
+    //            title: '审核开工申请',
+    //            url: '/OutsourcingProject/Startapplyfor/Form?keyValue=' + keyValue + "&mode=audit",
+    //            width: ($(top.window).width() - 200) + "px",
+    //            height: ($(top.window).height() - 100) + "px",
+    //            btn: ["审核", "关闭"],
+    //            callBack: function (iframeId) {
+    //                top.frames[iframeId].AcceptAudit();
+    //            }
+    //        })
+    //    }
+    //}
+    //申请开工申请
+    function f_apply(id, engineerid, state) {
+        var keyValue = id;
+        //登记情况下查看审核的详情
+        if (state == "0") {
+            url = '/OutsourcingProject/Startapplyfor/Form?keyValue=' + keyValue + "&actiontype=edit&state=" + state + "&engineerid=" + engineerid;
+
+        } else {  //非登记状态下查看
+            url = "/OutsourcingProject/Startapplyfor/AppForm?keyValue=" + keyValue + "&actiontype=edit&state=" + state + "&engineerid=" + engineerid;
+        }
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'AppForm',
+                title: '编辑开工申请',
+                url: url,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+        //$.SetForm({
+        //    url: "../../OutsourcingProject/Startappprocessstatus/GetFormJson",
+        //    param: { keyValue: pid },
+        //    success: function (data) {
+        //        if (data != null) {
+        //            //EXAMSTATUS--资质审查--0:未完成1:完成
+        //            //PACTSTATUS--合同与协议
+        //            //SECURITYSTATUS--安全保证金
+        //            //EQUIPMENTTOOLSTATUS--设备工器具验收
+        //            //TECHNICALSTATUS--安全技术交底
+        //            //THREETWOSTATUS--三措两案
+        //            if (data.EXAMSTATUS == "1" && data.SECURITYSTATUS == "1" && data.PACTSTATUS == "1" && data.TECHNICALSTATUS == "1" && data.THREETWOSTATUS == "1" && data.EQUIPMENTTOOLSTATUS == "1") {
+        //                var keyValue = id;
+        //                if (checkedRow(keyValue)) {
+        //                    var dlg = dialogOpen({
+        //                        id: 'Form',
+        //                        title: '开工申请',
+        //                        url: '/OutsourcingProject/Startapplyfor/Form?keyValue=' + keyValue + "&mode=edit",
+        //                        width: ($(top.window).width() - 600) + "px",
+        //                        height: ($(top.window).height() - 300) + "px",
+        //                        btn: null,
+        //                        callBack: function (iframeId) {
+        //                            top.frames[iframeId].AcceptClick();
+        //                        }
+        //                    })
+        //                }
+        //            } else {
+        //                var str = "请您完成";
+        //                str += data.EXAMSTATUS == "0" ? "资质审查、" : "";
+        //                str += data.SECURITYSTATUS == "0" ? "安全保证金、" : "";
+        //                str += data.PACTSTATUS == "0" ? "合同与协议、" : "";
+        //                str += data.TECHNICALSTATUS == "0" ? "安全技术交底、" : "";
+        //                str += data.THREETWOSTATUS == "0" ? "三措两案、" : "";
+        //                str += data.EQUIPMENTTOOLSTATUS == "0" ? "设备工器具验收、" : "";
+        //                str = str.substr(0, str.length - 1);
+        //                str += "的未完成项!";
+        //                dialogMsg(str, 0);
+        //            }
+        //        }
+        //    }
+        //});
+    }
+    //删除
+    function btn_delete(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../OutsourcingProject/Startapplyfor/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的开工申请！', 0);
+        }
+    }
+
+
+    //审核/审查开工申请
+    function approve(id, state, engineerid) {
+        var keyValue = id;
+        var title = "";
+        if (state == "1") title = "审查开工申请";
+        else title = "审核开工申请";
+        var url = "/OutsourcingProject/Startapplyfor/AppForm?keyValue=" + keyValue + "&actiontype=approve&state=" + state + "&engineerid=" + engineerid;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "AppForm",
+                title: title,
+                url: url,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title">开工申请</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="工程或单位名称" style="width: 200px;" />
+                            </td>
+                            <td class="formTitle">申请开工时间</td>
+                            <td>
+                                <input id="StartTime" readonly type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'EndTime\')}' })">
+                            </td>
+                            <td class="formTitle">至</td>
+                            <td>
+                                <input id="EndTime" readonly type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'StartTime\')}' })">
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search"></i>全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                        <script>$('.toolbar').authorizeButton()</script>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+            

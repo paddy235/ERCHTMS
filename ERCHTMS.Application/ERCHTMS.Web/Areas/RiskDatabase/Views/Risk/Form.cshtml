@@ -1,0 +1,276 @@
+﻿@{
+    ViewBag.Title = "区域管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js"></script>
+
+<script>
+    var keyValue = request('keyValue');
+    var parentId = request('parentId');
+    var mode = request('mode');
+    var workId = request('workId');
+    var dangerId = request('dangerId');
+    var areaId = request('areaId');
+    var workName = request('workName');
+    var dangerName = request('dangerName');
+    var areaName = request('areaName');
+    $(function () {
+        initControl();
+        GetGrid();
+    })
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!areaId) {
+            $.SetForm({
+                url: "../../RiskDatabase/Risk/GetRiskJson",
+                dataType: "json",
+                param: { workId: workId, dangerId: dangerId, areaId: areaId },
+                success: function (data) {
+                    if (data.length > 0) {
+                        if (data[0].deptname != null) {
+                            $("#DeptName").val(data[0].deptname);
+                        }
+                        if (data[0].majorname != null) {
+                            $("#MajorName").val(data[0].majorname);
+                        }
+                        if (data[0].teamname != null) {
+                            $("#TeamName").val(data[0].teamname);
+                        }
+                        if (data[0].grade != null) {
+                            $("#Grade").val(data[0].grade);
+                        }
+                    }
+                }
+            });
+        } else {
+            $("#ParentId").val(parentId); 
+            $("#WorkId").val(workId);
+            $("#WorkContent").val(decodeURIComponent(workName));
+        }
+        if (!!areaId) {
+            $("#AreaId").val(areaId);
+            $("#AreaId").trigger("change");
+        }
+        if(!!dangerId){
+            $("#DangerId").val(dangerId);
+            $("#DangerId").trigger("change");
+        }
+        if (!!workId) {
+            $("#WorkId").val(workId);
+        } 
+
+    }
+    //保存表单
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["AreaName"] = $("#AreaId").find("option:selected").text();
+        postData["ItemName"] = $("#ItemId").find("option:selected").text();
+        postData["DangerName"] = $("#DangerId").find("option:selected").text();
+        postData["WorkContent"] = $("#WorkId").find("option:selected").text();
+        $.SaveForm({
+            url: "../../RiskDatabase/DangerSource/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().GetTree();
+                //$.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //编辑
+    function edit(id) {
+        dialogOpen({
+            id: "win0",
+            title: "风险辨识评估",
+            url: '/RiskDatabase/Risk/Details?keyValue=' + id + '&workId=' + workId + "&dangerId=" + dangerId + "&areaId=" + areaId + "&workName=" + encodeURIComponent(workName) + "&areaName=" + encodeURIComponent(areaName) + "&dangerName=" + encodeURIComponent(dangerName),
+            width: ($(top.window).width() - 80) + "px",
+            height: ($(top.window).height() - 20) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+
+    }
+    //删除
+    function del(id) {
+        if (!!id) {
+            $.RemoveForm({
+                url: "../../RiskDatabase/Risk/RemoveForm",
+                param: { keyValue: id },
+                success: function (data) {
+                    $("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的数据！', 0);
+        }
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/Risk/GetListJson",
+            postData:{workId:workId,dangerId:dangerId,areaId:!!areaId ? areaId : "-1"},
+            datatype: "json",
+            autoheight: true,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', index: 'Oper', width: 100, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" + rowObject.Id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + rowObject.Id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        return html;
+                    }
+                },
+                { label: '危险源/潜在事件', name: 'DangerSource', width: 300, align: 'center' },
+                { label: '危害描述', name: 'Description', width: 300, align: 'center' },
+                { label: '风险值', name: 'ItemR', width: 300, align: 'center' },
+                { label: '风险等级', name: 'Grade', width: 300, align: 'center' },
+                { label: "可能导致的事故类型", name: "AccidentName", width: 200, align: "center" }
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 50, 100],
+            rownumbers: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { value: nodeId, keyword: $("#txt_Keyword").val() },
+            }).trigger('reloadGrid');
+        });
+    }
+    //辨识评估
+    function addRisk(obj) {
+        
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        else {
+            dialogOpen({
+                id: "win0",
+                title: "风险辨识评估",
+                url: '/RiskDatabase/Risk/Details?keyValue=&workId=' + $("#WorkId").val() + "&dangerId=" + $("#DangerId").val() + "&areaId=" + $("#AreaId").val() + "&workName=" + encodeURIComponent($("#WorkId").find("option:selected").text()) + "&areaName=" + encodeURIComponent($("#AreaId").find("option:selected").text()) + "&dangerName=" + encodeURIComponent($("#DangerId").find("option:selected").text()),
+                width: ($(top.window).width() - 80) + "px",
+                height: ($(top.window).height() - 20) + "px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+        }
+    };
+    //选择区域时获取危险点信息
+    function selArea(obj, select) {
+        $.ajax({
+            url: "../../RiskDatabase/Risk/GetRisks",
+            data: {parentId:$(obj).val()},
+            type: "post",
+            dataType: "html",
+            async: false,
+            success: function (data) {
+                select.html('<option value="">请选择</option>');
+                select.append(data);
+            },
+            error: function (XMLHttpRequest, textStatus, errorThrown) {
+                
+            }
+        });
+    }
+</script>
+<div style="margin:10px;">
+    <table class="form" id="form1">
+        <tr>
+            <td class="formTitle" style="width:150px;">所属区域<font face="宋体">*</font></td>
+            <td class="formValue">
+                <select id="AreaId" class="form-control" onchange="selArea(this, $('#DangerId'))" isvalid="yes" checkexpession="NotNull">
+                    <option value="">请选择区域</option>
+                    @Html.Raw(new ERCHTMS.Busines.RiskDatabase.RiskBLL().GetAreasOptionsString())
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">风险点名称<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DangerName" type="hidden" />
+                <select id="DangerId" class="form-control" onchange="selArea(this, $('#ItemId'))" isvalid="yes" checkexpession="NotNull">
+                    <option value="">请选择风险点</option>
+                </select>
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle">操作项目<font face="宋体">*</font></td>
+            <td class="formValue">
+                <select id="ItemId" class="form-control" isvalid="yes" checkexpession="NotNull" onchange="selArea(this, $('#WorkId'))">
+                    <option value="">请选择操作项目</option>
+                </select>
+                <input id="ItemName" type="hidden" /><input id="DangerId" type="hidden" /><input id="AreaId" type="hidden" />
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle">作业工序/操作步骤<font face="宋体">*</font></td>
+            <td class="formValue">
+                <select id="WorkId" class="form-control"  isvalid="yes" checkexpession="NotNull">
+                    <option value="">请选择作业工序</option>
+                </select>
+                <input id="WorkContent" type="hidden" /><input id="DangerId" type="hidden" /><input id="AreaId" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">最高风险等级</td>
+            <td class="formValue">
+                <input id="Grade" type="text" class="form-control" placeholder="自动获取最高等级" readonly />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">涉及的部门<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DeptName" type="text" class="form-control" placeholder="请选择部门" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDept('', 1, 2, '选择部门', this.parentNode, 'DeptName,DeptCode');" />
+                <input id="DeptCode" type="hidden" /><input id="DeptId" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">涉及的专业<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="MajorName" type="text" class="form-control" placeholder="请选择专业" onclick='selectDept($("#DeptId").val(), 1, 2, "选择专业", this.parentNode, "MajorName,MajorCode");' />
+                <input id="MajorCode" type="hidden" /><input id="MajorId" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">涉及的班组<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="TeamName" type="text" class="form-control" placeholder="请选择班组"  onclick='selectDept($("#MajorId").val(), 1, 2, "选择班组", this.parentNode, "TeamName,TeamCode");' />
+                <input id="TeamCode" type="hidden" />
+            </td>
+        </tr>
+    </table>
+    <div class="ibox">
+        <div class="ibox-title">
+            <h5>可能存在的危险源/潜在事件</h5>
+            <div class="ibox-tools">
+                <a href="javascript:addRisk(this)" class="btn btn-primary">新 增</a>
+            </div>
+        </div>
+        <div class="ibox-content">
+            <table id="gridTable"></table>
+            <div id="gridPager"></div>
+        </div>
+    </div>
+    
+</div>

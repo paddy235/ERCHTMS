@@ -1,0 +1,318 @@
+﻿
+@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var _parentId = "";
+    var _isOrg = "";
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //$('#layout').layout({
+        //    applyDemoStyles: false,
+        //    onresize: function () {
+        //        $(window).resize()
+        //    }
+        //});
+        //resize重设(表格、树形)宽高
+        //$(window).resize(function (e) {
+        //    window.setTimeout(function () {
+        //        $('#gridTable').setGridWidth(($('.gridPanel').width()));
+        //        $("#gridTable").setGridHeight($(window).height() - 141.5);
+        //        $("#itemTree").setTreeHeight($(window).height());
+        //    }, 200);
+        //    e.stopPropagation();
+        //});
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 25
+            }
+          );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = item.Sort;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../SystemManage/MenuAuthorize/GetMenuAuthPagedList",
+            datatype: "json",
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false, formatter: function (cellva, options, row) {
+                        var htmlStr = "<a href=\"javascript:Copy('" + row.Id + "','" + row.DepartName + "')\" title=\"复制\"><i class=\"fa fa-file\"></i></a>";
+                        htmlStr += '<a href="javascript:edit(\'' + row.Id + '\',\'' + row.DepartId + '\',\'' + row.DepartName +'\')" title="修改"><i class="fa fa-pencil-square-o"></i></a>'
+                        htmlStr += '<a href="javascript:del(\'' + row.Id + '\')" title="删除"><i class="fa fa-trash-o"></i></a>'
+                        return htmlStr;
+                    }
+                },
+                { label: '单位名称', name: 'DepartName', index: 'DepartName', width: 200, align: 'center' },
+                { label: '公司显示名称', name: 'DisplayName', index: 'DisplayName', width: 200, align: 'center' },
+                { label: '注册码', name: 'RegistCode', index: 'RegistCode', width: 200, align: 'center' },
+                  { label: '版本号', name: 'VersionCode', index: 'VersionCode', width: 100, align: 'center' },
+                {
+                    label: '授权操作', name: 'AuthOper', width: 200, align: 'center',sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                       
+                        var htmlStr = "<a href='javascript:void(0)' style='color: #337ab7; text-decoration: underline;' onclick=\"MenuAuth('" + rowObject.DepartId + "','" + rowObject.DepartCode + "','" + rowObject.DepartName +"')\">新增功能授权</a>";
+                        htmlStr += "<a href='javascript:void(0)' style='color: #337ab7; text-decoration: underline;' onclick=\"MenuSetting('" + rowObject.DepartId + "','" + rowObject.DepartCode + "','" + rowObject.DepartName +"','2')\">APP界面设置</a>";
+                        htmlStr += "<a href='javascript:void(0)' style='color: #337ab7; text-decoration: underline;' onclick=\"MenuSetting('" + rowObject.DepartId + "','" + rowObject.DepartCode + "','" + rowObject.DepartName + "','1')\">安卓终端界面设置</a>";
+                        //htmlStr += "<a href='javascript:void(0)' style='color: #337ab7; text-decoration: underline;' onclick=\"MenuSetting('" + rowObject.DepartId + "','" + rowObject.DepartCode + "','" + rowObject.DepartName + "','0')\">Windows终端界面设置</a>";
+                        return htmlStr;
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            // rowList: [30, 50, 100],
+
+            pager: false,
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            loadError: function (xhr, status, error) {
+                top.location.href = "../../Login/Index?Login_Error=1";
+            },
+        });
+        //$gridTable.authorizeColModel()
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var departId = !$("#itemTree").getCurrentNode() ? "" : $("#itemTree").getCurrentNode().id;
+            var queryJson = {
+                keyword: $("#txt_Keyword").val(),
+                departId: departId,
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+
+
+    //新增
+    function add() {
+   
+        var checkNode = $("#itemTree").getCurrentNode();
+        if (!checkNode) {
+            dialogMsg('请选择要添加的节点！', 0);
+            return false;
+        }
+        var parameter = "?DepartId=" + checkNode.id + "&DepartName=" + checkNode.text + "&DepartCode=" + checkNode.Code;
+        if (!!checkNode.parent ) {
+            parameter += "&ParentId=" + checkNode.parent.id + "&ParentName=" + checkNode.parent.text;
+        }
+        var datas = $("#gridTable").jqGrid('getRowData');
+        if (datas != undefined && datas.length > 0) {
+            dialogMsg('一个单位只能添加一条授权信息！', 0);
+            return false;
+        }
+        dialogOpen({
+            id: "Form",
+            title: '新增',
+            url: '/SystemManage/MenuAuthorize/Form' + parameter,
+            width: ($(top.window).width() - 500) + "px",
+            height: ($(top.window).height()-100)+"px",
+            //btn: null,
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    };
+    //查看
+    function show(id,deptName) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+           var dlg= dialogOpen({
+                id: "Form",
+                title: '查看单位授权信息',
+               url: '/SystemManage/MenuAuthorize/Form?action=show&keyValue=' + keyValue + "&deptName=" + deptName,
+                width: "800px",
+                height: "720px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //编辑
+    function edit(id,deptid,deptname) {
+        var keyValue = !!id ? id : $("#gridTable").jqGridRowValue("Id");
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: "Form",
+                title: '修改单位授权信息',
+                url: '/SystemManage/MenuAuthorize/Form?keyValue=' + keyValue + "&DepartId=" + deptid + "&DepartName=" + deptname,
+                width: ($(top.window).width() - 500) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                //btn: null,
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+        }
+    }
+    //删除
+    function del(id) {
+        var keyValue = !!id?id: $("#gridTable").jqGridRowValue("Id");
+        if (keyValue) {
+            $.RemoveForm({
+                msg: "删除该数据会关联删除关联授权配置数据，确认删除吗？",
+                url: "../../SystemManage/MenuAuthorize/Remove",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的信息！', 0);
+        }
+    }
+    function MenuAuth(departId, departCode, departName) {
+        var parameter = "?DepartId=" + departId + "&DepartName=" + departName + "&DepartCode=" + departCode;
+        dialogOpen({
+            id: "AuthForm",
+            title: '新增',
+            url: '/SystemManage/MenuAuthorize/AuthorizeForm' + parameter,
+            width: "1000px",
+            height: ($(top.window).height() - 50) + "px",
+            //btn: null,
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    function MenuSetting(departId, departCode, departName, platformType) {
+        var parameter = "?DepartId=" + departId + "&DepartName=" + departName + "&DepartCode=" + departCode + "&platform=" + platformType;
+        dialogOpen({
+            id: "SettingForm",
+            title: '新增',
+            url: '/SystemManage/MenuAuthorize/MenuSetting' + parameter,
+            width: "1000px",
+            height: ($(top.window).height() - 200) + "px",
+            //btn: null,
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    function Copy(Id, deptName) {
+        dialogOpen({
+            id: "CopyForm",
+            title: '新增',
+            url: '/SystemManage/MenuAuthorize/CopyForm?keyValue=' + Id + "&deptName=" + deptName,
+            width: "600px",
+            height: ($(top.window).height() - 200) + "px",
+            //btn: null,
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">单位授权管理</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

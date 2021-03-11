@@ -1,0 +1,293 @@
+﻿@{;
+  ViewBag.Title = "列表页面";
+  Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    
+    var recId = request('recId'); 
+    var deptCode = request('deptCode');
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //查看登记的问题
+    function showWt(objId, count) {
+            var url = "/QuestionManage/QuestionInfo/SdIndex?safetycheck=0&checkid=" + objId;
+            var idx = dialogOpen({
+                id: 'Question',
+                title: '问题信息',
+                url: url,
+                width: ($(top.window).width()) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    top.layer.close(idx);
+                }
+            });
+    }
+    //查看登记的违章
+    function showWz(objId) {
+        var url = '/LllegalManage/LllegalRegister/SdIndex?safetycheck=0&reseverone=' + objId;
+        var idx = dialogOpen({
+            id: 'Details',
+            title: '违章信息',
+            url: url,
+            width: ($(top.window).width() - 300) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            recId: recId,
+            status: 2
+        }
+      
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            postData: { queryJson: JSON.stringify(queryJson),deptCode:deptCode },
+            height: $(window).height() - 170,
+            url: "../../SaftyCheck/SaftyCheckDataRecord/GetTaskList",
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', hidden: true },
+                 {
+                     label: '操作', name: 'Oper', index: 'ID', width: 100, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:funcAction('view','" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                         return html;
+                     }
+                 },
+                 {
+                     label: '检查单位', name: 'checkeddepart',  width: 150, align: 'center', sortable: true
+                     //,formatter: function (cellvalue, options, rowObject) {
+                     //    return formatDate(cellvalue, 'yyyy-MM-dd') + "至" + formatDate(rowObject.CheckEndTime, 'yyyy-MM-dd');
+                     //}
+                 },
+                  {
+                      label: '要求检查时间', name: 'checkbegintime', width: 180, align: 'center', sortable: true,
+                      formatter: function (cellvalue, options, rowObject) {
+                          return formatDate(cellvalue, 'yyyy-MM-dd') + "至" + formatDate(rowObject.checkendtime, 'yyyy-MM-dd');
+                      }
+                  },
+                 {
+                     label: '实际检查时间', name: 'startdate', width: 180, align: 'center', sortable: true,
+                     formatter: function (cellvalue, options, rowObject) {
+                         return formatDate(cellvalue, 'yyyy-MM-dd') + "至" + formatDate(rowObject.enddate, 'yyyy-MM-dd');
+                     }
+                 },
+                
+                { label: '检查名称', name: 'checkdatarecordname', index: 'CheckDataRecordName', width: 350, align: 'center', sortable: true },
+                 {
+                     label: '检查进度', width: 200, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         if (rowObject.SolveCount == "0") return "未开始检查";
+                         var process = "<div style='width: " + rowObject.solvecount + "%; background-color:green;color:black;'>" + rowObject.solvecount + "%" + "</div>";
+                         return process;
+                     }
+                 },
+                {
+                    label: '不符合项', name: 'count', index: 'Count', width: 140, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var innerText = "";
+                        if (cellvalue > 0) {
+                            innerText = "隐患数量：<a href=javascript:funcAction('count','" + rowObject.id + "') style='color:blue; text-decoration:underline;color:red;'  title='查看隐患'>" + cellvalue + "项</a><br />";
+                        } else {
+                            innerText += "隐患数量：" + cellvalue + "项<br />";
+                        }
+                        if (top.window.isWz == "1") {
+                            if (rowObject.wzcount > 0) {
+                                innerText += "违章数量：<a onclick=\"showWz('" + rowObject.id + "')\" style='text-decoration:underline;cursor:pointer;color:red;'>" + rowObject.wzcount + "项</a><br />";
+                            } else {
+                                innerText += "违章数量：" + rowObject.wzcount + "项<br />";
+                            }
+                        }
+                        if (top.window.isWt == "1") {
+                            if (rowObject.wtcount > 0) {
+                                innerText += "问题数量：<a onclick=\"showWt('" + rowObject.id + "')\" style='text-decoration:underline;cursor:pointer;color:red;'>" + rowObject.wtcount + "项</a><br />";
+                            } else {
+                                innerText += "问题数量：" + rowObject.wtcount + "项<br />";
+                            }
+                        }
+                        return innerText;
+                    }
+                },
+                 {
+                     label: '处理进度', name: 'count1', index: 'Count', align: 'left', sortable: true, headerAlign: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+
+                         var innerText = "";
+                         if (cellvalue > 0) {
+                             innerText = "<div style='width: " + (rowObject.count1) + "%; background-color:green;color:black;'>隐患处理进度：" + rowObject.count1 + "%" + "</div>";
+                         } else {
+                             if (rowObject.count == 0) {
+                                 innerText += "隐患处理进度：-<br />";
+                             } else {
+                                 innerText += "隐患处理进度：" + cellvalue + "%<br />";
+                             }
+
+                         }
+                         if (top.window.isWz == "1") {
+                             if (rowObject.wzcount1 > 0) {
+                                 innerText += "<div style='width: " + (rowObject.wzcount1) + "%; background-color:green;color:black;margin-top:2px;'>违章处理进度：" + rowObject.wzcount1 + "%" + "</div>";
+                             } else {
+                                 if (rowObject.wzcount == 0) {
+                                     innerText += "违章处理进度：-<br />";
+                                 } else {
+                                     innerText += "违章处理进度：" + rowObject.wzcount1 + "%<br />";
+                                 }
+
+                             }
+                         }
+                         if (top.window.isWt == "1") {
+                             if (rowObject.wtcount1 > 0) {
+                                 innerText += "<div style='width: " + (rowObject.wtcount1) + "%; background-color:green;color:black;'>问题处理进度：" + rowObject.wtcount1 + "%" + "</div>";
+                             } else {
+                                 if (rowObject.wtcount == 0) {
+                                     innerText += "问题处理进度：-<br />";
+                                 } else {
+                                     innerText += "问题处理进度：" + rowObject.wtcount1 + "%";
+                                 }
+
+
+                             }
+                         }
+                         return innerText;
+                     }
+                 },
+                {
+                    label: '查看登记结果', name: 'Oper', index: 'ID', align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:funcAction('forResult','" + rowObject.id + "') style='color:blue; text-decoration:underline'  title='查看登记结果'>查看登记结果</a>";
+                        return html;
+                    }
+                }
+
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+
+            gridComplete: function () {
+
+            }
+        });
+    }
+         //操作显示
+         function funcAction(action, val) {
+             if (action == "view") {
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/ZXForm?recid=' + val + '&zj=0&cname=&ctype=&action=view';
+                 var idx = dialogOpen({
+                     id: "win0",
+                     title: "查看检查计划",
+                     url: url,
+                     width: ($(top.window).width()) + "px",
+                     height: ($(top.window).height()) + "px",
+                     btns: 1,
+                     btn: ["关闭"],
+                     callBack: function (iframeId) {
+                         top.layer.close(idx);
+                     }
+                 });
+             }
+            else if (action == "count") {
+                 var url = '/HiddenTroubleManage/HTBaseInfo/Index?mode=0&SAFETYCHECKOBJECTID=' + val;
+                 if (checkedRow(val)) {
+                     var idx = dialogOpen({
+                         id: 'HTWindow',
+                         title: '隐患列表',
+                         url: url,
+                         btns: 1,
+                         btn: ["关闭"],
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         callBack: function (iframeId) {
+                             top.layer.close(idx);
+                         }
+                     });
+                 }
+             } else if (action == "forResult") {
+                 //查看登记结果
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/ZXDetails?recid=' + val + '&zj=0&cname=';
+
+                 if (checkedRow(val)) {
+                     dialogOpen({
+                         id: 'ZJDetails',
+                         title: '查看检查记录',
+                         url: url,
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         btn: null,
+                         callBack: function (iframeId) {
+                             top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                         }
+                     });
+                 }
+             }
+         }
+         function updateData() {  
+             Loading(true, "请稍候,正在处理……");
+             $.get("UpdateCheckUsers", function (data) {
+                 Loading(false);
+                 var json=eval("("+data+")");
+                 if (json.type == "3") {
+                     dialogAlert(json.message, -1);
+                 } else {
+                     dialogMsg(json.message, 1);
+                  
+                 }
+             });
+         }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+   
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            
+            <div class="titlePanel">
+  
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="lr-replace" class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

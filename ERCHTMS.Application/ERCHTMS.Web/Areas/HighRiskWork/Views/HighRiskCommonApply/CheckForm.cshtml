@@ -1,0 +1,1431 @@
+﻿@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+<script>
+    var keyValue = request('keyValue');
+    var mode = request('mode');
+    var state = request('state');
+    var curflowid = "";
+
+    var curUserName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var isHDGZ = '@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("贵州毕节版本"))';
+    var isJdz = '@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("景德镇版本"))';
+
+    $(function () {
+        initControl();
+        ChangeMBCDZY();
+        
+        //审核阶段
+        if (state == "2") {
+            $("#btn_Save").css("display", "none");
+        }
+
+        //已完结
+        if (state == "3") {
+            $("#btnexport").show();
+        }
+        else {
+            $("#btnexport").hide();
+        }
+
+        $.ajax({
+            url: '../../HighRiskWork/HighRiskCommonApply/GetShowPattern',
+            data: { showtype: "1" },//安全措施
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                $("#Result").val(result);//1.手动输入 0.带入配置
+            }
+        });
+
+        //加载安全措施
+        LoadScGrid();
+        //加载审核信息
+        LoadShGrid();
+        //加载作业安全分析
+        //GetRiskGrid();
+        //加载执行信息
+        LoadZxGrid();
+
+    });
+    //初始化控件
+    function initControl() {
+        if (mode == "view") {
+            $("#panel5").css("display", "none");
+            $("#btn_Save,#btn_Submit,#btn_Transfer").attr("style", "display:none");
+            $("#form1 input,textarea,select, .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+
+        if (!isHDGZ) {
+            $("#tr_worklicensor").hide();
+            $("#WorkLicensorName").removeAttr("isvalid");
+        }
+
+        //通用作业类型
+        $("#WorkType").ComboBox({
+            param: { EnCode: "CommonType" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "======请选择======",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+
+        //风险等级
+        BindRiskType("");
+
+        //确定中
+        $("#btn_Save").click(function () {
+            AcceptClick();
+        });
+        //提交流程
+        $("#btn_Submit").click(function () {
+            SubmitAction();
+        });
+        //审批转交
+        $("#btn_Transfer").click(function () {
+            TransferAction();
+        });
+
+
+        $("#AuditDate").val("@DateTime.Now.ToString("yyyy-MM-dd")");
+        $("#AuditUserName").val(curUserName); //审核人姓名
+        $("#AuditUserId").val(userId); //审核人ID
+        $("#AuditDeptName").val(deptName); //审核部门名称
+        $("#AuditDeptId").val(deptId); //审核部门id
+        $("#AuditDeptCode").val(deptCode);//审核部门code
+
+
+        if (!!state) {
+            //确认阶段，隐藏审核相关信息
+            if (state == "1") {
+                $("#panel4").css("display", "none");
+                $("#panel5").css("display", "none");
+                $("#panel6").css("display", "none");
+            }
+            else if (state == "2") {
+                $("#panel6").css("display", "none");
+                //审核阶段及其他阶段
+                $("#AuditUserName").attr("isvalid", true);
+                $("#AuditDate").attr("isvalid", true);
+            }
+        }
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../HighRiskWork/HighRiskCommonApply/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    //根据作业类型切换风险等级数据
+                    BindRiskType(data.WorkType);
+                    $("#form1").formDeserialize(data);
+                    if (data.WorkDeptType == "0") {//单位内部
+                        $("#td_title_projectname").hide();
+                        $("#td_value_projectname").hide();
+                        $("input[name='WorkDeptType']:eq(0)").prop("checked", "checked");
+                        GetSpecialty(data.WorkDeptId, data.SpecialtyType);
+                    }
+                    if (data.WorkDeptType == "1") {//外包单位
+                        $("input[name='WorkDeptType']:eq(1)").prop("checked", "checked");
+                        $("#td_title_projectname").show();
+                        $("#td_value_projectname").show();
+                        //区域的处理
+                        $("#WorkAreaName").attr("onclick", "").attr("placeholder", "");
+                        GetSpecialty(data.EngineeringId, data.SpecialtyType);
+                    }
+                    if (data.NonWorkingApprove == "0") {
+                        $("input[name='NonWorkingApprove']:eq(0)").prop("checked", "checked");
+                        $("#td_title_approvedept").hide();
+                        $("#td_value_approvedept").hide();
+                    }
+                    if (data.NonWorkingApprove == "1") {
+                        $("input[name='NonWorkingApprove']:eq(1)").prop("checked", "checked");
+                        $("#td_title_approvedept").show();
+                        $("#td_value_approvedept").show();
+                    }
+                    $("input[name='IsMessage']:eq(" + data.IsMessage + ")").prop("checked", "checked");
+                    if (data.FlowApplyType == "3") {
+                        $("#text_nextstepapproveusername").show();
+                        $("#value_nextstepapproveusername").show();
+                        $("#NextStepApproveUserName").attr("isvalid", "yes");
+                    }
+                    else {
+                        $("#text_nextstepapproveusername").hide();
+                        $("#value_nextstepapproveusername").hide();
+                        $("#NextStepApproveUserName").removeAttr("isvalid");
+                    }
+                    curflowid = data.FlowId;
+                    //景德镇版本控制
+                    if (!!isJdz) {
+                        var text = $("#WorkType").attr("data-text");
+                        if (text == "有限空间作业") {
+                            $("#tr_worklicensor").show();
+                            $("#trElectricity").hide();
+                        }
+                        else if (text == "断路作业" || text == "破土作业") {
+                            $("#tr_worklicensor").hide();
+                            $("#trElectricity").show();
+                        }
+                        else {
+                            $("#tr_worklicensor").hide();
+                            $("#trElectricity").hide();
+                        }
+                        var flowName = data.FlowName;
+                        var dataValue = $("#WorkType").attr("data-value");
+                        if (dataValue == "11" && flowName == '确认中') {
+                            //盲板抽堵作业，风险辨识必填
+                            $("#RiskIdentification").attr("isvalid", "yes");
+                            $("#RiskIdentification").attr("checkexpession", "NotNull");
+                            $("#RiskIdentification").removeAttr("readonly");
+                        } else {
+                            $("#RiskIdentification").removeAttr("isvalid");
+                            $("#RiskIdentification").removeAttr("checkexpession");
+                            $("#RiskIdentification").attr("readonly");
+                        }
+                        if (dataValue == "12") {
+                            if (data.DangerAnalyse == "1") {
+                                $("input[name='DangerAnalyse']:eq(0)").prop("checked", "checked");
+                            } else {
+                                $("input[name='DangerAnalyse']:eq(1)").prop("checked", "checked");
+                            }
+                            if (data.SafetyAnalyse == "1") {
+                                $("input[name='SafetyAnalyse']:eq(0)").prop("checked", "checked");
+                            } else {
+                                $("input[name='SafetyAnalyse']:eq(1)").prop("checked", "checked");
+                            }
+                        }
+                    }
+                }
+            })
+            file_upload.bindFiles(false, false, keyValue, 'uploader1', false);
+            if ($("#WorkType").attr("data-value") == "11") {
+                //绑定图片
+                $.ajax({
+                    url: '../../PublicInfoManage/ResourceFile/GetFilesByRecId',
+                    data: { recId: keyValue + "_01" },
+                    type: "post",
+                    success: function (data) {
+                        var objdata = eval("(" + data + ")"); //转化为对象类型
+                        file_upload.bind(objdata, false, true, keyValue + "_01", "uploader2");
+                    }
+                });
+            }
+        }
+
+        $("#btn_Export").click(function () {
+            goReport();
+        });
+
+    }
+
+    function BindRiskType(workType) {
+        var enCode = "";
+        //景德镇 作业类型为“高处作业”,显示作业级别，风险等级隐藏
+        if (!!isJdz && workType == "12") {
+            enCode = "CommonWorkType";
+        } else {
+            enCode = "CommonRiskType";
+        }
+
+        //风险等级
+        $("#RiskType").ComboBox({
+            param: { EnCode: enCode },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "=请选择=",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+    }
+
+    function chooseUser() {
+        selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'NextStepApproveUserName,NextStepApproveUserAccount' });
+    }
+
+    //获取部门下的专业类别
+    function GetSpecialty(departid, stype) {
+        var specialtytype = stype;
+        if (mode == "edit" || mode == "add") {
+            specialtytype = "";
+        }
+        var workdepttype = $("input[name='WorkDeptType']:checked").val();
+        var flag = false;
+        $.ajax({
+            url: "../../HighRiskWork/Scaffold/GetSpecialtyToJson?deptid=" + departid + "&specialtytype=" + specialtytype + "&workdepttype=" + workdepttype,
+            asycn: true,
+            type: 'get',
+            success: function (data) {
+                if (!!data) {
+                    var json = JSON.parse(data);
+                    for (var i = 0; i < json.length; i++) {
+                        if (stype == json[i].itemvalue) {
+                            $("#SpecialtyType").append('<option value="' + json[i].itemvalue + '" selected="selected">' + json[i].itemname + '</option>');
+                        }
+                        else {
+                            $("#SpecialtyType").append('<option value="' + json[i].itemvalue + '">' + json[i].itemname + '</option>');
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        var projectisempty = 0;
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if (state == "1") {
+            var arrData = $("#gridTable").jqGrid("getRowData");
+            var resultshow = $("#Result").val();
+            var resultArr = new Array();
+            for (var i = 0; i < arrData.length; i++) {
+                var curId = arrData[i].Id;
+                var domId = "#people_" + curId;
+                var ppId = "#peopleid_" + curId;
+                var signid = "#sign_" + curId;
+                var result = $("input[name='result_" + curId + "']:checked").val();
+                result = !!result ? result : "";
+                var people = $(domId).val();
+                people = !!people ? people : "";
+                var peopleid = $(ppId).val();//人员Id
+                peopleid = !!peopleid ? peopleid : "";
+                var signpic = $(signid).attr("src");//签名
+                signpic = !!signpic ? signpic : "";
+
+                //手动输入
+                var projectname = "";
+                if (resultshow == "1") {
+                    var domidproject = "#projectname_" + curId;
+                    projectname = $(domidproject).val();
+                    if (!projectname) {
+                        projectisempty += 1;
+                    }
+                }
+                var curObj = { id: curId, projectname: projectname, result: result, people: people, peopleid: peopleid, signpic: signpic };
+                resultArr.push(curObj);
+            }
+            if (resultArr.length > 0) {
+                postData["recordData"] = JSON.stringify(resultArr); // resultData;
+            }
+        }
+
+        if (projectisempty > 0) {
+            dialogAlert("请填写安全措施!", function () {
+                return false;
+            })
+        }
+        else {
+            $.SaveForm({
+                url: "../../HighRiskWork/HighRiskCommonApply/SaveMeasureForm?keyValue=" + keyValue,
+                param: postData,
+                loading: "正在保存数据...",
+                success: function () {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            })
+        }
+    }
+
+    //提交到审核
+    function SubmitAction() {
+        var projectisempty = 0;
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        var isnodone = 0;
+        var isempty = 0;
+        //确认状态下提交
+        if (state == "1") {
+            var resultshow = $("#Result").val();
+            var arrData = $("#gridTable").jqGrid("getRowData");
+            var resultArr = new Array();
+            for (var i = 0; i < arrData.length; i++) {
+                var curId = arrData[i].Id;
+                var domId = "#people_" + curId;
+                var ppId = "#peopleid_" + curId;
+                var signid = "#sign_" + curId;
+                var result = $("input[name='result_" + curId + "']:checked").val();
+                if (!!result && result == "0") {
+                    isnodone += 1;
+                }
+                if (!result) {
+                    isempty += 1;
+                }
+                result = !!result ? result : "";
+                var people = $(domId).val();
+                people = !!people ? people : "";
+                var peopleid = $(ppId).val();//人员Id
+                peopleid = !!peopleid ? peopleid : "";
+                var signpic = $(signid).attr("src");//签名
+                signpic = !!signpic ? signpic : "";
+
+                //手动输入
+                var projectname = "";
+                if (resultshow == "1") {
+                    var domidproject = "#projectname_" + curId;
+                    projectname = $(domidproject).val();
+                    if (!projectname) {
+                        projectisempty += 1;
+                    }
+                }
+                var curObj = { id: curId, projectname: projectname, result: result, people: people, peopleid: peopleid, signpic: signpic };
+                resultArr.push(curObj);
+            }
+            if (resultArr.length > 0) {
+                postData["recordData"] = JSON.stringify(resultArr); // resultData;
+            }
+        }
+        else {
+            //审核结果
+            var auditresult = $("input[name='AuditState']:checked").val();
+            if (auditresult == "" || auditresult == undefined) {
+                dialogAlert("审核结果未勾选,无法进行提交!!!", function () {
+                    return false;
+                })
+                return false;
+            }
+            postData["AuditState"] = auditresult;
+            postData["AuditSignImg"] = $("#AuditSignImg").attr("src");
+        }
+        postData["state"] = state;
+
+
+        if (projectisempty > 0) {
+            dialogAlert("请填写安全措施!", function () {
+                return false;
+            })
+        }
+        else {
+            if (isempty > 0) {
+                dialogAlert("安全措施有未设置的项,无法进行提交!", function () {
+                    return false;
+                })
+            }
+                //存在未完成的
+            else if (isnodone > 0) {
+                dialogConfirm("安全措施有未完成的项,提交将会结束流程,确定提交?", function (res) {
+                    if (res) {
+                        $.SaveForm({
+                            url: "../../HighRiskWork/HighRiskCommonApply/SubmitCheckForm?keyValue=" + keyValue,
+                            param: postData,
+                            loading: "正在保存数据...",
+                            success: function () {
+                                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                            }
+                        })
+                    }
+                });
+            }
+            else  //所有都完成
+            {
+                $.SaveForm({
+                    url: "../../HighRiskWork/HighRiskCommonApply/SubmitCheckForm?keyValue=" + keyValue,
+                    param: postData,
+                    loading: "正在保存数据...",
+                    success: function () {
+                        $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                        top.refreshWork();//刷新首页待办事项
+                    }
+                })
+            }
+        }
+
+    }
+
+    function TransferAction() {
+        var url = '/HighRiskWork/HighRiskCommonApply/TransferForm?keyValue=' + keyValue + "&FlowId=" + curflowid;
+        idx = dialogOpen({
+            id: "Transfer",
+            title: '审批转交',
+            url: url,
+            width: ($(top.window).width() * 0.4) + "px",
+            height: ($(top.window).height() * 0.4) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                //top.layer.close(idx);
+                //$.currentIframe().$("#gridTable").trigger("reloadGrid");
+            },
+            cancel: function (index) {
+            }
+        });
+    }
+
+    //查看更多
+    function showmore(type) {
+        switch (type) {
+            case 0:
+                var html = $("#WorkUserNames").val();
+                $("#modalBody").html(html);
+                $("#QdModal").modal('show');
+                break;
+            case 1:
+                var html = $("#CopyUserNames").val();
+                $("#modalBody").html(html);
+                $("#QdModal").modal('show');
+                break;
+        }
+    }
+
+
+    //加载安全措施
+    function LoadScGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() / 2 - 100,
+            url: "../../HighRiskWork/HighRiskCommonApply/GetMeasureListJson",
+            postData: { scaffoldid: keyValue },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '安全措施', name: 'ProjectName', index: 'ProjectName', width: 700, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html =!!rowObject.ProjectName?rowObject.ProjectName:"";
+                        var showtype = $("#Result").val();
+                        //是手动输入
+                        if (showtype == "1") {
+                            var disabledhtml = "  ";
+                            if (mode == "view" || state == "2") {
+                                disabledhtml = "  disabled=\"disabled\"  ";
+                            }
+                            var content = !!rowObject.ProjectName ? rowObject.ProjectName : "";
+                            html = "<input type=\"text\"  style=\"width:98%;\" id=\"projectname_" + rowObject.Id + "\" value=\"" + content + "\" " + disabledhtml + ">&nbsp;";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '安全措施情况', name: 'Result', index: 'Result', width: 200, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        if (!!rowObject.Id) {
+                            var yVal = "";
+                            var wVal = "";
+                            var disabledhtml = "  ";
+                            if (!!rowObject.Result) {
+                                if (rowObject.Result == "1") {
+                                    yVal = " checked = \"checked\"";
+                                }
+                                if (rowObject.Result == "0") {
+                                    wVal = " checked = \"checked\"";
+                                }
+                            }
+                            if (mode == "view" || state == "2") {
+                                disabledhtml = "  disabled=\"disabled\"  ";
+                            }
+
+                            var html = "<input type=\"radio\" onclick=\"changeState('" + rowObject.Id + "',this)\" name=\"result_" + rowObject.Id + "\" " + yVal + disabledhtml + " value=\"1\">" + rowObject.ResultYes + "&nbsp;";
+                            html += "<input type=\"radio\" onclick=\"changeState('" + rowObject.Id + "',this)\"  name=\"result_" + rowObject.Id + "\" " + wVal + disabledhtml + " value=\"0\">" + rowObject.ResultNo + "&nbsp;";
+
+                            return html;
+                        }
+                    }
+                },
+                {
+                    label: '确认人', name: 'CheckPersons', index: 'CheckPersons', width: 200, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.Id) {
+
+                            var disabledhtml = "  ";
+                            var content = !!rowObject.CheckPersons ? rowObject.CheckPersons : "";
+                            if (mode == "view" || state == "2") {
+                                disabledhtml = "  disabled=\"disabled\"  ";
+                            }
+                            var html = "<input type=\"text\" readonly  style=\"width:80%;\" id=\"people_" + rowObject.Id + "\" value=\"" + content + "\" " + disabledhtml + ">&nbsp;";
+
+                            return html;
+                        }
+                    }
+                },            {
+                    label: '确认人', name: 'CheckPersonsId', width: 100, align: 'center', hidden: true, formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.id) {
+                            var disabledhtml = "  ";
+                            var content = !!rowObject.CheckPersonsId ? rowObject.CheckPersonsId : "";
+                            var html = "<input type=\"hidden\"  id=\"peopleid_" + rowObject.id + "\" value=\"" + content + "\">&nbsp;";
+                            return html;
+                        }
+
+                    }
+                },
+                {
+                    label: '签名', name: 'SignPic', index: 'SignPic', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.Id) {
+                            var disabledhtml = "  ";
+                            var content = !!rowObject.SignPic ? rowObject.SignPic : "";
+                            var html = "";
+                            if (content == "" || content == undefined) {
+                                var html = "<img style=\"height:50px;\"  id=\"sign_" + rowObject.Id + "\" >&nbsp;";
+                            } else {
+                                html = "<img style=\"height:50px;\" id=\"sign_" + rowObject.Id + "\" src=\"../.." + content + "\">&nbsp;";
+                            }
+
+                            return html;
+                        }
+
+                    }
+                }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 100,
+            rowList: [15, 30, 50],
+            shrinkToFit: false,
+            gridview: true
+        });
+    }
+
+    //赋值确定人
+    function changeState(id,obj) {
+        var signImg = getUserSignPic(userId);
+        if(!!signImg)
+        {
+            $("#sign_" + id).attr("src", "../.." + signImg);
+            $("#people_" + id).val(curUserName);
+            $("#peopleid_" + id).val(userId);
+        }
+        else {
+            $(obj).get(0).checked = false;
+        }
+    }
+
+    //加载审核列表
+    function LoadShGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#approveGridTable');
+        $gridTable.jqGrid({
+            url: "../../HighRiskWork/Scaffold/GetScaffAuditToJson?scaffoldid=" + keyValue,
+            datatype: "json",
+            height: $(window).height() / 2 - 200,
+            postData: {},
+            autowidth: true,
+            colModel: [
+                 {
+                     label: '审核部门', name: 'AuditDeptName', width: 200, align: 'center', sortable: false
+                 },
+                { label: '审核人', name: 'AuditUserName', index: 'AuditUserName', width: 120, align: 'center', sortable: false },
+                {
+                    label: '审核结果', name: 'AuditState', index: 'AuditState', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = rowObject.AuditState == 1 ? "同意" : "不同意";
+                        return html;
+                    }
+                },
+                {
+                    label: '审核意见', name: 'AuditRemark', index: 'AuditRemark', width: 300, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.AuditRemark) {
+                            var content = rowObject.AuditRemark.length > 20 ? rowObject.AuditRemark.substring(0, 20) + "......" : rowObject.AuditRemark;
+
+                            html = "<div title=" + content + ">" + content + "</div>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '审核时间', name: 'AuditDate', index: 'AuditDate', width: 150, align: 'center', sortable: false, formatter: "date", formatoptions: { srcformat: 'Y-m-d H:i', newformat: 'Y-m-d H:i' }
+
+                },
+                {
+                    label: '签名', name: 'AuditSignImg', index: 'AuditSignImg', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var content = !!rowObject.AuditSignImg ? rowObject.AuditSignImg : "";
+                        var html = "";
+                        if (content == "" || content == undefined) {
+                            var html = "<img  style=\"height:50px;\" />&nbsp;";
+                        } else {
+                            html = "<img style=\"height:50px;\"  src=\"../.." + content + "\"/>&nbsp;";
+                        }
+
+                        return html;
+                    }
+                }
+            ],
+            pager: false,
+            rowNum: "20",
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+    }
+
+    //加载执行信息
+    function LoadZxGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#conditionGridTable');
+        $gridTable.jqGrid({
+            url: "../../HighRiskWork/Scaffold/GetConditonToJson?keyvalue=" + keyValue,
+            datatype: "json",
+            height: "400px",
+            postData: {},
+            autowidth: true,
+            colModel: [
+                { label: 'ID', name: 'Id', index: 'Id', width: 500, align: 'center', sortable: false, hidden: true },
+                {
+                    label: '执行信息', name: 'num', index: 'num', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+
+                        return "第" + cellvalue + "次作业执行信息";
+                    }
+                },
+                 {
+                     label: '作业时间', name: 'ConditionTime', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                         var html = "";
+                         if (!!rowObject.LedgerType) {
+                             if (rowObject.LedgerType == "0") {
+                                 html = "开始时间:" + formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                             }
+                             else {
+                                 html = "结束时间:" + formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                             }
+                         }
+                         return html;
+                     }
+                 },
+                { label: '执行情况说明', name: 'ConditionContent', index: 'ConditionContent', width: 500, align: 'center', sortable: false },
+                {
+                    label: '现场图片', name: 'ScenePicPath', index: 'ScenePicPath', width: 300, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.ScenePicPath) {
+                            html = "<div id=\"ScenePic_" + rowObject.Id + "\"><img src=\" ../.." + rowObject.ScenePicPath.substring(1, rowObject.ScenePicPath.length) + "\"  data-original=\" ../.." + rowObject.ScenePicPath.substring(1, rowObject.ScenePicPath.length) + "\" alt=\"\"  style=\"width:150px;height:100px;\" /></div>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '是否有附件', name: 'isannex', index: 'ISANNEX', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        if (rowObject.filenum == 0) {
+                            html = "否";
+                            return html;
+
+                        } else if (rowObject.filenum > 0) {
+                            html = "<a href=javascript:btn_Annex('" + rowObject.Id + "_02" + "') style='color:blue; text-decoration:underline;padding-left:0px;' title='修改'>是</a>";
+                            return html;
+
+                        }
+
+
+                    }
+
+                },
+                {
+                    label: '填报人', name: 'CreateUserName', index: 'CreateUserName', width: 150, align: 'center', sortable: false
+                },
+                {
+                    label: '填报时间', name: 'CreateDate', index: 'CreateDate', width: 150, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+
+                }
+            ],
+
+            pager: false,
+            rowNum: "100",
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                //获取所有数据
+                var datas = $("#" + this.id).jqGrid("getRowData");
+                if (!!datas) {
+                    $(datas).each(function (i, ele) {
+                        viewimg(ele.Id + "_01", "#ScenePic_" + ele.Id, ele.ScenePicPath); //现场图片
+                    });
+                }
+                Merger('conditionGridTable', new Array('num'));
+            }
+        });
+    }
+
+
+    //预览图片
+    function viewimg(id, objid, epath) {
+        var $obj = $(objid);
+        $.post("../../PublicInfoManage/ResourceFile/GetFilesByRecId", { recId: id }, function (data) {
+            var files = eval("(" + data + ")");
+            if (files.length > 0) {
+                $(files).each(function (i, file) {
+                    if (!!file.filepath) {
+                        var filepath = file.filepath.substring(15, file.filepath.length);
+                        if (!!epath && epath.indexOf(filepath) < 0) {
+                            var $li = $('<img title="点击查看大图" alt="点击查看大图" style=\"width:0px;height:0px;\" data-original="' + "/" + file.filepath.substring(1, file.filepath.length) + '" src="' + "/" + file.filepath.substring(1, file.filepath.length) + '"  />');
+                            $li.appendTo($obj);
+                        }
+                    }
+                });
+                $obj.viewer({ url: "data-original" });
+            }
+        });
+    }
+
+    //导出
+    function goReport() {
+        var dataValue = $("#WorkType").attr("data-value");
+        if (!!isJdz) {
+            if (dataValue == "11") {
+                location.href = "../../HighRiskWork/HighRiskCommonApply/ExportMBCDDetails?keyValue=" + keyValue;
+            } else if (dataValue == "12") {
+                location.href = "../../HighRiskWork/HighRiskCommonApply/ExportHighWorkDetails?keyValue=" + keyValue;
+            } else {
+                location.href = "../../HighRiskWork/HighRiskCommonApply/ExportDetails?keyValue=" + keyValue;
+            }
+        } else {
+            location.href = "../../HighRiskWork/HighRiskCommonApply/ExportDetails?keyValue=" + keyValue;
+        }
+    }
+
+    function auditCheck(obj) {
+        var signImg = getUserSignPic(userId);
+        if (!!signImg) {
+            $("#AuditSignImg").attr("src", "../.." + signImg);
+        } else {
+            $(obj).get(0).checked = false;
+        }
+    }
+
+
+    //加载作业安全分析
+    function GetRiskGrid() {
+        var $gridTable = $('#gridAnalyse');
+        $gridTable.jqGrid({
+            url: "../../HighRiskWork/HighRiskCommonApply/GetRiskListJson",
+            postData: { workId: keyValue },
+            datatype: "json",
+            height: "200px",
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '工作任务', name: 'WorkTask', width: 200, align: 'center',sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = '<textarea type="text" name="worktask" role="textbox" disabled="disabled"  maxlength="500" style="width: 100%;height:50px;" class="form-control" ';
+                        html += '>' + cellvalue + '</textarea>';
+                        return html;
+                    }
+                },
+                {
+                    label: '工序', name: 'WorkProcess', width: 200, align: 'center',sortable: false,  formatter: function (cellvalue, options, rowObject) {
+                        var html = '<textarea type="text"  name="workprocess" role="textbox" disabled="disabled"  maxlength="500" style="width: 100%;height:50px;" class="form-control" ';
+                        html += '>' + cellvalue + '</textarea>';
+                        return html;
+                    }
+                },
+                {
+                    label: '风险描述', name: 'AtRisk', width: 300, align: 'center',sortable: false,  formatter: function (cellvalue, options, rowObject) {
+                        var html = '<textarea type="text"  name="atrisk" role="textbox" disabled="disabled"  maxlength="500"  style="width: 100%;height:50px;" class="form-control" ';
+                        html += '>' + cellvalue + '</textarea>';
+                        return html;
+                    }
+                },
+                {
+                    label: '风险控制措施', name: 'Controls', width: 200, sortable: false, align: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = '<textarea type="text"  name="controls" role="textbox" disabled="disabled"  maxlength="500" style="width: 100%;height:50px;" class="form-control" ';
+                        html += '>' + cellvalue + '</textarea>';
+                        return html;
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+
+        });
+    }
+
+    function LoadMBList() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable1');
+        $gridTable.jqGrid({
+            //autowidth: true,
+            width: $('.form').width() - 124,
+            height: 'auto',
+            url: "../../HighRiskWork/HighRiskCommonApply/GetMBListToJson?highRiskId=" + keyValue,
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'Id', width: 10, align: 'left', sortable: true, hidden: true },
+                { label: '材质', name: 'Material', index: 'Material', width: 500, align: 'center', sortable: false },
+                { label: '规格', name: 'Specification', index: 'Specification', width: 500, align: 'center', sortable: false },
+                { label: '编号', name: 'SerialCode', index: 'SerialCode', width: 400, align: 'center', sortable: false }
+            ],
+            cellsubmit: 'clientArray',
+            multiselect: false,
+            viewrecords: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                selectRowCurIndex = $('#' + this.id).getInd(selectedRowIndex);
+            },
+            gridComplete: function () {
+            }
+        });
+    }
+
+    //选择盲板抽堵作业
+    function ChangeMBCDZY() {
+        var workType = $("#WorkType").attr("data-value");
+        if (!!isJdz && workType == "11") {
+            //作业类型为"盲板抽堵作业"
+            LoadMBList();
+            $(".mbcdzy").show();
+            $(".ckmb").hide();
+            $(".gczy").hide();
+            $("#st").text("计划装盲板时间");
+            $("#et").text("计划拆盲板时间");
+            $("#sp_rank").text("风险等级");
+        } else {
+            if (!!isJdz && workType == "12") {
+                $(".gczy").show();
+                $("#sp_rank").text("作业级别");
+            } else {
+                $(".gczy").hide();
+                $("#sp_rank").text("风险等级");
+            }
+            $(".mbcdzy").hide();
+            $(".mbcdzy").hide();
+            $(".ckmb").show();
+            $("#st").text("计划作业开始时间");
+            $("#et").text("计划作业结束时间");
+        }
+    }
+
+
+    function ShowAnalyse() {
+        var url = '/HighRiskWork/HighRiskCommonApply/AnalyseForm?mode=view&keyValue=' + keyValue;
+        idx = dialogOpen({
+            id: "Analyse",
+            title: '作业安全分析',
+            url: url,
+            width: ($(top.window).width() - 300) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //查看附件
+    function btn_Annex(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Annex',
+                title: '附件列表',
+                url: '/OccupationalHealthManage/Occupatioalstaff/FileList?keyValue=' + keyValue,
+                width: '600px',
+                height: '550px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+</script>
+<div style="margin: 0px; margin-top: 40px; background-color: white;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">申请单位<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input type="hidden" id="Result" />
+                <input id="ApplyDeptName" type="text" class="form-control" readonly />
+            </td>
+            <td class="formTitle">申请人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="ApplyUserName" type="text" class="form-control" readonly />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">申请时间<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="CreateDate" type="text" class="form-control" readonly />
+            </td>
+            <td class="formTitle">申请编号<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="ApplyNumber" type="text" class="form-control" readonly />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业类型<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <div id="WorkType" type="select" class="ui-select" readonly></div>
+            </td>
+            <td class="formTitle"><span id="sp_rank">风险等级</span><font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <div id="RiskType" type="select" class="ui-select" readonly style="float:left;width:60%;"></div>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="#" id="RiskRecord" onclick="ShowAnalyse()" class="btn btn-primary" title='作业安全分析'><i class='fa fa-pencil-square-o'></i>作业安全分析</a>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" id="tddept">作业单位类别<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="WorkDeptType" id="WorkDeptType1" value="0" disabled="disabled" />单位内部
+                    </label>
+                </div>
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="WorkDeptType" id="WorkDeptType2" value="1" disabled="disabled" />外包单位
+                    </label>
+                </div>
+                <input type="hidden" id="WorkDeptType" />
+            </td>
+            <td class="formTitle">专业类别<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <select id="SpecialtyType" name="SpecialtyType" class="form-control" disabled="disabled">
+                    <option value="">请选择</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业单位<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="WorkDeptName" type="text" class="form-control" readonly />
+                <input type="hidden" id="WorkDeptId" />
+                <input type="hidden" id="FlowId" />
+                <input type="hidden" id="CreateUserDeptCode" />
+            </td>
+            <td class="formTitle" id="td_title_projectname">工程名称<font face="宋体">*</font></td>
+            <td class="formValue" id="td_value_projectname" colspan="2">
+                <input id="EngineeringName" type="text" class="form-control" readonly />
+                <input id="EngineeringId" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle"><span id="st">计划作业开始时间</span><font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="WorkStartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm'})" disabled="disabled">
+            </td>
+            <td class="formTitle"><span id="et">计划作业结束时间</span><font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="WorkEndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm'})" disabled="disabled">
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业区域<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="WorkAreaName" type="text" class="form-control" readonly />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业地点<font face="宋体">*</font></td>
+            <td class="formValue" colspan="5">
+                <textarea id="WorkPlace" class="form-control" style="min-height: 30px;" maxlength="100" readonly></textarea>
+            </td>
+        </tr>
+        <tr class="ckmb">
+            <td class="formTitle">作业项目(内容)<font face="宋体">*</font></td>
+            <td class="formValue" colspan="5">
+                <textarea id="WorkContent" class="form-control" style="min-height: 80px;" maxlength="800" readonly></textarea>
+            </td>
+        </tr>
+        <tr class="gczy">
+            <td class="formTitle">对应工作票编号<br />及内容</td>
+            <td class="formValue" colspan="5">
+                <textarea id="WorkTicketNoContent" class="form-control" style="min-height: 80px;" readonly></textarea>
+            </td>
+        </tr>
+        <tr class="gczy">
+            <td class="formTitle"><span id="st">工作危险分析(JHA)</span><font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="DangerAnalyse" id="DangerAnalyse1" value="1" disabled="disabled" />有
+                    </label>
+                </div>
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="DangerAnalyse" id="DangerAnalyse2" value="1" disabled="disabled" />无
+                    </label>
+                </div>
+            </td>
+            <td class="formTitle"><span id="et">作业安全分析(JSA)</span><font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="SafetyAnalyse" id="SafetyAnalyse1" value="1" disabled="disabled" />有
+                    </label>
+                </div>
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="SafetyAnalyse" id="SafetyAnalyse2" value="1" disabled="disabled" />无
+                    </label>
+                </div>
+            </td>
+        </tr>
+        <tr class="gczy">
+            <td class="formTitle">运行许可人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="YXPermitUserName" type="text" class="form-control td_gczy" readonly />
+                <input id="YXPermitUserId" type="hidden" />
+            </td>
+            <td class="formTitle">值长/值班负责人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="WatchUserName" type="text" class="form-control td_gczy" readonly />
+                <input id="WatchUserId" type="hidden" />
+            </td>
+        </tr>
+        <tr class="gczy">
+            <td class="formTitle">受影响相关方确<br />认人</td>
+            <td class="formValue" colspan="2">
+                <input id="EffectConfirmerName" type="text" class="form-control" readonly />
+                <input id="EffectConfimerId" type="hidden" />
+            </td>
+        </tr>
+        <tr class="mbcdzy">
+            <td class="formTitle">设备管道名称<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="PipeLine" type="text" class="form-control checkmb" maxlength="100" readonly />
+            </td>
+            <td class="formTitle">介质<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="Media" type="text" class="form-control checkmb" readonly />
+            </td>
+        </tr>
+        <tr class="mbcdzy">
+            <td class="formTitle">温度<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="Temperature" type="text" class="form-control checkmb" readonly />
+            </td>
+            <td class="formTitle">压力<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="Pressure" type="text" class="form-control checkmb" readonly />
+            </td>
+        </tr>
+        <tr class="mbcdzy">
+            <td class="formTitle">盲板<font face="宋体">*</font></td>
+            <td class="formValue" colspan="4">
+                @*<button id="btnAddMB" type="button" class="btn btn-primary" onclick="addMB()">新  增</button>*@
+                <table id="gridTable1"></table>
+            </td>
+        </tr>
+        <tr class="mbcdzy">
+            <td class="formTitle">装盲板负责人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="ZMBDutyUserName" type="text" class="form-control checkmb" readonly />
+                <input id="ZMBDutyUserId" type="hidden" />
+            </td>
+            <td class="formTitle">拆盲板负责人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="CMBDutyUserName" type="text" class="form-control checkmb" readonly />
+                <input id="CMBDutyUserId" type="hidden" />
+            </td>
+        </tr>
+        <tr id="trElectricity" style="display:none">
+            <td class="formTitle">电源接入点</td>
+            <td class="formValue" colspan="2">
+                <input id="PowerAccess" type="text" class="form-control" readonly>
+            </td>
+            <td class="formTitle">电压</td>
+            <td class="formValue" colspan="2">
+                <input id="Voltage" type="text" class="form-control" readonly>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle ckmb">作业负责人<font face="宋体">*</font></td>
+            <td class="formValue ckmb" colspan="2">
+                <input id="WorkDutyUserName" type="text" class="form-control" readonly />
+            </td>
+            <td class="formTitle">监护人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="WorkTutelageUserName" type="text" class="form-control" readonly />
+            </td>
+        </tr>
+        <tr id="tr_worklicensor">
+            <td class="formTitle">作业许可人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="4">
+                <input id="WorkLicensorName" type="text" class="form-control" readonly />
+                <input type="hidden" id="WorkLicensorId" value="" />
+                <input type="hidden" id="WorkLicensorAccount" value="" />
+            </td>
+            <td>
+                <a id="btn_more" class="btn btn-primary" href="javascript:showmore(2);"><i class="fa fa-check"></i>&nbsp;更&nbsp;&nbsp;多</a>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业人员<font face="宋体">*</font></td>
+            <td class="formValue" colspan="4">
+                <input id="WorkUserNames" type="text" class="form-control" readonly />
+            </td>
+            <td>
+                <a id="btn_more" class="btn btn-primary" href="javascript:showmore(0);"><i class="fa fa-check"></i>&nbsp;更&nbsp;&nbsp;多</a>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">抄送人</td>
+            <td class="formValue" colspan="4">
+                <input id="CopyUserNames" type="text" class="form-control" readonly />
+            </td>
+            <td>
+                <a id="btn_more1" class="btn btn-primary" href="javascript:showmore(1);"><i class="fa fa-check"></i>&nbsp;更&nbsp;&nbsp;多</a>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" id="tddept">非工作时段审批<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="NonWorkingApprove" id="NonWorkingApprove1" value="0" checked="checked" disabled="disabled" />否
+                    </label>
+                </div>
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="NonWorkingApprove" id="NonWorkingApprove2" value="1" disabled="disabled" />是
+                    </label>
+                </div>
+                <input type="hidden" id="NonWorkingApprove" />
+            </td>
+            <td class="formTitle" id="td_title_approvedept" style="display:none">审批部门<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2" id="td_value_approvedept" style="display:none">
+                <input id="ApproveDept" type="text" class="form-control" disabled="disabled" />
+                <input type="hidden" id="ApproveDeptId" />
+                <input type="hidden" id="ApproveDeptCode" />
+            </td>
+        </tr>
+        <tr style="display:none">
+            <td class="formTitle" id="tddept">短信通知审批人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="IsMessage" id="IsMessage1" value="0" disabled="disabled" />否
+                    </label>
+                </div>
+                <div class="radio-inline">
+                    <label>
+                        <input type="radio" name="IsMessage" id="IsMessage2" value="1" disabled="disabled" />是
+                    </label>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">风险辨识</td>
+            <td class="formValue" colspan="5">
+                <textarea id="RiskIdentification" class="form-control" style="min-height: 80px;" maxlength="1000" readonly></textarea>
+            </td>
+        </tr>
+        <tr class="mbcdzy">
+            <td class="formTitle">盲板图位置</td>
+            <td class="formValue" colspan="5">
+                <div class="ibox">
+                    <div id="uploader2" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                        <div class="queueList">
+                            <div id="dndArea1" class="placeholder">
+                                <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                <input type="hidden" id="MBPlaceFileId" />
+                            </div>
+                        </div>
+                        <div class="statusBar" style="display: none;">
+                            <div class="progress">
+                                <span class="text">0%</span>
+                                <span class="percentage"></span>
+                            </div>
+                            <div class="info"></div>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">附件</td>
+            <td class="formValue" colspan="5">
+                <div class="ibox">
+                    <div id="uploader1" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                        <div class="queueList">
+                            <div id="dndArea" class="placeholder">
+                                <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                            </div>
+                        </div>
+                        <div class="statusBar" style="display: none;">
+                            <div class="progress">
+                                <span class="text">0%</span>
+                                <span class="percentage"></span>
+                            </div>
+                            <div class="info"></div>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>
+<div class="panel panel-default" id="safetyMeasure">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;安全措施确认</strong>
+        <span class="tools pull-right">
+            <a class="fa fa-chevron-down" title="展开/收起"></a>
+        </span>
+    </div>
+    <div class="panel-body">
+        <div style="margin-top: 5px; margin-right: 30px;">
+            <table id="gridTable"></table>
+        </div>
+    </div>
+</div>
+@*<div class="panel panel-default" id="riskAnalyse">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;作业安全分析</strong>
+        <span class="tools pull-right">
+            <a href="#" disabled="disabled" id="select" class="btn btn-primary btn-xs">选择工作任务</a>&nbsp;&nbsp;&nbsp;&nbsp;
+            <a href="#" id="choose1" disabled="disabled" class="btn btn-primary btn-xs">新增工作任务</a>&nbsp;&nbsp;&nbsp;&nbsp; <a class="fa fa-chevron-down" title="展开/收起"></a>
+        </span>
+    </div>
+    <div class="panel-body">
+        <table id="gridAnalyse"></table>
+        <div id="AnalysePager"></div>
+    </div>
+</div>*@
+<div class="panel panel-default" id="panel5">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;审核信息</strong>
+        <span class="tools pull-right">
+            <a class="fa fa-chevron-down" title="展开/收起"></a>
+        </span>
+    </div>
+    <div class="panel-body">
+        <div style="margin-top: 5px; margin-right: 30px;">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">审核部门<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="2">
+                        <input id="AuditDeptName" type="text" class="form-control" checkexpession="NotNull" />
+                        <input type="hidden" id="AuditDeptId" />
+                        <input type="hidden" id="AuditDeptCode" />
+                    </td>
+                    <td class="formTitle">审核人<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="2">
+                        <input id="AuditUserName" type="text" class="form-control" checkexpession="NotNull" />
+                        <input type="hidden" id="AuditUserId" />
+                    </td>
+                    <td class="formTitle" id="text_nextstepapproveusername">下一步审核人<font face="宋体">*</font></td>
+                    <td class="formValue" id="value_nextstepapproveusername">
+                        <input type="text" class="form-control" id="NextStepApproveUserName" readonly onclick="chooseUser()" isvalid="yes" checkexpession="NotNull" />
+                        <input type="hidden" id="NextStepApproveUserAccount" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审核日期<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="2">
+                        <input id="AuditDate" type="text" class="form-control" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" disabled="disabled" checkexpession="NotNull" />
+                    </td>
+                    <td class="formTitle">审核结果<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="2">
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="AuditState" id="AuditState1" value="1" onclick="auditCheck(this)" />同意
+                            </label>
+                        </div>
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="AuditState" id="AuditState2" value="0" onclick="auditCheck(this)" />不同意
+                            </label>
+                        </div>
+                    </td>
+                    <td class="formTitle">签名<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <img id="AuditSignImg" style="height: 50px;" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审核意见</td>
+                    <td class="formValue" colspan="5">
+                        <textarea id="AuditRemark" name="AuditRemark" class="form-control"></textarea>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+<div class="panel panel-default" id="panel4">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;审核记录</strong>
+        <span class="tools pull-right">
+            <a class="fa fa-chevron-down" title="展开/收起"></a>
+        </span>
+    </div>
+    <div class="panel-body">
+        <div style="margin-top: 5px; margin-right: 30px;">
+            <table id="approveGridTable"></table>
+        </div>
+    </div>
+</div>
+<div class="panel panel-default" id="panel6">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;作业执行信息</strong>
+        <span class="tools pull-right">
+            <a class="fa fa-chevron-down" title="展开/收起"></a>
+        </span>
+    </div>
+    <div class="panel-body">
+        <div style="margin-top: 5px; margin-right: 30px;">
+            <table id="conditionGridTable"></table>
+        </div>
+    </div>
+</div>
+<div class="form-button" style="top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float: left;">
+        <a id="btn_Transfer" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;审&nbsp;&nbsp;批&nbsp;&nbsp;转&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+        <a id="btn_Save" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+    </div>
+</div>
+<div class="form-button" style="top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;" id="btnexport">
+    <div style="float: left;">
+        <a id="btn_Export" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4;"><i class="fa fa-download"></i>&nbsp;导&nbsp;&nbsp;出</a>
+    </div>
+</div>
+<div class="modal" id="QdModal">
+    <div class="modal-dialog" style="width: 300px; margin-top: 100px;">
+        <div class="modal-content" style="text-align: center;">
+            <div class="modal-header">
+                <h5>作业人员</h5>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
+            <div class="modal-footer">
+                <button id="btnModal" type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>

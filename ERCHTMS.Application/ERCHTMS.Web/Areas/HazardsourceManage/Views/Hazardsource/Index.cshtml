@@ -1,0 +1,281 @@
+@{
+    ViewBag.Title = "危险源辨识评估";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script src="~/Content/scripts/business/Grid.js"></script>
+<script>
+    var _parentId = "";
+    var _isOrg = "";
+    var IsDanger = "";
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    //加载页面
+    $(function () {
+        //页面初始化
+        InitialPage();
+        //加载按钮权限
+        LoadToolBar();
+        //（搜索条件）
+        ComboxBindData("DistrictId", top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + top.currUserOrgId);
+        //加载列表createuserid
+        var arrCol = new Array();
+        arrCol.push(
+               { label: '主键', name: 'id', index: 'id', align: 'center', sortable: false, hidden: true },
+                { label: '所属区域', name: 'districtname', index: 'districtname', align: 'center', sortable: true,width:100},
+                { label: '危险源名称（场所）', name: 'dangersource', index: 'dangersource', align: 'center', sortable: true },
+                { label: '可能导致的事故类型', name: 'accidentname', index: 'accidentname', align: 'center', sortable: true,width:80},
+                //{ label: '安全控制措施', name: 'measure', index: 'measure', align: 'center', sortable: true },
+                         {
+                             label: '安全控制措施', name: 'measurenum',width:70, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                                 var count = cellvalue;
+                                 //if (count == 0)
+                                 //    count = AjaxCommon("../../RiskDatabase/Measures/GetCountByRiskId?riskId1=" + rowObject.id);
+                                 if (count > 0)
+                                     return "<a href=javascript:DialogOpenShow('/HazardsourceManage/Hazardsource/ShowMeaSure?riskId1=" + rowObject.id + "','安全控制措施','',''," + true + ") style='color:blue; text-decoration:underline'  title='安全控制措施'>" + count + "</a>";
+                                 return 0;
+                             }
+                         },
+
+                { label: '责任部门', name: 'deptname', index: 'deptname', align: 'center', width: 80, sortable: true },
+                { label: '监督管理责任人', name: 'jdglzrrfullname', index: 'jdglzrrfullname', width: 70, align: 'center', sortable: true },
+                { label: '是否为重大危险源', name: 'isdangername', index: 'isdangername', width: 80, align: 'center', sortable: true });
+        GetGrid("../../HazardsourceManage/Hazardsource/GetPageListJson", arrCol, "desc", "createdate", true, false, $(window).height() - 170, 40)
+        //加载树
+        GetTree();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载地区
+    function ComboxBindData(id, url) {
+        $("#" + id).ComboBoxTree({
+            //url: ?orgID=" + value,
+            url: url,
+            description: "==请选择==",
+            height: "180px",
+            allowSearch: true
+        });
+    }
+    //加载组织机构树
+    function GetTree() {
+        var json;
+        if (roleName.indexOf("省级") >= 0) {
+            json = JSON.stringify(
+             {
+                 SelectMode: 0,
+                 Mode: 5
+             }
+           );
+        } else {
+            json = JSON.stringify(
+                        {
+                            SelectMode: 0,
+                            Mode: 0
+                        }
+                      );
+        }
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = item.Nature;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //var item = {
+        //    height: $(window).height() - 50,
+        //    url: "../../BaseManage/User/GetDepartTreeJson",
+        //    onnodeclick: function (item) {
+        //        _parentId = item.EnCode;
+        //        _isOrg = item.Sort;
+        //        $('#btn_Search').trigger("click");
+        //    }
+        //};
+        //初始化
+        $("#itemTree").treeview(item);
+
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    //加载搜索条件
+    function GetQueryJson() {
+        var dId = $("#DistrictId").attr('data-value');
+        var dName = $("#DistrictId").attr('data-text');
+        if (dId == "" || dId == undefined || dId == null) {
+            dId = "";
+            dName = "";
+        }
+        var queryJson = {
+            DistrictId: dId,
+            DistrictName: dName,
+            DangerSource: $("#DangerSource").val(),
+            IsDanger: IsDanger,
+            code: _parentId,
+            isOrg: _isOrg,
+            type: 1
+        }
+        return queryJson;
+    }
+
+    //平台导入
+    function ImportForPlamt() {
+        var keyValue = "";
+        $.ConfirmAjax({
+            msg: "导入过程数据去重可能需要消耗较长时间,确定导入平台数据吗？",
+            url: '../../HazardsourceManage/Hazardsource/ImportForPlamt',
+            param: { keyValue: keyValue },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        })
+
+    }
+    //仅查看重大危险源
+    function searchIsDanger() {
+        IsDanger = "1";
+        var $gridTable = $('#gridTable');
+        var queryJson = GetQueryJson();
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        }).trigger('reloadGrid');
+
+    }
+    //设为历史记录
+    function SetHistory() {
+        var queryJson = GetQueryJson();
+        $.ConfirmAjax({
+            msg: "确定设为历史记录吗？",
+            url: '../../HazardsourceManage/Hazardsource/SetHistory',
+            param: { queryJson: JSON.stringify(queryJson) },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        })
+
+    }
+
+
+
+    //打开历史记录
+    function OpenHistory() {
+        var dlg =dialogOpen({
+            id: 'HistoryForm',
+            title: '历史记录',
+            url: '/HazardsourceManage/History/Index',
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn:["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+
+        //DialogOpenShow("/HazardsourceManage/History/Index", "历史记录", "", "", true);
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">危险源辨识评估</div>
+            <div class="titlePanel">
+
+
+                <div class="title-search">
+
+
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle">所属区域：</td>
+                                                <td class="formValue">
+                                                    <div id="DistrictId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width: 200px;"></div>
+                                                </td>
+                                            </tr>
+
+
+                                            <tr>
+                                                <td class="formTitle">名称：</td>
+                                                <td class="formValue">
+                                                    <input id="DangerSource" type="text" class="form-control" placeholder="请输入危险源名称" style="width: 200px;" />
+                                                </td>
+                                            </tr>
+
+
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+
+                </div>
+
+                <div class="toolbar" id="divToolBar">
+
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

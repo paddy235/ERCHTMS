@@ -1,0 +1,285 @@
+﻿@{
+    ViewBag.Title = "CheckIndex";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script> ;
+    var taskshareid = request('taskshareid');//任务id
+    var tasktype = request('tasktype');//任务类型
+    var curdeptid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var currolenames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var teamid = "";
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        if (currolenames.indexOf("班组") >= 0) {
+            teamid = curdeptid;
+        }
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 142);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //监督状态
+        $("#SuperviseState").ComboBox({
+            param: { EnCode: "SuperviseState" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "======全部======",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 142,
+            postData: { queryJson: getQueryJson() }, page: 1,
+            url: "../../HighRiskWork/StaffInfo/GetTaskTableToJson",
+            datatype: "json",
+            colModel: [
+                {
+                    label: '操作', name: 'Oper', width: 80, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:show('" + rowObject.id + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                        return html;
+                    }
+                },
+                {
+                    label: '监督状态', name: 'supervisestate', width: 100, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") {
+                            cellvalue = "未监督";
+                        }
+                        else if (cellvalue == "1") {
+                            cellvalue = "已监督";
+                        }
+                        else if (cellvalue == "2") {
+                            cellvalue = "监督中";
+                        }
+                        return cellvalue;
+                    }
+                },
+                { label: '旁站监督单位', name: 'pteamname', width: 150, align: 'center', sortable: false },
+                { label: '旁站监督员', name: 'taskusername', width: 150, align: 'center', sortable: false },
+                {
+                    label: '旁站时间', name: 'pstarttime', width: 250, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.pendtime, 'yyyy-MM-dd hh:mm');
+                      }
+                },
+                {
+                    label: '监督时长', name: 'sumtimestr', width: 150, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatSeconds(cellvalue);
+                    }
+                },
+                { label: '作业名称', name: 'workname', width: 150, align: 'center', sortable: false },
+                { label: '作业单位', name: 'workdeptname', width: 150, align: 'center', sortable: false },
+                {
+                    label: '作业类别', name: 'infotype', width: 100, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var val = "";
+                        if (!!rowObject.workinfotype && !!rowObject.handtype) {
+                            val = rowObject.workinfotype + "," + rowObject.handtype;
+                        }
+                        else if (!!rowObject.workinfotype) {
+                            val = rowObject.workinfotype;
+                        }
+                        else if (!!rowObject.handtype) {
+                            val = rowObject.handtype;
+                        }
+                        return val;
+                    }
+                },
+                { label: '作业区域', name: 'workareaname', width: 150, align: 'center', sortable: false },
+                  //{
+                  //    label: '作业时间', name: 'workstarttime', width: 300, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                  //        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.workendtime, 'yyyy-MM-dd hh:mm');
+                  //    }
+                  //}
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 25, 30],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+
+        $("#btn_Search").click(function () {
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                ////隐藏搜索框
+                var title = $(".ui-filter-text");
+                title.trigger("click");
+            }
+
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //重置所有查询条件
+    function ResetCondition() {
+        //监督状态
+        $("#SuperviseState").attr("data-text", "===全部===");
+        $("#SuperviseState").attr("data-value", "");
+        $("#SuperviseState div:eq(0)").text("===全部===");
+        $("#filter-form").find(":input").val("");
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var query = {
+            taskshareid: taskshareid,
+            teamid: teamid,
+            tasklevel: "1",
+            dataissubmit: "1",
+            supervisestate: $("#SuperviseState").attr("data-value"),
+            pstarttime: $("#StartTime").val(),
+            pendtime: $("#EndTime").val(),
+            teamid: $("#DepartId").val(),
+            taskuserid: $("#TaskUserId").val(),
+        }
+        return JSON.stringify(query);
+    }
+
+    //查看详情
+    function show(keyValue) {
+        var idx = dialogOpen({
+            id: "SecondForm",
+            title: "查看旁站监督任务",
+            url: '/HighRiskWork/StaffInfo/TaskForm?keyValue=' + keyValue + "&mode=view",
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 300) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    function formatSeconds(value) {
+        var secondTime = parseInt(value);// 秒
+        var minuteTime = 0;// 分
+        var hourTime = 0;// 小时
+        if (secondTime > 60) {//如果秒数大于60，将秒数转换成整数
+            //获取分钟，除以60取整数，得到整数分钟
+            minuteTime = parseInt(secondTime / 60);
+            //获取秒数，秒数取佘，得到整数秒数
+            secondTime = parseInt(secondTime % 60);
+            //如果分钟大于60，将分钟转换成小时
+            if (minuteTime > 60) {
+                //获取小时，获取分钟除以60，得到整数小时
+                hourTime = parseInt(minuteTime / 60);
+                //获取小时后取佘的分，获取分钟除以60取佘的分
+                minuteTime = parseInt(minuteTime % 60);
+            }
+        }
+        var result = "" + parseInt(secondTime) + "秒";
+
+        if (minuteTime > 0) {
+            result = "" + parseInt(minuteTime) + "分" + result;
+        }
+        if (hourTime > 0) {
+            result = "" + parseInt(hourTime) + "小时" + result;
+        }
+        return result;
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 420px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle">监督状态：</td>
+                                                <td class="formValue">
+                                                    <div id="SuperviseState" type="select" class="ui-select"></div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">旁站时间：</td>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="StartTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="EndTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">旁站单位：</td>
+                                                <td class="formValue">
+                                                    <input id="DepartmentName" type="text" style="width: 200px;" class="form-control" placeholder="请选择单位" readonly onclick="selectDept('', 0, 0, '选择单位', document.body, 'DepartmentName,DepartmentCode,DepartId');" />
+                                                    <input id="DepartmentCode" type="hidden" />
+                                                    <input id="DepartId" type="hidden" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">旁站监督员:</td>
+                                                <td class="formValue">
+                                                    <input id="TaskUserName" type="text" class="form-control" errormsg="旁站监督员" placeholder="请选择旁站监督人员" isvalid="yes" checkexpession="NotNull" onclick="selectSuperviseUser(window.document.body, ',TaskUserId,TaskUserName,,');" readonly />
+                                                    <input id="TaskUserId" type="hidden" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-primary" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+

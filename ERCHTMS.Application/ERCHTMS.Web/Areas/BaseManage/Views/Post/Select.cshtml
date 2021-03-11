@@ -1,0 +1,329 @@
+﻿@{
+    ViewBag.Title = "用户管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var _parentId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var _isOrg = "Organize";
+    var deptId = request('deptId');
+    var deptCode = request('deptCode');
+    var checkMode = request('checkMode');
+    var mode = request('mode');
+    var userIds = request('userIds');
+    var userKind = request('userKind');
+    var eliminateUserIds = request('eliminateUserIds');
+    var special = request('special');
+    var side = request('side');
+    var rolename = request('rolename');
+    var projectid = request('projectid');
+    var istree = request('istree');
+    var postids = request('postids');
+    var stationid = request('stationid');
+    var id = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    $(function () {
+        if (checkMode == 0) {
+            $(".ui-layout-east").remove();
+        }
+        InitialPage();
+        if (istree == '0') {
+            $("#tree_div").hide();
+        } else {
+            $("#tree_div").show();
+            GetTree();
+        }
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 141.5);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+
+            }, 200);
+            e.stopPropagation();
+        });
+        $("#station").height($(window).height() - 50);
+        //编辑进来默认赋值之前已选择的人员(针对于人员多选)
+        //if (mode == 2) {
+        if (stationid) {
+            postids = top.Form.window.$("#" + stationid).val();
+        }
+        var arr = [];
+        if (!!postids) {
+            arr = postids.split(",");
+                $(arr).each(function (m, keyvalue) {
+                    $.ajax({
+                        url: "../../BaseManage/Post/GetFormJson",
+                        data: { keyValue: keyvalue },
+                        type: "get",
+                        dataType: "JSON",
+                        async: false,
+                        success: function (result) {
+                            $("#station").append("<div id='div" + result.EnCode + "'><input type='checkbox' value='" + result.RoleId + "' id='" + result.EnCode + "' checked='checked' dutyname='" + decodeURIComponent(result.FullName) + "' ><label for='" + result.EnCode + "'>" + decodeURIComponent(result.FullName) + "</label></div>");
+                        }
+                    });
+
+                });
+            }
+        //}
+
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+           {
+               Ids: id,
+               SelectMode: checkMode,
+               Mode: mode
+           }
+         );
+        var item = {
+            height: $(window).height() - 35,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            //url: "../../BaseManage/Department/GetDeptTreeJson?Ids=" + deptId + "&checkMode=" + checkMode + "&mode=" + mode,
+            onnodeclick: function (item) {
+                deptId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+    function selRow(obj, roleid, name, ecode) {
+        if (obj.checked) {
+            if (document.getElementById("div" + ecode) == null) {
+                $("#station").append("<div id='div" + ecode + "'><input type='checkbox' value='" + roleid + "' id='" + ecode + "' checked='checked' dutyname='" + decodeURIComponent(name) + "' ><label for='" + ecode + "'>" + decodeURIComponent(name) + "</label></div>");
+            }
+        } else {
+            if (document.getElementById("div" + ecode) != null) {
+                $("#div" + ecode).remove();
+            }
+        }
+    }
+    var selectedRowIndex = -1;
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+            keyword: $("#txt_Keyword").val(),
+            deptid: deptId
+        }
+
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1,
+            url: "../../BaseManage/Post/GetPostListJsonForSelect",
+            datatype: "json",
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'roleid', hidden: true }, 
+                { label: '岗位编码', name: 'encode', index: 'encode', width: 100, align: 'center' },
+                { label: '岗位名称', name: 'fullname', index: 'fullname', width: 200, align: 'center' },
+                { label: '层级', name: 'nature', index: 'nature', width: 100, align: 'center' },
+                { label: '角色', name: 'rolenames', index: 'rolenames', width: 400, align: 'center' },
+                { label: '岗位描述', name: 'description', index: 'description', width: 100, align: 'center' },
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [10, 20, 30],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            multiselect: checkMode == 0 ? false : true,
+            gridview: true,
+            onSelectRow: function (rowid, status) {
+                if (checkMode == 0) {
+                    selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                    // alert($gridTable.jqGrid("getRowData", selectedRowIndex).Account);
+                } else {
+                    var rowObject = $gridTable.jqGrid('getRowData', rowid);
+                    selRow($gridTable.find(".jqgrow").eq(rowid - 1).find("input:checkbox").eq(0).get(0), rowObject.roleid, encodeURIComponent(rowObject.fullname), rowObject.encode);
+                }
+            },
+            onSelectAll: function (aRowids, status) {
+                $(aRowids).each(function (i, item) {
+                    var rowObject = $gridTable.jqGrid('getRowData', item);
+                    selRow($gridTable.find(".jqgrow").eq(i).find("input:checkbox").eq(0).get(0), rowObject.roleid, encodeURIComponent(rowObject.fullname), rowObject.encode);
+                });
+            },
+
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                if ($("#itemTree").html().length == 0 && checkMode == 0) {
+                    $(".ui-layout-west").hide(); $(".ui-layout-pane-center").css({ left: "10px", width: "100%" }); $(".ui-jqgrid-view").css({ width: "100%" });
+                    $("#gbox_gridTable").css({ width: "100%" }); $("#gridPager").css({ width: "100%" }); $(".ui-jqgrid-hdiv").css({ width: "100%" });
+                    $(".ui-jqgrid-bdiv").css({ width: "100%" });
+
+                }
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $("#txt_Keyword").val(),
+                deptid: deptId
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    //返回选择后的结果并赋值到dom控件,多个值用逗号分隔
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序必须依次为用户名称,用户账号，用户Id,部门Id,部门Code,部门名称,手机号（多选用逗号分隔）
+    function AcceptClick(options) {
+
+        var winObject = options.winObject;
+        var domId = options.domId;
+        var selVal = new Array();
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var dutyId = ""; var dutynName = "";
+                if (checkMode == 1) {
+                    var arr = $("#station").find("input:checked");
+                    if (arr.length == 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+
+                        arr.each(function (i, dom) {
+                            dutyId += dom.value + ",";
+                            dutynName += $(dom).attr("dutyname") + ",";
+                        });
+                        dutyId = dutyId.substring(0, dutyId.length - 1);
+                        dutynName = dutynName.substring(0, dutynName.length - 1);
+                    }
+                } else {
+                    if (selectedRowIndex <= 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+                        var rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                        dutyId = rowObject.roleid;
+                        dutynName = rowObject.fullname;
+                    }
+
+                }
+                var ids = domId.split(',');
+                var selVal = new Array(dutyId, dutynName);
+                for (var j = 0; j < ids.length; j++) {
+                    if (ids[j].length >= 0) {
+                        if (ids[j] != "") {
+                            var dom = $(winObject).find("#" + ids[j]).eq(0);
+                            var domlbl = $(winObject).find("#lbl" + ids[j]).eq(0);
+                            if (dom != undefined) {
+                                dom.val(selVal[j]);
+                            }
+                            if (domlbl != undefined) {
+                                domlbl.html(selVal[j]);
+                            }
+                        }
+                    }
+                }
+            }
+            if (options.callBack) {
+                options.callBack();
+            }
+            dialogClose();
+        }
+
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div id="tree_div" class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a href="javascript:selectAll();">组织机构树</a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-right: 0px;">
+            <div class="panel-Title">岗位信息</div>
+
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a data-value="EnCode">岗位编码</a></li>
+                                        <li><a data-value="FullName">岗位名称</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="lr-replace" class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                @*<div class="alert alert-danger" style="text-align: left; margin-bottom: 3px; padding:5px; ">
+                        <i class="fa fa-question-circle alert-dismissible" style="position: relative; top: 1px; font-size: 15px;"></i>
+                        注：请点击要选择的数据行，然后再点击“确认”按钮
+                    </div>*@
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-east" style="margin-left: 0px;">
+        <div class="west-Panel" style="margin-left: 0px;">
+            <div class="panel-Title">
+                <a href="javascript:selectAll();">已选中的岗位</a>
+            </div>
+            <div id="station" style="overflow: auto; height: 450px; margin-left: 5px;">
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+

@@ -1,0 +1,643 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+@*<style>
+    .ui-jqgrid tr.jqgrow td {
+    white-space:normal !important;
+    height:auto;
+    vertical-align:text-top;
+    padding-top:2px;
+    word-break:break-all;
+    }
+    </style>*@
+<link href="~/Content/scripts/plugins/uploadify/uploadify.css" rel="stylesheet" />
+<link href="~/Content/scripts/plugins/uploadify/uploadify.extension.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/uploadify/jquery.uploadify.min.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    var rqaction = request('action');
+    var belongdeptid = request('belongdeptid');
+    var actiontype = request("actiontype");
+    var selectedRowIndex = 0;
+    var dataRows = [];//返回的所有的选中风险点的IDs
+    var objthis = null;
+    var dictrictid = "";
+    var search = 0;
+    var risk = "";
+    var objnum = 0;//考核对象索引
+
+    var assessName = "";
+
+    var kjfs = 0;
+    var sdfs = 100;
+    $(function () {
+        initControl();
+        GetGrid1();
+      
+    });
+
+    //初始化控件
+    function initControl() {
+        $("#IsDefault").ComboBox({
+            description: "==请选择==",
+        });
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../SafetyAssess/SafetyAssess/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    sdfs = data.ActualScore;
+                    kjfs = 100 - parseFloat(data.ActualScore);
+                    //设置当前记录总数
+                    setInfo();
+                }
+            });
+
+        } else {
+            $("#AssessDate").val("@DateTime.Now.ToString()");
+            $("#CreateDate").val("@DateTime.Now.ToString()");
+            $("#CreateUserName").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName");
+            keyValue = newGuid();
+        }
+        //查看
+        if (actiontype == "view") {
+            $("#btn_Save").css("display", "none");
+            $("#btn_Submit").css("display", "none");
+            $("#choose1").css("display", "none");
+            $("#remove").css("display", "none");
+            $(".form-button").css("display", "none");
+            $("#form1 input,textarea,select , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+    }
+
+    function objNext() {
+        objnum++;
+    }
+    
+    //删除考核对象
+    function delRow(obj) {
+        var idx=dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                var grid = $("#gridTable1");
+                var val = $(obj).parent().children().eq(0).val();
+                grid.find("input:text[title='" + val + "']").each(function (j, dom) {
+                    grid.delRowData($(dom).parent().parent().attr("id"));
+                });
+                //$(obj).parent().parent().remove();
+                top.layer.close(idx);
+            }
+        });
+    }
+    function GetGrid1() {
+        var chargedeptcode = "";
+        var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+        if (isSystem == "False") {
+            chargedeptcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+        }
+        var queryJson = {};
+        if (actiontype == "add") {
+            queryJson = {
+                assessid: "",
+                actiontype: actiontype
+            }
+        } else {
+            queryJson = {
+                assessid: keyValue,
+                actiontype: actiontype
+            }
+        }
+        var $gridTable = $("#gridTable1");
+        $gridTable.jqGrid({
+            url: "../../SafetyAssess/SafetyAssessDetail/GetTableListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },//绑定grid加参数
+            datatype: "json",
+            height: $(top.window).height()-400,
+            emptyrecords: true,
+            autowidth: true,
+            rowNum: 100000000,
+            sortname: 'autoid',
+            sortorder: 'asc',
+            //pager: "#gridPager1",
+            emptyrecords: "没有检索到数据",
+            colModel: [
+                { label: 'AssessId', name: 'assessid', hidden: true },
+                { label: '主键', name: 'pkid', hidden: true }, { label: 'name', name: 'name', hidden: true },
+                {
+                    label: '考核项目', name: 'assesspro',width: 450, align: 'left', sortable: false, headerAlign: 'center',classes:"name1"
+                    ,formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.assesspro) {
+                            assessName = rowObject.assessname;
+                            var innerText = "";
+                            innerText += "<input style='border:none;width:70%;height:30px;' readonly='readonly' type='text' title='" + rowObject.assesspro + "' value='" + rowObject.assesspro + "'  />";
+                            innerText += "&nbsp;&nbsp;&nbsp;&nbsp;<input style='border:none;width:10%;height:30px;' readonly='readonly' type='text' title='" + rowObject.allscore + "' value='" + rowObject.allscore + "'  />&nbsp;分";
+                            return innerText;
+                        }
+                    }
+                },
+                {
+                    label: '考核标准', name: 'assesscontent', width: 650, align: 'left', sortable: false, headerAlign: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.assesscontent) {
+                            if (rowObject.assesscontent.indexOf("<ul") < 0) {
+                                var innerText = "<ul style='list-style:none; '>";
+                                cellvalue = rowObject.assesscontent.split('|');
+
+                                $(cellvalue).each(function (i, dom) {
+                                    innerText += "<li parentid='" + rowObject.parentid + "'><input style='border: none;width:80%;height:30px;' readonly='readonly' type='text' title='" + dom + "' value='" + dom + "' onchange='setValue(this)' class='ckcontent' rowid='" + options.rowId + "' />&nbsp;&nbsp;&nbsp;&nbsp;<input style='border: none;width:10%;;height:30px;' readonly='readonly' type='text' title='" + rowObject.score + "' value='" + rowObject.score + "' rowid='" + options.rowId + "' />&nbsp;分</li>";
+                                });
+                                innerText += "</ul>";
+                                return innerText;
+                            } else {
+                                var content = $.parseHTML(cellvalue);
+                                var li = $(content).find("li");
+                                
+                                var innerText = "<ul style='list-style:none; '>";
+                                $(li).each(function (i, dom) {
+                                    if (!!$(dom).text()) {
+                                        innerText += "<li parentid='" + rowObject.parentid + "'><input style='border: none;width:80%;height:30px;' type='text' title='" + $(dom).text() + "' value='" + $(dom).text() + "' onchange='setValue(this)' class='ckcontent' rowid='" + options.rowId + "'/>&nbsp;&nbsp;&nbsp;&nbsp;<input style='border: none;width:10%;;height:30px;' type='text' title='" + rowObject.score + "' value='" + rowObject.score + "' rowid='" + options.rowId + "' />&nbsp;分</li>";
+                                    }
+                                });
+                                innerText += "</ul>";
+                                return innerText;
+
+                            }
+                        } else {
+                            var cellvalue = "<ul style='list - style:none; '></ul>";
+                            return cellvalue;
+                        }
+                    }
+                    
+                },
+                {
+                    label: '考核', name: 'assesscontent', width: 700, align: 'left', sortable: false, headerAlign: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.assesscontent) {
+                            var subtractscore = rowObject.subtractscore == null ? "0" : rowObject.subtractscore;
+                            var condition = rowObject.condition == null ? "" : rowObject.condition;
+                            if (rowObject.assesscontent.indexOf("<ul") < 0) {
+                                var innerText = "<ul style='list-style:none; '>";
+                                innerText += "&nbsp;&nbsp;&nbsp;&nbsp;扣减分数：<input id='" + options.rowId + "' parentid='" + rowObject.parentid + "' name='subtractscore' style='border:none;width:10%;;height:30px;' type='text' title='" + subtractscore + "' value='" + subtractscore + "' onblur='CalculateScore(this)' isvalid='yes' checkexpession='PositiveSpotNumNotNul'/>";
+                                innerText += "&nbsp;&nbsp;&nbsp;&nbsp;考核情况：<input parentid='" + rowObject.parentid + "' style='border:none;width:55%;;height:30px;' type='text' title='" + condition + "' value='" + condition + "'  />";
+                                innerText += "</ul>";
+                                return innerText;
+                            } else {
+                                var content = $.parseHTML(cellvalue);
+                                var li = $(content).find("li");
+                                var innerText = "<ul style='list-style:none; '>";
+                                $(li).each(function (i, dom) {
+                                    if (!!$(dom).text()) {
+                                        innerText += "&nbsp;&nbsp;&nbsp;&nbsp;扣减分数：<input id='" + options.rowId + "' parentid='" + rowObject.parentid + "' name='subtractscore' style='border:none;width:10%;height:30px;' type='text' title='" + subtractscore + "' value='" + subtractscore + "' onblur='CalculateScore(this)' isvalid='yes' checkexpession='PositiveSpotNumNotNul'/>";
+                                        innerText += "&nbsp;&nbsp;&nbsp;&nbsp;考核情况：<input parentid='" + rowObject.parentid + "' style='border:none;width:55%;height:30px;' type='text' title='" + condition + "' value='" + condition + "'  />";
+                                    }
+                                });
+                                innerText += "</ul>";
+                                return innerText;
+
+                            }
+                        } else {
+                            var cellvalue = "<ul style='list - style:none; '></ul>";
+                            return cellvalue;
+                        }
+                    }
+                },
+                {
+                    label: '实得分数', name: 'parentid', width: 150, align: 'left', sortable: false, headerAlign: 'center', classes: "name1"
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var allactualscore = rowObject.allactualscore == null ? "" : rowObject.allactualscore;
+                        var innerText = "";
+                        innerText += "&nbsp;&nbsp;<input name='actualscore' readonly='readonly' style='border:none;width:50px;height:30px;' parentid='" + rowObject.parentid + "' type='text' title='" + allactualscore + "' value='" + allactualscore + "'  />&nbsp;分";
+                        return innerText;
+                    }
+                },
+
+            ],
+            viewrecords: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $(".unwritten").text("");
+                Merger('gridTable1', new Array('assesspro'));
+                Merger('gridTable1', new Array('parentid'));
+                getSelIds();
+                setInfo();
+                if (actiontype == "add" || rqaction == "add" ) {
+                    $("#AssessName").val(assessName);
+                }
+            }
+        });
+    }
+    //计算实得分数
+    function CalculateScore(obj) {
+        //数据验证 不能输入空，输入空默认赋值0   不能输入汉字，输入汉字默认赋值0
+        if ($(obj).val() == "") {
+            $(obj).val(0);
+            //return false;
+        }
+        if (!isdecimalspotNotNulll($(obj).val())) {
+            dialogMsg('必须为数字（整数部分最多9位，小数部分最多2位）！', 0);
+            $(obj).val(0);
+            //return false;
+        }
+        var allscore = $(obj).parent().parent().prev().prev().find("input").eq(1).val();//分数
+        var pid = $(obj).attr("parentid");
+        var scorelist = $("#gridTable1").find("input[name='subtractscore']");
+        var allsubtractscore = 0;
+        kjfs = 0;
+        sdfs = 0;
+        $(scorelist).each(function (m, res) {
+            if ($(res).attr("parentid") == pid) {
+                allsubtractscore += parseFloat($(res).val());
+            }
+            kjfs += parseFloat($(res).val());
+        });
+        var allactualscore = parseFloat(allscore) - allsubtractscore;
+        sdfs = 100 - kjfs;
+        //$(obj).parent().parent().next().find("input").eq(0).val(allactualscore);
+        if (allactualscore < 0) {
+            dialogMsg('输入的数值过大，该考核项目总分不足以扣减，请重新输入！', 0);
+            $(obj).val(0);
+
+            allsubtractscore = 0;
+            $(scorelist).each(function (m, res) {
+                if ($(res).attr("parentid") == pid) {
+                    allsubtractscore += parseFloat($(res).val());
+                }
+                kjfs += parseFloat($(res).val());
+            });
+            allactualscore = parseFloat(allscore) - allsubtractscore;
+            sdfs = 100 - kjfs;
+        }
+
+        //所有都赋值
+        var actualscorelist = $("#gridTable1").find("input[name='actualscore']");
+        $(actualscorelist).each(function (m, res) {
+            if ($(res).attr("parentid") == pid) {
+                $(res).val(allactualscore);
+            }
+        });
+        //设置当前记录总数
+        setInfo();
+    }
+    //验证带小数点数字且不能为null,空
+    function isdecimalspotNotNulll(obj) {
+        var controlObj = $.trim(obj);
+        if (controlObj == null || controlObj == undefined) {
+            return false;
+        }
+        //reg = /^\d+(\.\d+)?$/;
+        reg = /^\d{1,9}(.\d{1,2})?$/;
+        if (!reg.test(obj)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+    //保存表单;
+    function AcceptClick(issubmit) {
+        debugger;
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var projectItem = $("#gridTable1").jqGrid('getRowData');
+        if (projectItem.length == 0) {
+            dialogMsg('考核项目不能为空！', 0);
+            return false;
+        }
+        var json = "";
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["IsSubmit"] = issubmit;
+        postData["ActualScore"] = sdfs;
+        if (sdfs < 0) {
+            dialogMsg('实得总分小于100，请检查！', 0);
+            return false;
+        }
+        var checkContent = 0;
+        if (projectItem.length > 0) {
+            var arr = [];
+            //$(projectItem).each(function (i, dom) {
+                //考核内容
+                var domCheckContent = $("#gridTable1").find("li");
+                var checkContentValue = "";
+            if (domCheckContent.length > 0) {
+                var aid = "";
+                var pid = "";
+                    $(domCheckContent).each(function (m, res) {
+                        debugger;
+                        //第一级
+                        
+                        //var newArr = [];
+                        //if (arr.length > 0) {
+                        //    newArr = getIdJsonObj(aid, arr);
+                        //}
+                        if (pid != $(res).attr("parentid")) {
+                            aid = newGuid();
+                            pid = $(res).attr("parentid");
+
+                            var allactualscore = $(res).parent().parent().next().next().find("input").eq(0).val();
+                            var allscore = $(res).parent().parent().prev().find("input").eq(1).val();
+                            arr.push({
+                                AutoId: m,//顺序号
+                                ID: aid,//id
+                                AssessId: keyValue,//考核表ID
+                                Score: allscore,
+                                ParentId: "0",
+                                Hierarchy: 1,
+                                AssessContent: $(res).parent().parent().prev().find("input").eq(0).val(),
+                                SubtractScore: parseFloat(allscore) - parseFloat(allactualscore),
+                                ActualScore: allactualscore,
+                                Condition: ""
+                            });
+                        }
+                        
+
+                        //第二级
+                        var content = $(res).find("input[type='text']").eq(0).val();
+                        if ($.trim(content).length==0) {
+                            checkContent = 1;
+                        }
+                        var score = $(res).find("input[type='text']").eq(1).val();
+                        var subtractscore = $(res).parent().parent().next().find("input").eq(0).val();
+                        var condition = $(res).parent().parent().next().find("input").eq(1).val();
+                        arr.push({
+                            AutoId: m,//顺序号
+                            ID: newGuid(),//id
+                            AssessId: keyValue,//考核表ID
+                            Score: score,
+                            ParentId: aid,
+                            Hierarchy: 2,
+                            AssessContent: content,
+                            SubtractScore: subtractscore,
+                            ActualScore: parseFloat(score) - parseFloat(subtractscore),
+                            Condition: condition
+                        });
+                    });
+                } else {
+                    checkContent = 1;
+                }
+            json = JSON.stringify(arr);
+        }
+        if (checkContent == 1) {
+            dialogMsg('考核内容存在空！', 0);
+            return false;
+        }
+        postData["projectItem"] = encodeURIComponent(json);
+        $.SaveForm({
+            url: "../../SafetyAssess/SafetyAssess/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //根据ID筛选
+    function getIdJsonObj(keys, arr) {
+        var newArr = arr.filter(function (p) {
+            return p.ID == keys;
+        });
+        return newArr;
+    }     
+    //新增考核项目
+    function addCheckContent(obj, parentid) {
+        debugger;
+        var title = $(obj).prev().attr("title");
+        var li = $("#gridTable1").find("li[parentid='" + parentid + "']:last");
+        var rowid = 0;
+        if (li != undefined) {
+            rowid = li.find("input:last").attr("rowid");
+            rowid++;
+            li.parent().append("<li style='border-bottom:1px solid #ccc' parentid='" + parentid + "'><input style='border: none;width:80%;height:30px;'  type='text' class='ckcontent' rowid='" + rowid + "' onchange='setValue(this)' />&nbsp;&nbsp;&nbsp;&nbsp;分数：<input style='border: none;width:5%;;height:30px;' type='text' rowid='" + rowid + "' /><a onclick=\"removeCheckContent(this)\" title='删除考核内容'><i class='fa fa-minus-circle'></i></a></li>");
+            objNext();
+        } else {
+            rowid = $(obj).parent().next().next().find("ul").find("input:last").attr("rowid");
+            rowid++;
+            $(obj).parent().next().find("ul").append("<li style='border-bottom:1px solid #ccc' parentid='" + parentid + "'><input style='border: none;width:80%;height:30px;' class='ckcontent' type='text' rowid='" + rowid + "' onchange='setValue(this)' />&nbsp;&nbsp;&nbsp;&nbsp;分数：<input style='border: none;width:5%;;height:30px;' type='text' rowid='" + rowid + "' /><a onclick=\"removeCheckContent(this)\" title='删除考核内容'><i class='fa fa-minus-circle'></i></a></li>");
+            objNext();
+        }
+        setInfo();
+    }
+    //标记有更改过的考核内容的文本框并属性标记
+    function setChange(obj) {
+        $(obj).attr("ischange", "1");
+    }
+    //删除考核内容
+    function removeCheckContent(obj,title) {
+
+        var dlg=dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                if ($(obj).parent().parent().find("li").length > 1) {
+                    $(obj).parent().remove();
+                } else {
+                    var node = $(obj).parent().parent().parent().prev();
+                    if (node.attr("rowspan") != undefined) {
+                        var node1 = node.parent().next().find(".name1");
+                        node1.attr("rowspan", parseInt(node.attr("rowspan")) - 1);
+                        node1.show();
+                        $(obj).parent().parent().parent().parent().remove();
+                    } else {
+                        node=$("#gridTable1").find(".name1:visible>input:text[title='" + title + "']").eq(0);
+                        if (node != undefined) {
+                            node = node.parent();
+                            if (node.attr("rowspan") != undefined) {
+                                var rowspanCount = node.attr("rowspan");
+                                node.attr("rowspan", parseInt(rowspanCount) - 1);
+                            }
+                        }
+                        $(obj).parent().parent().parent().parent().remove();
+                    }
+                }
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //新增安全考核项目
+    var dofrom = null;
+    function addItems(bid) {
+        pfrom = 0;
+        dofrom = dialogOpen({
+            id: "PrjectItem",
+            title: "新增考核项目",
+            url: '/SafetyAssess/SafetyAssessDetail/Form?ctype=1&bid=' + bid,
+            width: "800px",
+            height: "400px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    };
+   
+    function serProject() {
+
+    }
+    //清空所有记录
+    function removeItem() {
+        var dlg = dialogConfirm("确定清空吗？", function (isSure) {
+            if (isSure) {
+                data = new Array();
+                selIds ="";
+                $("#gridTable1").clearGridData();
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //导入考核项目
+    function importData() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入',
+            url: '/SafetyAssess/SafetyAssess/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                $.ajax({
+                    url: top.contentPath + "/SafetyAssess/SafetyAssess/GetObj",
+                    type: "Get",
+                    async: false,
+                    dataType: "Json",
+                    success: function (data) {
+                        if (data != null && data.length > 0) {
+                            var arr = [];
+                            for (var i = 0; i < data.length; i++) {
+                                arr.push({rid:newGuid(),pkid:newGuid(),stid: data[i].CheckObjectId, content: data[i].RiskName, require: data[i].CheckContent, name: data[i].CheckObject, checkobjecttype: data[i].CheckObjectType });
+                            }
+                            //动态填充表格
+                            fillItems(arr);
+                        }
+
+                    }
+                });
+            }
+        });
+    }
+    var selIds ="";
+    var data = new Array();//存储选择的考核项目
+    //选择考核项目,新增项目或选择考核表后动态填充表格
+    function fillItems(items, ids) {
+        debugger;
+        var $gridTable = $("#gridTable1");
+        
+        var len = $gridTable.find(".ckcontent").length;
+        var idx = len == 0 ? 0 : len;
+        $(items).each(function (j, item) {
+            debugger;
+            $gridTable.addRowData(parseInt(idx)+j + 1, item);
+        });
+        
+        //设置当前记录总数
+        setInfo();
+        //获取本次操作选择的考核对象（含上级分类）
+        if (ids != undefined) {
+            getSelIds();
+        }
+       
+    }
+    //设置列表当前总记录数
+    function setInfo() {
+        var $gridTable = $("#gridTable1");
+        $("#gridPager1").html("<table style='border:none;width:100%;margin-top:5px;'><tr><td style='border:none;width:57%;'><b>当前共有&nbsp;" + $gridTable.find(".ckcontent").length + "&nbsp;条记录</b></td><td style='border:none;width:33%;'><b>扣减分数：&nbsp;" + kjfs + "&nbsp;分</b></td><td style='border:none;width:10%;'><b>实得分数：&nbsp;" + sdfs + "&nbsp;分</b></td></tr></table>");
+    }
+    //标记有更改过的考核内容的文本框并属性标记
+    function setValue(obj) {
+        $(obj).attr("ischange","1");
+    }
+    //查看时获取已选择的考核对象
+    function getSelIds() {
+        $("#gridTable1").find("td[aria-describedby='gridTable1_stid']").each(function (j, dom) {
+            if(selIds.indexOf($(dom).text())<0){
+                selIds+=$(dom).text()+",";
+            }
+        });
+    }
+    function selectAssess() {
+        var idx0 = dialogOpen({
+            id: 'AssessWin',
+            title: '选择安全考核表',
+            url: '/SafetyAssess/SafetyAssessData/Index?actiontype=select',
+            width: '98%',
+            height: '98%',
+            btn: null,
+            callBack: function (iframeId) {
+            }
+        });
+    }
+    function setStd(assessId) {
+        rqaction = "add";
+        var queryJson = {
+            assessid: assessId,
+            actiontype: "add"
+        }
+        kjfs = 0;
+        sdfs = 100;
+        $("#gridTable1").jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        }).trigger('reloadGrid');
+    }
+</script>
+<div style="margin: 50px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;考核表信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">被考核单位<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DeptName" type="text" class="form-control" placeholder="请选择单位" readonly onclick="selectDept('', 0, 0, '选择单位', window.document.body, 'DeptName,DeptCode');" isvalid="yes" checkexpession="NotNull"/>
+                        <input id="DeptCode" type="hidden" />
+                    </td>
+                    <td class="formTitle">考核时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="AssessDate" type="text" class="form-control" readonly="readonly" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">考核表名称<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="AssessName" type="text" readonly class="form-control" placeholder="考核表名称" isvalid="yes" checkexpession="LenStr" length="100" onclick="selectAssess()"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">操作人</td>
+                    <td class="formValue">
+                        <input id="CreateUserName" type="text" class="form-control" readonly="readonly" />
+                    </td>
+                    <td class="formTitle">操作时间</td>
+                    <td class="formValue">
+                        <input id="CreateDate" type="text" class="form-control" readonly="readonly" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading" id="btns">
+            <strong>&nbsp;&nbsp;考核项目</strong>
+            <span class="tools pull-right">
+                
+            </span>
+        </div>
+        <div class="panel-body">
+            <table id="gridTable1"></table>
+            <div id="gridPager1"></div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <a id="btn_Save" class="btn btn-primary" onclick="AcceptClick(0)"><i class="fa fa-mail-forward"></i>&nbsp;保&nbsp;&nbsp;存</a>
+    &nbsp;&nbsp;
+    <a id="btn_Submit" class="btn btn-primary" onclick="AcceptClick(1)"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+</div>

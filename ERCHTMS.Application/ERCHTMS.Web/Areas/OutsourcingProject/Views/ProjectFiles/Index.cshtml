@@ -1,0 +1,196 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>    
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var _itemCode = "";
+
+    $(function () {
+        InitialPage();
+        GetTree()
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 140);
+                $("#itemTree").setTreeHeight($(window).height() - 48);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var queryJson = {
+            txtSearch: $("#txt_Keyword").val(),
+            ItemCode: _itemCode
+        }
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 140,
+            url: "../../OutsourcingProject/ProjectFiles/GetProFilesList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+            { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "','" + rowObject.createuserorgcode + "','" + rowObject.createuserorgid + "','1')  title='查看'><i class='fa fa-eye'></i></a>";
+                        return html;
+                    }
+                },
+                { label: '外包工程', name: 'engineername', index: 'engineername', width: 220, align: 'center', sortable: true },
+                { label: '外包单位', name: 'fullname', index: 'fullname', width: 220, align: 'center', sortable: true },
+                { label: '实际开工时间', name: 'planenddate', index: 'planenddate', align: 'center', sortable: true, formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } },
+                { label: '实际完工时间', name: 'actualenddate', index: 'actualenddate',  align: 'center', sortable: true, formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 't.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                txtSearch: $("#txt_Keyword").val(),
+                ItemCode: _itemCode
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+     
+    }
+    //查看
+    function show(id, orgcode, orgId) {
+
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看工程档案',
+                url: '/OutsourcingProject/ProjectFiles/Form?keyValue=' + keyValue + '&orgCode=' + orgcode + '&orgId=' + orgId + '&actiontype=view',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 200) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json;
+        if (roleName.indexOf("省级")>=0) {
+            json = JSON.stringify(
+             {
+                 SelectMode: 0,
+                 Mode: 5
+             }
+           );
+        } else {
+            json = JSON.stringify(
+                        {
+                            SelectMode: 0,
+                            Mode:3
+                        }
+                      );
+        }
+        
+        var item = {
+            height: $(window).height() - 48,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _itemCode = item.value;
+                //_isOrg = item.Sort;
+                //_deptId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+            </div>
+        </div>
+    </div>

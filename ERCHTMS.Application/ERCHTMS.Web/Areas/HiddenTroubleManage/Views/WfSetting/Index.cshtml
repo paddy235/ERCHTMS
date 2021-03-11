@@ -1,0 +1,367 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var instanceid = request("instanceid"); //流程配置id
+    var mode = request("mode");
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 108.5);
+            }, 200);
+            e.stopPropagation();
+        });
+
+
+
+        //初始化组件
+        $.SetForm({
+            url: "../../HiddenTroubleManage/WfSetting/InitPageDataJson?vdate=" + new Date(),
+            success: function (data) {
+
+                //流程配置实例
+                $("#instanceid").ComboBox({
+                    id: "ID",
+                    text: "INSTANCENAME",
+                    description: "===请选择===",
+                    allowSearch: false,
+                    height: '300px',
+                    data: data.Instance
+                }).bind("change", function () {
+                    $.SetForm({
+                        url: "../../HiddenTroubleManage/WfInstance/GetActivityJson?instanceid=" + $("#instanceid").ComboBoxGetValue(),
+                        success: function (data) {
+                            if (!!data) {
+                                data.push({ id: "其他", name: "其他" });
+
+                                ////起始流程
+                                $("#startflow").ComboBox({
+                                    id: "name",
+                                    text: "name",
+                                    description: "===请选择===",
+                                    allowSearch: false,
+                                    data: data
+                                });
+                                ////目标流程
+                                $("#endflow").ComboBox({
+                                    id: "name",
+                                    text: "name",
+                                    description: "===请选择===",
+                                    allowSearch: false,
+                                    data: data
+                                });
+                            }
+                        }
+                    });
+                });
+
+                //起始流程
+                $("#startflow").ComboBox({
+                    id: "name",
+                    text: "name",
+                    description: "===请选择===",
+                    allowSearch: false,
+                    data: []
+                });
+                //目标流程
+                $("#endflow").ComboBox({
+                    id: "name",
+                    text: "name",
+                    description: "===请选择===",
+                    allowSearch: false,
+                    data: []
+                });
+                //提交类型
+                var array = new Array();
+                array.push({ ItemName: "制定提交" });
+                array.push({ ItemName: "提交" });
+                array.push({ ItemName: "同级提交" });
+                array.push({ ItemName: "上报" });
+                array.push({ ItemName: "制定退回" });
+                array.push({ ItemName: "退回" });
+                $("#submittype").ComboBox({
+                    id: "ItemName",
+                    text: "ItemName",
+                    description: "===请选择===",
+                    allowSearch: false,
+                    data: array
+                });
+                //是否更改流程状态
+                var isupdateflowArray = [{ ItemName: "是", ItemValue: "是" }, { ItemName: "否", ItemValue: "否" }]
+                $("#isupdateflow").ComboBox({
+                    id: "ItemName",
+                    text: "ItemValue",
+                    description: "===请选择===",
+                    allowSearch: false,
+                    data: isupdateflowArray
+                });
+            }
+        });
+
+
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+
+        var queryJson = {
+            organizeid: $("#organizeid").val(), //所属单位
+            instanceid: $("#instanceid").ComboBoxGetValue(), //流程实例
+            submittype: $("#submittype").ComboBoxGetValue(), //提交类型
+            isupdateflow: $("#isupdateflow").ComboBoxGetValue(), //是否更改状态
+            startflow: $("#startflow").ComboBoxGetValue(), //起始流程
+            endflow: $("#endflow").ComboBoxGetValue(), //目标流程
+            flowcode: $("#flowcode").val()
+        };
+
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 160,
+            url: "../../HiddenTroubleManage/WfSetting/GetWfSettingInfoPageList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', index: 'id', width: 100, align: 'center', hidden: true },
+                 {
+                     label: '操作', name: 'oper', index: 'id', width: 200, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:viewdata('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                         html += "&nbsp;&nbsp;&nbsp;<a href=javascript:removedata('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         //html += "&nbsp;&nbsp;&nbsp;<a href=javascript:editdata('" + rowObject.id + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                         html += "&nbsp;&nbsp;&nbsp;<a href=javascript:editdata('" + rowObject.id + "','" + rowObject.organizeid + "','" + rowObject.organizename + "')  title='条件'><i class='fa fa-pencil-square-o'></i></a>";
+                         return html;
+                     }
+                 },
+                { label: '序号', name: 'serialnumber', index: 'serialnumber', width: 100, align: 'center', sortable: true },
+                { label: '流程代码', name: 'flowcode', index: 'flowcode', width: 150, align: 'center', sortable: true },
+                { label: '流程配置实例', name: 'instancename', index: 'instancename', width: 250, align: 'center', sortable: true },
+                { label: '流程导向配置名称', name: 'settingname', index: 'settingname', width: 360, align: 'left', sortable: true },
+                { label: '起始流程', name: 'startflow', index: 'startflow', width: 150, align: 'center', sortable: true },
+                { label: '目标流程', name: 'endflow', index: 'endflow', width: 150, align: 'center', sortable: true },
+                { label: '提交类型', name: 'submittype', index: 'submittype', width: 150, align: 'center', sortable: true },
+                { label: '是否自动处理', name: 'isautohandle', index: 'isautohandle', width: 150, align: 'center', sortable: true }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [15, 30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'serialnumber',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                organizeid: $("#organizeid").val(), //所属单位
+                instanceid: $("#instanceid").ComboBoxGetValue(), //流程实例
+                submittype: $("#submittype").ComboBoxGetValue(), //提交类型
+                isupdateflow: $("#isupdateflow").ComboBoxGetValue(), //是否更改状态
+                startflow: $("#startflow").ComboBoxGetValue(), //起始流程
+                endflow: $("#endflow").ComboBoxGetValue(), //目标流程
+                flowcode: $("#flowcode").val()
+            };
+
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+
+            $(".ui-filter-list").css("display", "none");
+            $(".ui-filter-text ").removeClass("active");
+            $(".ui-filter-text ").removeAttr("style");
+        });
+
+    }
+
+    //条件管理页面
+    function editdata(obj, orgid, orgname) {
+        var rqUrl = '/HiddenTroubleManage/WfSetting/Form?keyValue=' + obj + '&orgid=' + orgid + '&orgname=' + orgname;
+        var title = "流程导向配置条件管理";
+        dialogOpen({
+            id: 'MgHidForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //新增视图
+    function btn_add() {
+        var rqUrl = '/HiddenTroubleManage/WfSetting/Form?keyValue=';
+        var title = "新增流程导向配置实例";
+        dialogOpen({
+            id: 'AddHidForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //删除
+    function removedata(obj) {
+        $.RemoveForm({
+            url: '../../HiddenTroubleManage/WfSetting/RemoveForm',
+            param: { keyValue: obj },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        });
+    }
+
+    //查看视图
+    function viewdata(obj) {
+        var rqUrl = '/HiddenTroubleManage/WfSetting/Form?keyValue=' + obj + '&actiontype=view';
+        var title = "查看流程导向配置实例";
+
+        var dlg = dialogOpen({
+            id: 'ViewHidForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //重置所有查询条件
+    function ResetCondition() {
+        //流程代码
+        $("#flowcode").val("");
+        //所属单位
+        $("#organizename").val("");
+        $("#organizeid").val("");
+        //流程实例
+        $("#instanceid").attr("data-text", "===全部===");
+        $("#instanceid").attr("data-value", "");
+        $("#instanceid div:eq(0)").text("===全部===");
+        //是否更改流程状态
+        $("#isupdateflow").attr("data-text", "===全部===");
+        $("#isupdateflow").attr("data-value", "");
+        $("#isupdateflow div:eq(0)").text("===全部===");
+        //提交类型
+        $("#submittype").attr("data-text", "===全部===");
+        $("#submittype").attr("data-value", "");
+        $("#submittype div:eq(0)").text("===全部===");
+        //起始流程
+        $("#startflow").attr("data-text", "===全部===");
+        $("#startflow").attr("data-value", "");
+        $("#startflow div:eq(0)").text("===全部===");
+        //目标流程
+        $("#endflow").attr("data-text", "===全部===");
+        $("#endflow").attr("data-value", "");
+        $("#endflow div:eq(0)").text("===全部===");
+
+    }
+</script>
+
+<div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+    <div class="panel-Title">流程导向配置实例列表</div>
+    <div class="titlePanel">
+        <div class="title-search">
+            <table>
+                <tr>
+                    <td>查询条件:</td>
+                    <td style="padding-left: 10px;">
+                        <div class="ui-filter" style="width: 350px;">
+                            <div class="ui-filter-text">
+                                请选择过滤条件
+                            </div>
+                            <div class="ui-filter-list" style="width: 400px; ">
+                                <table class="form" id="filter-form">
+                                    <tr>
+                                        <td class="formTitle">所属单位：</td>
+                                        <td class="formValue">
+                                            <input id="organizename" type="text" class="form-control" readonly placeholder="请选择所属单位" onclick="selectDept('', 0, 9, '所属单位', window.document.body, 'organizename,,organizeid,,', '')" />
+                                            <input id="organizeid" type="hidden" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="formTitle">流程实例：</td>
+                                        <td class="formValue">
+                                            <div id="instanceid" type="select" class="ui-select" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="formTitle">提交类型：</td>
+                                        <td class="formValue">
+                                            <div id="submittype" type="select" class="ui-select" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="formTitle"><span style="white-space:pre-wrap;">是否更改流程状态：</span></td>
+                                        <td class="formValue">
+                                            <div id="isupdateflow" type="select" class="ui-select" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="formTitle">起始流程：</td>
+                                        <td class="formValue">
+                                            <div id="startflow" type="select" class="ui-select" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="formTitle">目标流程：</td>
+                                        <td class="formValue">
+                                            <div id="endflow" type="select" class="ui-select" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="formTitle">流程代码：</td>
+                                        <td class="formValue">
+                                            <input id="flowcode" type="text" class="form-control" />
+                                        </td>
+                                    </tr>
+                                </table>
+                                <div class="ui-filter-list-bottom">
+                                    <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                    <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+            </div>
+        </div>
+    </div>
+    <div class="gridPanel">
+        <table id="gridTable"></table>
+        <div id="gridPager"></div>
+    </div>
+</div>

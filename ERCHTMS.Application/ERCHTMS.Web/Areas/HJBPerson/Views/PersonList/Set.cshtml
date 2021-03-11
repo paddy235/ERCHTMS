@@ -1,0 +1,202 @@
+﻿
+@{
+    ViewBag.Title = "实时在厂人员统计设置";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+    var num = ViewBag.mType;
+}
+
+
+<script>
+    var keyValue = request('keyValue');
+    var maxTime = request('maxTime');
+    var minTime = request('minTime');
+    var moduleType = request('ModuleType');
+    var instanceId = "";
+    var formId = "";
+    var isClick = true;
+    $(function () {
+        DateTime();
+        GetGrid();
+    });
+
+    //日期默认
+    function DateTime() {
+        $("#sTime").val(minTime);
+        $("#eTime").val(maxTime);
+    }
+
+    function GetGrid() {
+        $gridTable = $("#PageList");
+
+        $gridTable.jqGrid({
+            url: "../../PersonList/GetPersonSet",
+            datatype: "json",
+            height: $(window).height() - 230,
+            autowidth: true,
+            postData: { ModuleType: moduleType },
+            colModel: [
+                { label: '主键', name: 'personsetid', hidden: true },
+                { label: '单位(部门)', name: 'deptname', index: 'deptname', width: 150, align: 'center' },
+                { label: '姓名', name: 'realname', index: 'realname', width: 350, align: 'center' },
+                { label: '岗位', name: 'dutyname', index: 'dutyname', width: 350, align: 'center' }
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 40, 100],
+            pager: '#PagePaging',
+            //sortname: 'REALNAME',
+            //sortorder: 'desc',
+            multiboxonly: true,
+            multiselect: true,
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+            },
+            loadError: function (xhr, status, error) {
+            },
+            gridComplete: function () {
+            }
+        });
+
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var st = $("#sTime").val();
+        var et = $("#eTime").val();
+        if (st > et && st != "" && et != "") {
+            dialogMsg('开始时间不能大于结束时间！', 2);
+            return false;
+        }
+        if (st < minTime) {
+            dialogMsg('开始时间不能小于最小时间范围！', 2);
+            return false;
+        }
+        if (et > maxTime) {
+            dialogMsg('结束时间不能大于最大时间范围！', 2);
+            return false;
+        }
+        var query = {
+            sTime: $("#sTime").val(),
+            eTime: $("#eTime").val(),
+            inOut: $("#inOut option:selected").val(),
+            userID: keyValue
+        }
+        return JSON.stringify(query);
+    }
+
+    //新增人员数据
+    function add()
+    {
+        var adddlg = dialogOpen({
+            id: "add",
+            title: '新增人员',
+            url: '/HJBPerson/PersonList/add',
+            width: ($(top.window).width() - 300) + "px",
+            height: ($(top.window).height() - 300) + "px",
+            btn: ["保存","关闭"],
+            callBack: function (iframeId) {
+                var ids = top.document.getElementById(iframeId).contentWindow.$("#gridTable").jqGridRowValue("userid");
+                if (ids.length == 0) {
+                    dialogMsg("请选择一条记录！", 0);
+                    return false;
+                }
+                console.log(ids);
+                
+                top.layer.close(adddlg);
+
+                $.ajax({
+                    url: "../../PersonList/addUser",
+                    data: { queryJson: ids, ModuleType: moduleType },
+                    type: "post",
+                    dataType: "json",
+                    success: function (data) {
+                        window.location.reload();
+                    },
+                });
+            }
+        });
+    }
+
+    //删除人员数据
+    function del()
+    {
+        var ids = $("#PageList").jqGridRowValue("personsetid");
+        if (ids.length == 0) {
+            dialogMsg("请选择至少一条记录！", 0);
+            return false;
+        } else {
+            $.RemoveForm({
+                url: '../../PersonList/delUser',
+                param: { keyValue: ids },
+                success: function (data) {
+                    window.location.reload();
+                }
+            })
+        }
+    }
+</script>
+
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            @if (num == "0")
+            {
+                <div class="titlePanel">
+                    <div class="title-search">
+
+                        <div class="row">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>
+                                        <div style="margin-left: 10px;" class="toolbar">
+                                            <div class="btn-group">
+                                                <button id="btn_in" class="btn btn-primary btn10" type="button" onclick="state = 1;$('#con1').show();$('#con2').hide();$('#con3').hide();$('.btn10').removeClass('btn-primary');$('.btn10').addClass('btn-default');$(this).addClass('btn-primary');"><i class="fa fa"></i>&nbsp;数据设置</button>
+                                                @*<button id="btn_out" class="btn btn-default btn10" type="button" onclick="state = 2;$('#con1').hide();$('#con2').show();$('#con3').hide();$('.btn10').removeClass('btn-primary');$('.btn10').addClass('btn-default');$(this).addClass('btn-primary');"><i class="fa fa"></i>&nbsp;预警设置</button>
+                                                <button id="btn_zz" class="btn btn-default btn10" type="button" onclick="state = 3; $('#con1').hide(); $('#con2').hide();$('#con3').show(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary');"><i class="fa fa"></i>&nbsp;展示指标设置</button>*@
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+            }
+            
+            <div id="con1" style="margin-top: 10px;" class="gridPanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td><a style="color:#337ab7;text-decoration:none">说明：加入以下列表人员仅特定人员可查看,其他人不可查看</a></td>
+                            <td style="padding-left: 20px;">
+                                <a id="lr-add-menu" class="btn btn-primary" onclick="add()" ><i class="fa fa-plus"></i>&nbsp;新增</a>
+                                <a id="lr-delete-menu" class="btn btn-primary" onclick="del()" ><i class="fa fa-trash-o"></i>&nbsp;删除</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div style="margin-top: 10px;">
+                    <table id="PageList"></table>
+                    <div id="PagePaging"></div>
+                </div>
+                    
+            </div>
+            <div id="con2" style="margin-top: 10px;display:none" class="gridPanel">
+                <table class="ui-jqgrid-btable">
+                    <tr>
+                        <th>启用</th>
+                        <th>预警标准</th>
+                    </tr>
+                    <tr>
+                        <td><input role="checkbox" type="checkbox" id="dostart" class="cbox" name="dostart"></td>
+                        <td>人员在厂滞留时间大于<input class="text" />小时进行预警提醒</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,209 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta content="门禁系统数据展示" name="keywords">
+    <meta content="门禁系统数据展示" name="description">
+    <meta http-equiv="refresh" content="180" />
+    <title>门禁系统数据展示</title>
+    <link rel="stylesheet" href="./css/common.css">
+    <link rel="stylesheet" href="./css/index.css">
+    <link rel="stylesheet" href="./css/swiper.min.css">
+    <script src="./js/jquery-2.2.4.min.js"></script>
+    <script src="./js/swiper.min.js"></script>
+    <script type="text/javascript">
+        //var apiUrl = "http://10.36.1.70/erchtmsapp/api/";
+        var path = window.location.pathname.substr(1, window.location.pathname.length);
+        var appName = path.substring(0, path.indexOf("/"));
+        var apiUrl = window.location.protocol + "//" + window.location.hostname + "/" + appName + "app/api/";
+        if(window.location.port.length>0){
+            apiUrl = window.location.protocol + "//" + window.location.hostname + ":" + window.location.port + "/" + appName + "app/api/";
+        }
+        //获取安全生产天数
+        function getDays() {
+            $.get(apiUrl + "basedata/GetSafeDays", function (data) {
+                if (data.length > 0) {
+                    var html = "";
+                    var arr = data.split('');
+                    var len = arr.length;
+                    $(arr).each(function (i, num) {
+                        html += '<div class=\"numBox\"><span>'+arr[len-i-1]+'</span></div>';
+                    });
+                    $(".safeDays").append(html);
+                }
+            });
+        }
+        //设置时间
+        function setTime() {
+            var currDate = new Date();
+            var strDate = currDate.getFullYear() + "-" + (currDate.getMonth() + 1) + "-" + currDate.getDate();
+            $("#date1").text(strDate + " " + getWeekday());
+            var hour = currDate.getHours() < 10 ? "0" + currDate.getHours() : currDate.getHours();
+            var min = currDate.getMinutes() < 10 ? "0" + currDate.getMinutes() : currDate.getMinutes();
+            var sec = currDate.getSeconds() < 10 ? "0" + currDate.getSeconds() : currDate.getSeconds();
+            $("#time1").text(hour + ":" + min+":"+sec);
+        }
+        //获取天气预报
+        function getWeather() {
+            var url = "http://api.map.baidu.com/telematics/v3/weather?location=黄石&output=json&ak=WcLjizhBNNayeSkR712CRMFR";
+            $.ajax(url, {
+                dataType: 'jsonp',
+                crossDomain: true,
+                success: function (data) {
+                    if (!!data.results) {
+                        var result = data.results[0];
+                        var todayObj = result.weather_data[0]; //当天天气对象
+                        var weatherData = todayObj.weather + ',' + todayObj.wind;
+                        $("#weather").text(weatherData);
+                    }
+                }
+            });
+        }
+        function stat() {
+            $.get(apiUrl + "person/GetSumList", function (json) {
+                var count = json.count + "";
+                var html = "";
+                if (count.length > 0) {
+                    var arr = count.split('');
+                    $(arr).each(function (i, num) {
+                        html += '<div class="numBg"><img src="./images/'+num+'.png"></div>';
+                    });
+                 
+                    $("#count1").prepend(html);
+                }
+                else {
+                    $("#count1").prepend('<div class="numBg"><img src="./images/0.png"></div>');
+                }
+                count = json.data.length + "";
+                html = "";
+                if (count.length > 0) {
+                    var arr = count.split('');
+                    $(arr).each(function (i, num) {
+                        html += '<div class="numBg"><img src="./images/' + num + '.png"></div>';
+                    });
+
+                    $("#count2").prepend(html);
+                } else {
+                    $("#count2").prepend('<div class="numBg"><img src="./images/0.png"></div>');
+                }
+
+                html = "";
+                var j=1;
+                $(json.data).each(function (i, item) {
+                    j = i + 1;
+                    if (j == 1) {
+                        html += '<div class=\"swiper-slide clearfix\"><div class="content_bot bot1"><table rules="none"><tr><th style="width: 84px">排名</th><th>外包单位</th><th style="width:105px">在厂人数</th></tr>';
+                    }
+                    var type = item.depttype == "0" ? "临时" : "长协";
+                    var className = item.depttype == "0" ? "temporaryColor1" : "temporaryColor";
+                    html += '<tr><td>' + j + '</td><td>' + item.deptname + '<span class="'+className+'">'+type+'</span></td><td><div>' + item.count + '</div></td></tr>';
+                    if (j % 10 == 0) {
+                        html+='</table></div></div><div class=\"swiper-slide clearfix\"><div class="content_bot bot1"><table rules="none"><tr><th style="width: 84px">排名</th><th>外包单位</th><th style="width:105px">在厂人数</th></tr>';
+                    }
+                    j++;
+                });
+                
+                $("#tab0").html(html);
+                if ($("#tab0").find(".swiper-slide").last().children().length==0) {
+                    $("#tab0").find(".swiper-slide").last().remove();
+                }
+                new Swiper('.swiper-container', {
+                    spaceBetween: 300,
+                    loop: true,
+                    loopedSlides: 2,
+                    slidesPerView: 'auto',
+                    autoplay: {
+                        delay: 10000,
+                        disableOnInteraction:false
+                    }
+                });
+            });
+        }
+        
+        $(function () {
+            getProjectCount();
+            setTime();
+            window.setInterval("setTime()", 1000);
+            getDays();
+            stat();
+            getWeather();
+        });
+        //获取当前是星期几
+        function getWeekday() {
+            var arr = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+            var iWeek = new Date().getDay();
+            return arr[iWeek];
+        }
+        //获取临时外包工程数
+        function getProjectCount() {
+            $.get(apiUrl + "WorkMeeting/GetTempProjectCount", function (json) {
+                var count = json.data + "";
+                var html = "";
+                if (count.length > 0) {
+                    var arr = count.split('');
+                    $(arr).each(function (i, num) {
+                        html += '<div class="numBg"><img src="./images/' + num + '.png"></div>';
+                    });
+
+                    $("#count3").prepend(html);
+                }
+                else {
+                    $("#count3").prepend('<div class="numBg"><img src="./images/0.png"></div>');
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+<div class="header">
+    <div class="title">
+        <img src="./images/logo.png">
+    </div>
+    <div class="title cent">
+        实时在厂外包人员数量
+    </div>
+    <div class="title rt ">
+        安全生产天数
+        <div style="margin-left: 14px" class="safeDays">天</div>
+    </div>
+</div>
+<img src="./images/header_line.png" style="width: 100%">
+<div class="main_content">
+    <div class="row">
+        <div class="content_box out_box1">
+            <span>实时在厂外包总人数</span>
+            <div class="content" id="count1">
+                <div class="numBg1">人</div>
+            </div>
+        </div>
+        <div class="content_box out_box2">
+            <span>实时在厂外包单位数</span>
+            <div class="content" id="count2">
+                <div class="numBg1">个</div>
+            </div>
+        </div>
+        <div class="content_box out_box3">
+            <span>实时开工临时外包工程</span>
+            <div class="content" id="count3">
+                <div class="numBg1">个</div>
+            </div>
+        </div>
+        <div class="content_box out_box4">
+            <span>天气-时间</span>
+            <h1 id="time1">10:25:14</h1>
+            <h2 id="date1">2019-11-27 星期三</h2>
+            <h3 id="weather"><img src="./images/weather_icon.png">晴天 27℃</h3>
+        </div>
+    </div>
+    <div class="row">
+        <div class="swiper-container">
+            <div class="swiper-wrapper" id="tab0">
+                
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

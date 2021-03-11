@@ -1,0 +1,373 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<script>
+    var curUserId = "";
+    var curUserRole = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    //违章默认登记列表页
+    $(function () {
+        curUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //初始化数据
+        $.SetForm({
+            url: "../../QuestionManage/QuestionInfo/GetQueryConditionJson",
+            success: function (data) {
+                //流程状态
+                $("#FlowState").ComboBox({
+                    id: "ItemValue",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.FlowState
+                });
+            }
+        });
+
+        //开始时间
+        var startDate = "@DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd")";
+        $("#StartTime").val(startDate);
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        //问题基本信息
+        var queryJson = {
+            action: "Register",
+            starttime: $("#StartTime").val(), //创建开始时间
+            endtime: $("#EndTime").val(),//创建结束时间
+            flowstate: $("#FlowState").ComboBoxGetValue(), //流程状态
+            questiondescribe: $("#QuestionDescribe").val() //问题描述
+        };
+
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../QuestionManage/QuestionInfo/GetListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+               { label: '主键', name: 'id', index: 'id', width: 100, align: 'center', hidden: true },
+               {
+                   label: '操作', name: 'oper', index: 'id', width: 120, align: 'center',
+                   formatter: function (cellvalue, options, rowObject) {
+
+                       var html = "<a href=javascript:viewdata('" + rowObject.id + "','" + rowObject.flowstate + "')  title='查看'><i class='fa fa-eye'></i></a>";
+
+                       if (rowObject.flowstate == "问题登记" && rowObject.createuserid == curUserId) {
+                           html += "&nbsp;&nbsp;&nbsp;<a href=javascript:editdata('" + rowObject.id + "','" + rowObject.flowstate + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+
+                           html += "&nbsp;&nbsp;&nbsp;<a href=javascript:removedata('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                       }
+                       return html;
+                   }
+               },
+                {
+                    label: '流程状态', name: 'flowstate', index: 'flowstate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.flowstate) {
+                            html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='问题流程'>" + rowObject.flowstate + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '问题编号', name: 'questionnumber', index: 'questionnumber', width: 150, align: 'center', sortable: true },
+                {
+                    label: '问题描述', name: 'questiondescribe', index: 'questiondescribe', width: 250, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var questiondescribe = rowObject.questiondescribe;
+
+                        if (questiondescribe.length > 20) {
+                            questiondescribe = questiondescribe.substring(0, 20) + "......";
+                        }
+                        return "<div title=" + rowObject.questiondescribe + ">" + questiondescribe + "</div>";
+                    }
+                },
+                { label: '检查类型', name: 'checktypename', index: 'checktypename', width: 150, align: 'center', sortable: true },
+                { label: '整改责任人', name: 'reformpeoplename', index: 'reformpeoplename', width: 150, align: 'center', sortable: true },
+                { label: '验证人', name: 'verifypeoplename', index: 'verifypeoplename', width: 150, align: 'center', sortable: false }
+            ],
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            //违章基本信息
+            var queryJson = {
+                action: "Register",
+                starttime: $("#StartTime").val(), //创建开始时间
+                endtime: $("#EndTime").val(),//创建结束时间
+                flowstate: $("#FlowState").ComboBoxGetValue(), //流程状态
+                questiondescribe: $("#QuestionDescribe").val() //问题描述
+            };
+
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+
+            $(".ui-filter-list").css("display", "none");
+            $(".ui-filter-text ").removeClass("active");
+            $(".ui-filter-text ").removeAttr("style");
+        });
+
+    }
+
+
+
+    //导入
+    var idx;
+    var isImport = false;
+    function importdata() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入信息',
+            url: '/QuestionManage/QuestionInfo/Import',
+            width: "500px",
+            height: "450px",
+            btn: ["确认", "关闭"],
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                }
+                var queryJson = {
+                    action: "Register",
+                    starttime: $("#StartTime").val(), //创建开始时间
+                    endtime: $("#EndTime").val(),//创建结束时间
+                    flowstate: $("#FlowState").ComboBoxGetValue(), //流程状态
+                    questiondescribe: $("#QuestionDescribe").val() //问题描述
+                };
+
+                $('#gridTable').jqGrid('setGridParam', {
+                    postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+                }).trigger('reloadGrid');
+            }
+        });
+    }
+
+    //新增违章
+    function add() {
+        dialogOpen({
+            id: 'QuestionForm',
+            title: '新增问题',
+            url: '/QuestionManage/QuestionInfo/Form',
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //删除问题
+    function removedata(obj) {
+        $.RemoveForm({
+            url: '../../QuestionManage/QuestionInfo/RemoveForm',
+            param: { keyValue: obj },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        });
+    }
+
+    //问题流程图
+    function OpenViewFlow(keyValue) {
+        var title = "问题流程图";
+        var rqUrl = "/SystemManage/WorkFlow/Detail?keyValue=" + keyValue + "&mode=0";
+        dialogOpen({
+            id: 'QuestionFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() / 2 + 200) + "px",
+            height: ($(top.window).height() / 2 + 300) + "px",
+            btn: null
+        });
+    }
+
+    //减少天数
+    function SubtractDays(date, value) {
+        var d = new Date(date);
+        d.setDate(d.getDate() - value);
+        var m = d.getMonth() + 1;
+        return d.getFullYear() + "-" + m + "-" + d.getDate();
+    }
+
+    //查看视图
+    function viewdata(obj, flowstate) {
+        var rqUrl = "";
+        title = "查看问题";
+
+        //未整改隐患的查看页面
+        if (flowstate == "问题登记") {
+            rqUrl = '/QuestionManage/QuestionInfo/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (flowstate == "问题整改") {
+            rqUrl = '/QuestionManage/QuestionReform/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (flowstate == "问题验证") {
+            rqUrl = '/QuestionManage/QuestionVerify/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else {
+            rqUrl = '/QuestionManage/QuestionInfo/DoneForm?keyValue=' + obj + '&actiontype=view';
+        }
+        dialogOpen({
+            id: 'QuestionForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //编辑视图
+    function editdata(obj, flowstate) {
+        var rqUrl = "";
+        title = "问题信息";
+
+        //未整改隐患的查看页面
+        if (flowstate == "问题登记") {
+            rqUrl = '/QuestionManage/QuestionInfo/Form?keyValue=' + obj + '&actiontype=edit';
+        }
+        else if (flowstate == "问题整改") {
+            rqUrl = '/QuestionManage/QuestionReform/Form?keyValue=' + obj + '&actiontype=edit';
+        }
+        else if (flowstate == "问题验证") {
+            rqUrl = '/QuestionManage/QuestionVerify/Form?keyValue=' + obj + '&actiontype=edit';
+        }
+        dialogOpen({
+            id: 'QuestionForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //重置所有查询条件
+    function ResetCondition() {
+        var startTime = "@DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd")";
+        var endTime = "@DateTime.Now.ToString("yyyy-MM-dd")";
+        //开始时间
+        $("#StartTime").val(startTime);
+        //结束时间
+        $("#EndTime").val(endTime);
+
+        //流程状态
+        $("#FlowState").attr("data-text", "===全部===");
+        $("#FlowState").attr("data-value", "");
+        $("#FlowState div:eq(0)").text("===全部===");
+
+        //问题描述
+        $("#QuestionDescribe").val("");
+    }
+
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 5px; margin-right: 5px;">
+            <div class="panel-Title"></div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件:</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 350px;">
+                                    <div class="ui-filter-text">
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px; ">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <th class="formTitle">创建时间：</th>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="StartTime" readonly type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="EndTime" readonly type="text" value=@DateTime.Now.ToString("yyyy-MM-dd") class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">流程状态：</td>
+                                                <td class="formValue">
+                                                    <div id="FlowState" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">问题描述：</td>
+                                                <td class="formValue">
+                                                    <input id="QuestionDescribe" type="text" class="form-control" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+                        <a class="btn btn-default" onclick="importdata()"><i class="fa fa-file-excel-o"></i>&nbsp;导入</a> 
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

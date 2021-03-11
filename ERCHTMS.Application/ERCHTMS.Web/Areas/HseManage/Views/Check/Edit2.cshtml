@@ -1,0 +1,204 @@
+﻿@model ERCHTMS.Entity.HseManage.CheckRecordEntity
+
+@{
+    ViewBag.Title = "Edit";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/Content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/layui/layui.all.js"></script>
+<script src="~/Content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var lastSel, id = '@ViewBag.id', isShow = true;
+    jQuery(function () {
+        jQuery('#CardName').click(function () {
+            jQuery(this).blur();
+            dialogOpen({
+                id: "form1",
+                title: '选择预警指标卡',
+                url: '../@Url.Action("Select")',
+                width: "600px",
+                height: "400px",
+                callBack: function (iframeId) {
+                    var data = top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                    jQuery('#CardName').val(data.CardName);
+                    jQuery('#CardId').val(data.CardId);
+
+                    jQuery.getJSON('@Url.Action("CardDetail")', { id: data.CardId }, function (data) {
+                        if (data && data.CheckContents) {
+                            jQuery('.unwritten').remove();
+
+                            for (var i = 0; i < data.CheckContents.length; i++) {
+                                jQuery('#grid').jqGrid('addRowData', i, { CheckContent: data.CheckContents[i].Content, CheckContentId: data.CheckContents[i].CheckContentId, Num1: 0, Num2: 0, Num3: 0, Num4: 0 });
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+        var json = JSON.parse('@Html.Raw(ViewBag.json)');
+        jQuery('#grid').jqGrid({
+            autowidth: true,
+            rownumbers: true,
+            //multiselect: true,
+            //multiboxonly: true,
+            height: 260,
+            editurl: 'clientArray',
+            datatype: 'local',
+            data: json,
+            colModel: [
+                { name: 'CheckItemId', index: 'CheckItemId', hidden: true, key: true },
+                { name: 'CheckContentId', index: 'CheckContentId', hidden: true },
+                { name: 'Dangerous', index: 'Dangerous', hidden: true },
+                { name: 'Measures', index: 'Measures', hidden: true },
+                { name: 'Dangerous2', index: 'Dangerous2', hidden: true },
+                { name: 'Measures2', index: 'Measures2', hidden: true },
+                { label: '检查内容', name: 'CheckContent', index: 'CheckContent', width: 300, align: 'center' },
+                {
+                    label: '安全数量', name: 'Num1', index: 'Num1', width: 100, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue > 0) return cellvalue;
+                        else return '';
+                    }
+                },
+                {
+                    label: '风险数量', name: 'Num2', index: 'Num2', width: 100, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue > 0) {
+                            return '<label onclick="editRow(\'' + rowObject.CheckItemId + '\');" style="color:blue;">' + cellvalue + '</label>';
+                        }
+                        else return '';
+                    }
+                },
+                {
+                    label: '紧急的风险数量', name: 'Num3', index: 'Num3', width: 100, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue > 0) {
+                            return '<label onclick="editRow2(\'' + rowObject.CheckItemId + '\');" style="color:blue;">' + cellvalue + '</label>';
+                        }
+                        else return '';
+                    }
+                },
+                {
+                    label: '不适应', name: 'Num4', index: 'Num4', width: 100, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue > 0) return cellvalue;
+                        else return '';
+                    }
+                },
+            ],
+            //onSelectRow: function (rowid) {
+            //    if (rowid && rowid != lastSel) {
+            //        jQuery('#grid').jqGrid('saveRow', lastSel);
+            //        lastSel = rowid;
+            //        jQuery('.ssss').hide();
+            //        isShow = false;
+            //    }
+            //    jQuery('#grid').jqGrid('editRow', rowid, true);
+            //},
+        });
+
+        jQuery('.ssss').hide();
+        isShow = false;
+    });
+
+    function editRow(rowid) {
+        console.log(rowid);
+        jQuery('.ssss').show();
+        isShow = true;
+        var rowdata = jQuery('#grid').jqGrid('getRowData', rowid);
+        jQuery('#dangerouse').val(rowdata.Dangerous);
+        jQuery('#measures').val(rowdata.Measures);
+    }
+
+    function editRow2(rowid) {
+        console.log(rowid);
+        jQuery('.ssss').show();
+        isShow = true;
+        var rowdata = jQuery('#grid').jqGrid('getRowData', rowid);
+        jQuery('#dangerouse').val(rowdata.Dangerous2);
+        jQuery('#measures').val(rowdata.Measures2);
+    }
+
+    function AcceptClick() {
+        if (lastSel)
+            jQuery('#grid').jqGrid('saveRow', lastSel);
+
+        var data = jQuery('#grid').jqGrid('getRowData');
+        var valid = true;
+        jQuery.each(data, function (i, o) {
+            if (!(o.Num1 > 0 || o.Num2 > 0 || o.Num3 > 0 || o.Num4 > 0)) {
+                layer.msg('行 ' + (i + 1) + ' 检查结果未填写！');
+                valid = false;
+                return false;
+            }
+        });
+
+        if (!valid) return false;
+
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        var postData = $("#form1").formSerialize();
+        postData.CheckItems = data;
+
+        jQuery.SaveForm({
+            url: '/../@Url.Action("Edit")',
+            type: 'post',
+            contentType: 'application/json',
+            dataType: 'json',
+            param: JSON.stringify(postData),
+            success: function (data) {
+                $.currentIframe().reload();
+            }
+        });
+    }
+</script>
+<div style="margin: 10px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">类别<font face="宋体">*</font></td>
+            <td class="formValue">
+                @Html.DropDownListFor(x => x.Category, ViewData["Category"] as List<SelectListItem>, new { @class = "form-control selectpicker", maxlength = 500, placeholder = "请选择类别" })
+                @Html.HiddenFor(x => x.CardId)
+                @*<input id="Category" name="Category" type="text" maxlength="6" class="form-control" isvalid="yes" checkexpession="NotNull" />*@
+            </td>
+            <td class="formTitle">名称<font face="宋体">*</font></td>
+            <td class="formValue">
+                @Html.TextBoxFor(x => x.CardName, new { @class = "form-control", placeholder = "请输入名称", isvalid = "yes", checkexpession = "NotNull", maxlength = 200 })
+                @*<input id="CardName" name="CardName" type="text" maxlength="50" class="form-control" isvalid="yes" checkexpession="NotNull" />*@
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">检查人</td>
+            <td class="formValue">
+                @Html.TextBoxFor(x => x.CheckUser, new { @class = "form-control" })
+            </td>
+            <td class="formTitle">检查时间</td>
+            <td class="formValue">
+                @Html.TextBoxFor(x => x.CheckTime, new { @class = "form-control", onfocus = "WdatePicker({dateFmt:\"yyyy-MM-dd HH:mm:ss\"});" })
+                @*<input id="SubmitTime" name="SubmitTime" type="text" class="form-control disabled" isvalid="yes" checkexpession="NotNull" disabled />*@
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">检查地点</td>
+            <td class="formValue" colspan="3">
+                @Html.TextBoxFor(x => x.CheckPlace, new { @class = "form-control" })
+            </td>
+        </tr>
+        <tr>
+            <td colspan="4">
+                <table id="grid"></table>
+            </td>
+        </tr>
+        <tr class="ssss">
+            <td class="formTitle">存在风险</td>
+            <td class="formValue" colspan="3">
+                <input class="form-control" id="dangerouse" name="dangerous" type="text" value="">
+            </td>
+        </tr>
+        <tr class="ssss">
+            <td class="formTitle">采取措施</td>
+            <td class="formValue" colspan="3">
+                <input class="form-control" id="measures" name="measures" type="text" value="">
+            </td>
+        </tr>
+    </table>
+</div>

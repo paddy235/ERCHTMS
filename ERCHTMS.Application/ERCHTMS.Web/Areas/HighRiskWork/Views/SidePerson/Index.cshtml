@@ -1,0 +1,228 @@
+@{;
+  ViewBag.Title = "列表页面";
+  Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>    ;
+
+    var _parentId = "";
+    var _isOrg = "";
+    var treedeptcode = "";
+    var treedeptid = "";
+
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        json = JSON.stringify({ SelectMode: 0, Mode: 0 });
+        url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+
+        var item = {
+            height: $(window).height() - 50,
+            url: url,
+            onnodeclick: function (item) {
+                _parentId = item.Code;
+                _isOrg = item.Sort;
+                treedeptcode = item.Code;
+                treedeptid = item.id;
+
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../HighRiskWork/SidePerson/GetPageTableJson",
+            datatype: "json",
+            colModel: [
+                { label: '', name: 'createuserid', hidden: true }, { label: '', name: 'createuserdeptcode', hidden: true }, { label: '', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'sideid', width: 10, align: 'left', sortable: true, hidden: true },
+                 {
+                     label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                 },
+                { label: '姓名', name: 'sideusername', align: 'center', sortable: true },
+                { label: '性别', name: 'sideusersex', align: 'center', sortable: false },
+                { label: '单位/部门', name: 'sideuserdeptname', width: 300, align: 'center', sortable: false },
+                { label: '旁站监督级别', name: 'sideuserlevel', align: 'center', sortable: true }],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 25, 30],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+        });
+
+        //查询
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                keyword: $("#txt_Keyword").val(),
+                deptcode: treedeptcode,
+                deptid: treedeptid
+            }
+
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //查看详情
+    function show() {
+        var keyValue = $('#gridTable').jqGridRowValue('sideid');
+        var idx = dialogOpen({
+            id: "Form",
+            title: "查看旁站监督人员",
+            url: '/HighRiskWork/SidePerson/Form?keyValue=' + keyValue,
+            width: '500px',
+            height: '400px',
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加旁站监督人员',
+            url: '/HighRiskWork/SidePerson/Form',
+            width: '500px',
+            height: '400px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('sideid');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑旁站监督人员',
+                url: '/HighRiskWork/SidePerson/Form?keyValue=' + keyValue,
+                width: '500px',
+                height: '400px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('sideid');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../HighRiskWork/SidePerson/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的旁站监督人员！', 0);
+        }
+    }
+
+    //导出
+    function exportResult() {
+        var queryJson = JSON.stringify({
+            keyword: $("#txt_Keyword").val(),
+        })
+        location.href = "../../HighRiskWork/SidePerson/ExportData?queryJson=" + queryJson;
+    }
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right: 8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor: pointer;" title="展开/收起"></i>
+                </div>
+                <a onclick=''></a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">旁站监督员管理</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>姓名：</td>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>新增</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download"></i>导出</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

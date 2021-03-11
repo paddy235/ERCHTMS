@@ -1,0 +1,410 @@
+﻿@{
+  ViewBag.Title = "列表页面";
+  Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var ctype = "";
+    var cname = "";
+    var st = request("st");
+    var et = request("et");
+    var qyear = request("qyear");
+    var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        if (qyear.length > 0) {
+            $(".title-search").remove();
+        }
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+
+            }, 200);
+            e.stopPropagation();
+        });
+        if(st) $("#StartTime").val(st);
+        if(et) $("#EndTime").val(et);
+    }
+    //查看登记的问题
+    function showWt(objId) {
+        var url = '/QuestionManage/QuestionInfo/SdIndex?safetycheck=0&checkid=' + objId + '& relevanceid =';
+        var idx = dialogOpen({
+            id: 'Details',
+            title: '问题信息',
+            url: url,
+            width: ($(top.window).width() - 80) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //查看登记的违章
+    function showWz(objId) {
+        var url = '/LllegalManage/LllegalRegister/SdIndex?safetycheck=0&reseverone=' + objId;
+        var idx = dialogOpen({
+            id: 'Details',
+            title: '违章信息',
+            url: url,
+            width: ($(top.window).width() - 300) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            isGrpChecked: "1",
+            chkDept: orgId,
+            stm: st,
+            etm: et,
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            postData: { queryJson: JSON.stringify(queryJson) },
+            height: $(window).height() - 170,
+            url: "../../SaftyCheck/SaftyCheckDataRecord/GetPageListJsonForChk",
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'ID', hidden: true },
+                 {
+                     label: '操作', name: 'Oper', index: 'ID', width: 100, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:funcAction('view','" + rowObject.ID + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                         return html;
+                     }
+                 },
+                { label: '检查名称', name: 'CheckDataRecordName', index: 'CheckDataRecordName', width: 200, align: 'center', sortable: true},
+                 {
+                     label: '检查时间', name: 'CheckBeginTime', index: 'CheckBeginTime', width: 180, align: 'center', sortable: true,
+                     formatter: function (cellvalue, options, rowObject) {
+                         return formatDate(cellvalue, 'yyyy-MM-dd') + "至" + formatDate(rowObject.CheckEndTime, 'yyyy-MM-dd');
+                     }
+                 },
+                 {
+                     label: '检查进度', width: 150, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         if (rowObject.SolveCount == "0") return "未开始检查";
+                         var process = "<div style='width: " + rowObject.SolveCount + "%; background-color:green;color:black;'>" + "已完成" + rowObject.SolveCount + "%" + "</div>";
+                         return process;
+                     }
+                 },
+                {
+                    label: '不符合项', name: 'Count', index: 'Count', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var innerText ="";
+                        if (cellvalue > 0) {
+                            innerText = "隐患数量：<a href=javascript:funcAction('count','" + rowObject.ID + "') style='color:blue; text-decoration:underline'  title='查看隐患'>" + cellvalue + "</a><br />";
+                        } else {
+                            innerText += "隐患数量：" + cellvalue + "<br />";
+                        }
+                        if (top.window.isWz == "1") {
+                            if (rowObject.WzCount > 0) {
+                                innerText += "违章数量：<a onclick=\"showWz('" + rowObject.ID + "')\" style='text-decoration:underline;cursor:pointer;'>" + rowObject.WzCount + "</a><br />";
+                            } else {
+                                innerText += "违章数量：" + rowObject.WzCount + "<br />";
+                            }
+                        }
+                        if (top.window.isWt == "1") {
+                            if (rowObject.WtCount > 0) {
+                                innerText += "问题数量：<a onclick=\"showWt('" + rowObject.ID + "')\" style='text-decoration:underline;cursor:pointer;'>" + rowObject.WtCount + "</a>";
+                            } else {
+                                innerText += "问题数量：" + rowObject.WtCount;
+                            }
+                        }
+                        return innerText;
+                    }
+                },
+                {
+                    label: '处理进度', name: 'Count1', index: 'Count', align: 'left', sortable: true, headerAlign: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        var innerText = "";
+                        if (cellvalue > 0) {
+                            innerText = "<div style='width: " + (rowObject.Count1) + "%; background-color:green;color:black;'>隐患处理进度：" + rowObject.Count1 + "%" + "</div>";
+                        } else {
+                            if (rowObject.Count == 0) {
+                                innerText += "隐患处理进度：-<br />";
+                            } else {
+                                innerText += "隐患处理进度：" + cellvalue + "%<br />";
+                            }
+
+                        }
+                        if (top.window.isWz == "1") {
+                            if (rowObject.WzCount1 > 0) {
+                                innerText += "<div style='width: " + (rowObject.WzCount1) + "%; background-color:green;color:black;margin-top:2px;'>违章处理进度：" + rowObject.WzCount1 + "%" + "</div>";
+                            } else {
+                                if (rowObject.WzCount == 0) {
+                                    innerText += "违章处理进度：-<br />";
+                                } else {
+                                    innerText += "违章处理进度：" + rowObject.WzCount1 + "%<br />";
+                                }
+
+                            }
+                        }
+                        if (top.window.isWt == "1") {
+                            if (rowObject.WtCount1 > 0) {
+                                innerText += "<div style='width: " + (rowObject.WtCount1) + "%; background-color:green;color:black;'>问题处理进度：" + rowObject.WtCount1 + "%" + "</div>";
+                            } else {
+                                if (rowObject.WtCount == 0) {
+                                    innerText += "问题处理进度：-<br />";
+                                } else {
+                                    innerText += "问题处理进度：" + rowObject.WtCount1 + "%";
+                                }
+
+
+                            }
+                        }
+                        return innerText;
+                    }
+                },
+                {
+                    label: '查看登记结果', name: 'Oper', index: 'ID', align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:funcAction('forResult','" + rowObject.ID + "') style='color:blue; text-decoration:underline'  title='查看登记结果'>查看登记结果</a>";
+                        return html;
+                    }
+                },
+                { label: '检查单位', name: 'CheckDept', index: 'CheckDept', align: 'center', sortable: true }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            ////隐藏搜索框
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                ////隐藏搜索框
+                var title = $(".ui-filter-text");
+
+                title.trigger("click");
+            }
+                 //$("#SelectedStartTime").html($("#StartTime").val());
+                 //$("#SelectedEndTime").html($("#EndTime").val());
+                 $("#see").val("1");
+                 var queryJson = {
+                     ctype: ctype,
+                     stm: $("#StartTime").val(),
+                     etm: $("#EndTime").val(),
+                     isGrpChecked: "1",
+                     chkDept: orgId,
+                     keyword: $("#txt_Keyword").val()
+                 }
+                 //alert(JSON.stringify(queryJson));
+                 $gridTable.jqGrid('setGridParam', {
+                     postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+                 }).trigger('reloadGrid');
+             });
+        //查询回车
+             $('#txt_Keyword').bind('keypress', function (event) {
+                 if (event.keyCode == "13") {
+                     $('#btn_Search').trigger("click");
+                 }
+             });
+         }
+         //导出结果
+         function btn_exportResult() {
+             var stm = "";
+             var etm = "";
+             if ($("#see").val() == "1") {
+                 stm = $("#StartTime").val();
+                 etm = $("#EndTime").val();
+             }
+             if (qyear.length>0) {
+                 stm = st;
+                 etm = et;
+             }
+             ////查询条件
+             var queryJson = JSON.stringify({
+                 ctype: ctype,
+                 stm: stm,
+                 etm: etm,
+                 isGrpChecked: "1",
+                 chkDept: orgId,
+                 keyword: $("#txt_Keyword").val(),
+             })
+             location.href = "../../SaftyCheck/SaftyCheckDataRecord/ExportChkData?queryJson=" + queryJson;
+         }
+         //操作显示
+         function funcAction(action, val) {
+             //编辑及查看
+             if (action == "edit") {
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/ZXGrpForm?recid=' + val + '&zj=0' + '&cname=' + cname + '&ctype=' + ctype + "&action=edit";
+                 if (checkedRow(val)) {
+                     dialogOpen({
+                         id: 'Details',
+                         title: '修改安全检查计划',
+                         url: url,
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         callBack: function (iframeId) {
+                             top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                         }
+                     });
+                 }
+             }
+             else if (action == "view") {
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/ZXGrpForm?recid=' + val + '&zj=0' + '&cname=' + cname + '&ctype=' + ctype + "&action=view";
+                 var idx = dialogOpen({
+                     id: "win0",
+                     title: "查看安全检查计划",
+                     url: url,
+                     width: ($(top.window).width() - 200) + "px",
+                     height: ($(top.window).height() - 100) + "px",
+                     btns: 1,
+                     btn: ["关闭"],
+                     callBack: function (iframeId) {
+                         top.layer.close(idx);
+                     }
+                 });
+             }                 //删除
+             else if (action == "del") {
+                 if (val) {
+                     $.RemoveForm({
+                         url: '../../SaftyCheck/SaftyCheckDataRecord/RemoveForm',
+                         param: { keyValue: val },
+                         success: function (data) {
+                             $("#gridTable").trigger("reloadGrid");
+                         }
+                     })
+                 } else {
+                     dialogMsg('请选择需要删除的记录！', 0);
+                 }
+             } else if (action == "count") {
+                 var url = '/HiddenTroubleManage/HTBaseInfo/Index?mode=0&SAFETYCHECKOBJECTID=' + val;
+                 if (checkedRow(val)) {
+                     var idx = dialogOpen({
+                         id: 'HTWindow',
+                         title: '隐患列表',
+                         url: url,
+                         btns: 1,
+                         btn: ["关闭"],
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         callBack: function (iframeId) {
+                             top.layer.close(idx);
+                         }
+                     });
+                 }
+             } else if (action == "forResult") {
+                 //查看登记结果
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/ZXDetails?recid=' + val + '&cname=' + cname;
+
+                 if (checkedRow(val)) {
+                     dialogOpen({
+                         id: 'ZJDetails',
+                         title: '查看安全检查计划',
+                         url: url,
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         btn: null,
+                         callBack: function (iframeId) {
+                             top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                         }
+                     });
+                 }
+             }
+         }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">   
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left:10px;">
+            <div class="panel-Title">
+                <span id="CheckOfTypeName">检查表信息</span>
+                <div class="btn-group" id="forShow" style="float: right;">
+                </div>
+            </div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                      @*  <strong id="SelectedStartTime">@DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd")</strong> 至 <strong id="SelectedEndTime">@DateTime.Now.ToString("yyyy-MM-dd")</strong>*@
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <th class="formTitle">检查时间：</th>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="StartTime" readonly type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="EndTime" readonly type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker()">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                             <tr>
+                                                <td class="formTitle">检查名称：</td>
+                                                <td class="formValue">
+                                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="lr-replace" class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="btn_export" class="btn btn-default" onclick="btn_exportResult()">导出</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

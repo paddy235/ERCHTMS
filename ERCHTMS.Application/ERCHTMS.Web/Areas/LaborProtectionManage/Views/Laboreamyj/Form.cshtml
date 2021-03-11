@@ -1,0 +1,184 @@
+@using ERCHTMS.Code
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script>
+    var keyValue = request('keyValue');
+    var lastrow;
+    var lastcell;
+    $(function () {
+
+        GetGrid();
+    });
+
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var url;
+        var data;
+
+        url = "../../LaborProtectionManage/Laboreamyj/GetListJson";
+        data = { queryJson: keyValue }
+
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 300,
+            url: url,
+            postData: data,
+            datatype: "json",
+            colModel: [
+               { label: '主键', name: 'ID', hidden: true },
+                { label: '用户id', name: 'UserId', hidden: true },
+                {
+                    label: '序号', name: 'num', width: 50, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return options.rowId;
+                    }
+                },
+               {
+                   label: '名称',
+                   name: 'Name',
+                   index: 'Name',
+                   width: 200,
+                   align: 'center'
+               },
+                {
+                    label: '编号',
+                    name: 'No',
+                    index: 'No',
+                    width: 200,
+                    align: 'center'
+                },
+               {
+                   label: '类型',
+                   name: 'Type',
+                   index: 'Type',
+                   width: 200,
+                   align: 'center'
+               },
+               {
+                   label: '劳动防护用品单位',
+                   name: 'Unit',
+                   index: 'Unit',
+                   width: 200,
+                   align: 'center'
+               },
+                {
+                    label: '库存数量预警值',
+                    name: 'Value',
+                    index: 'Value',
+                    width: 200,
+                    align: 'center', editable: true, edittype: "text"
+                }
+            ],
+            cellEdit: true,
+            cellsubmit: 'clientArray',
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            beforeEditCell: function (rowid, cellname, v, iRow, iCol) {
+                //点击保存的时候恢复原始状态，去掉编辑列
+                lastcell = iCol;
+                lastrow = iRow;
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    function delRow(num) {
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid('delRowData', num);
+
+    }
+
+
+    //保存表单;
+    function AcceptClick() {
+        $gridTable = $('#gridTable');
+
+        $gridTable.jqGrid('saveCell', lastrow, lastcell);
+
+        var rowdata = $gridTable.jqGrid('getRowData');
+        var num = 0;
+        for (var i = 0; i < rowdata.length; i++) {
+            if (rowdata[i].Value == "") {
+                dialogMsg(rowdata[i].Name + '的库存数量预警值为空，请填写库存数量预警值', 0);
+                return false;
+            }
+            if (!(/(^[1-9]\d*$)/.test(rowdata[i].Value))) {
+                dialogMsg(rowdata[i].Name + '的库存数量预警值的值无效，请填写正整数', 0);
+                return false;
+            }
+            num += Number(rowdata[i].Value);
+        }
+        $("#ShouldNum").val(num);
+        var json = "";
+        if (rowdata.length > 0) {
+            var arr = [];
+            var msg = "";
+            var gridid = "gridTable";
+            $(rowdata).each(function (i, dom) {
+                dom.ID = $gridTable.find("tr").eq(i + 1).find("td[aria-describedby='" + gridid + "_ID']").eq(0).html();
+                dom.Name = $gridTable.find("tr").eq(i + 1).find("td[aria-describedby='" + gridid + "_Name']").eq(0).html();
+                dom.No = $gridTable.find("tr").eq(i + 1).find("td[aria-describedby='" + gridid + "_No']").eq(0).html();
+                dom.Unit = $gridTable.find("tr").eq(i + 1).find("td[aria-describedby='" + gridid + "_Unit']").eq(0).html();
+                dom.Type = $gridTable.find("tr").eq(i + 1).find("td[aria-describedby='" + gridid + "_Type']").eq(0).html();
+                dom.Value = $gridTable.find("tr").eq(i + 1).find("td[aria-describedby='" + gridid + "_Value']").eq(0).html();
+                arr.push({ ID: dom.ID, Name: dom.Name, No: dom.No, Unit: dom.Unit, Type: dom.Type, Value: dom.Value });
+            });
+            json = JSON.stringify(arr);
+        }
+        $.SaveForm({
+            url: "../../LaborProtectionManage/Laboreamyj/SaveForm",
+            param: { json: json },
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;设置库存预警值</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;操作信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+
+                <tr>
+                    <td class="formTitle">操作人</td>
+                    <td class="formValue">
+                        <input id="LaborOperationUserName" value="@OperatorProvider.Provider.Current().UserName" type="text" readonly="readonly" class="form-control" />
+                    </td>
+                    <td class="formTitle">操作时间</td>
+                    <td class="formValue">
+                        <input id="LaborOperationTime" type="text" value="@DateTime.Now.ToString("yyyy-MM-dd")" readonly="readonly" class="form-control" />
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+    </div>
+</div>

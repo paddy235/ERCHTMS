@@ -1,0 +1,223 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    ;
+    var _parentId = '';
+    var _parentCode = '';
+    var _parentName = '';
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 150);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        $("#btn_Search").click(function () {
+            $('#gridTable').jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+        //吊装工具名称
+        $("#TOOLNAME").ComboBox({
+            param: { EnCode: "ToolName" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "==全部==",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+    }
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+              {
+                  SelectMode: 0,
+                  Mode: 0
+              }
+            );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.id;
+                _parentCode = item.value;
+                _parentName = item.text;
+                _isOrg = item.Nature;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 150);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 150,
+            url: "../../HighRiskWork/Lifthoist/getTempEquipentList",
+            datatype: "json",
+            postData: { queryJson: getQueryJson() },
+            colModel: [
+                 { label: 'jobid', name: 'jobid', hidden: true, align: 'center', sortable: false },
+                 { label: 'certid', name: 'certid', hidden: true, align: 'center', sortable: false },
+                 {
+                     label: '操作', name: 'oper', width: 120, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:btn_view('" + rowObject.jobid + "','" + rowObject.certid + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                         return html;
+                     }
+                 },
+                 { label: '所属单位', name: 'applycompanyname', width: 360, sortable: false, align: 'center' },
+                 { label: '设备名称', name: 'toolname', width: 220, sortable: false, align: 'center' },
+                 { label: '入场时间', name: 'workstartdate', width: 200, align: 'center', sortable: false, formatter: "date", formatoptions: { srcformat: 'Y-m-d H:i', newformat: 'Y-m-d H:i' } },
+                 { label: '离场时间', name: 'workenddate', width: 100, align: 'center', sortable: false, formatter: "date", formatoptions: { srcformat: 'Y-m-d H:i', newformat: 'Y-m-d H:i' } }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 't.applydate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    function btn_view(jobid, certid) {
+        var title = "查看临时入场特种设备信息";
+        var url = '/HighRiskWork/Lifthoist/TempEquipentForm?mode=view&jobid=' + jobid + "&certid=" + certid;
+        dialogOpen({
+            id: 'ViewForm',
+            title: title,
+            url: url,
+            width: ($(window).width() - 400) + "px",
+            height: ($(window).height() - 200) + 'px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+
+    }
+    //重置所有查询条件
+    function ResetCondition() {
+        $("#filter-form").find(":input").val("");
+        //设备名称
+        $("#TOOLNAME").attr("data-text", "===全部===");
+        $("#TOOLNAME").attr("data-value", "");
+        $("#TOOLNAME div:eq(0)").text("===全部===");
+        $('#btn_Search').trigger("click");
+    }
+    function getQueryJson() {
+        var query = {
+            TOOLNAME: $("#TOOLNAME").attr("data-value"),
+            CONSTRUCTIONUNITNAME: _parentName,
+            CONSTRUCTIONUNITCODE: _parentCode,
+            CONSTRUCTIONUNITID: _parentId,
+            WorkStartDate: $("#WorkStartDate").val(),
+            WorkEndDate: $("#WorkEndDate").val()
+        }
+        return JSON.stringify(query);
+    }
+    function reload_current() {
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: getQueryJson() }, page: 1
+        }).trigger('reloadGrid');
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <ul class="nav nav-tabs">
+                <li class="active"><a href="#itemTreePanel" data-toggle="tab">按部门</a></li>
+                <li class="col-md-2 text-right" style="display:inline-block;float:right;margin-top:8px;"><i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i></li>
+            </ul>
+            <div class="tab-content">
+                <div id="itemTreePanel" class="tab-pane active">
+                    <div class="center-Panel">
+                        <div class="panel panel-default">
+                            <div id="itemTree"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table id="filter-form">
+                        <tr>
+                            <td class="formTitle" id="td_setupdate">入离场时间：</td>
+                            <td class="formValue">
+                                <input id="WorkStartDate" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'WorkEndDate\')}' })">
+                            </td>
+                            <td style="padding:0 5px;">
+                                至
+                            </td>
+                            <td>
+                                <input id="WorkEndDate" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'WorkStartDate\')}' })">
+                            </td>
+                            <td class="formTitle" style="padding-left:10px;">设备名称：</td>
+                            <td class="formValue">
+                                <div id="TOOLNAME" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width:120px;"></div>
+                            </td>
+                            <td style="padding-left:10px;">
+                                <div class="ui-filter-list-bottom">
+                                    <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                    <a id="btn_Reset" class="btn btn-primary" onclick="ResetCondition()">&nbsp;全&nbsp;&nbsp;部</a>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

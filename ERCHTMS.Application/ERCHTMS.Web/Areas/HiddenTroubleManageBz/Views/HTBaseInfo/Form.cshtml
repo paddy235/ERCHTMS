@@ -1,0 +1,988 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<link href="~/Content/scripts/plugins/uploadify/uploadify.css" rel="stylesheet" />
+<link href="~/Content/scripts/plugins/uploadify/uploadify.extension.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/uploadify/jquery.uploadify.min.js"></script>
+<script>
+    var keyValue = request("keyValue"); //主键 隐患信息主键
+    var safetyCheckObjectID = request("saftycheckdatarecordid");  //主键 安全检查对象
+    var riskname = request("riskname");
+    var actiontype = request("actiontype");
+    var ctype = request("ctype"); //检查类型
+    var districtid = request("districtid"); //隐患区域id
+    var districname = request("districname"); //隐患区域名称
+    var checkcontent = request("checkcontent");//检查内容
+    var riskdescribe = request("riskdescribe");//风险描述
+    var actionDo = request("actionDo"); // 操作动作
+    var roleCard = "";
+
+    //初始方法
+    $(function () {
+
+        //验证当前是否存在flash插件
+        var fls = flashChecker();
+        var s = "";
+        if (!fls.f) {
+            var html = "<a href='http://get.adobe.com/cn/flashplayer/' style='text-decoration:none;color:red;' target='_bank'>您的浏览器未安装Flash插件,无法支持文件上传功能,请下载安装!</a>";
+            $("#HidMessage").html(html);
+        }
+
+        $(".center-Panel").css({ "width": "100%", "height": ($(top.window).height() - 160) + "px", "padding-top": "38px" });
+        $("#RISKNAME").val(riskname);
+        initControl();
+        GetGrid();
+        GetApprovalGrid(); //评估评估信息
+        //上传文件
+        uploadify();
+
+
+        //查看下
+        if (actiontype == "view") {
+            $("#btn_Save").attr("disabled", "disabled");
+            $("#btn_Submit").attr("disabled", "disabled");
+            $("#ChooseCheckStantard").attr("disabled", "disabled");
+            $("#ChooseHaveCheck").attr("disabled", "disabled");
+            $("#uploadify").css("display", "none");
+            $("#uploadify-queue").css("display", "none");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+
+            $("#btn_Save").attr("readonly", "readonly");
+            $("#btn_Submit").attr("readonly", "readonly");
+            $("#ChooseCheckStantard").attr("readonly", "readonly");
+            $("#ChooseHaveCheck").attr("readonly", "readonly");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("readonly", "readonly");
+            });
+        }
+
+        if (!!actionDo && actionDo == "CheckIn") {
+            $("#btn_Submit").css("display", "none");
+        }
+
+        //焦点设置到编辑框，移除提示
+        $(".form-control").focus(function () {
+            $(".poptip").remove();
+        });
+
+
+        //安全管理员身份判断 或指定部门
+        $.ajax({
+            type: "get",
+            url: "../../HiddenTroubleManage/HTBaseInfo/QuerySafetyRole",
+            success: function (data) {
+
+                //非安全管理员或指定人员  整改信息及验收信息非必填
+                if (parseInt(data) == 0) {
+
+                    roleCard = "0";
+
+                    $("#CHANGEPERSONNAME").removeAttr("isvalid");
+
+                    $("#CHANGEDEADINE").removeAttr("isvalid");
+
+                    $("#PLANMANAGECAPITAL").removeAttr("isvalid");
+
+                    $("#ACCEPTPERSONNAME").removeAttr("isvalid");
+
+                    $("#ACCEPTDATE").removeAttr("isvalid");
+
+                    $(".form:eq(1) tr:eq(0) span").remove(); //整改责任人
+                    $(".form:eq(1) tr:eq(2) span").remove(); //整改截至时间  计划治理资金(元)
+
+                    $(".form:eq(2) tr:eq(0) span").remove(); //验收人
+                    $(".form:eq(2) tr:eq(1) span").remove(); //验收日期
+                }
+            }
+        });
+
+    });
+
+    //评估列表
+    function GetApprovalGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#approvalGridTable');
+        $gridTable.jqGrid({
+            url: "../../HiddenTroubleManage/HTApproval/GetListJson?hideCode=" + $("#HIDCODE").val(),
+            datatype: "json",
+            height: $(window).height() / 2 - 200,
+            autowidth: true,
+            colModel: [
+                {
+                    label: '操作', name: 'ID', index: 'ID', width: 120, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:Detail('" + rowObject.ID + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        return html;
+                    }
+                },
+                { label: '评估人', name: 'APPROVALPERSONNAME', index: 'APPROVALPERSONNAME', width: 120, align: 'center' },
+                { label: '评估单位', name: 'APPROVALDEPARTNAME', index: 'APPROVALDEPARTNAME', width: 150, align: 'center' },
+                {
+                    label: '评估情况', name: 'APPROVALRESULT', index: 'APPROVALRESULT', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = rowObject.APPROVALRESULT == "0" ? "不通过" : "通过";
+                        return html;
+                    }
+                },
+                {
+                    label: '评估时间', name: 'APPROVALDATE', index: 'APPROVALDATE', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = rowObject.APPROVALDATE.replace("00:00:00", "");
+                        return html;
+                    }
+                }
+            ],
+            pager: false,
+            rowNum: "20",
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+    }
+
+    //评估详情
+    function Detail(keyValue) {
+        dialogOpen({
+            id: 'DetailForm',
+            title: '隐患评估详情',
+            url: '/HiddenTroubleManage/HTApproval/Detail?keyValue=' + keyValue,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: null
+        });
+    }
+
+    //获取列表
+    function GetGrid() {
+        var folderId = $("#HIDPHOTO").val();
+        var selectedRowIndex = 0;
+        var $gridTable = $('#picgridTable');
+        $gridTable.jqGrid({
+            url: "../../PublicInfoManage/ResourceFile/GetImageListJsonByFolder?folderId=" + folderId,
+            datatype: "json",
+            height: $(window).height() / 2 - 250,
+            autowidth: true,
+            colModel: [
+                { label: '标记', name: 'FilePath', hidden: true },
+                { label: 'FolderId', name: 'FolderId', hidden: true },
+                { label: 'FileType', name: 'FileType', hidden: true },
+                {
+                    label: '操作', name: 'FileId', index: 'FileId', width: 120, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (actiontype != "view") {
+                            var html = "&nbsp;&nbsp;<a href=javascript:DelPic('" + rowObject.FileId + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                            return html;
+                        }
+                        else {
+                            return "";
+                        }
+                    }
+                },
+                {
+                    label: '文件名', width: $(".profile-content").width() - 350, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        return "<div style='cursor:pointer;'><div style='float: left;'><img src='" + top.contentPath + "/Content/images/filetype/" + rowObject.FileType +
+                            ".png' style='width:35px;height:35px;padding:5px;margin-left:-7px;margin-right:5px;' /></div>" +
+                            "<div style='float: left;line-height:35px;'><a href='" + top.contentPath + rowObject.FilePath.replace("~", "") + "' target='_blank'>" + rowObject.FileName + "</a></div></div>";
+                    }
+                },
+            ],
+            pager: false,
+            rowNum: "20",
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+    }
+
+    //删除图片
+    function DelPic(key) {
+        $.RemoveForm({
+            url: "../../PublicInfoManage/ResourceFile/ThoroughRemoveForm",
+            param: { keyValue: key, fileType: "" },
+            success: function (data) {
+                $("#picgridTable").resetSelection();
+                $("#picgridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    //初始化控件
+    function initControl() {
+        //安全检查项目ID
+        if (!!safetyCheckObjectID) {
+            $("#ChooseHaveCheck").css("display", "none");
+            $("#SAFETYCHECKOBJECTID").val(safetyCheckObjectID);
+
+            //禁用是否违章
+            $("input[name='ISBREAKRULE']").each(function (index, ele) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+        //区域
+        if (!!districtid && !!districname) {
+            $("#ChooseHaveCheck").css("display", "none");
+            $("#HIDPOINT").val(districtid);
+            $("#HIDPOINTNAME").val(districname);
+            $.ajax({
+                type: "get",
+                url: "../../BaseManage/District/GetListJsonByHidCode",
+                data: { keyValue: districtid },
+                success: function (data) {
+                    if (!!data) {
+                        var obj = eval("(" + data + ")");
+                        $("#CHANGEPERSONNAME").val(obj.DisreictChargePerson);
+                        $("#CHANGEPERSON").val(obj.DisreictChargePersonID);
+                        $("#CHANGEDUTYDEPARTNAME").val(obj.ChargeDept);
+                        $("#CHANGEDUTYDEPARTCODE").val(obj.ChargeDeptCode);
+                        $("#CHANGEDUTYTEL").val(obj.LinkTel);
+                    }
+                }
+            });
+
+            $("#HIDPOINT").prop("disabled", "disabled");
+            $("#HIDPOINTNAME").prop("disabled", "disabled");
+        }
+        //风险描述
+        if (!!riskdescribe) {
+            riskdescribe = top.Details.risklength
+            $("#HIDDESCRIBE").val(riskdescribe);
+        }
+        //检查内容
+        if (!!checkcontent) {
+            checkcontent = top.Details.contentlength;
+            var chHtml = "";
+            var checkTxt = checkcontent.split('|');
+            for (var i = 0; i < checkTxt.length; i++) {
+                if (!!checkTxt[i]) {
+                    chHtml += checkTxt[i] + ";\n";
+                }
+            }
+            $("#CHANGEMEASURE").val(chHtml); //检查内容填充
+        }
+
+        //登记
+        $("#btn_Save").click(function () {
+            AcceptClick();
+        });
+
+        //提交流程
+        $("#btn_Submit").click(function () {
+            SubmitAction();
+        });
+
+        //选择已有的隐患数据
+        $("#ChooseHaveCheck").click(function () {
+            dialogOpen({
+                id: 'ChosseForm',
+                title: '选择隐患',
+                url: '/HiddenTroubleManage/HTBaseInfo/DetailList',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    var data = new Array("HIDDESCRIBE", "CHECKMANNAME", "CHECKMAN", "CHECKDEPARTNAME", "CHECKDEPARTID",
+                        "CHECKTYPE", "CHECKDATE", "HIDRANK", "HIDTYPE", "CHANGEPERSONNAME", "CHANGEPERSON",
+                        "CHANGEDUTYTEL", "CHANGEDUTYDEPARTNAME", "CHANGEDUTYDEPARTCODE", "CHANGEDEADINENUM",
+                         "PLANMANAGECAPITAL", "CHANGEMEASURE", "ACCEPTPERSONNAME", "ACCEPTPERSON", "ACCEPTDEPARTNAME", "ACCEPTDEPARTCODE", "HIDPOINT", "HIDPOINTNAME");
+                    top.document.getElementById(iframeId).contentWindow.GetObjectData(window.document.body, data);
+                }
+            });
+        });
+
+
+        //初始化组件
+        $.SetForm({
+            url: "../../HiddenTroubleManage/HTBaseInfo/GetInitDataJson",
+            success: function (data) {
+
+                //排查人
+                $("#CHECKMANNAME").val(data.User.UserName);
+                $("#CHECKMAN").val(data.User.UserId);
+                //排查单位
+                $("#CHECKDEPARTNAME").val(data.User.DeptName);
+                $("#CHECKDEPARTID").val(data.User.DeptCode);
+                //隐患图片
+                $("#HIDPHOTO").val(data.HidPhoto);
+                //隐患编码
+                $("#HIDCODE").val($.trim(data.HidCode));
+                //检查类型
+                $("#CHECKTYPE").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "==请选择==",
+                    allowSearch: false,
+                    data: data.CheckType
+                });
+                //隐患类型
+                $("#HIDTYPE").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "==请选择==",
+                    allowSearch: false,
+                    data: data.HidType
+                });
+                //隐患级别
+                $("#HIDRANK").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "==请选择==",
+                    allowSearch: false,
+                    data: data.HidRank
+                });
+                //培训模板
+                $("#TRAINTEMPLATENAME").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "==请选择==",
+                    allowSearch: false,
+                    data: data.TrainTemplateName,
+                });
+            }
+        });
+
+        //排查日期
+
+        var curDate = "@DateTime.Now.ToString("yyyy-MM-dd")";
+        $("#CHECKDATE").val(curDate);
+
+        //传递过来的ctype不为空
+        if (!!ctype) {
+            $.SetForm({
+                url: "../../HiddenTroubleManage/HTBaseInfo/GetQueryJsonByEnCode?encode=" + ctype + "&itemObj=SaftyCheckType",
+                success: function (data) {
+                    $("#CHECKTYPE").ComboBoxSetValue(data.ItemDetailId);
+                    $("#CHECKTYPE").attr("data-text", data.ItemName);
+                    $("#CHECKTYPE").attr("data-value", data.ItemDetailId);
+                    $("#CHECKTYPE div:eq(0)").text(data.ItemName);
+                    $("#CHECKTYPE").attr("disabled", "disabled");
+                }
+            });
+        }
+
+
+        //隐藏回退原因
+        $(".form tr:eq(21)").css("display", "none");
+        $(".form tr:eq(21) td").each(function (ele, index) {
+            $(this).css("display", "none");
+        });
+
+        if ($("#HIDRANK")[0].innerText.indexOf("重大") < 0) {
+            //隐藏重大隐患填项
+            for (var i = 10; i <= 15; i++) {
+                $(".form tr:eq(" + i + ")").css("display", "none");
+                $(".form tr:eq(" + i + ") td").each(function (ele, index) {
+                    $(this).css("display", "none");
+                });
+            }
+        }
+
+        $("#HIDRANK").change(function (ele) {
+            var rankName = $(ele.target).attr("data-text");
+            if (rankName.indexOf("重大") > 0) {
+                for (var i = 10; i <= 15; i++) {
+                    $(".form tr:eq(" + i + ")").removeAttr("style");
+                    $(".form tr:eq(" + i + ") td").each(function (ele, index) {
+                        $(this).removeAttr("style");
+                    });
+                }
+            }
+            else {
+                for (var i = 10; i <= 15; i++) {
+                    $(".form tr:eq(" + i + ")").css("display", "none");
+                    $(".form tr:eq(" + i + ") td").each(function (ele, index) {
+                        $(this).css("display", "none");
+                    });
+                }
+            }
+        });
+
+
+        //判断是否违章
+        var chkVal = $("input[name='ISBREAKRULE']:checked").val();
+        if (chkVal == "0") {
+            $(".form tr:eq(6)").css("display", "none");
+            $(".form tr:eq(6) td").each(function (index, ele) {
+                $(this).css("display", "none");
+            });
+
+            $(".form tr:eq(5) td").each(function (index, ele) {
+                if (index > 1) {
+                    $(this).css("display", "none");
+                }
+            });
+        }
+
+
+        //违章记录控制
+        $("input[name='ISBREAKRULE']").click(function () {
+            var checkValue = $(this).val();
+            if (checkValue == "1") {
+                $(".form tr:eq(6)").removeAttr("style");
+                $(".form tr:eq(6) td").each(function (ele, index) {
+                    $(this).removeAttr("style");
+                });
+                $(".form tr:eq(5) td").each(function (index, ele) {
+                    if (index > 1) {
+                        $(this).removeAttr("style");
+                    }
+                });
+                $(".form tr:eq(1) td:eq(0)").html("违章描述");
+                $("#btn_Submit").attr("disabled", "disabled");
+
+                $(".marginTop").css("display", "none");
+                $("#panel2").css("display", "none");
+                $("#panel3").css("display", "none");
+                $("#panel4").css("display", "none");
+
+                $("#CHANGEPERSONNAME").removeAttr("isvalid");
+                $("#CHANGEDEADINE").removeAttr("isvalid");
+                $("#PLANMANAGECAPITAL").removeAttr("isvalid");
+                $("#ACCEPTPERSONNAME").removeAttr("isvalid");
+                $("#ACCEPTDATE").removeAttr("isvalid");
+                $(".form:eq(1) tr:eq(0) span").remove(); //整改责任人
+                $(".form:eq(1) tr:eq(2) span").remove(); //整改截至时间  计划治理资金(元)
+                $(".form:eq(2) tr:eq(0) span").remove(); //验收人
+                $(".form:eq(2) tr:eq(1) span").remove(); //验收日期
+            }
+            else {
+                $(".form tr:eq(6)").css("display", "none");
+                $(".form tr:eq(6) td").each(function (ele, index) {
+                    $(this).css("display", "none");
+                });
+                $(".form tr:eq(5) td").each(function (index, ele) {
+                    if (index > 1) {
+                        $(this).css("display", "none");
+                    }
+                });
+                $(".form tr:eq(1) td:eq(0)").html("隐患描述");
+                $("#btn_Submit").removeAttr("disabled");
+
+
+                $(".marginTop").css("display", "block");
+                $("#panel2").css("display", "block");
+                $("#panel3").css("display", "block");
+                $("#panel4").css("display", "block");
+
+                if (roleCard != "0") {
+                    $("#CHANGEPERSONNAME").attr("isvalid", "yes");
+                    $("#CHANGEDEADINE").attr("isvalid", "yes");
+                    $("#PLANMANAGECAPITAL").attr("isvalid", "yes");
+                    $("#ACCEPTPERSONNAME").attr("isvalid", "yes");
+                    $("#ACCEPTDATE").removeAttr("isvalid");
+
+                    $(".form:eq(1) tr:eq(0) td:eq(0)").html("整改责任人<span style='color:red;'>*</span>"); //整改责任人
+                    $(".form:eq(1) tr:eq(2) td:eq(0)").html("整改截至时间<span style='color:red;'>*</span>"); //整改截至时间
+                    $(".form:eq(1) tr:eq(2) td:eq(2)").html("计划治理资金(元)<span style='color:red;'>*</span>"); //计划治理资金(元)
+                    $(".form:eq(2) tr:eq(0) td:eq(0)").html("验收人<span style='color:red;'>*</span>"); //验收人
+                    $(".form:eq(2) tr:eq(1) td:eq(0)").html("验收日期<span style='color:red;'>*</span>"); //验收日期
+                }
+            }
+        });
+
+
+        //获取表单数据
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../HiddenTroubleManage/HTBaseInfo/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+
+                    //隐患整改
+                    if (null != data.changeInfo) {
+                        $("#CHANGEID").val(data.changeInfo.ID); //主键
+                        $("#form1").formDeserialize(data.changeInfo);
+
+                        //回退原因
+                        if (!!data.changeInfo.BACKREASON) {
+                            $(".form tr:eq(21)").removeAttr("style");
+                            $(".form tr:eq(21) td").each(function (index, ele) {
+                                $(this).removeAttr("style");
+                            });
+                        }
+                    }
+
+
+                    //隐患验收
+                    if (null != data.acceptInfo) {
+                        $("#ACCEPTID").val(data.acceptInfo.ID);
+                        $("#form1").formDeserialize(data.acceptInfo);
+
+                    }
+
+                    //隐患基本信息
+                    if (null != data.baseInfo) {
+
+                        if (data.baseInfo.HIDPHOTO == null || data.baseInfo.HIDPHOTO == "") {
+                            data.baseInfo.HIDPHOTO = $("#HIDPHOTO").val();
+                        }
+
+                        $("#form1").formDeserialize(data.baseInfo);
+
+                        $("#CHECKTYPE").ComboBoxSetValue(data.baseInfo.CHECKTYPE); //排查类型
+                        $("#HIDRANK").ComboBoxSetValue(data.baseInfo.HIDRANK);  //隐患级别
+                        $("#HIDTYPE").ComboBoxSetValue(data.baseInfo.HIDTYPE); //隐患类别
+                        $("#TRAINTEMPLATENAME").ComboBoxSetValue(data.baseInfo.TRAINTEMPLATENAME);  //模板
+
+
+                        //是否违章
+                        if (data.baseInfo.ISBREAKRULE == "1") {
+
+                            $("input[name='ISBREAKRULE']:eq(0)").prop("checked", "checked");
+
+                            $(".form tr:eq(6)").removeAttr("style");
+                            $(".form tr:eq(6) td").each(function (ele, index) {
+                                $(this).removeAttr("style");
+                            });
+                            $(".form tr:eq(5) td").each(function (index, ele) {
+                                if (index > 1) {
+                                    $(this).removeAttr("style");
+                                }
+                            });
+                            $(".form tr:eq(1) td:eq(0)").html("违章描述");
+                            $("#btn_Submit").attr("disabled", "disabled");
+
+                            $(".marginTop").css("display", "none");
+                            $("#panel2").css("display", "none");
+                            $("#panel3").css("display", "none");
+                            $("#panel4").css("display", "none");
+                        }
+                        else {
+                            $("input[name='ISBREAKRULE']:eq(1)").prop("checked", "checked");
+                        }
+
+                        //是否挂牌督办
+                        if (data.baseInfo.ISGETAFTER == "1") {
+                            $("input[name='ISGETAFTER']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISGETAFTER']:eq(1)").prop("checked", "checked");
+                        }
+
+                    }
+
+
+                    if ($("#HIDRANK")[0].innerText.indexOf("重大") > 0) {
+                        //隐藏重大隐患填项
+                        for (var i = 10; i <= 15; i++) {
+                            $(".form tr:eq(" + i + ")").removeAttr("style");
+                            $(".form tr:eq(" + i + ") td").each(function (ele, index) {
+                                $(this).removeAttr("style");
+                            });
+                        }
+                    }
+
+                }
+            })
+        }
+    }
+
+    //保存表单;
+    function AcceptClick() {
+
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+
+        var isBreakRule = $("input[name='ISBREAKRULE']:checked").val();
+        postData["ISBREAKRULE"] = isBreakRule;
+
+        var isGetAfter = $("input[name='ISGETAFTER']:checked").val();
+        postData["ISGETAFTER"] = isGetAfter;
+
+        $("#btn_Save").attr("disabled", "disabled");
+
+        $.SaveForm({
+            url: "../../HiddenTroubleManage/HTBaseInfo/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                if (!!safetyCheckObjectID) {
+                    var param = "";
+                    if (ctype != "1") {
+                        param = { recid: safetyCheckObjectID, userAccount: "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account" };
+                    } else {
+                        param = { recid: safetyCheckObjectID, allcount: 1, isdata: 1 };
+                    }
+                    top.Details.$('#gridTable').jqGrid('setGridParam', {
+                        postData: { queryJson: JSON.stringify(param) }, page: 1
+                    }).trigger('reloadGrid');
+                }
+                else {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            },
+            complete: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        });
+    }
+
+    //提交流程
+    function SubmitAction() {
+
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+
+        var isBreakRule = $("input[name='ISBREAKRULE']:checked").val();
+        postData["ISBREAKRULE"] = isBreakRule;
+
+        var isGetAfter = $("input[name='ISGETAFTER']:checked").val();
+        postData["ISGETAFTER"] = isGetAfter;
+
+        $("#btn_Submit").attr("disabled", "disabled");
+
+        $.SaveForm({
+            url: "../../HiddenTroubleManage/HTBaseInfo/SubmitForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                if (!!safetyCheckObjectID) {
+                    top.Details.$('#gridTable').jqGrid('setGridParam', {
+                        postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+                    }).trigger('reloadGrid');
+                }
+                else {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            }
+        });
+        $("#btn_Submit").removeAttr("disabled");
+    }
+
+    //上传图片
+    function uploadify() {
+        var folderId = $("#HIDPHOTO").val();
+        $("#uploadify").uploadify({
+            method: 'post',
+            uploader: '../../PublicInfoManage/ResourceFile/UploadifyFile?folderId=' + folderId,
+            swf: top.contentPath + '/Content/scripts/plugins/uploadify/uploadify.swf',
+            buttonText: "上传图片",
+            height: 30,
+            width: 90,
+            fileTypeExts: '*.bmp;*.ico;*.gif;*.jpeg;*.jpg;*.png;*.psd;;*.JPEG;*.PNG;*.JPG;*.BMP;',
+            removeCompleted: false,
+            onSelect: function (file) {
+                $("#" + file.id).prepend('<div style="float:left;width:50px;margin-right:2px;"><img src="' + top.contentPath + '/Content/images/filetype/' + file.type.replace('.', '') + '.png" style="width:40px;height:40px;" /></div>');
+                $('.border').hide();
+            },
+            onUploadSuccess: function (file) {
+                $("#" + file.id).find('.uploadify-progress').remove();
+                $("#" + file.id).find('.data').html(' 恭喜您，上传成功！');
+                $("#" + file.id).prepend('<a class="succeed" title="成功" onclick="javascript:$(this).parent().remove();"><i class="fa fa-check-circle"></i></a>');
+                Loading(false);
+                $("#picgridTable").trigger("reloadGrid");
+                Loading(false);
+            },
+            onUploadError: function (file) {
+                $("#" + file.id).removeClass('uploadify-error');
+                $("#" + file.id).find('.uploadify-progress').remove();
+                $("#" + file.id).find('.data').html(' 很抱歉，上传失败！');
+                $("#" + file.id).prepend('<span class="error" title="失败"><i class="fa fa-exclamation-circle"></i></span>');
+            }
+        });
+        $("#uploadify-button").prepend('<i style="opacity: 0.6;" class="fa fa-cloud-upload"></i>&nbsp;');
+        $("#uploadify-queue").css("height", "61px");
+    }
+</script>
+
+<div class="center-Panel">
+    <div style="margin-top: 5px;"></div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+          <strong>&nbsp;&nbsp;隐患基本信息</strong> 
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">隐患编码<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="HIDCODE" type="text" class="form-control" disabled="disabled" readonly errormsg="隐患编码" />
+                            <input id="ADDTYPE" type="hidden" value="0" />
+                            <input id="SAFETYCHECKOBJECTID" type="hidden" />
+                        </td>
+                        <td class="formTitle">所属工程</td>
+                        <td class="formValue">
+                            <input id="HIDPROJECTNAME" type="text" class="form-control" placeholder="请选择所属工程" readonly onclick="selectProject(window.document.body, 'HIDPROJECTNAME,HIDPROJECT');" />
+                            <input id="HIDPROJECT" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">隐患描述<span style="color:red;">*</span></td>
+                        <td class="formValue" colspan="3">
+                            <div>
+                                <div style="float:left; width:90%">
+                                    <textarea id="HIDDESCRIBE" class="form-control" style="width: 98%; height: 80px;" errormsg="隐患描述" isvalid="yes" checkexpession="LenStr" length="2000"></textarea>
+                                </div>
+                                <div style="float: left; width: 10%">
+                                    <a href="#" id="ChooseHaveCheck" class="btn btn-primary" title='已有隐患'><i class='fa fa-pencil-square-o'></i>已有隐患</a>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">排查人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            @**用户名称,用户账号，用户Id,部门Id,部门Code,部门名称,手机号**@
+                            <input id="CHECKMANNAME" type="text" class="form-control" errormsg="排查人" placeholder="请选择排查人" isvalid="yes" checkexpession="NotNull" readonly onclick="selectUser({deptId:'', checkMode:0,mode:2,winObject: window.document.body,domId: 'CHECKMANNAME,,CHECKMAN,CHECKDEPARTID,,CHECKDEPARTNAME'});" />
+                            <input id="CHECKMAN" type="hidden" />
+                        </td>
+                        <td class="formTitle">排查单位<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="CHECKDEPARTNAME" type="text" class="form-control" disabled="disabled" readonly />
+                            <input id="CHECKDEPARTID" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">检查类型<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="CHECKTYPE" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="检查类型" />
+                        </td>
+                        <td class="formTitle">排查日期<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="CHECKDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="排查日期" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">隐患级别<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="HIDRANK" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="隐患级别"></div>
+                        </td>
+                        <td class="formTitle">隐患类别<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="HIDTYPE" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="隐患类别"></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">是否违章</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISBREAKRULE" id="ISBREAKRULE1" value="1" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISBREAKRULE" id="ISBREAKRULE2" value="0" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">培训模板</td>
+                        <td class="formValue">
+                            <div id="TRAINTEMPLATENAME" type="select" class="ui-select" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章人员</td>
+                        <td class="formValue" colspan="3">
+                            <input id="BREAKRULEUSERNAMES" type="text" class="form-control" placeholder="请选择违章人员" readonly onclick="selectUser({deptId:'', checkMode:1,mode:2,winObject: window.document.body,domId: 'BREAKRULEUSERNAMES,,BREAKRULEUSERIDS'});" />
+                            <input id="BREAKRULEUSERIDS" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">隐患区域<span style="color:red;">*</span></td>
+                        <td class="formValue" colspan="3">
+                            <input id="HIDPOINTNAME" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" errormsg="隐患区域" placeholder="请选择隐患区域" readonly onclick="selectArea(window.document.body, 'HIDPOINTNAME,HIDPOINT,CHANGEPERSONNAME,CHANGEPERSON,CHANGEDUTYDEPARTNAME,CHANGEDUTYDEPARTCODE,CHANGEDUTYTEL');" />
+                            <input id="HIDPOINT" type="hidden" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">隐患地点</td>
+                        <td class="formValue" colspan="3">
+                            <input id="HIDPLACE" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="128" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">隐患报告摘要</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REPORTDIGEST" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">隐患产生原因</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="HIDREASON" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">隐患危害程度</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="HIDDANGERLEVEL" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">防控措施</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="PREVENTMEASURE" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">隐患整改计划</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="HIDCHAGEPLAN" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">应急预案简述</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="EXIGENCERESUME" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">是否挂牌督办</td>
+                        <td class="formValue" colspan="3">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISGETAFTER" id="ISGETAFTER1" value="1" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISGETAFTER" id="ISGETAFTER2" value="0" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">隐患图片</td>
+                        <td class="formValue" colspan="3">
+                            <input id="HIDPHOTO" type="hidden" /><!--隐患相片-->
+                            <input id="uploadify" name="uploadify" type="file" />
+                            <!--照片-->
+                            <table id="picgridTable"></table>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;隐患整改信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">整改责任人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="CHANGEPERSONNAME" class="form-control" placeholder="请选择整改责任人" errormsg="整改责任人" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDifferentUser('', 0, 2, window.document.body, 'CHANGEPERSONNAME,,CHANGEPERSON,,CHANGEDUTYDEPARTCODE,CHANGEDUTYDEPARTNAME,CHANGEDUTYTEL', 'ACCEPTPERSON', '验收人');" />
+                            <input id="CHANGEPERSON" type="hidden" />
+                            <input id="CHANGEID" type="hidden" />
+                        </td>
+                        <td class="formTitle">整改人电话</td>
+                        <td class="formValue">
+                            <input id="CHANGEDUTYTEL" type="text" class="form-control" errormsg="整改人电话" isvalid="yes" length="11" checkexpession="LenNumOrNull" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改责任单位</td>
+                        <td class="formValue" colspan="3">
+                            <input id="CHANGEDUTYDEPARTNAME" type="text" class="form-control" disabled="disabled" readonly />
+                            <input id="CHANGEDUTYDEPARTCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改截至时间<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="CHANGEDEADINE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="整改截至时间" />
+                        </td>
+                        <td class="formTitle">计划治理资金(元)<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="PLANMANAGECAPITAL" type="text" class="form-control" isvalid="yes" checkexpession="Num" errormsg="计划治理资金" value="0" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改措施</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="CHANGEMEASURE" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">回退原因</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="BACKREASON" class="form-control" disabled="disabled" readonly isvalid="yes" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel3">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;隐患验收信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">验收人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="ACCEPTPERSONNAME" class="form-control" placeholder="请选择验收人" errormsg="验收人" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDifferentUser('', 0, 2, window.document.body, 'ACCEPTPERSONNAME,,ACCEPTPERSON,,ACCEPTDEPARTCODE,ACCEPTDEPARTNAME', 'CHANGEPERSON', '整改责任人');" />
+                            <input id="ACCEPTPERSON" type="hidden" />
+                            <input id="ACCEPTID" type="hidden" />
+                        </td>
+                        <td class="formTitle">验收单位</td>
+                        <td class="formValue">
+                            <input id="ACCEPTDEPARTNAME" type="text" class="form-control" disabled="disabled" readonly />
+                            <input id="ACCEPTDEPARTCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">验收日期<span style="color:red;">*</span></td>
+                        <td class="formValue" colspan="3">
+                            <input id="ACCEPTDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="验收日期" />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel4">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;隐患评估与预评估信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-left:10px;">
+                <table id="approvalGridTable"></table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+    </div>
+    <div id="HidMessage" style="width:360px; margin-left:20px; float:left;"></div>
+</div>

@@ -1,0 +1,134 @@
+﻿@{
+    ViewBag.Title = "危险点管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script type="text/javascript">
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../OutsourcingProject/Dangerdata/GetPageListJson",
+            datatype: "json",
+            height: $(window).height() - 160,
+            autowidth: true,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true },
+               { label: '危险点', name: 'dangerpoint', width: 450, align: 'center' },
+               { label: '防范措施', name: 'measures', width: 200, align: 'center' }
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rownumWidth: 50,
+
+            rowList: [15, 30, 50, 100],
+            rownumbers: true,
+            sortname: 'createdate',
+            sortorder: 'desc',
+            multiselect: true,
+            shrinkToFit: false,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val() }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txtKeyword").val("");
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val() }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    function AcceptClick() {
+        var $gridTable = $("#gridTable");
+        var indexs = $gridTable.jqGrid('getGridParam', 'selarrrow');
+        if (indexs.length > 0) {
+            var dangerpoint = "";
+            var measures = "";
+            var ids = "";
+            for (var i = 0; i < indexs.length; i++) {
+                var rows = $gridTable.jqGrid('getRowData', indexs[i]);
+                dangerpoint += rows.dangerpoint + ",";
+                measures += rows.measures + ",";
+                ids += rows.id + ",";
+            }
+            dangerpoint = dangerpoint.substring(0, dangerpoint.length - 1);
+            measures = measures.substring(0, measures.length - 1);
+            ids = ids.substring(0, ids.length - 1);
+            $(top.WorkForm.window.node).val(dangerpoint);
+            if (top.WorkForm.window.ids != "") {
+                top.WorkForm.window.ids += "," + ids;
+            } else {
+                top.WorkForm.window.ids = ids;
+            }
+            if (measures.length > 1000) {
+                dialogMsg('措施长度超出限制,请重新选择！', 0);
+                $(top.WorkForm.window.node).parent().next().find("textarea").eq(0).val("");
+            } else {
+                $(top.WorkForm.window.node).parent().next().find("textarea").eq(0).val(measures);
+            }
+           
+            dialogClose();
+        } else {
+            dialogMsg('请选择危险点数据！', 0);
+        }
+       
+      
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td width="10"></td>
+                            <td>
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入工作任务" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,702 @@
+﻿@{
+    ViewBag.Title = "危大工程统计";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<!--第三方统计图start-->
+<script src="~/Content/Scripts/plugins/highcharts/highcharts.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/modules/exporting.js"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+<style type="text/css">
+    $ {
+        demo .css;
+    }
+
+    .css1 {
+        width: 50px;
+        font-weight: bold;
+    }
+
+    .css2 {
+        width: 100px;
+    }
+    #gridTable1 a, #gridTable2 a, #gridTable a {
+        text-decoration: underline;
+        color: #1688f5;
+    }
+</style>
+<script src="~/Content/scripts/business/Common.js"></script>
+<!--第三方统计图end-->
+<script>
+    var state = 1;
+    var year = "";
+    $(function () {
+        InitialPage();
+        statTJ();
+    })
+
+    function InitialPage() {
+        $('#desktop').height(1000);
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#desktop').height(1000);
+            }, 800);
+            e.stopPropagation();
+        });
+        $("#StartDate").val("@DateTime.Now.ToString("yyyy")");
+    }
+
+    //单位对比
+    function statTJ() {
+        LoadDataTJ();
+        binggrid($("#StartDate").val(), "gridTable1");
+    }
+
+    //单位对比图形
+    function LoadDataTJ() {
+        year = $("#StartDate").val();
+        $.get("GetEngineeringContrastForSJ", { year: year }, function (data) {
+            var json = eval("(" + data + ")");
+            $('#tjcontainer').highcharts({
+                chart: {
+                    type: 'column',
+                    borderWidth: 1
+                },
+                title: {
+                    text: '单位对比'
+                },
+                xAxis: {
+                    categories: json.xValues
+                },
+                yAxis: {
+                    lineWidth: 1,
+                    minorGridLineWidth: 0,
+                    minorTickInterval: 'auto',
+                    minorTickWidth: 1,
+                    gridLineDashStyle: 'longdash',
+                    allowDecimals: false,
+                    min: 0,
+                    title: {
+                        text: '数量（个）'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value + '个'
+                        }
+                    },
+                    stackLabels: {
+                        enabled: true,
+                        style: {
+                            fontWeight: 'bold',
+                            color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                        }
+                    }
+
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true
+                },
+                legend: { enabled: false },
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        dataLabels: {
+                            enabled: true,
+                            color: (Highcharts.theme && Highcharts.theme.dataLabelsColor) || 'white',
+                            style: {
+                                textShadow: '0 0 3px black'
+                            },
+                            formatter: function () {
+                                if (this.y != 0) {
+                                    return Math.round(this.y / json.total * 10000) / 100.00 + "%";
+                                }
+                                else {
+                                    return this.y;
+                                }
+                                
+                            }
+                        }
+                    }
+                },
+                series:json.data
+            , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        });
+    }
+
+    //单位对比表格
+    function binggrid(year, tid) {
+        var $gridTable = $("#" + tid);
+        $gridTable.jqGrid({
+            url: "../../EngineeringManage/EngineeringStatistics/GetEngineeringContrastGridForSJ",
+            postData: { year: year },
+            datatype: "json",
+            mtype: "post",
+            autoheight: true,
+            height: 300,
+            width: $(window).width() - 100,
+            colModel: [
+                { label: '电厂名称', name: 'typename', align: 'center', sortable: false },
+                {
+                    label: '数量', name: 'num', align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                    var html = "";
+                    if (cellvalue == "0") {
+                        return cellvalue;
+                    }
+                    else {
+                        html += "<a href=javascript:openPerilEngineering('" + rowObject.orgcode + "','" + $("#StartDate").val() + "','','')>" + cellvalue + "</a>";
+                    }
+                    return html;
+                    }
+                },
+                { label: '比例', name: 'rate', align: 'center', sortable: false }
+
+            ],
+            rowNum: 100,
+            rownumbers: true
+            , gridComplete: function () {
+
+            }
+        });
+    }
+
+    function openPerilEngineering(code, year,month, type) {
+        var url = '/EngineeringManage/PerilEngineering/SJIndexList?code=' + code + "&year=" + year + "&month=" + month + "&type=" + type;
+        var idx = dialogOpen({
+            id: 'speEquIndex',
+            title: '危大工程列表',
+            url: url,
+            btns: 1,
+            btn: ["关闭"],
+            width: ($(top.window).width() - 50) + "px",
+            height: ($(top.window).height() - 50) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //工程类别
+    function statQS() {
+        LoadDataQS();
+        binggrid1(year, 'gridTable');
+    }
+
+    //工程类别图形
+    function LoadDataQS() {
+        year = $("#StartDate").val();
+        $.get("GetEngineeringCategoryForSJ", { year: year }, function (data) {
+            var json = eval("(" + data + ")");
+            $('#qscontainer').highcharts({
+                chart: {
+                    type: 'pie'
+                },
+                title: {
+                    text: '工程类别统计'
+                },
+                subtitle: {
+                    text: ''
+                },
+                tooltip: {
+                    headerFormat: '<span style="font-size:10px">{point.key}</span><table>',
+                    pointFormat: '<tr><td style="color:{series.color};padding:0">{series.name}: </td>' +
+                        '<td style="padding:0"><b>{point.percentage:.2f}%</b></td></tr>',
+                    footerFormat: '</table>',
+                    shared: true,
+                    useHTML: true
+                },
+                plotOptions: {
+                    pie: {
+                        allowPointSelect: true,
+                        cursor: 'pointer',
+                        dataLabels: {
+                            enabled: true,
+                            format: '{point.name}: <b>{point.percentage:.2f}%</b>'
+                        },
+                        showInLegend: false
+                    }
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                },
+                series: json.data
+            });
+        });
+    }
+
+    //工程类别表格
+    function binggrid1(year, tid) {
+        var $gridTable = $("#" + tid);
+        $gridTable.jqGrid({
+            url: "../../EngineeringManage/EngineeringStatistics/GetEngineeringCategoryGridForSJ",
+            postData: { year: year },
+            datatype: "json",
+            mtype: "post",
+            autoheight: true,
+            height: 300,
+            width: $(window).width() - 100,
+            colModel: [
+                { label: '工程类别', name: 'typename', align: 'center', sortable: false },
+                {
+                    label: '数量', name: 'num', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '比例', name: 'rate', align: 'center', sortable: false }
+            ],
+            rowNum: 100,
+            rownumbers: true
+            , gridComplete: function () {
+
+            }
+        });
+    }
+
+    //月度趋势
+    function statDB() {
+        LoadDataDB();
+        binggrid2(year, 'gridTable2');
+    }
+
+    //月度趋势图形
+    function LoadDataDB() {
+        year = $("#StartDate").val();
+        $.get("GetEngineeringMonthForSJ", { year: year }, function (data) {
+            var json = eval("(" + data + ")");
+            $('#dbcontainer').highcharts({
+                title: {
+                    text: '月度趋势'
+                },
+                subtitle: {
+                    text: ''
+                },
+                xAxis: {
+                    categories: json.xValues
+                },
+                yAxis: {
+                    min: 0,
+                    title: {
+                        text: '数量(个)'
+                    },
+                    plotLines: [{
+                        value: 0,
+                        width: 1,
+                        color: '#808080'
+                    }], tickInterval: 1
+                },
+                tooltip: {
+                    valueSuffix: ''
+                },
+                legend: {
+                    enabled:false
+                },
+                exporting: {
+                    enabled: false
+                },
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                },
+                series: json.data
+            });
+        });
+    }
+
+    //月度趋势表格
+    function binggrid2(year, tid) {
+        var $gridTable = $("#" + tid);
+        $gridTable.jqGrid({
+            url: "../../EngineeringManage/EngineeringStatistics/GetEngineeringMonthGridForSJ",
+            postData: { year: year },
+            datatype: "json",
+            mtype: "post",
+            autoheight: true,
+            height: 300,
+            width: $(window).width() - 100,
+            colModel: [
+                { label: '工程类别', name: 'typeName', align: 'center', sortable: false },
+                {
+                    label: '1月', name: 'num1', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','1','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '2月', name: 'num2', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','2','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '3月', name: 'num3', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','3','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '4月', name: 'num4', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','4','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '5月', name: 'num5', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','5','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '6月', name: 'num6', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','6','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '7月', name: 'num7', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','7','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '8月', name: 'num8', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','8','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '9月', name: 'num9', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','9','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '10月', name: 'num10', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','10','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '11月', name: 'num11', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','11','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '12月', name: 'num12', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == "0") {
+                            return cellvalue;
+                        }
+                        else {
+                            html += "<a href=javascript:openPerilEngineering('','" + $("#StartDate").val() + "','12','" + rowObject.type + "')>" + cellvalue + "</a>";
+                        }
+                        return html;
+                    }
+                }
+            ],
+            rowNum: 100,
+            rownumbers: true
+            , gridComplete: function () {
+
+            }
+        });
+    }
+
+    function query() {
+        year = $("#StartDate").val();
+        if (state == 1) {
+            $("#btntj").trigger("click");
+            $("#gridTable1").jqGrid('setGridParam', {
+                postData: { year: year }, page: 1
+            }).trigger('reloadGrid');
+        }
+        if (state == 2) {
+            LoadDataQS();
+            $("#gridTable").jqGrid('setGridParam', {
+                postData: { year: year }, page: 1
+            }).trigger('reloadGrid');
+        }
+        if (state == 3) {
+            LoadDataDB();
+            $("#gridTable2").jqGrid('setGridParam', {
+                postData: { year: year }, page: 1
+            }).trigger('reloadGrid');
+        }
+    }
+
+    function reset() {
+        //时间
+        $("#StartDate").val("@DateTime.Now.ToString("yyyy")");
+        query();
+    }
+
+    //导出
+    function exportResult() {
+        var queryJson = JSON.stringify({
+            year: $("#StartDate").val()
+        });
+        if (state ==1) {
+            location.href = "../../EngineeringManage/EngineeringStatistics/ExportEngineeringContrastDataForSJ?queryJson=" + queryJson;
+        }
+        if (state==2) {
+            location.href = "../../EngineeringManage/EngineeringStatistics/ExportEngineeringCategoryDataForSJ?queryJson=" + queryJson;
+        }
+        if (state == 3) {
+            location.href = "../../EngineeringManage/EngineeringStatistics/ExportEngineeringMonthDataForSJ?queryJson=" + queryJson;
+        }
+        
+    }
+</script>
+<div class="border" id="desktop" style="background: #fff; overflow-y: auto; overflow-x: hidden;">
+    <div style="margin-top: 10px;">
+        <div class="row">
+            <table style="width: 100%;">
+                <tr>
+                    <td style="width: 65px; font-weight: bold;" align="right">年度：</td>
+                    <td style="width: 80px;">
+                        <div style="float: left; width: 70px;">
+                            <input id="StartDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy")" onfocus="WdatePicker({dateFmt:'yyyy'})">
+                        </div>
+                    </td>
+                    <td align="right" style="width: 140px;">
+                        <a id="btn_Search" class="btn btn-primary" onclick="query()"><i class="fa fa-search"></i>&nbsp;查询</a>
+                        &nbsp;<a id="btn_Reset" class="btn btn-primary" onclick="reset()"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                    </td>
+                    <td align="left" style="padding-left:50px;padding-right:50px">
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <a id="export" class="btn btn-primary" onclick="exportResult()"><i class="fa fa-download"></i>&nbsp;导出</a>
+                            </div>
+                        </div>
+                    </td>
+                    <td align="right">
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <button id="btntj" class="btn btn-primary btn10" type="button" onclick="state = 1; $('#divTJ').show(); $('#divQS').hide(); $('#divDB').hide(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); statTJ();"><i class="fa fa-bar-chart"></i>&nbsp;单位对比</button>
+                                <button id="btnpa" class="btn btn-default btn10" type="button" onclick="state = 2; $('#divTJ').hide(); $('#divQS').show(); $('#divDB').hide(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); statQS();"><i class="fa fa fa-bar-chart"></i>&nbsp;工程类别</button>
+                                <button id="btnqs" class="btn btn-default btn10" type="button" onclick="state = 3; $('#divTJ').hide(); $('#divQS').hide(); $('#divDB').show(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); statDB();"><i class="fa fa-bar-chart"></i>&nbsp;月度趋势</button>
+
+                            </div>
+                        </div>
+                    </td>
+                    
+                </tr>
+            </table>
+
+        </div>
+
+    </div>
+
+    <!-- 单位对比-->
+    <div id="divTJ">
+        <div class="panel panel-default" style="margin-top: 10px;">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="tjcontainer" style="margin: 10px;"></div>
+            </div>
+        </div>
+        <div class="row" id="grid1">
+            <div class="panel panel-default" style="margin: 10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <table id="gridTable1" title="aaaa"></table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 工程类别 -->
+    <div id="divQS" style="display: none;">
+        <div class="panel panel-default" style="margin-top: 10px;">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="qscontainer" style="margin: 10px;"></div>
+            </div>
+        </div>
+        <div class="row" id="grid1">
+            <div class="panel panel-default" style="margin: 10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <table id="gridTable"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 月度趋势 -->
+    <div id="divDB" style="display: none;">
+        <div class="panel panel-default" style="margin-top: 10px;">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="dbcontainer" style="margin: 10px;"></div>
+            </div>
+        </div>
+        <div class="row" id="grid1">
+            <div class="panel panel-default" style="margin: 10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <table id="gridTable2"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+

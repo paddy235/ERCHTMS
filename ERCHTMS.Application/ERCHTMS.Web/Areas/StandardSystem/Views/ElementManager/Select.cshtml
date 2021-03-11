@@ -1,0 +1,140 @@
+﻿@{
+    ViewBag.Title = "选择元素";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script>
+    var deptId = request('deptId');
+    var checkMode = request('checkMode');
+    var mode = request('mode');
+    var deptIds = request('deptIds');
+    var type = request('type');
+    var checkednodes = request('CheckedNodes');
+    var relevantelementid = request('relevantelementid');
+    $(function () {
+        initControl();
+    })
+    //初始化数据
+    function initControl() {
+        var json = JSON.stringify(
+             {
+                 Ids:deptId,
+                 SelectMode: checkMode,
+                 Mode: mode,
+                 DeptIds:deptIds
+             }
+           );
+        var item = {
+            cascadecheck: false,
+            showcheck: true,
+            url: "../../StandardSystem/ElementManager/GetElementTreeJson",
+        };
+        $("#ElementTree").treeview(item);
+        var nodes = [];
+        if (relevantelementid) {
+            checkednodes = top.Form.window.$("#" + relevantelementid).val();
+        }
+        if (checkednodes) {
+            nodes = checkednodes.split(',');
+        }
+        $("#ElementTree").setCheckedNodes(nodes);
+    }    //返回选择后的结果并赋值到dom控件    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序依次为部门名称,部门Code，部门Id（多选用逗号分隔）    //callback:回调函数    function AcceptClick(options) {
+        var winObject = options.winObject;
+        var domId = options.domId;
+        var selVal = new Array();
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var deptTree = $("#ElementTree");
+                if (checkMode == 1) {
+                    selVal = new Array(deptTree.getCheckedValues(),deptTree.getCheckedTexts());
+                } else {
+                    var currentNode = deptTree.getCurrentNode();
+                    if (type == "highrisk") {
+                        if (currentNode.Nature == "厂级") {
+                            dialogMsg('该节点不允许选择！', 0);
+                            return;
+                        }
+                    }
+                    selVal = new Array(currentNode.value, currentNode.text);
+                }
+
+                
+                var ids = domId.split(',');
+                for (var j = 0; j < ids.length; j++) {
+                    if (ids[j].length > 0) {
+                        var dom = $(winObject).find("#" + ids[j]).eq(0);
+                        if (dom != undefined) {
+                            dom.val(selVal[j]);
+                        }
+                    }
+
+                }
+            }
+
+            //if (_win != undefined) {
+            //    if (typeof (_win.callBackSelect) == "function") {
+            //        _win.callBackSelect();
+            //    }
+
+            //}
+            //if (callback) {
+            //    callback();
+            //}
+            dialogClose();
+        }
+    }
+
+
+
+    function PostSubmit(winObject, domId, callback) {
+        var selVal = new Array();
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var deptTree = $("#ElementTree");
+                if (checkMode == 1) {
+                    selVal = new Array(deptTree.getCheckedTexts(), deptTree.getCheckedValues(), deptTree.getCheckedIds());
+                } else {
+                    var currentNode = deptTree.getCurrentNode();
+                    var manager = "";
+                    var managerId = "";
+                    if (currentNode.manager != undefined && currentNode.manager != null) {
+                        var arr = currentNode.manager.split(',');
+                        if (arr.length > 0) {
+                            manager = arr[0]; managerId = arr[1];
+                        }
+                    }
+                    selVal = new Array(currentNode.text, currentNode.value, currentNode.id, manager, managerId);
+                }
+                var ids = domId.split(',');
+                $.ajax({
+                    url: "../../BaseManage/Department/GetType?keyValue=" + currentNode.id,
+                    type: "post",
+                    dataType: "json",
+                    async: false,
+                    success: function (data) {
+                        if (data == true) {
+                            for (var j = 0; j < ids.length; j++) {
+                                if (ids[j].length > 0) {
+                                    var dom = $(winObject).find("#" + ids[j]).eq(0);
+                                    if (dom != undefined) {
+                                        dom.val(selVal[j]);
+                                    }
+                                }
+
+                            }
+                        }
+                        else {
+                            dialogMsg('此节点不能选择！', 2);
+                        }
+                    },
+                });
+            }
+            if (callback) {
+                callback();
+            }
+            dialogClose();
+        }
+    }
+</script>
+<div style="margin: 10px;">
+    <div id="ElementTree"></div>
+</div>

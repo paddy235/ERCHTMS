@@ -1,0 +1,375 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/Content/scripts/plugins/jqgrid/jqgrid.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/dialog/dialog.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/layout/jquery.layout.js"></script>
+
+<script src="~/Content/scripts/plugins/jqgrid/grid.locale-cn.js"></script>
+<script src="~/Content/scripts/plugins/jqgrid/jqgrid.min.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var currUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var currDeptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    var currDeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var currDeptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var mode = request('mode');
+    var IsCommit = request('IsCommit');
+    var IsPublic = request('IsPublic');
+
+    $(function () {
+        InitCombobox();
+        initControl();
+        GetGrid(keyValue);
+        if (mode == "view") {
+            $("#AddPlanWork").attr("disabled", "disabled");
+        } else {
+            if (roleName.indexOf("厂级部门用户") >= 0 && roleName.indexOf("安全管理员")) {
+                $("#PlanLevel").attr("disabled", false);
+            }
+            $("#AddPlanWork").attr("disabled", false);
+        }
+       
+        if (roleName.indexOf("专业级用户") >= 0 || roleName.indexOf("班组级用户") >= 0) {
+            $.ajax({
+                url: '../../ObserveRecord/Obsplan/GetParentDeptBySpecialArgs?parentid=' + "@ERCHTMS.Code.OperatorProvider.Provider.Current().ParentId" + '&nature=部门',
+                dataType: "JSON",
+                type: "post",
+                success: function (result) {
+                    $("#PlanDeptCode").val(result.EnCode);
+                    $("#PlanDeptId").val(result.DepartmentId);
+                    $("#PlanDept").val(result.FullName);
+                   
+                }
+            });
+        } else {
+            $("#PlanDeptCode").val(currDeptCode);
+            $("#PlanDeptId").val(currDeptId);
+            $("#PlanDept").val(currDeptName);
+        }
+        if (IsPublic == "1") {
+            $("#PlanYear").attr("disabled", "disabled");
+        }
+    });
+    //初始化控件
+    function initControl() {
+        $("#PlanAreaCode").ComboBoxTree({
+            url: "../../BaseManage/District/GetTreeJson",
+            param: { orgID: orgId, areaIds: "", planId: "" },
+            id: "DistrictID",
+            text: "DistrictName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+
+        $("#PlanSpeciaty").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "SpecialtyType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../ObserveRecord/Obsplan/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.PlanAreaCode != null) {
+                        $("#PlanAreaCode").ComboBoxSetValue(data.PlanAreaCode);
+                    }
+                    $("#PlanSpeciaty").ComboBoxSetValue(data.PlanSpeciatyCode);
+                }
+            })
+        } else {
+            keyValue = keyValue.length == 0 ? newGuid() : keyValue;
+        }
+    }
+    function GetGrid(planId) {
+        var queryJson = {
+            planId: planId
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 175.5,
+            url: "../../ObserveRecord/Obsplanwork/GetPlanWorkList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '', name: 'ID', hidden: true, index: 'ID', width: 100, align: 'left', sortable: true },
+                 {
+                     label: '操作', name: 'oper', width: 120, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "";
+                         html = "<a href=javascript:show('" + rowObject.id + "')   title='查看'><i class='fa fa-eye'></i></a>";
+                         if (mode != "view") {
+                             if ((rowObject.createuserid == currUserId && IsCommit != '1' && IsPublic != '1') ||
+                          (rowObject.createuserdeptcode = currDeptCode && roleName.indexOf("安全管理员") >= 0 && IsCommit != '1' && IsPublic != '1') ||
+                          (rowObject.createuserdeptcode = currDeptCode && roleName.indexOf("负责人") >= 0 && IsCommit != '1' && IsPublic != '1')) {
+                                 html += "<a href=javascript:delwork('" + rowObject.id + "')   title='删除'><i class='fa fa-trash-o'></i></a>";
+                             }
+                         }
+                         //发布后查询是否进行了观察记录---是--不允许修改 否 --可以修改
+                         if (mode == "planChange") {
+                             $.ajax({
+                                 url: '../../ObserveRecord/Observerecord/GetObsRecordByPlanIdAndFjId?planid=' + keyValue + '&planfjid=' + rowObject.id,
+                                 dataType: "JSON",
+                                 async: false,
+                                 success: function (result) {
+                                     if (!result) {
+                                         if ((rowObject.createuserid == currUserId) ||
+                                                             (rowObject.createuserdeptcode = currDeptCode && roleName.indexOf("安全管理员") >= 0) ||
+                                                             (rowObject.createuserdeptcode = currDeptCode && roleName.indexOf("负责人") >= 0)) {
+                                             html += "<a href=javascript:edit('" + rowObject.id + "','" + IsPublic + "')   title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                                         }
+                                     }
+                                 }
+                             });
+                         } else {
+                             if (mode != "view") {
+                                 if ((rowObject.createuserid == currUserId) ||
+                                                            (rowObject.createuserdeptcode = currDeptCode && roleName.indexOf("安全管理员") >= 0) ||
+                                                            (rowObject.createuserdeptcode = currDeptCode && roleName.indexOf("负责人") >= 0)) {
+                                     html += "<a href=javascript:edit('" + rowObject.id + "','" + IsPublic + "')   title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                                 }
+                             }
+
+                         }
+                         return html;
+                     }
+                 },
+                { label: '任务分解', name: 'workname', index: 'fjname', width: 240, align: 'center', sortable: false },
+                { label: '风险等级', name: 'risklevel', index: 'risklevel', width: 150, align: 'center', sortable: false },
+                { label: '观察频率', name: 'obsnumtext', index: 'obsnumtext', width: 150, align: 'center', sortable: false },
+                { label: '观察人员', name: 'obsperson', index: 'obsperson', width: 240, align: 'center', sortable: false },
+                { label: '计划观察月份', name: 'obsmonth', index: 'obsmonth', width: 180, align: 'center', sortable: false },
+                { label: '备注', name: 'remark', index: 'remark', width: 130, align: 'center', sortable: false },
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var $gridTable = $('#gridTable');
+        var rows = $gridTable.jqGrid("getRowData")
+        if (rows.length > 0) {
+            var postData = $("#form1").formSerialize(keyValue);
+            postData["PlanDeptCode"] = $("#PlanDeptCode").val();
+            postData["PlanDeptId"] = $("#PlanDeptId").val();
+            postData["PlanSpeciatyCode"] = $("#PlanSpeciatyCode").val();
+            postData["PlanArea"] = $("#PlanAreaCode").attr("data-text");
+            postData["PlanAreaCode"] = $("#PlanAreaCode").attr("data-value");
+            postData["PlanSpeciaty"] = $("#PlanSpeciaty").attr("data-text");
+            postData["PlanSpeciatyCode"] = $("#PlanSpeciaty").attr("data-value");
+            //if ($("#PlanLevel").attr("data-value") == "" || $("#PlanLevel").attr("data-value") == undefined) {
+            //    postData["PlanLevel"] = "部门级"
+            //} else {
+            //    postData["PlanLevel"] = $("#PlanLevel").attr("data-value");
+            //}
+
+            var urlCommit = "";
+            if (roleName.indexOf("公司级") >= 0) {
+                urlCommit = "../../ObserveRecord/Obsplan/SaveFbForm?keyValue=" + keyValue;
+            } else if (roleName.indexOf("厂级部门") >= 0) {
+                postData["PlanLevel"] = $("#PlanLevel").attr("data-value");
+                urlCommit = "../../ObserveRecord/Obsplan/SaveEHSForm?keyValue=" + keyValue;
+            } else {
+                postData["PlanLevel"] = "部门级"
+                urlCommit = "../../ObserveRecord/Obsplan/SaveForm?keyValue=" + keyValue;
+            }
+            $.SaveForm({
+                url: urlCommit,
+                param: postData,
+                loading: "正在保存数据...",
+                success: function () {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            dialogMsg("至少有一条任务分解！", 0);
+        }
+
+    }
+    //function chooseMajor() {
+
+    //    if ($("#PlanDept").val() == "" || $("#PlanDept").val() == undefined) {
+    //        dialogMsg("请先选择部门！", 0);
+    //    } else {
+    //        var dept = $("#PlanDeptId").val()
+    //        selectDept(dept, 0, 200, '选择所属专业', window.document.body, 'PlanSpeciaty,PlanSpeciatyCode');
+    //    }
+    //}
+    function AddPlanWork() {
+        dialogOpen({
+            id: 'obsForm',
+            title: '添加任务分解',
+            url: '/ObserveRecord/ObsPlanWork/Form?PlanId=' + keyValue,
+            width: "800px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    function show(id) {
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: 'obsForm',
+                title: '查看任务分解',
+                url: '/ObserveRecord/ObsPlanWork/Form?PlanId=' + keyValue + "&keyValue=" + id,
+                width: "800px",
+                height: "600px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+    function edit(id, IsPublic) {
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: 'obsForm',
+                title: '编辑任务分解',
+                url: '/ObserveRecord/ObsPlanWork/Form?PlanId=' + keyValue + "&keyValue=" + id + '&IsPublic=' + IsPublic,
+                width: "800px",
+                height: "600px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function delwork(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../ObserveRecord/Obsplanwork/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的任务分解！', 0);
+        }
+    }
+    function InitCombobox() {
+        var data = [
+            { no: "公司级", name: "公司级" },
+            { no: "部门级", name: "部门级" },
+        ];
+        $("#PlanLevel").ComboBox({
+            id: "no",
+            text: "name",
+            description: "==默认填写==",
+            height: '400px',
+            allowSearch: false,
+            data: data
+        });
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <div id="obsInfo" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;观察计划基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">作业内容<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="WorkName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                    <td class="formTitle">计划等级</td>
+                    <td class="formValue">
+                        <div id="PlanLevel" type="select" disabled="disabled" class="ui-select" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="PlanDept" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName" />
+                        <input type="hidden" id="PlanDeptCode" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode" />
+
+
+                    </td>
+                    <td class="formTitle">专业</td>
+                    <td class="formValue">
+                        <div id="PlanSpeciaty" type="select" class="ui-select"></div>
+
+                    </td>
+                    @*<td class="formTitle">专业</td>
+                    <td class="formValue" >
+                        <select id="PlanSpeciaty" name="PlanSpeciaty" class="form-control" >
+                            <option value="">请选择</option>
+                            @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("SpecialtyType"))
+                        </select>
+                    </td>*@
+                    @*<td class="formTitle">专业</td>
+                    <td class="formValue">
+                        <input id="PlanSpeciaty" type="text" class="form-control" onclick="chooseMajor()" />
+                        <input type="hidden" id="PlanSpeciatyCode" />
+                    </td>*@
+                </tr>
+                <tr>
+                    <td class="formTitle">区域<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="PlanAreaCode" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                        @*<input type="hidden" id="PlanAreaCode" />*@
+                        <input type="hidden" id="PlanDeptId" />
+                    </td>
+                    <td class="formTitle">计划年度<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="PlanYear" type="text" class="form-control input-datepicker fxyear" isvalid="yes" value="@DateTime.Now.Year" checkexpession="NotNull" onfocus="WdatePicker({ dateFmt: 'yyyy', minDate: '#F{$dp.$D(\'MinYear\')}' })" />
+                        <input id="MinYear" type="hidden" class="form-control input-datepicker" isvalid="yes" checkexpession="NotNull" onfocus="WdatePicker({ dateFmt: 'yyyy' })" value="@DateTime.Now.Year" />
+                    </td>
+                </tr>
+            </table>
+            </div>
+        </div>
+    <div id="obstype" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;任务分解</strong>
+            <span class="tools pull-right">
+                <a href="javascript:AddPlanWork(this)" id="AddPlanWork" class="btn btn-primary btn-xs">新增任务分解</a>&nbsp;&nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+        </div>
+</div>

@@ -1,0 +1,1285 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<script>
+    //隐患台账列表页
+    var _parentId = "";
+    var _isOrg = "";
+    var _deptId = "";
+    var pfrom = request("pfrom");
+    var safetyCheckObjectID = ""; //主键 安全检查对象
+    var DeviceId = ""; //主键 特种设备id
+    var safetyCheckType = "";  //安全检查类型
+    var currentdate = "@DateTime.Now.ToString("yyyy-MM-dd")";
+    var currenttime = "@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")";
+    var checkObjId = request("checkObjId");//安全检查对象Id
+    var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    var curUserRole = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var relevanceId = request("relevanceId");  // 关联程序ID
+    var relevanceType = request("relevanceType");  // 关联程序Type
+    var districtid = request("districtid");  //区域
+    var districtname = request("districname"); //区域名称
+    var changeStatus = request("ChangeStatus"); //整改状态
+    var mode = request("mode"); //统计参数
+    var pMode = request("pMode");
+    var hType = request("hType");//隐患类别
+    var qWorkstream = "";
+    var areaCode = request("code");//区域编码
+    var stDate = request("st"); //检查开始日期-设备
+    var etDate = request("et"); //检查结束日期-设备
+    var startdate = request("startdate"); //创建时间(起始)
+    var enddate = request("enddate"); //创建时间(截止)
+    var aff = request("aff"); // 所属关系-设备
+    var equtype = request("equtype"); //设备类型 -设备
+    var qdeptcode = request("qdeptcode"); //待查询的部门编码
+    var qrankname = request("qrankname");  //隐患级别名称
+    var qyearmonth = request("qyearmonth");  //当前年月
+    var qyear = request("qyear");  //年度
+    var bmmark = request("bmmark");  //部门及统计标记
+    var qchangestatus = request("qchangestatus");//整改状态
+    var qchecktype = request("qchecktype");//检查类别
+    var engineerid = request("engineerid");//外包工程id
+    var HidRegisterType = request("hidregistertype"); //登记单位
+    var HidDepart = request("HidDepart");//所属单位
+    var HtLevel = request("HtLevel");//隐患级别
+    var hidModultId = ""; //当前模块
+    var majorClassify = request("majorClassify"); //专业分类
+    var curIndustry = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Industry";
+    var standingmark = "1"; //台账标记
+    var IsEnableMinimalistMode = 0;
+    var layerId = request("layerId");
+
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+        //本单位 or 本子单位 查询
+        $("input[name='chooseMethod']").click(function () {
+            $('#btn_Search').trigger('click');
+        });
+        $('.ui-filter').click(function (e) {
+            stopPropagation(e)
+        })
+        $(document).bind('click', function () {
+            $('.ui-filter-text').removeClass("active");//border-bottom-color: rgb(204, 204, 204);
+            $('.ui-filter-text').attr("style", "border-bottom-color: rgb(204, 204, 204);");
+            $('.ui-filter-list').fadeOut();
+        })
+    });
+    function stopPropagation(e) {
+        var ev = e || window.event
+        if (ev.stopPropagation) {
+            ev.stopPropagation()
+        } else if (window.event) {
+            window.event.cancelBubble = true
+        }
+    }
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#deptTree").setTreeHeight($(window).height() - 130);
+                $("#itemTree").height($(window).height() - 90);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        safetyCheckObjectID = request("SAFETYCHECKOBJECTID");  //检查传入的参数
+        DeviceId = request("DeviceId");//传入的特种设备ID(在特种设备模块管理检查记录的地方)
+        safetyCheckType = request("SAFETYCHECKTYPE");  //检查传入的参数
+
+        if (!!safetyCheckObjectID || !!safetyCheckType) {
+            $("#lr-add").css("display", "none");
+            $("#lr-addNew").css("display", "none");
+            $("#lr-edit").css("display", "none");
+            $("#lr-delete").css("display", "none");
+        }
+
+        //初始化值--按创建单位
+        $("#btnFromCondition").val(1);
+
+        $.SetForm({
+            url: "../../HiddenTroubleManage/HTBaseInfo/GetQueryConditionJson",
+            success: function (data) {
+                IsEnableMinimalistMode = data.IsEnableMinimalistMode;
+                if (IsEnableMinimalistMode > 0)
+                {
+                    $("#titleDescribe").html("隐患内容：");
+                } 
+                //隐患级别
+                $("#HidRank").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.HidRank
+                });
+
+                //整改状态
+                $("#ChangeStatus").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.ChangeStatus
+                });
+
+                //流程状态
+                $("#WorkStream").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.WorkStream
+                });
+
+                //安全检查类型
+                $("#SaftyCheckType").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.SaftyCheckType,
+                });
+
+                //隐患类别
+                $("#HidType").ComboBoxTree({
+                    url: "../../HiddenTroubleManage/HTBaseInfo/GetHiddenTypeDataJson",
+                    description: "===全部===",
+                    allowSearch: false
+                });
+
+                //台账类型
+                $("#HidStandingType").ComboBox({
+                    id: "ItemValue",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.HidStandingType,
+                    height: '200px'
+                });
+
+                var hidregistertype = new Array();
+                //省级用户
+                if (curUserRole.indexOf("省级用户") >= 0) {
+                    //登记形式
+                    hidregistertype.push({ ItemDetailId: "省公司登记", ItemName: "省公司登记" });
+                    hidregistertype.push({ ItemDetailId: "下属各单位登记", ItemName: "下属各单位登记" });
+                }
+                else {
+                    $("#regunit1").css("display", "none");
+                    $("#regunit2").css("display", "none");
+                    $("#regunit3").css("display", "none");
+                }
+                //登记形式
+                $("#HidRegisterType").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: hidregistertype
+                });
+
+                //登记单位
+                if (!!HidRegisterType) {
+                    $("#HidRegisterType").ComboBoxSetValue(HidRegisterType);
+                }
+
+                //整改状态
+                if (!!changeStatus) {
+                    $("#ChangeStatus").ComboBoxSetText(changeStatus);
+                }
+            }
+        });
+
+
+        //隐患曝光
+        if (!!mode) {
+            var val1 = "";
+            var val2 = "";
+            switch (mode) {
+                //隐患曝光
+                case "1":
+                    $("#StartTime").val("");
+                    $("#EndTime").val("");
+                    $("#IsExposureState").find("option[value='1']").attr("selected", true);
+                    break;
+                    //全部隐患
+                case "qbyh":
+                    //缺省
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    break;
+                    //全部已整改
+                case "qbyzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患类型
+                    $("#ChangeStatus").attr("data-text", "已整改");
+                    val1 = $("#ChangeStatus-option ul li:eq(6)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val1);
+                    $("#ChangeStatus div:eq(0)").text("已整改");
+                    break;
+                    //全部未整改
+                case "qbwzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    $("#ChangeStatus").attr("data-text", "未整改");
+                    val1 = $("#ChangeStatus-option ul li:eq(1)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val1);
+                    $("#ChangeStatus div:eq(0)").text("未整改");
+                    break;
+                    //全部逾期未整改
+                case "qbyqwzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    $("#ChangeStatus").attr("data-text", "逾期未整改");
+                    val1 = $("#ChangeStatus-option ul li:eq(2)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val1);
+                    $("#ChangeStatus div:eq(0)").text("逾期未整改");
+                    break;
+                    //I级重大隐患
+                case "yjqbyh":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "I级重大隐患");
+                    val1 = $("#HidRank-option ul li:eq(2)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("I级重大隐患");
+                    break;
+                    //已整改I级重大隐患
+                case "yjzdyzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "I级重大隐患");
+                    val1 = $("#HidRank-option ul li:eq(2)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("I级重大隐患");
+                    //隐患状态
+                    $("#ChangeStatus").attr("data-text", "已整改");
+                    val2 = $("#ChangeStatus-option ul li:eq(6)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val1);
+                    $("#ChangeStatus div:eq(0)").text("已整改");
+                    break;
+                    //未整改I级重大隐患
+                case "yjzdwzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "I级重大隐患");
+                    val1 = $("#HidRank-option ul li:eq(2)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("I级重大隐患");
+                    //隐患状态
+                    $("#ChangeStatus").attr("data-text", "未整改");
+                    val2 = $("#ChangeStatus-option ul li:eq(1)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val2);
+                    $("#ChangeStatus div:eq(0)").text("未整改");
+                    break;
+                    //逾期未整改I级重大隐患
+                case "yjzdyqwzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "I级重大隐患");
+                    val1 = $("#HidRank-option ul li:eq(2)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("I级重大隐患");
+
+                    //逾期未整改
+                    $("#ChangeStatus").attr("data-text", "逾期未整改");
+                    val2 = $("#ChangeStatus-option ul li:eq(2)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val2);
+                    $("#ChangeStatus div:eq(0)").text("逾期未整改");
+                    break;
+
+                    //II级重大隐患
+                case "erjqbyh":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "II级重大隐患");
+                    val1 = $("#HidRank-option ul li:eq(3)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("II级重大隐患");
+                    break;
+                    //已整改II级重大隐患
+                case "erjzdyzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "II级重大隐患");
+                    val1 = $("#HidRank-option ul li:eq(3)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("II级重大隐患");
+                    //隐患状态
+                    $("#ChangeStatus").attr("data-text", "已整改");
+                    val2 = $("#ChangeStatus-option ul li:eq(6)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val1);
+                    $("#ChangeStatus div:eq(0)").text("已整改");
+                    break;
+                    //未整改II级重大隐患
+                case "erjzdwzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "II级重大隐患");
+                    val1 = $("#HidRank-option ul li:eq(3)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("II级重大隐患");
+                    //隐患状态
+                    $("#ChangeStatus").attr("data-text", "未整改");
+                    val2 = $("#ChangeStatus-option ul li:eq(1)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val2);
+                    $("#ChangeStatus div:eq(0)").text("未整改");
+                    break;
+                    //逾期未整改II级重大隐患
+                case "erjzdyqwzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "II级重大隐患");
+                    val1 = $("#HidRank-option ul li:eq(3)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("II级重大隐患");
+                    //逾期未整改
+                    $("#ChangeStatus").attr("data-text", "逾期未整改");
+                    val2 = $("#ChangeStatus-option ul li:eq(2)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val2);
+                    $("#ChangeStatus div:eq(0)").text("逾期未整改");
+                    break;
+                    //一般隐患
+                case "ybqbyh":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "一般隐患");
+                    val1 = $("#HidRank-option ul li:eq(1)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("一般隐患");
+                    break;
+                    //已整改一般隐患
+                case "ybyzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "一般隐患");
+                    val1 = $("#HidRank-option ul li:eq(1)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("一般隐患");
+                    //隐患状态
+                    $("#ChangeStatus").attr("data-text", "已整改");
+                    val2 = $("#ChangeStatus-option ul li:eq(6)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val1);
+                    $("#ChangeStatus div:eq(0)").text("已整改");
+                    break;
+                    //未整改一般隐患
+                case "ybwzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "一般隐患");
+                    val1 = $("#HidRank-option ul li:eq(1)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("一般隐患");
+
+                    //隐患状态
+                    $("#ChangeStatus").attr("data-text", "未整改");
+                    val2 = $("#ChangeStatus-option ul li:eq(1)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val2);
+                    $("#ChangeStatus div:eq(0)").text("未整改");
+                    break;
+                    //逾期未整改一般隐患
+                case "ybyqwzg":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    //隐患级别
+                    $("#HidRank").attr("data-text", "一般隐患");
+                    val1 = $("#HidRank-option ul li:eq(1)").attr("data-value");
+                    $("#HidRank").attr("data-value", val1);
+                    $("#HidRank div:eq(0)").text("一般隐患");
+
+                    //逾期未整改
+                    $("#ChangeStatus").attr("data-text", "逾期未整改");
+                    val2 = $("#ChangeStatus-option ul li:eq(2)").attr("data-value");
+                    $("#ChangeStatus").attr("data-value", val2);
+                    $("#ChangeStatus div:eq(0)").text("逾期未整改");
+                    break;
+                    //设备统计下隐患数量查询
+                case "sbtjyh":
+                    qWorkstream = "1"; //代入参数，用于确定数据范围 即 非隐患登记及隐患评估状态下的数据
+                    $("#HidType").attr("data-text", "设备设施事故隐患");
+                    val1 = $("#HidType-option ul li:eq(3)").attr("data-value");
+                    $("#HidType").attr("data-value", val1);
+                    $("#HidType div:eq(0)").text("设备设施事故隐患");
+                    break;
+                    //隐患发现排行榜
+                case "yhfxphb":
+                    qWorkstream = "1";
+                    break;
+                    //隐患整改排行榜
+                case "yhzgphb":
+                    qWorkstream = "1";
+                    break;
+                    //隐患趋势图
+                case "tendencyht":
+                    qWorkstream = "1";
+                    break;
+                    //检查安全
+                case "safetycheck":
+                    $("#StartTime").val("");
+                    $("#EndTime").val("");
+                    break;
+                    //隐患统计信息(按整改部门、按区域)
+                case "yhtjinfo":
+                    $("#StartTime").val("");
+                    $("#EndTime").val("");
+                    qWorkstream = "1";
+                    break;
+                    //隐患统计信息(按登记部门、按区域)
+                case "yhdjinfo":
+                    $("#StartTime").val("");
+                    $("#EndTime").val("");
+                    qWorkstream = "1";
+                    break;
+                    //外包工程下的所有隐患
+                case "wbgcyh":
+                    $("#StartTime").val("");
+                    $("#EndTime").val("");
+                    qWorkstream = "";
+                    break;
+                    //省级设备统计隐患
+                case "sjsbyhtj":
+                    $("#StartTime").val("");
+                    $("#EndTime").val("");
+                    qWorkstream = "1";
+                    break;
+                    //省级首页
+                case "home":
+                    $("#StartTime").val("");
+                    $("#EndTime").val("");
+                    qWorkstream = "1";
+                    break;
+                case "wbhtjcx":  //未闭环，按责任单位
+                    $("#StartTime").val("");
+                    $("#EndTime").val("");
+                    qWorkstream = "1";
+                    break;
+            }
+        }
+        //创建开始时间
+        if (!!startdate)
+        {
+            $("#StartTime").val(startdate);
+        }
+        //创建截止时间
+        if (!!enddate) {
+            $("#EndTime").val(enddate);
+        }
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = "";
+        var url = "";
+        if (curUserRole.indexOf("省级用户") >= 0) {
+            $("#ulTabs").css("display", "none");
+            $("#ulTabsDetail").css("display", "none");
+
+            json = JSON.stringify({ SelectMode: 0, Mode: 9 });
+            url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+            var grpitem = {
+                height: $(window).height() - 90,
+                url: url,
+                onnodeclick: function (item) {
+                    _parentId = item.Code;
+                    _isOrg = item.Sort;
+                    _deptId = item.id;
+                    $("#btnFromCondition").val("");
+                    $('#btn_Search').trigger("click");
+                }
+            };
+            $("#deptTreeGrp").treeview(grpitem);
+        }
+        else {
+            $("#deptTreeGrp").css("display", "none");
+            //初始化创建单位
+            json = JSON.stringify({ SelectMode: 0, Mode: 23 });
+            url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+            var item = {
+                height: $(window).height() - 130,
+                url: url,
+                onnodeclick: function (item) {
+                    _parentId = item.Code;
+                    _isOrg = item.Sort;
+                    _deptId = item.id;
+                    $("#btnFromCondition").val(1);
+                    $('#btn_Search').trigger("click");
+                }
+            };
+            $("#deptTree").treeview(item);
+
+            //按整改单位初始化
+            json = JSON.stringify({ SelectMode: 0, Mode: 0 });
+            url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+            var oitem = {
+                height: $(window).height() - 90,
+                url: url,
+                onnodeclick: function (item) {
+                    _parentId = item.Code;
+                    _isOrg = item.Sort;
+                    _deptId = item.id;
+                    $("#btnFromCondition").val(0);
+                    $('#btn_Search').trigger("click");
+                }
+            };
+            $("#itemTree").treeview(oitem);
+
+            if ($("#deptTree").html().length == 0) {
+                $(".ui-layout-west").hide();
+                $('.ui-layout-center').css({ "padding-left": "5px" });
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 200);
+            }
+            else {
+                $('#layout').layout({
+                    applyDemoStyles: false,
+                    onresize: function () {
+                        $(window).resize()
+                    }
+                });
+            }
+        }
+    }
+
+
+    function QueryJson()
+    {
+
+        if (!!safetyCheckObjectID || !!relevanceId) {
+            standingmark = "";
+        }
+        //隐患基本信息
+        var queryJson = {
+            code: _parentId,
+            isOrg: _isOrg,
+            action: "Ledger",
+            checkId: safetyCheckObjectID,
+            DeviceId: DeviceId,
+            checkType: safetyCheckType,
+            StartTime: $("#StartTime").val(), //创建开始时间
+            EndTime: $("#EndTime").val(),//创建结束时间
+            cdstDate: $("#cdstDate").val(), //整改截止开始时间
+            cdetDate: $("#cdetDate").val(), //整改截止结束时间
+            HidRank: $("#HidRank").attr("data-value"), //隐患级别
+            ChangeStatus: $("#ChangeStatus").attr("data-text") == "===全部===" ? "" : $("#ChangeStatus").attr("data-text"), //隐患状态
+            WorkStream: $("#WorkStream").attr("data-text") == "===全部===" ? "" : $("#WorkStream").attr("data-text"), //流程状态
+            SaftyCheckType: $("#SaftyCheckType").attr("data-value"), //检查类型
+            HidType: $("#HidType").ComboBoxTreeGetValue(), //隐患类型
+            HidDescribe: $("#HidDescribe").val(), //事故隐患描述(简题)
+            HidPoint: districtid,
+            IsExposureState: $("#IsExposureState").val(), // $("input[name='IsExposureState']:checked").val()  //是否曝光
+            qWorkstream: qWorkstream,
+            RelevanceId: relevanceId,   //关联程序
+            RelevanceType: relevanceType,
+            pMode: pMode,
+            stDate: stDate,
+            etDate: etDate,
+            aff: aff,
+            equtype: equtype,
+            mode: mode,
+            areaCode: areaCode,  //隐患区域
+            checkObjId: checkObjId,
+            qdeptcode: qdeptcode, //单位
+            qrankname: qrankname,  //隐患级别名称
+            qyearmonth: qyearmonth, //年度-月份
+            qyear: qyear, //年度
+            qchangestatus: qchangestatus, //整改状态
+            qchecktype: qchecktype, //检查类别
+            engineerid: engineerid,//外包工程
+            hidregistertype: $("#HidRegisterType").ComboBoxGetValue() == "===全部===" ? "" : $("#HidRegisterType").ComboBoxGetValue(),
+            HidDepart: HidDepart,
+            HtLevel: HtLevel,
+            querybtntype: $("#btnFromCondition").val(),
+            choosetag: $("input[name='chooseMethod']:checked").val(),
+            majorClassify: majorClassify,
+            pfrom: pfrom,
+            HidStandingType: $("#HidStandingType").ComboBoxGetValue(),
+            standingmark: standingmark,
+            bmmark: bmmark
+        };
+        
+        return queryJson;
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+
+        var queryJson = QueryJson();
+
+        if (mode == "bigHt") {
+            queryJson["HtLevel"] = "bigHt";
+        }
+        if (mode == "pType") {
+            queryJson["HidType"] = hType;
+            queryJson["pType"] = 1;
+            queryJson["qWorkstream"] = "1";  //取非登记及评估下
+        }
+
+        //初始化固定列
+        var model = [{ label: '主键', name: 'id', index: 'id', width: 100, align: 'center', hidden: true },
+               { label: '临时流程用户', name: 'participant', index: 'participant', align: 'center', hidden: true },
+               { label: '隐患图片业务id', name: 'hidphoto', index: 'hidphoto', align: 'center', hidden: true },
+               { label: '隐患整改图片业务id', name: 'hidchangephoto', index: 'hidchangephoto', align: 'center', hidden: true },
+               {
+                   label: '操作', name: 'oper', index: 'id', width: 120, align: 'center',
+                   formatter: function (cellvalue, options, rowObject) {
+                       var html = "";
+                       //公司管理员可以删除所有
+                       if (curUserRole.indexOf("公司级用户") >= 0 && curUserRole.indexOf("公司管理员") >= 0) {
+                           html += "&nbsp;&nbsp;&nbsp;<a href=javascript:removedata('" + rowObject.id + "','" + rowObject.hidcode + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                       }
+                       html += "<a href=javascript:viewdata('" + rowObject.id + "','" + rowObject.addtype + "','" + rowObject.workstream + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                       return html;
+                   }
+               },
+                { label: '登记类型', name: 'addtype', index: 'addtype', width: 100, align: 'center', hidden: true },
+                {
+                    label: '流程状态', name: 'workstream', index: 'workstream', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.workstream) {
+                            if (rowObject.workstream == "整改结束") {
+                                html = "<div style='background-color:green;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;' title='隐患流程'>" + rowObject.workstream + "</a></div>";
+                            }
+                            else if (rowObject.workstream == "隐患整改") {
+                                var changedeadine = rowObject.changedeadine; //整改截止时间
+
+                                if (!!changedeadine) {
+
+                                    var d1 = new Date(currentdate.replace(/\-/g, "\/"));  //当前时间
+
+                                    var d2 = new Date(changedeadine.replace(/\-/g, "\/"));  //整改截止时间
+
+                                    var d3 = new Date(SubtractDays(changedeadine, 3).replace(/\-/g, "\/")); //提前三天
+
+                                    var d4 = new Date(SubtractDays(changedeadine, 5).replace(/\-/g, "\/")); //提前五天
+
+                                    html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='隐患流程'>" + rowObject.workstream + "</a>";
+                                    //逾期未整改
+                                    if (d1 > d2) {
+                                        html = "<div style='background-color:red;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='隐患流程'>" + rowObject.workstream + "</a></div>";
+                                    }
+                                    //即将到期未整改
+                                    //一般隐患
+                                    if (rowObject.hidrankname == "一般隐患" && d3 <= d1 && d1 <= d2) {
+                                        html = "<div style='background-color:orange;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;' title='隐患流程'>" + rowObject.workstream + "</a></div>";
+                                    }
+                                    //重大隐患Hid
+                                    if (rowObject.hidrankname.indexOf("重大隐患") >= 0 && d4 <= d1 && d1 <= d2) {
+                                        html = "<div style='background-color:orange;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;' title='隐患流程'>" + rowObject.workstream + "</a></div>";
+                                    }
+                                }
+                                else {
+                                    html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='隐患流程'>" + rowObject.workstream + "</a>";
+                                }
+                            }
+                            else if (rowObject.workstream == "隐患评估")
+                            {
+                                var beforeapprovedate = !!rowObject.beforeapprovedate ? rowObject.beforeapprovedate : "";
+
+                                var afterapprovedate = !!rowObject.afterapprovedate ? rowObject.afterapprovedate : "";
+
+                                var curapprovedate = !!rowObject.curapprovedate ? rowObject.curapprovedate : "";
+
+                                var d1 = new Date(currenttime.replace(/\-/g, "\/"));  //当前时间
+
+                                var d2 = !!beforeapprovedate ? new Date(beforeapprovedate.replace(/\-/g, "\/")) : "";  //评估即将到期时间点
+
+                                var d3 = !!afterapprovedate? new Date(afterapprovedate.replace(/\-/g, "\/")):""; //评估截止时间点
+
+                                var d4 = !!curapprovedate ? new Date(curapprovedate.replace(/\-/g, "\/")):""; //对应提交到评估的时间点
+
+                                html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='隐患流程'>" + rowObject.workstream + "</a>";
+                                if (!!d3)
+                                {
+                                    //逾期未评估
+                                    if (d1 > d3) {
+                                        html = "<div style='background-color:red;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='隐患流程'>" + rowObject.workstream + "</a></div>";
+                                    }
+                                }
+                                if (!!d2 && !!d4)
+                                {
+                                    //即将到期未评估
+                                    if (d1 >= d2 && d1 <= d3) {
+                                        html = "<div style='background-color:orange;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;' title='隐患流程'>" + rowObject.workstream + "</a></div>";
+                                    }
+                                }
+                            }
+                            else if (rowObject.workstream == "隐患验收")
+                            {
+                                var beforeacceptdate = !!rowObject.beforeacceptdate ? rowObject.beforeacceptdate : "";
+
+                                var afteracceptdate = !!rowObject.afteracceptdate ? rowObject.afteracceptdate : "";
+
+                                var curacceptdate = !!rowObject.curacceptdate ? rowObject.curacceptdate : "";
+
+                                var d1 = new Date(currenttime.replace(/\-/g, "\/"));  //当前时间
+
+                                var d2 = !!beforeacceptdate ? new Date(beforeacceptdate.replace(/\-/g, "\/")) : "";  //验收即将到期时间点
+
+                                var d3 = !!afteracceptdate ? new Date(afteracceptdate.replace(/\-/g, "\/")) : ""; //验收截止时间点
+
+                                var d4 = !!curacceptdate ? new Date(curacceptdate.replace(/\-/g, "\/")) : ""; //对应提交到验收的时间点
+
+                                html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='隐患流程'>" + rowObject.workstream + "</a>";
+                                if (!!d3)
+                                {
+                                    //逾期未验收
+                                    if (d1 > d3) {
+                                        html = "<div style='background-color:red;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='隐患流程'>" + rowObject.workstream + "</a></div>";
+                                    }
+                                }
+                                if (!!d2 && !!d4)
+                                {
+                                    //即将到期未验收
+                                    if (d1 >= d2 && d1 <= d3) {
+                                        html = "<div style='background-color:orange;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;' title='隐患流程'>" + rowObject.workstream + "</a></div>";
+                                    }
+                                }
+                            }
+                            else {
+                                html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='隐患流程'>" + rowObject.workstream + "</a>";
+                            }
+                        }
+
+                        return html;
+                    }
+                }];
+
+
+        $.ajax({
+            url: "../../AuthorizeManage/Module/GetModuleIdByCode",
+            data: { enCode: "HiddenStandingBook" },
+            type: "post",
+            success: function (data) {
+                if (!!data) {
+                    hidModultId = data;
+                    if (!!hidModultId) {
+                        //初始化值
+                        $.SetForm({
+                            url: "../../AuthorizeManage/ModuleListColumnAuth/GetColumnAuth",
+                            param: { moduleId: hidModultId },
+                            success: function (result) {
+                                if (!!result) {
+                                    var defaultFields = result.data.DEFAULTCOLUMNFIELDS;//默认列
+                                    var defaultName = result.data.DEFAULTCOLUMNNAME;//默认列名称
+                                    var arrayDefaultName = defaultName.split(',');
+                                    var arrayDefaultFields = defaultFields.split(',');
+                                    for (var i = 0; i < arrayDefaultFields.length; i++) {
+                                        //违章图片、整改图片
+                                        if (arrayDefaultFields[i] == "hidbasefilepath") {
+                                            model.push({
+                                                label: arrayDefaultName[i], name: arrayDefaultFields[i], index: arrayDefaultFields[i], width: 180, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                                                    var html = "";
+                                                    if (!!rowObject.hidbasefilepath) {
+                                                        html = "<div id=\"hidbasefilepath_" + rowObject.id + "\"><img src=\" ../.." + rowObject.hidbasefilepath.substring(1, rowObject.hidbasefilepath.length) + "\"  data-original=\" ../.." + rowObject.hidbasefilepath.substring(1, rowObject.hidbasefilepath.length) + "\" alt=\"\"  style=\"width:150px;height:150px;\" /></div>";
+                                                    }
+                                                    return html;
+                                                }
+                                            });
+                                        }
+                                        else if (arrayDefaultFields[i] == "reformfilepath") {
+                                            model.push({
+                                                label: arrayDefaultName[i], name: arrayDefaultFields[i], index: arrayDefaultFields[i], width: 180, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                                                    var html = "";
+                                                    if (!!rowObject.reformfilepath) {
+                                                        html = "<div id=\"reformfilepath_" + rowObject.id + "\"><img src=\" ../.." + rowObject.reformfilepath.substring(1, rowObject.reformfilepath.length) + "\" data-original=\" ../.." + rowObject.reformfilepath.substring(1, rowObject.reformfilepath.length) + "\" style=\"width:150px;height:150px;\" alt=\"\" /></div>";
+                                                    }
+                                                    return html;
+                                                }
+                                            })
+                                        }
+                                            //隐患描述
+                                        else if (arrayDefaultFields[i] == "hiddescribe") {
+                                            model.push({
+                                                label: arrayDefaultName[i], name: arrayDefaultFields[i], index: arrayDefaultFields[i], width: 180, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                                                    var html = "";
+                                                    if (!!rowObject.hiddescribe) {
+                                                        html = "<span style=\"white-space:pre-wrap;\">" + rowObject.hiddescribe + "</span>";
+                                                    }
+                                                    return html;
+                                                }
+                                            })
+                                        }
+                                        else {
+                                            model.push({ label: arrayDefaultName[i], name: arrayDefaultFields[i], index: arrayDefaultFields[i], width: 150, align: 'center' })
+                                        }
+                                    }
+                                }
+                            }
+                        });
+
+                        $gridTable.jqGrid({
+                            autowidth: true,
+                            height: $(window).height() - 170,
+                            url: "../../HiddenTroubleManage/HTBaseInfo/GetListJson",
+                            postData: { queryJson: JSON.stringify(queryJson) },
+                            datatype: "json",
+                            colModel: model,
+                            viewrecords: true,
+                            rowNum: 15,
+                            rowList: [15, 30, 50, 100],
+                            pager: "#gridPager",
+                            sortname: 'ordernumber asc ,createdate',
+                            sortorder: 'desc',
+                            rownumbers: true,
+                            shrinkToFit: true,
+                            gridview: true,
+                            onSelectRow: function () {
+                                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                            },
+                            gridComplete: function () {
+                                $("#" + this.id).setSelection(selectedRowIndex, false);
+                                //获取所有数据
+                                var datas = $("#" + this.id).jqGrid("getRowData");
+                                if (!!datas)
+                                {
+                                    $(datas).each(function (i, ele) {
+                                        var htbaseId = "#hidbasefilepath_" + ele.id;
+                                        viewimg(ele.hidphoto, htbaseId, ele.hidbasefilepath); //隐患图片
+                                        var htchangeId = "#reformfilepath_" + ele.id;
+                                        viewimg(ele.hidchangephoto, htchangeId, ele.reformfilepath); //整改图片
+                                    });
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+
+         
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(QueryJson()) }, page: 1
+            }).trigger('reloadGrid');
+
+            $(".ui-filter-list").css("display", "none");
+            $(".ui-filter-text ").removeClass("active");
+            $(".ui-filter-text ").removeAttr("style");
+        });
+
+        $("#btn_Search1").click(function () {
+          
+
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(QueryJson()) }, page: 1
+            }).trigger('reloadGrid');
+
+            $(".ui-filter-list").css("display", "none");
+            $(".ui-filter-text ").removeClass("active");
+            $(".ui-filter-text ").removeAttr("style");
+        });
+
+    }
+
+    //预览图片
+    function viewimg(id, objid, epath) {
+        var $obj = $(objid);
+        $.post("../../PublicInfoManage/ResourceFile/GetFilesByRecId", { recId: id }, function (data) {
+            var files = eval("(" + data + ")");
+            if (files.length > 0) {
+                $(files).each(function (i, file) {
+                    if (!!file.filepath)
+                    {
+                        var filepath = file.filepath.substring(15, file.filepath.length);
+                        if (!!epath && epath.indexOf(filepath) < 0) {
+                            var $li = $('<img title="点击查看大图" alt="点击查看大图" style=\"width:0px;height:0px;\" data-original="' + "/" + file.filepath.substring(1, file.filepath.length) + '" src="' + "/" + file.filepath.substring(1, file.filepath.length) + '"  />');
+                            $li.appendTo($obj);
+                        }
+                    }
+                });
+                $obj.viewer({ url: "data-original" });
+            }
+        });
+    }
+
+    //删除
+    function removedata(obj, hidcode) {
+        $.RemoveForm({
+            url: '../../HiddenTroubleManage/HTBaseInfo/RemoveForm',
+            param: { keyValue: obj, hidCode: hidcode },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        });
+    }
+
+    function OpenViewFlow(keyValue) {
+        var title = "隐患流程图";
+        var rqUrl = "/SystemManage/WorkFlow/Index?keyValue=" + keyValue;
+        dialogOpen({
+            id: 'HidFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() / 2 + 220) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //减少天数
+    function SubtractDays(date, value) {
+        var d = new Date(date);
+        d.setDate(d.getDate() - value);
+        var m = d.getMonth() + 1;
+        return d.getFullYear() + "-" + m + "-" + d.getDate();
+    }
+
+    //查看视图
+    function viewdata(obj, atype, workstream) {
+        var rqUrl = "";
+        var title = "查看隐患";
+
+        //未整改隐患的查看页面
+        if (workstream == "隐患登记") {
+            if (atype == "0" || atype == "3") {
+                rqUrl = '/HiddenTroubleManage/HTBaseInfo/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (atype == "2") {
+                rqUrl = '/HiddenTroubleManage/HTBaseInfo/CForm?keyValue=' + obj + '&actiontype=view';
+            }
+            else  //已整改的查看页面
+            {
+                title = "已整改隐患查看";
+                rqUrl = '/HiddenTroubleManage/HTBaseInfo/NewForm?keyValue=' + obj + '&actiontype=view';
+            }
+        }
+        else if (workstream == "制定整改计划") {
+            rqUrl = '/HiddenTroubleManage/HTChangePlan/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "隐患完善") {
+            rqUrl = '/HiddenTroubleManage/HTPerfection/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "隐患评估") {
+            rqUrl = '/HiddenTroubleManage/HTApproval/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "隐患整改") {
+            rqUrl = '/HiddenTroubleManage/HTChangeInfo/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "隐患验收") {
+            rqUrl = '/HiddenTroubleManage/HTAcceptInfo/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "复查验证") {
+            rqUrl = '/HiddenTroubleManage/HTReCheck/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "整改效果评估") {
+            rqUrl = '/HiddenTroubleManage/HTEstimate/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "整改结束") {
+            rqUrl = '/HiddenTroubleManage/HTBaseInfo/DoneForm?keyValue=' + obj + '&actiontype=view';
+        }
+
+        dialogOpen({
+            id: 'HidForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //重置所有查询条件
+    function ResetCondition() {
+        //整改截止开始时间
+        $("#cdstDate").val("");
+        //整改截止结束时间
+        $("#cdetDate").val("");
+        //开始时间
+        $("#StartTime").val("");
+        //结束时间
+        $("#EndTime").val("");
+        //隐患级别
+        $("#HidRank").attr("data-text", "===全部===");
+        $("#HidRank").attr("data-value", "");
+        $("#HidRank div:eq(0)").text("===全部===");
+        //整改状态
+        $("#ChangeStatus").attr("data-text", "===全部===");
+        $("#ChangeStatus").attr("data-value", "");
+        $("#ChangeStatus div:eq(0)").text("===全部===");
+        //流程状态
+        $("#WorkStream").attr("data-text", "===全部===");
+        $("#WorkStream").attr("data-value", "");
+        $("#WorkStream div:eq(0)").text("===全部===");
+        //检查类型
+        $("#SaftyCheckType").attr("data-text", "===全部===");
+        $("#SaftyCheckType").attr("data-value", "");
+        $("#SaftyCheckType div:eq(0)").text("===全部===");
+        //隐患类型
+        $("#HidType").ComboBoxSetText("===全部===");
+        //登记单位
+        $("#HidRegisterType").attr("data-text", "===全部===");
+        $("#HidRegisterType").attr("data-value", "");
+        $("#HidRegisterType div:eq(0)").text("===全部===");
+        //
+        //台账类型
+        $("#HidStandingType").attr("data-text", "===全部===");
+        $("#HidStandingType").attr("data-value", "");
+        $("#HidStandingType div:eq(0)").text("===全部===")
+
+        ////是否曝光
+        $("#IsExposureState").find("option:eq(0)").attr("selected", true);
+
+
+        //事故隐患描述(简题)
+        $("#HidDescribe").val("");
+    }
+
+    //导出excel
+    function exportExcel() {
+        //隐患基本信息
+        var queryJson = JSON.stringify(QueryJson());
+        window.location.href = "../../HiddenTroubleManage/HTBaseInfo/ExportExcel?queryJson=" + queryJson + "&fileName=隐患基本信息&mode=1&currentModuleId=" + hidModultId;
+    }
+
+    //导出一览表
+    function exportList() {
+        var queryJson = JSON.stringify(QueryJson());
+        window.location.href = "../../HiddenTroubleManage/HTBaseInfo/ExportList?queryJson=" + queryJson +"&mode=1";
+    }
+
+    //电力安全隐患排查治理情况月报表
+    function exportSituation() {
+        window.location.href = "../../HiddenTroubleManage/HTBaseInfo/ExportSituation?mode=1";
+    }
+    function exportGovern()
+    {
+        var queryJson = JSON.stringify(QueryJson());
+        window.location.href = "../../HiddenTroubleManage/HTBaseInfo/ExportGovern?queryJson=" + queryJson + "&mode=1";
+    }
+    //自定义列表
+    function customList() {
+        dialogOpen({
+            id: 'CustomList',
+            title: '自定义列表内容',
+            url: '/AuthorizeManage/ModuleListColumnAuth/Setting?moduleId=' + hidModultId + "&refreshlist=gridTable&layerId=" + layerId,
+            width: ($(top.window).width() - 300) + "px",
+            height: ($(top.window).height() - 300) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //期限设置
+    function setting() {
+        dialogOpen({
+            id: "SettingForm",
+            title: '期限设置',
+            url: "/HiddenTroubleManage/HTBaseInfo/ExpirationForm?modulename=Hidden",
+            width: ($(top.window).width() / 2) + "px",
+            height: ($(top.window).height() / 2) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+</script>
+
+<style type="text/css">
+    #HidRegisterType .ui-select-text {
+        width: 120px;
+    }
+</style>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <input type="hidden" id="btnFromCondition" />
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <ul class="nav nav-tabs" id="ulTabs">
+                <li class="active">
+                    <a data-toggle="tab" href="#tab1" onclick="javascript: $('#btnFromCondition').val(1); _parentId = ''; _isOrg = ''; $('#btn_Search').trigger('click');" title="点击刷新数据">按登记单位</a>
+                </li>
+                <li id="area">
+                    <a data-toggle="tab" href="#tab2" onclick="javascript: $('#btnFromCondition').val(0); _parentId = ''; _isOrg = ''; $('#btn_Search').trigger('click');" title="点击刷新数据">按整改单位</a>
+                </li>
+            </ul>
+            <div class="tab-content" id="ulTabsDetail">
+                <div id="tab1" class="tab-pane active">
+                    <div style="height: 38px; padding: 8px 0px 0px 25px; border-bottom: 1px solid #ccc; ">
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="chooseMethod" id="chooseMethod1" value="0" checked="checked" />本单位
+                            </label>
+                        </div>
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="chooseMethod" id="chooseMethod2" value="1" />本子单位
+                            </label>
+                        </div>
+                    </div>
+                    <div id="deptTree"></div>
+                </div>
+                <div id="tab2" class="tab-pane">
+                    <div id="itemTree">
+                    </div>
+                </div>
+            </div>
+            <div id="deptTreeGrp">
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title"></div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件:</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 350px;">
+                                    <div class="ui-filter-text">
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px; ">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <th class="formTitle">登记时间：</th>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="StartTime" readonly type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="EndTime" readonly type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <th class="formTitle"><span style="white-space:pre-wrap;">整改截止时间</span>：</th>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="cdstDate" readonly type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="cdetDate" readonly type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">台账类型：</td>
+                                                <td class="formValue">
+                                                    <div id="HidStandingType" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">隐患级别：</td>
+                                                <td class="formValue">
+                                                    <div id="HidRank" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">隐患状态：</td>
+                                                <td class="formValue">
+                                                    <div id="ChangeStatus" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">流程状态：</td>
+                                                <td class="formValue">
+                                                    <div id="WorkStream" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">检查类型：</td>
+                                                <td class="formValue">
+                                                    <div id="SaftyCheckType" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">隐患类别：</td>
+                                                <td class="formValue">
+                                                    <div id="HidType" type="selectTree" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" id="titleDescribe"><span style="white-space:pre-wrap;">事故隐患描述(简题)</span>：</td>
+                                                <td class="formValue">
+                                                    <input id="HidDescribe" type="text" class="form-control" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">是否曝光：</td>
+                                                <td class="formValue">
+                                                    <select id="IsExposureState" class="selectpicker show-menu-arrow form-control" width="120px">
+                                                        <option value="" selected="selected">===全部===</option>
+                                                        <option value="1">是</option>
+                                                        <option value="0">否</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding-left:10px">
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li style="width:300px;"><a style="float:left" data-value="逾期未评估、未整改、未验收">逾期未评估、未整改、未验收</a><div style="float: left; margin-left:24px; background-color: red; height: 22px; width: 80px;"></div></li>
+                                        <li style="width:300px;"><a style="float:left" data-value="即将到期未评估、未整改、未验收">即将到期未评估、未整改、未验收</a><div style="float: left; background-color: orange; height: 22px; width: 80px;"></div></li>
+                                        <li style="width:300px;"><a style="float:left" data-value="整改结束">整改结束</a><div style="float: right; background-color: green; margin-right: 10px; height: 22px; width: 80px;"></div></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left:10px" id="regunit1">登记单位：</td>
+                            <td class="formValue" id="regunit2">
+                                <div id="HidRegisterType" type="select" class="ui-select" width="120px" />
+                            </td>
+                            <td style="padding-left:10px" id="regunit3">
+                                <a id="btn_Search1" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a class="btn btn-default" onclick="setting()"><i class="fa fa-gear"></i>&nbsp;期限设置</a>
+                        <a class="btn btn-default" onclick="customList()"><i class="fa fa-edit"></i>&nbsp;自定义列表</a>
+                        <a class="btn btn-default" onclick="exportExcel()"><i class="fa fa-download"></i>&nbsp;导出</a>
+                        <a class="btn btn-default" onclick="exportList()"><i class="fa fa-download"></i>&nbsp;导出一览表</a>
+                        <a class="btn btn-default" onclick="exportGovern()"><i class="fa fa-download"></i>&nbsp;导出治理台账</a>
+                        <a class="btn btn-default" onclick="exportSituation()"><i class="fa fa-download"></i>&nbsp;导出隐患排查治理情况表</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

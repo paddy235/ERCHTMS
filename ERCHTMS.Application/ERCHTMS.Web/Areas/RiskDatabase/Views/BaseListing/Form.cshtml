@@ -1,0 +1,970 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script type="text/javascript" src="~/Content/scripts/business/common.js"></script>
+<style type="text/css">
+    #tab1 td {
+        padding-top:5px;
+    }
+</style>
+<script>
+    var keyValue = request('keyvalue');
+    var type = request('type');
+    var action = request('action');
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        var ConventionalData = [{ ItemName: "常规", ItemValue: 0 }, { ItemName: "非常规", ItemValue: 1 }];
+        //常规/非常规
+        $("#IsConventional").ComboBox({
+            data: ConventionalData,
+            description: "======请选择======",
+            id: "ItemValue",
+            text: "ItemName"
+        });
+        var SpecialEquData = [{ ItemName: "是", ItemValue: 0 }, { ItemName: "否", ItemValue: 1 }];
+        //是否特种设备
+        $("#IsSpecialEqu").ComboBox({
+            data: SpecialEquData,
+            description: "======请选择======",
+            id: "ItemValue",
+            text: "ItemName"
+        });
+        if (type == 0) {
+            $("#NameTile").html("作业活动<font face=\"宋体\">*</font>");
+            $("#trArea").hide();
+            $("#AreaName").removeAttr("isvalid");
+            $("#trSpeEqu").hide();
+            $("#IsSpecialEqu").removeAttr("isvalid");
+        }
+        else if (type == 1) {
+            $("#NameTile").html("设备名称<font face=\"宋体\">*</font>");
+            $("#trStep").hide();
+            $("#ActivityStep").removeAttr("isvalid");
+            $("#trConventional").hide();
+            $("#IsConventional").removeAttr("isvalid");
+            $("#tr_Post").hide();
+            $("#Post").removeAttr("isvalid");
+        }
+        if (action=="show") {
+            $("#form1").find("input,textarea,.ui-select,.ui-select-text,.ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+                $(this).attr("readonly", "readonly");
+            })
+        }
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../RiskDatabase/BaseListing/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+    }
+    //保存表单;
+    function AcceptClick(close) {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["Type"] = type;
+        $.SaveForm({
+            url: "../../RiskDatabase/BaseListing/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            close: close,
+            success: function () {
+                $("#ActivityStep").val("");
+                $("#IsConventional").attr("data-text", "======请选择======");
+                $("#IsConventional").attr("data-value", "");
+                $("#IsConventional div:eq(0)").text("======请选择======");
+                $("#AreaName").val("");
+                $("#AreaCode").val("");
+                $("#AreaId").val("");
+                $("#IsSpecialEqu").attr("data-text", "======请选择======");
+                $("#IsSpecialEqu").attr("data-value", "");
+                $("#IsSpecialEqu div:eq(0)").text("======请选择======");
+                $("#Others").val("");
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                keyValue = "@Guid.NewGuid().ToString()";
+            }
+        })
+    }
+    function ShowDesc() {
+        idx = dialogContent({
+            id: "win1",
+            title: "特种设备目录",
+            btns: 1,
+            btn: ["关闭"],
+            content: $("#divsbsscbys").html(),
+            width: "1000px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    function SelectPost()
+    {
+        var options = { winObject: window.document.body, domId: "PostId,Post" };
+        var url = '/BaseManage/Post/Select?checkMode=0&mode=4&stationid=PostId&deptId=' + top.currUserDeptId ;
+        return dialogOpen({
+            id: "Post",
+            title: "选择岗位",
+            url: url,
+            width: ($(top.window).width() - 200) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(options);
+            }
+        });
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr id="tr_Post">
+            <td class="formTitle">岗位(工种)<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="Post" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly="readonly" onclick="SelectPost()" />
+                <input type="hidden" id="PostId" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" id="NameTile">作业活动<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="Name" type="text" class="form-control" isvalid="yes" checkexpession="NotNull"/>
+                <input type="hidden" id="ControlsDept" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName" />
+                <input type="hidden" id="ControlsDeptId" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId"/>
+                <input type="hidden" id="ControlsDeptCode" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode"/>
+            </td>
+        </tr>
+        <tr id="trStep">
+            <td class="formTitle">活动步骤<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="ActivityStep" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr id="trConventional">
+            <td class="formTitle">常规/非常规<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="IsConventional" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+        </tr>
+        <tr id="trArea">
+            <td class="formTitle">所在地点<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="AreaName" type="text" class="form-control" readonly="readonly" isvalid="yes" checkexpession="NotNull" onclick="selectArea(window.document.body, 'AreaName,AreaCode,,,,,,AreaId');" />
+                <input type="hidden" id="AreaCode" />
+                <input type="hidden" id="AreaId" />
+            </td>
+        </tr>
+        <tr id="trSpeEqu">
+            <td class="formTitle">是否特种设备<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div style="display:flex">
+                    <div id="IsSpecialEqu" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width:75%"  />
+                </div>
+               <div style="">
+                   <a href="#" id="Analyse" onclick="ShowDesc()" class="btn btn-primary" title='特种设备目录'><i class='fa fa-pencil-square-o'></i>特种设备目录</a>
+
+               </div>
+                
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">其他</td>
+            <td class="formValue">
+                <input type="text" class="form-control" id="Others" />
+            </td>
+        </tr>
+    </table>
+</div>
+<div id="divL" style="margin:0px; display:none;" class="table1 sbsscbys">
+    
+    <div style="margin:10px;" id="divsbsscbys">
+        <div style="text-align:center;margin-top: 30px;font-size: large;font-weight: bold;">特种设备目录</div>
+        <table id="tab1" cellpadding="0" border="1" style=" text-align: left;margin:20px 20px 20px 20px" align="left">
+            <tr style="font-size:20px;font-weight:bold;height:40px;">
+                <td style="width:60px"><label>代码</label></td>
+                <td style="width:120px"> <label>种 类</label></td>
+                <td style="width:300px"> <label>类 别</label></td>
+                <td> <label>品 种</label></td>
+            </tr>
+            <tr>
+                <td><label>1000</label></td>
+                <td><label>锅炉</label></td>
+                <td colspan="2">
+                    <label>锅炉，是指利用各种燃料、电或者其他能源，将所盛装 的液体加热到一定的参数，并通过对外输出介质的形式提供 热能的设备，其范围规定为设计正常水位容积大于或者等于 30L，且额定蒸汽压力大于或者等于 0.1MPa（表压）的承压 蒸汽锅炉；出口水压大于或者等于 0.1MPa（表压），且额定 功率大于或者等于 0.1MW 的承压热水锅炉；额定功率大于或 者等于 0.1MW 的有机热载体锅炉。 </label>
+                </td>
+            </tr>
+            <tr>
+                <td><label>1100</label></td>
+                <td></td>
+                <td>
+                    <label>承压蒸汽锅炉</label>
+                </td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>1200</label></td>
+                <td></td>
+                <td>
+                    <label>承压热水锅炉</label>
+                </td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>1300</label></td>
+                <td></td>
+                <td>
+                    <label>有机热载体锅炉</label>
+                </td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>1310</label></td>
+                <td></td>
+                <td></td>
+                <td><label>有机热载体气相炉</label></td>
+            </tr>
+            <tr>
+                <td><label>1320</label></td>
+                <td></td>
+                <td></td>
+                <td><label>有机热载体液相炉</label></td>
+            </tr>
+            <tr>
+                <td><label>2000</label></td>
+                <td><label>压力容器</label></td>
+                <td colspan="2"><label>压力容器，是指盛装气体或者液体，承载一定压力的密 闭设备，其范围规定为最高工作压力大于或者等于 0.1MPa （表压）的气体、液化气体和最高工作温度高于或者等于标 准沸点的液体、容积大于或者等于 30L 且内直径(非圆形截 面指截面内边界最大几何尺寸)大于或者等于 150mm 的固定 式容器和移动式容器；盛装公称工作压力大于或者等于 0.2MPa（表压），且压力与容积的乘积大于或者等于 1.0MPa? L 的气体、液化气体和标准沸点等于或者低于 60℃液体的气 瓶；氧舱。  </label></td>
+            </tr>
+            <tr>
+                <td><label>2100</label></td>
+                <td></td>
+                <td>
+                    <label>固定式压力容器</label>
+                </td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>2110</label></td>
+                <td></td>
+                <td></td>
+                <td><label>超高压容器</label></td>
+            </tr>
+            <tr>
+                <td><label>2130</label></td>
+                <td></td>
+                <td></td>
+                <td><label>第三类压力容器</label></td>
+            </tr>
+            <tr>
+                <td><label>2150</label></td>
+                <td></td>
+                <td></td>
+                <td><label>第二类压力容器</label></td>
+            </tr>
+            <tr>
+                <td><label>2170</label></td>
+                <td></td>
+                <td></td>
+                <td><label>第一类压力容器</label></td>
+            </tr>
+            <tr>
+                <td><label>2200</label></td>
+                <td></td>
+                <td><label>移动式压力容器</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>2210</label></td>
+                <td></td>
+                <td></td>
+                <td><label>铁路罐车</label></td>
+            </tr>
+            <tr>
+                <td><label>2220</label></td>
+                <td></td>
+                <td></td>
+                <td><label>汽车罐车</label></td>
+            </tr>
+            <tr>
+                <td><label>2230</label></td>
+                <td></td>
+                <td></td>
+                <td><label>长管拖车</label></td>
+            </tr>
+            <tr>
+                <td><label>2240</label></td>
+                <td></td>
+                <td></td>
+                <td><label>罐式集装箱</label></td>
+            </tr>
+            <tr>
+                <td><label>2250</label></td>
+                <td></td>
+                <td></td>
+                <td><label>管束式集装箱</label></td>
+            </tr>
+            <tr>
+                <td><label>2300</label></td>
+                <td></td>
+                <td>
+                    <label>气瓶</label>
+                </td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>2310</label></td>
+                <td></td>
+                <td></td>
+                <td><label>无缝气瓶</label></td>
+            </tr>
+            <tr>
+                <td><label>2320</label></td>
+                <td></td>
+                <td></td>
+                <td><label>焊接气瓶</label></td>
+            </tr>
+            <tr>
+                <td><label>23T0</label></td>
+                <td></td>
+                <td></td>
+                <td><label>特种气瓶（内装填料气瓶、纤维缠绕 气瓶、 低温绝热气瓶）</label></td>
+            </tr>
+            <tr>
+                <td><label>2400</label></td>
+                <td></td>
+                <td>
+                    <label>氧舱</label>
+                </td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>2410</label></td>
+                <td></td>
+                <td></td>
+                <td><label>医用氧舱</label></td>
+            </tr>
+            <tr>
+                <td><label>2420</label></td>
+                <td></td>
+                <td></td>
+                <td><label>高气压舱</label></td>
+            </tr>
+            <tr>
+                <td><label>8000</label></td>
+                <td><label>压力管道</label></td>
+                <td colspan="2"><label>压力管道，是指利用一定的压力，用于输送气体或者液 体的管状设备，其范围规定为最高工作压力大于或者等于 0.1MPa（表压），介质为气体、液化气体、蒸汽或者可燃、 易爆、有毒、有腐蚀性、最高工作温度高于或者等于标准沸 点的液体，且公称直径大于或者等于 50mm 的管道。公称直 径小于 150mm，且其最高工作压力小于 1.6MPa（表压）的输 送无毒、不可燃、无腐蚀性气体的管道和设备本体所属管道 除外。其中，石油天然气管道的安全监督管理还应按照《安 全生产法》、《石油天然气管道保护法》等法律法规实施。</label></td>
+            </tr>
+            <tr>
+                <td><label>8100</label></td>
+                <td><label>长输管道</label></td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>8110</label></td>
+                <td></td>
+                <td></td>
+                <td><label>输油管道</label></td>
+            </tr>
+            <tr>
+                <td><label>8120</label></td>
+                <td></td>
+                <td></td>
+                <td><label>输气管道</label></td>
+            </tr>
+            <tr>
+                <td><label>8200</label></td>
+                <td></td>
+                <td><label>公用管道</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>8210</label></td>
+                <td></td>
+                <td></td>
+                <td><label>燃气管道</label></td>
+            </tr>
+            <tr>
+                <td><label>8220</label></td>
+                <td></td>
+                <td></td>
+                <td><label>热力管道</label></td>
+            </tr>
+            <tr>
+                <td><label>8300</label></td>
+                <td></td>
+                <td><label>工业管道</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>8310</label></td>
+                <td></td>
+                <td></td>
+                <td><label>工艺管道</label></td>
+            </tr>
+            <tr>
+                <td><label>8320</label></td>
+                <td></td>
+                <td></td>
+                <td><label>动力管道</label></td>
+            </tr>
+            <tr>
+                <td><label>8330</label></td>
+                <td></td>
+                <td></td>
+                <td><label>制冷管道</label></td>
+            </tr>
+            <tr>
+                <td><label>7000</label></td>
+                <td><label>压力管道元件</label></td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>7100</label></td>
+                <td></td>
+                <td><label>压力管道管子</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>7110</label></td>
+                <td></td>
+                <td></td>
+                <td><label>无缝钢管</label></td>
+            </tr>
+            <tr>
+                <td><label>7120</label></td>
+                <td></td>
+                <td></td>
+                <td><label>焊接钢管</label></td>
+            </tr>
+            <tr>
+                <td><label>7130</label></td>
+                <td></td>
+                <td></td>
+                <td><label>有色金属管</label></td>
+            </tr>
+            <tr>
+                <td><label>7140</label></td>
+                <td></td>
+                <td></td>
+                <td><label>球墨铸铁管</label></td>
+            </tr>
+            <tr>
+                <td><label>7150</label></td>
+                <td></td>
+                <td></td>
+                <td><label>复合管</label></td>
+            </tr>
+            <tr>
+                <td><label>71F0</label></td>
+                <td></td>
+                <td></td>
+                <td><label>非金属材料管</label></td>
+            </tr>
+            <tr>
+                <td><label>7200</label></td>
+                <td></td>
+                <td><label>压力管道管件</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>7210</label></td>
+                <td></td>
+                <td></td>
+                <td><label>非焊接管件（无缝管件）</label></td>
+            </tr>
+            <tr>
+                <td><label>7220</label></td>
+                <td></td>
+                <td></td>
+                <td><label>焊接管件（有缝管件）</label></td>
+            </tr>
+            <tr>
+                <td><label>7230</label></td>
+                <td></td>
+                <td></td>
+                <td><label>锻制管件</label></td>
+            </tr>
+            <tr>
+                <td><label>7270</label></td>
+                <td></td>
+                <td></td>
+                <td><label>复合管件</label></td>
+            </tr>
+            <tr>
+                <td><label>72F0</label></td>
+                <td></td>
+                <td></td>
+                <td><label>非金属管件</label></td>
+            </tr>
+            <tr>
+                <td><label>7300</label></td>
+                <td></td>
+                <td><label>压力管道阀门</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>7320</label></td>
+                <td></td>
+                <td></td>
+                <td><label>金属阀门</label></td>
+            </tr>
+            <tr>
+                <td><label>73F0</label></td>
+                <td></td>
+                <td></td>
+                <td><label>非金属阀门</label></td>
+            </tr>
+            <tr>
+                <td><label>73T0</label></td>
+                <td></td>
+                <td></td>
+                <td><label>特种阀门</label></td>
+            </tr>
+            <tr>
+                <td><label>7400</label></td>
+                <td></td>
+                <td><label>压力管道法兰</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>7410</label></td>
+                <td></td>
+                <td></td>
+                <td><label>钢制锻造法兰</label></td>
+            </tr>
+            <tr>
+                <td><label>7420</label></td>
+                <td></td>
+                <td></td>
+                <td><label>非金属法兰</label></td>
+            </tr>
+            <tr>
+                <td><label>7500</label></td>
+                <td></td>
+                <td><label>补偿器</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>7510</label></td>
+                <td></td>
+                <td></td>
+                <td><label>金属波纹膨胀节</label></td>
+            </tr>
+            <tr>
+                <td><label>7530</label></td>
+                <td></td>
+                <td></td>
+                <td><label>旋转补偿器</label></td>
+            </tr>
+            <tr>
+                <td><label>75F0</label></td>
+                <td></td>
+                <td></td>
+                <td><label>非金属膨胀节</label></td>
+            </tr>
+            <tr>
+                <td><label>7700</label></td>
+                <td></td>
+                <td><label>压力管道密封元件</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>7710</label></td>
+                <td></td>
+                <td></td>
+                <td><label>金属密封元件</label></td>
+            </tr>
+            <tr>
+                <td><label>77F0</label></td>
+                <td></td>
+                <td></td>
+                <td><label>非金属密封元件</label></td>
+            </tr>
+            <tr>
+                <td><label>7T00</label></td>
+                <td></td>
+                <td><label>压力管道特种元件</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>7T10</label></td>
+                <td></td>
+                <td></td>
+                <td><label>防腐管道元件</label></td>
+            </tr>
+            <tr>
+                <td><label>7TZ0</label></td>
+                <td></td>
+                <td></td>
+                <td><label>元件组合装置</label></td>
+            </tr>
+            <tr>
+                <td><label>3000</label></td>
+                <td><label>电梯</label></td>
+                <td colspan="2"><label>电梯，是指动力驱动，利用沿刚性导轨运行的箱体或者沿固 定线路运行的梯级（踏步），进行升降或者平行运送人、货 物的机电设备，包括载人（货）电梯、自动扶梯、自动人行 道等。非公共场所安装且仅供单一家庭使用的电梯除外。</label></td>
+            </tr>
+            <tr>
+                <td><label>3100</label></td>
+                <td></td>
+                <td><label>曳引与强制驱动电梯</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>3110</label></td>
+                <td></td>
+                <td></td>
+                <td><label>曳引驱动乘客电梯</label></td>
+            </tr>
+            <tr>
+                <td><label>3120</label></td>
+                <td></td>
+                <td></td>
+                <td><label>曳引驱动载货电梯</label></td>
+            </tr>
+            <tr>
+                <td><label>3130</label></td>
+                <td></td>
+                <td></td>
+                <td><label>强制驱动载货电梯</label></td>
+            </tr>
+            <tr>
+                <td><label>3200</label></td>
+                <td></td>
+                <td><label>液压驱动电梯</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>3210</label></td>
+                <td></td>
+                <td></td>
+                <td><label>液压乘客电梯</label></td>
+            </tr>
+            <tr>
+                <td><label>3220</label></td>
+                <td></td>
+                <td></td>
+                <td><label>液压载货电梯</label></td>
+            </tr>
+            <tr>
+                <td><label>3300</label></td>
+                <td></td>
+                <td></td>
+                <td><label>自动扶梯与自动人行道</label></td>
+            </tr>
+            <tr>
+                <td><label>3310</label></td>
+                <td></td>
+                <td></td>
+                <td><label>自动扶梯</label></td>
+            </tr>
+            <tr>
+                <td><label>3320</label></td>
+                <td></td>
+                <td></td>
+                <td><label>自动人行道</label></td>
+            </tr>
+            <tr>
+                <td><label>3400</label></td>
+                <td></td>
+                <td><label>其它类型电梯</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>3410</label></td>
+                <td></td>
+                <td></td>
+                <td><label>防爆电梯</label></td>
+            </tr>
+            <tr>
+                <td><label>3420</label></td>
+                <td></td>
+                <td></td>
+                <td><label>消防员电梯</label></td>
+            </tr>
+            <tr>
+                <td><label>3430</label></td>
+                <td></td>
+                <td></td>
+                <td><label>杂物电梯</label></td>
+            </tr>
+            <tr>
+                <td><label>4000</label></td>
+                <td><label>起重机械</label></td>
+                <td colspan="2"><label>起重机械，是指用于垂直升降或者垂直升降并水平移动 重物的机电设备，其范围规定为额定起重量大于或者等于 0.5t 的升降机；额定起重量大于或者等于 3t（或额定起重 力矩大于或者等于 40t·m 的塔式起重机，或生产率大于或 者等于 300t/h 的装卸桥），且提升高度大于或者等于 2m 的 起重机；层数大于或者等于 2 层的机械式停车设备。</label></td>
+            </tr>
+            <tr>
+                <td><label>4100</label></td>
+                <td></td>
+                <td><label>桥式起重机</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>4110</label></td>
+                <td></td>
+                <td></td>
+                <td><label>通用桥式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4130</label></td>
+                <td></td>
+                <td></td>
+                <td><label>防爆桥式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4140</label></td>
+                <td></td>
+                <td></td>
+                <td><label>绝缘桥式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4150</label></td>
+                <td></td>
+                <td></td>
+                <td><label>冶金桥式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4170</label></td>
+                <td></td>
+                <td></td>
+                <td><label>电动单梁起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4190</label></td>
+                <td></td>
+                <td></td>
+                <td><label>电动葫芦桥式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4200</label></td>
+                <td></td>
+                <td><label>门式起重机</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>4210</label></td>
+                <td></td>
+                <td></td>
+                <td><label>通用门式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4220</label></td>
+                <td></td>
+                <td></td>
+                <td><label>防爆门式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4230</label></td>
+                <td></td>
+                <td></td>
+                <td><label>轨道式集装箱门式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4240</label></td>
+                <td></td>
+                <td></td>
+                <td><label>轮胎式集装箱门式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4250</label></td>
+                <td></td>
+                <td></td>
+                <td><label>岸边集装箱起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4260</label></td>
+                <td></td>
+                <td></td>
+                <td><label>造船门式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4270</label></td>
+                <td></td>
+                <td></td>
+                <td><label>电动葫芦门式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4280</label></td>
+                <td></td>
+                <td></td>
+                <td><label>装卸桥</label></td>
+            </tr>
+            <tr>
+                <td><label>4290</label></td>
+                <td></td>
+                <td></td>
+                <td><label>架桥机</label></td>
+            </tr>
+            <tr>
+                <td><label>4300</label></td>
+                <td></td>
+                <td><label>塔式起重机</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>4310</label></td>
+                <td></td>
+                <td></td>
+                <td><label>普通塔式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4320</label></td>
+                <td></td>
+                <td></td>
+                <td><label>电站塔式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4400</label></td>
+                <td></td>
+                <td><label>流动式起重机</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>4400</label></td>
+                <td></td>
+                <td></td>
+                <td><label>轮胎起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4410</label></td>
+                <td></td>
+                <td></td>
+                <td><label>轮胎起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4420</label></td>
+                <td></td>
+                <td></td>
+                <td><label>履带起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4440</label></td>
+                <td></td>
+                <td></td>
+                <td><label>集装箱正面吊运起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4450</label></td>
+                <td></td>
+                <td></td>
+                <td><label>铁路起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4700</label></td>
+                <td></td>
+                <td><label>门座式起重机</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>4710</label></td>
+                <td></td>
+                <td></td>
+                <td><label>门座起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4760</label></td>
+                <td></td>
+                <td></td>
+                <td><label>固定式起重机</label></td>
+            </tr>
+            <tr>
+                <td><label>4800</label></td>
+                <td></td>
+                <td><label>升降机</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>4860</label></td>
+                <td></td>
+                <td></td>
+                <td><label>施工升降机</label></td>
+            </tr>
+            <tr>
+                <td><label>4870</label></td>
+                <td></td>
+                <td></td>
+                <td><label>简易升降机</label></td>
+            </tr>
+            <tr>
+                <td><label>4900</label></td>
+                <td></td>
+                <td><label>缆索式起重机</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>4A00</label></td>
+                <td></td>
+                <td><label>桅杆式起重机</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>4D00</label></td>
+                <td></td>
+                <td><label>机械式停车设备</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>5000</label></td>
+                <td><label>场（厂）内专用机动车辆</label></td>
+                <td colspan="2"><label>场（厂）内专用机动车辆，是指除道路交通、农用车辆以外仅在工厂厂区、旅游景区、游乐场所等特定区域使用的专用机动车辆。</label></td>
+            </tr>
+            <tr>
+                <td><label>5100</label></td>
+                <td></td>
+                <td><label>机动工业车辆</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>5110</label></td>
+                <td></td>
+                <td></td>
+                <td><label>叉车</label></td>
+            </tr>
+            <tr>
+                <td><label>5200</label></td>
+                <td></td>
+                <td><label>非公路用旅游观光车辆</label></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>F000</label></td>
+                <td><label>安全附件</label></td>
+                <td></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td><label>7310</label></td>
+                <td></td>
+                <td></td>
+                <td><label>安全阀</label></td>
+            </tr>
+            <tr>
+                <td><label>F220</label></td>
+                <td></td>
+                <td></td>
+                <td><label>爆破片装置</label></td>
+            </tr>
+            <tr>
+                <td><label>F230</label></td>
+                <td></td>
+                <td></td>
+                <td><label>紧急切断阀</label></td>
+            </tr>
+            <tr>
+                <td><label>F260</label></td>
+                <td></td>
+                <td></td>
+                <td><label>气瓶阀门</label></td>
+            </tr>
+        </table>
+    </div>
+</div>

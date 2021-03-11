@@ -1,0 +1,426 @@
+﻿@{
+    ViewBag.Title = "危险点管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script type="text/javascript">
+    var risktype = request("risktype");
+    var areaname = request("areaname");
+    var areacode = request("areacode");
+    var riskname = request("riskname");
+    var IsGdxy = false;
+    $(function () {
+        IsGdxy = GetVersion();
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $("#RiskType").val(risktype); 
+        var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+        if (roleNames.indexOf("公司级用户") >= 0 || roleNames.indexOf("厂级部门用户") >= 0) {
+            deptCode = top.currUserOrgCode;
+        } else {
+            deptCode = top.currUserDeptCode;
+        }
+        if (roleNames.indexOf("集团用户") >= 0) {
+            deptCode = "00";
+        }
+
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 200);
+                $("#itemTree").height($(window).height() - 65);
+                $("#deptTree").height($(window).height() - 65);
+
+            }, 200);
+            e.stopPropagation();
+        });
+       
+
+    }
+
+    //查看风险评估
+    function show(id) {
+        id = id == undefined ? $("#gridTable").jqGridRowValue("id") : id;
+        var idx = dialogOpen({
+            id: "win0",
+            title: "查看风险辨识评估详情",
+            url: '/RiskDatabase/RiskAssess/Show?keyValue=' + id,
+            width: ($(top.window).width() - 80) + "px",
+            height: ($(top.window).height() - 20) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+
+    }
+    //编辑风险评估
+    function edit(id) {
+        var idx = dialogOpen({
+            id: "win",
+            title: "编辑风险辨识评估",
+            url: '/RiskDatabase/RiskAssess/Details?keyValue=' + id,
+            width: ($(top.window).width() - 80) + "px",
+            height: ($(top.window).height() - 20) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+
+    }
+    var state = false;
+    var isAll = false;
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/RiskAssess/GetPageListJson",
+            postData: { queryJson: JSON.stringify({ riskType: risktype, areaname: areaname, fxname: riskname }) },
+            datatype: "json",
+            height: $(window).height() - 200,
+            width: 2000,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true }, { label: '', name: 'areaid', hidden: true }, { label: '', name: 'createuserorgcode', hidden: true },
+                { label: '', name: 'createuserid', hidden: true }, { label: '', name: 'deptcode', hidden: true },
+               {
+                   label: '操作', name: 'Oper', index: 'Oper', width: 100, align: 'center', sortable: false
+                    ,formatter: function (cellvalue, options, rowObject) {
+                    var html = "";
+                    html += "<a href=javascript:show('" + rowObject.id + "')  title='查看详情' style='text-decoration:underline'><i class='fa fa-eye' ></i></a>";
+                   return html;
+                   }
+               },
+               { label: '风险类别', name: 'risktype', width: 80, align: 'center', hidden: true },
+               { label: '作业任务', name: 'worktask', width: 150, align: 'center', hidden: true },
+               { label: '单元', name: 'element', width: 150, align: 'center', hidden: true },
+               { label: '设备名称', name: 'equipmentname', width: 150, align: 'center', hidden: true },
+               { label: "所在位置", name: "districtname", width: 100, align: "center" },
+
+               { label: '工序', name: 'process', width: 150, align: 'center', hidden: true },
+               { label: '项目', name: 'project', width: 150, align: 'center', hidden: true },
+
+               { label: '风险点类别', name: 'majornametype', width: 150, align: 'center', hidden: true },
+               { label: '风险点', name: 'majorname', width: 150, align: 'center', hidden: true },
+               {
+                   label: '存储地点', name: 'place', index: 'districtname', width: 150, align: 'center', hidden: true, formatter: function (cellvalue, options, rowObject) {
+                       return rowObject.districtname;
+                   }
+               },
+               { label: '名称', name: 'toolordanger', width: 150, align: 'center', hidden: true },
+               { label: '包装单位', name: 'packuntil', width: 120, align: 'center', hidden: true },
+               { label: '数量', name: 'packnum', width: 80, align: 'center', hidden: true },
+               { label: '规格型号/储存重量或容积', name: 'storagespace', width: 150, align: 'center', hidden: true },
+
+
+               { label: '职业病危害因素', name: 'description', width: 200, align: 'center', hidden: true },
+                {
+                    label: "危险源", name: "faultordanger", width: 100, align: "center",hidden: true, 
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.risktype == "设备") {
+                            if (rowObject.faulttype == null) return "";
+                            else return rowObject.faulttype;
+                        } else {
+                            if (rowObject.dangersource == null) return "";
+                            else return rowObject.dangersource;
+                        }
+                    }
+                },
+               { label: '部门', name: 'postdept', width: 150, align: 'center', hidden: true },
+               { label: '岗位名称', name: 'jobname', width: 120, align: 'center', hidden: true },
+               { label: '人员', name: 'postperson', width: 80, align: 'center', hidden: true },
+           
+               { label: '涉及系统', name: 'hjsystem', width: 150, align: 'center' },
+              
+               { label: '所含设备设施', name: 'hjequpment', width: 150, align: 'center', hidden: true },
+               {
+                   label: '危险源类别', name: 'dangersourcetype', width: 150, align: 'center'
+                  ,formatter: function (cellvalue, options, rowObject) {
+                      if (rowObject.risktype == "设备") {
+                       if (rowObject.faultcategory == null) return "";
+                       else return rowObject.faultcategory;
+                   } else {
+                       if (rowObject.dangersourcetype == null) return "";
+                       else return rowObject.dangersourcetype;
+                   }
+                  }
+               },
+               { label: '危险源', name: 'dangersource', width: 150, align: 'center' },
+               { label: '部件', name: 'parts', width: 100, align: 'center', hidden: true },
+               { label: "故障类型", name: "faulttype", width: 100, align: "center", hidden: true },
+               { label: '危害因素', name: 'riskdesc', width: 300, align: 'left',headerAlign:'center' },
+               { label: '危害后果', name: 'result', width: 120, align: 'center' },
+               { label: '风险值', name: 'itemr', width: 80, align: 'center' },
+               { label: '工程技术措施', name: 'f1', width: 200, align: 'left', headerAlign: 'center' },
+               { label: '管理措施', name: 'f2', width: 200, align: 'left', headerAlign: 'center' },
+               { label: '培训教育措施', name: 'f3', width: 200, align: 'left', headerAlign: 'center' },
+               { label: '个体防护措施', name: 'f4', width: 200, align: 'left', headerAlign: 'center' },
+               { label: '应急处置措施', name: 'f5', width: 200, align: 'left', headerAlign: 'center' },
+
+               { label: '风险等级', name: 'grade', width: 80, align: 'center' },
+               {
+                   label: "管控层级", name: "levelname", width: 100, align: "center", formatter: function (cellvalue, options, rowObject) {
+                       return rowObject.levelname == null || rowObject.levelname == "null" || rowObject.levelname == undefined ? "" : rowObject.levelname;
+                   }
+               },
+               { label: "管控责任单位", name: "deptname", width: 80, align: "center" },
+                { label: "管控责任岗位", name: "postname", width: 100, align: "center" },
+               { label: "责任人", name: "dutyperson", width: 100, align: "center" },
+               { label: "创建时间", name: "createdate", align: "center" }
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            rownumbers: true,
+            rownumWidth: 50,
+            sortname: 'itemr desc,id',
+            sortorder: 'desc',
+            shrinkToFit: false,
+            gridComplete: function () {
+               
+                if (IsGdxy) {
+                    var groupHeaders = new Array();
+                    groupHeaders.push(
+                        {
+                            startColumnName: "f1",
+                            numberOfColumns: 5,
+                            titleText: "<b>现有控制措施</b>"
+                        }
+                    );
+                    if ($("#RiskType").val() == "职业病危害" && !isAll) {
+                        $gridTable.showCol(["majorname", "description"]);
+                        $gridTable.hideCol(["riskdesc", "faultordanger", "majornametype", "project", "element", "faulttype", "result", "dangersource",
+                            "worktask", "process", "equipmentname", "parts", "jobname", "toolordanger", "dangersourcetype", "hjsystem", "hjequpment",
+                            "place", "packuntil", "packnum", "storagespace", "postdept", "postperson", "postname", "itemr"]);
+                    }
+                    else if ($("#RiskType").val() == "作业" && !isAll) {
+                        $gridTable.showCol(["worktask", "process", "riskdesc", "districtname", "result", "project"]);
+                        $gridTable.hideCol(["majorname", "faultordanger", "majornametype", "element", "faulttype", "description", "postdept", "postperson", "equipmentname", "parts",
+                            "jobname", "toolordanger", "dangersourcetype", "hjsystem", "hjequpment", "place", "packuntil", "packnum", "storagespace", "postname", "itemr"]);
+                        groupHeaders.push({
+                            startColumnName: "process",
+                            numberOfColumns: 2,
+                            titleText: "<b>作业步骤</b>"
+                        });
+                    }
+                    else if ($("#RiskType").val() == "设备" && !isAll) {
+                        $gridTable.showCol(["equipmentname", "faulttype", "parts", "riskdesc", "result", "element", "dangersource", "dangersourcetype"]);
+                        $gridTable.hideCol(["majorname", "faultordanger", "project", "hjequpment", "hjsystem", "majornametype", "postdept", "postperson",
+                            "description", "worktask", "process", "faulttype", "place", "packuntil", "packnum", "storagespace", "postname", "itemr"]);
+                        groupHeaders.push({
+                            startColumnName: "element",
+                            numberOfColumns: 3,
+                            titleText: "<b>风险点</b>"
+                        });
+                        groupHeaders.push({
+                            startColumnName: "dangersourcetype",
+                            numberOfColumns: 3,
+                            titleText: "<b>危险源项目</b>"
+                        });
+
+                    }
+                    else if ($("#RiskType").val() == "区域" && !isAll) {
+                        $gridTable.showCol(["dangersource", "riskdesc", "result", "hjsystem", "hjequpment"]);
+                        $gridTable.hideCol(["equipmentname", "faulttype", "project", "majornametype", "faultordanger", "postdept", "postperson",
+                            "element", "parts", "majorname", "description", "worktask", "process", "jobname", "toolordanger", "dangersourcetype", "place", "packuntil", "packnum", "storagespace", "postname", "itemr"]);
+
+                    }
+                    else if ($("#RiskType").val() == "管理" && !isAll) {
+                        $gridTable.showCol(["dangersource", "riskdesc", "majornametype", "result", "dangersourcetype", "majorname"]);
+                        $gridTable.hideCol(["equipmentname", "faulttype", "project", "districtname", "faultordanger", "postdept", "postperson", "element", "parts",
+                            "description", "worktask", "process", "jobname", "toolordanger", "hjsystem", "hjequpment", "place", "packuntil", "packnum", "storagespace", "postname", "itemr"]);
+                        groupHeaders.push({
+                            startColumnName: "dangersourcetype",
+                            numberOfColumns: 2,
+                            titleText: "<b>危险源</b>"
+                        });
+                    }
+                    else if ($("#RiskType").val() == "岗位" && !isAll) {
+                        $gridTable.showCol(["dangersource", "riskdesc", "result", "jobname", "dangersourcetype", "postdept", "postperson"]);
+                        $gridTable.hideCol(["equipmentname", "districtname", "project", "faulttype", "majornametype", "faultordanger", "element", "parts",
+                            "majorname", "description", "worktask", "process", "toolordanger", "hjsystem", "hjequpment", "place", "packuntil", "packnum", "storagespace", "postname", "itemr"]);
+                        groupHeaders.push({
+                            startColumnName: "postdept",
+                            numberOfColumns: 3,
+                            titleText: "<b>风险点</b>"
+                        });
+                    }
+                    else if ($("#RiskType").val() == "工器具及危化品" && !isAll) {
+                        $gridTable.showCol(["dangersource", "riskdesc", "result", "toolordanger", "majornametype", "dangersourcetype", "place", "packuntil", "packnum", "storagespace"]);
+                        $gridTable.hideCol(["equipmentname", "faulttype", "project", "faultordanger", "element", "postdept", "postperson", "parts", "majorname",
+                            "districtname", "description", "worktask", "process", "jobname", "hjsystem", "hjequpment", "postname", "itemr"]);
+                        groupHeaders.push({
+                            startColumnName: "place",
+                            numberOfColumns: 5,
+                            titleText: "<b>风险点</b>"
+                        });
+                    }
+                    else {
+                        $gridTable.showCol(["riskdesc", "faultordanger", "result"]);
+                        $gridTable.hideCol(["majorname", "description", "risktype", "project", "faulttype", "majornametype", "postdept",
+                            "postperson", "element", "equipmentname", "parts", "dangersource", "worktask", "process", "jobname", "toolordanger",
+                            "dangersourcetype", "hjsystem", "hjequpment", "place", "packuntil", "packnum", "storagespace", "postname", "itemr"]);
+                    }
+                    $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                    $('#gridTable').jqGrid("destroyGroupHeader");
+                    $('#gridTable').jqGrid("setGroupHeaders", {
+                        useColSpanStyle: true,
+                        groupHeaders: groupHeaders
+                    });
+                } else {
+                    if ($("#RiskType").val() == "职业病危害" && !isAll) {
+                        $gridTable.showCol(["majorname", "description"]);
+                        $gridTable.hideCol(["riskdesc", "faultordanger", "faulttype", "result", "dangersource", "worktask", "process",
+                            "equipmentname", "parts", "jobname", "toolordanger", "dangersourcetype", "hjsystem", "hjequpment", "f1", "f2", "f3", "f4", "f5", "dutyperson"]);
+                    }
+                    else if ($("#RiskType").val() == "作业" && !isAll) {
+                        $gridTable.showCol(["worktask", "process", "riskdesc", "result"]);
+                        $gridTable.hideCol(["majorname", "faultordanger", "faulttype", "description", "equipmentname", "parts",
+                            "dangersource", "jobname", "toolordanger", "dangersourcetype", "hjsystem", "hjequpment", "f1", "f2", "f3", "f4", "f5", "dutyperson"]);
+
+                    }
+                    else if ($("#RiskType").val() == "设备" && !isAll) {
+                        $gridTable.showCol(["equipmentname", "faulttype", "parts", "riskdesc", "result"]);
+                        $gridTable.hideCol(["majorname", "faultordanger", "description", "worktask", "process", "dangersource", "f1", "f2", "f3", "f4", "f5", "dutyperson"]);
+
+                    }
+                    else if ($("#RiskType").val() == "区域" && !isAll) {
+                        $gridTable.showCol(["dangersource", "riskdesc", "result", "hjsystem", "hjequpment"]);
+                        $gridTable.hideCol(["equipmentname", "faulttype", "faultordanger", "parts", "majorname", "description",
+                            "worktask", "process", "jobname", "toolordanger", "dangersourcetype", "f1", "f2", "f3", "f4", "f5", "dutyperson"]);
+
+                    }
+                    else if ($("#RiskType").val() == "管理" && !isAll) {
+                        $gridTable.showCol(["dangersource", "riskdesc", "result"]);
+                        $gridTable.hideCol(["equipmentname", "faulttype", "faultordanger", "parts", "majorname", "description", "worktask",
+                            "process", "jobname", "toolordanger", "dangersourcetype", "hjsystem", "hjequpment", "f1", "f2", "f3", "f4", "f5", "dutyperson"]);
+
+                    }
+                    else if ($("#RiskType").val() == "岗位" && !isAll) {
+                        $gridTable.showCol(["dangersource", "riskdesc", "result", "jobname", "dangersourcetype"]);
+                        $gridTable.hideCol(["equipmentname", "faulttype", "faultordanger", "parts", "majorname",
+                            "description", "worktask", "process", "toolordanger", "hjsystem", "hjequpment", "f1", "f2", "f3", "f4", "f5", "dutyperson"]);
+
+                    }
+                    else if ($("#RiskType").val() == "工器具及危化品" && !isAll) {
+                        $gridTable.showCol(["dangersource", "riskdesc", "result", "toolordanger", "dangersourcetype"]);
+                        $gridTable.hideCol(["equipmentname", "faulttype", "faultordanger", "parts", "majorname",
+                            "description", "worktask", "process", "jobname", "hjsystem", "hjequpment", "f1", "f2", "f3", "f4", "f5", "dutyperson"]);
+
+                    }
+                    else {
+                        $gridTable.showCol(["riskdesc", "faultordanger", "risktype", "result"]);
+                        $gridTable.hideCol(["majorname", "description", "faulttype", "equipmentname", "parts", "dangersource",
+                            "worktask", "process", "jobname", "toolordanger", "dangersourcetype", "hjsystem", "hjequpment", "f1", "f2", "f3", "f4", "f5", "dutyperson"]);
+                    }
+                    $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                }
+
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ riskType: risktype, areaname: areaname, fxname: riskname, level: $("#Grade").val() }) }, page: 1
+            }).trigger('reloadGrid');
+
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txtKeyword").val(""); $("#Grade").val(""); 
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ riskType: risktype, areaname: areaname, fxname: riskname, level: $("#Grade").val() }) }, page: 1
+            }).trigger('reloadGrid');
+
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    @*<div class="ui-layout-west">
+        <div class="west-Panel">
+            <ul class="nav nav-tabs" id="ulTabs">
+                <li class="active">
+                    <a data-toggle="tab" href="#tab1">按部门</a>
+                </li>
+                <li id="area">
+                    <a data-toggle="tab" href="#tab2">按区域</a>
+                </li>
+            </ul>
+            <div class="tab-content">
+                <div id="tab1" class="tab-pane active">
+                    <div id="deptTree"></div>
+
+                </div>
+                <div id="tab2" class="tab-pane">
+                    <div id="itemTree" style="overflow: auto; height: 500px;">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>*@
+    <div class="ui-layout-center" style="margin-left: 5px;">
+        <div class="center-Panel">
+            <div class="panel-Title" id="pelTitle">风险清单</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                风险类别&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                <select id="RiskType" class="form-control" style="width:80px;" disabled>
+                                    <option value="">请选择</option>
+                                    <option value="作业">作业</option>
+                                    <option value="设备">设备</option>
+                                    <option value="区域">区域</option>
+                                    <option value="管理">管理</option>
+                                    <option value="岗位">岗位</option>
+                                    <option value="工器具及危化品">工器具及危化品</option>
+                                </select>
+                            </td>
+                            <td>
+                                &nbsp;&nbsp;风险等级&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                <select id="Grade" class="form-control" style="width:70px;">
+                                    <option value="">请选择</option>
+                                    <option value="1">重大风险</option>
+                                    <option value="2">较大风险</option>
+                                    <option value="3">一般风险</option>
+                                    <option value="4">低风险</option>
+                                </select>
+                            </td>
+                            <td width="10"></td>
+                            <td style="display:none;">
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入关键字进行搜索" style="width: 150px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                       
+                    </div>
+                
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

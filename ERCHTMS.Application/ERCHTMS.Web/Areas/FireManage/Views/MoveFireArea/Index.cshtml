@@ -1,0 +1,293 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+<style type="text/css">
+    .panel-TitlePage {
+        border-color: #c5c5c5;
+        background-color: #fff;
+        color: #666;
+        height: 32px;
+        line-height: 32px;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
+        font-weight: bold;
+        border-top: 1px solid #ccc;
+        border-left: 1px solid #ccc;
+        border-right: 1px solid #ccc;
+        padding-left: 9px;
+    }
+</style>
+<script>
+    var _deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户部门编码
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户ID
+    var role = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//获取当前用户权限集合
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var ehsDeptCode = "@ViewBag.ehsDepartCode";//EHS部门Code
+    var actiontype = request('actiontype');
+    $(function () {
+        InitialPage();
+        //GetGrid(1);
+        //GetGrid(2);
+    });
+    //初始化页面
+    function InitialPage() {
+        if (actiontype == 'view') {
+            $('#add1').hide();
+            $('#add2').hide();
+        }
+        //else {
+        //    if ((roleName.indexOf("负责人") >= 0) || (userId == rowObject.CreateUserId) || (roleName.indexOf("管理员") >= 0) || (roleName.indexOf("厂级部门用户") >= 0)) {
+        //        $('#add1').show();
+        //        $('#add2').show();
+        //    } else {
+        //        $('#add1').hide();
+        //        $('#add2').hide();
+        //    }
+        //}
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - ($(window).height() / 1.5));
+                $('#gridTable2').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable2').setGridHeight($(window).height() - ($(window).height() / 1.5));
+            }, 200);
+            e.stopPropagation();
+        });
+        getDataAuthority();
+    }
+    function getDataAuthority() {
+        $.post(top.contentPath + "/AuthorizeManage/PermissionJob/GetDataAuthority", { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val() }, function (data) {
+            var jsonArr = eval("(" + data + ")");
+            GetGrid(1, jsonArr);
+            GetGrid(2, jsonArr);
+        });
+    }
+    //加载表格
+    function GetGrid(Rank, jsonArr) {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        if (Rank == 1) {
+            $gridTable = $('#gridTable');
+        }
+        if (Rank == 2) {
+            $gridTable = $('#gridTable2');
+        }
+        var queryJson = {
+            queryJson: JSON.stringify({ Rank: Rank })
+        }
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - ($(window).height()/1.5),
+            url: "../../FireManage/MoveFireArea/GetListJson",
+            postData: queryJson,
+            datatype: "json",
+            sortname: 'OrderNum',
+            sortorder: 'desc',
+            colModel: [
+                { label: '主键', name: 'Id', index: 'Id', width: 100, align: 'left', sortable: true, hidden: true },
+                {
+                    label: '操作', name: 'Oper', index: 'Oper', width: 160, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:show('" + rowObject.Id + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                        if (actiontype != 'view') {
+                            $(jsonArr).each(function (j, item1) {
+                                var authType = item1.authorizetype;//获取数据操作权限范围.1：本人,2：本部门，3：本部门及下属部门，4：本机构，5：全部
+                                switch (authType) {
+                                    //本用户
+                                    case 1:
+                                        if (top.currUserId == rowObject.CreateUserId) {
+                                            if (item1.encode == "edit") {
+                                                html += "<a href=javascript:btn_edit('" + rowObject.Id + "','" + rowObject.Rank + "')  title='修改' name='edit'><i class='fa fa-pencil-square-o'></i></a>";
+                                            }
+                                            if (item1.encode == "delete") {
+                                                html += "<a href=javascript:btn_delete('" + rowObject.Id + "')  title='删除' name='delete'><i class='fa fa-trash-o'></i></a>";
+                                            }
+                                        }
+                                        break;
+                                    //本部门
+                                    case 2:
+                                        if (rowObject.CreateUserDeptCode == top.currUserDeptCode) {
+                                            if (item1.encode == "edit") {
+                                                html += "<a href=javascript:btn_edit('" + rowObject.Id + "','" + rowObject.Rank + "')  title='修改' name='edit'><i class='fa fa-pencil-square-o'></i></a>";
+                                            }
+                                            if (item1.encode == "delete") {
+                                                html += "<a href=javascript:btn_delete('" + rowObject.Id + "')  title='删除' name='delete'><i class='fa fa-trash-o'></i></a>";
+                                            }
+                                        }
+                                        break;
+                                    //本子部门
+                                    case 3:
+                                        if ((rowObject.CreateUserDeptCode).indexOf(top.currUserDeptCode) >= 0) {
+                                            if (item1.encode == "edit") {
+                                                html += "<a href=javascript:btn_edit('" + rowObject.Id + "','" + rowObject.Rank + "')  title='修改' name='edit'><i class='fa fa-pencil-square-o'></i></a>";
+                                            }
+                                            if (item1.encode == "delete") {
+                                                html += "<a href=javascript:btn_delete('" + rowObject.Id + "')  title='删除' name='delete'><i class='fa fa-trash-o'></i></a>";
+                                            }
+                                        }
+                                        break;
+                                    //本机构
+                                    case 4:
+                                        if (rowObject.CreateUserOrgCode == top.currUserOrgCode) {
+                                            if (item1.encode == "edit") {
+                                                html += "<a href=javascript:btn_edit('" + rowObject.Id + "','" + rowObject.Rank + "')  title='修改' name='edit'><i class='fa fa-pencil-square-o'></i></a>";
+                                            }
+                                            if (item1.encode == "delete") {
+                                                html += "<a href=javascript:btn_delete('" + rowObject.Id + "')  title='删除' name='delete'><i class='fa fa-trash-o'></i></a>";
+                                            }
+                                        }
+                                        break;
+                                }
+                            });
+                        }
+                        return html;
+                    }
+                },
+                { label: '区域划分', name: 'Area', index: 'Area',align: 'center',width:800, sortable: false },
+                { label: '顺序号', name: 'OrderNum', index: 'OrderNum', width: 100, align: 'center', sortable: false },
+                { label: '', name: 'CreateUserId', index: 'CreateUserId', hidden: true },
+                { label: '', name: 'CreateUserDeptCode', index: 'CreateUserDeptCode', hidden: true },
+                { label: '', name: 'CreateUserOrgCode', index: 'CreateUserOrgCode', hidden: true }
+                ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                if (actiontype=='view') {
+                    //$gridTable.hideCol("Oper");
+                    $gridTable.hideCol("OrderNum");
+                }
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                $gridTable.setGridWidth(($('.gridPanel').width() - 2));
+            }
+        });
+
+    }
+    //查看
+    function show(keyValue) {
+        var idx0 = dialogOpen({
+            id: 'Sikp',
+            title: '查看动火区域维护',
+            url: '/FireManage/MoveFireArea/Form?actiontype=view&keyValue=' + keyValue,
+            width: '600px',
+            height: '400px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(idx0);
+            }
+        });
+    }
+    //新增
+    function btn_add(Rank) {
+        dialogOpen({
+            id: 'Form',
+            title: '添加动火区域',
+            url: '/FireManage/MoveFireArea/Form?actiontype=add&Rank=' + Rank,
+            width: '600px',
+            height: '400px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_edit(keyValue,Rank) {
+        //var keyValue = $('#gridTable').jqGridRowValue('ID');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑动火区域',
+                url: '/FireManage/MoveFireArea/Form?keyValue=' + keyValue +'&Rank=' + Rank,
+                width: '600px',
+                height: '400px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_delete(keyValue) {
+        //var keyValue = $('#gridTable').jqGridRowValue('ID');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../FireManage/MoveFireArea/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的动火区域！', 0);
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-center" style="padding-left:10px;">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    @*<table>
+                            <tr>
+                                <td>
+                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                </td>
+                                <td style="padding-left: 5px;">
+                                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                </td>
+                            </tr>
+                        </table>*@
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add1" onclick="btn_add(1)" class="btn btn-default"><i class="fa fa-plus"></i>&nbsp;登记一级动火区域</a>
+                        <a id="add2" onclick="btn_add(2)" class="btn btn-default"><i class="fa fa-plus"></i>&nbsp;登记二级动火区域</a>
+                    </div>
+                    <script>if (actiontype != 'view') { $('.toolbar').authorizeButton() }</script>
+                </div>
+            </div>
+            <div class="panel-TitlePage">
+                一级动火区域
+                @*<div class="toolbar">
+                        <div class="btn-group">
+                            <span class="tools pull-right">
+                                <a id="add1" onclick="btn_add(1)" style="cursor:pointer;"><i class="fa fa-plus"></i>&nbsp;登记一级动火区域</a>&nbsp;&nbsp;
+                            </span>
+                        </div>
+                        <script>$('.toolbar').authorizeButton()</script>
+                    </div>*@
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+            </div>
+            <div class="panel-TitlePage">
+                二级动火区域
+                @*<div class="toolbar">
+                        <div class="btn-group">
+                            <span class="tools pull-right">
+                                <a id="add2" onclick="btn_add(2)" style="cursor:pointer;"><i class="fa fa-plus"></i>&nbsp;登记二级动火区域</a>&nbsp;&nbsp;
+                            </span>
+                        </div>
+                    </div>*@
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable2"></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+

@@ -1,0 +1,1878 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script src="~/Content/index/plugins/layui/layui.all.js"></script>
+<script src="~/Content/scripts/business/jquery.cxscroll.min.js"></script>
+<link href="~/Content/styles/layout.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+<style>
+    .safeImg {
+        display: block;
+        width: 217px;
+        height: 140px;
+        position: relative;
+    }
+
+    ul li {
+        vertical-align: middle;
+    }
+</style>
+<script>
+    var keyValue = request('keyValue');
+    var actiontype = request('type');
+    var YLZJFILES = "@Guid.NewGuid().ToString()";
+    var YLXCFILES = "@Guid.NewGuid().ToString()";
+    var VideoFiles = "@Guid.NewGuid().ToString()";
+    var DrillStepRecordId = "@Guid.NewGuid().ToString()";
+    var deptcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var deptid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var currUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var currUserRole = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var currentdate = "@DateTime.Now.ToString("yyyy-MM-dd")";
+    var typeAction = "";
+    var EditFlag = false;
+    var IsGdxy = false;//版本标示 true 标示国电荥阳版本 false 通用版本
+    var historyid = "";
+
+    $(function () {
+        IsGdxy = GetVersion();
+        historyid = keyValue;
+        if (actiontype == "show" || actiontype == "history") {
+            $("#btngroup").hide();
+            EditFlag = false;
+            $("input").attr("disabled", "disabled");
+            $("select").attr("disabled", "disabled");
+            $("div").attr("disabled", "disabled");
+            $("textarea").attr("disabled", "disabled");
+            $("#save").hide();
+            $("#add").hide();
+            $("#import").hide();
+            $("img[name='topscore']").removeAttr("onclick");
+            $("img[name='selfscore']").removeAttr("onclick");
+
+            if (IsGdxy==true) {
+                $("#EvaluateRecord").hide();
+                $("#tabEvaluate").hide();
+                $("#AssessRecord").show();
+                $("#AssessDiv").show();
+                $("#tabAssessRecord").hide();
+                $("#ChooseAssessPerson").hide();
+
+                $("#historyRecord").show();
+            } else {
+                $("#EvaluateRecord").show();
+                $("#tabEvaluate").show();
+                $("#AssessRecord").hide();
+                $("#AssessDiv").hide();
+                $("#historyRecord").hide();
+            }
+            if (actiontype == "history") {
+                $("#historyRecord").hide();
+            }
+        } else if (actiontype == "evaluate") {
+            EditFlag = false;
+            $("#divtable input").attr("disabled", "disabled");
+            $("#divtable .ui-select").attr("disabled", "disabled");
+            $("#divtable select").attr("disabled", "disabled");
+            $("#divtable textarea").attr("disabled", "disabled");
+            $("#save").hide();
+            $("#add").hide();
+            $("#import").hide();
+            $("img[name='selfscore']").removeAttr("onclick");
+            $("#btngroup").hide();
+            if (IsGdxy) {
+                $("#EvaluateRecord").hide();
+                $("#AssessRecord").show();
+                $("#AssessDiv").show();
+                $("#historyRecord").show();
+            } else {
+                $("#EvaluateRecord").show();
+                $("#AssessRecord").hide();
+                $("#AssessDiv").hide();
+                $("#historyRecord").hide();
+            }
+        } else if (actiontype == "assessrecord") {
+            $("#divtable input").attr("disabled", "disabled");
+            $("#divtable .ui-select").attr("disabled", "disabled");
+            $("#divtable select").attr("disabled", "disabled");
+            $("#divtable textarea").attr("disabled", "disabled");
+            $("#save").hide();
+            $("#add").hide();
+            $("#import").hide();
+            $("img[name='selfscore']").removeAttr("onclick");
+            $("#btngroup").hide();
+            $("#EvaluateRecord").hide();
+            $("#AssessRecord").show();
+            $("#AssessDiv").show();
+            $("#AssessPersonName").val("");
+            $("#AssessPerson").val("");
+            $("#historyRecord").show();
+        }
+        else {
+            $("#btngroup").show();
+            EditFlag = true;
+            $("#EvaluateRecord").hide();
+            $("#AssessRecord").hide();
+            $("#historyRecord").hide();
+            if (IsGdxy == true) {
+                $("#AssessDiv").show();
+                $("#tabAssessRecord").hide();
+                $("#AssessPersonName").attr("isvalid", "yes").attr("checkexpession", "NotNull");
+            } else {
+                $("#AssessDiv").hide();
+                $("#AssessPersonName").removeAttr("isvalid").removeAttr("checkexpession");
+            }
+        }
+        if (top.window.isWt != "1") //判断系统是否配置了问题登记模块  如果没有则不显示演练问题及整改
+        {
+            $("#reform").hide();
+        }
+        InitDrillLevel();
+        initControl();
+        InitCheck();
+        GetAssessRecordGrid(keyValue);
+        getEvaluateGrid(keyValue);
+        GetQuestionGrid();
+        $('#dndArea4').delegate('li', 'click', function () {
+            var json = {
+                data: [{ src: $(this).find('img').attr("src") }]
+            };
+            layer.photos({
+                photos: json,
+                anim: 5
+            })
+        });
+
+    });
+    $.ajaxSetup({ async: false });
+    //初始化控件
+    function fn$play(e) {
+        var url = jQuery(e).data('url');
+        //debugger;
+        layer.open({
+            type: 1,
+            title: false,
+            area: [($(top.window).width() - 200) + "px", ($(top.window).height() - 250) + "px"],
+            content: jQuery('#videodiv'),
+            end: function () {
+                jQuery('#videodiv').empty();
+                jQuery('#videodiv').hide();
+            }
+        });
+        jQuery('#videodiv').show()
+        jQuery('#videodiv').append('<video src="' + url + '" autoplay="autoplay" style:"margin:0px auto;"></video>');
+    }
+
+    function playFile(filename, keyvalue, url, e) {
+        layer.open({
+            type: 1,
+            title: false,
+            area: ['1200px', '660px'],
+            content: jQuery('#videodiv'),
+            end: function () {
+                jQuery('#videodiv').empty();
+                jQuery('#videodiv').hide();
+            }
+        });
+        jQuery('#videodiv').show()
+        jQuery('#videodiv').append('<video src="' + decodeURIComponent(url) + '" autoplay="autoplay" style:"margin:0px auto;"></video>');
+    }
+    function InitDrillLevel() {
+        var data = [];
+        if (actiontype == "show" || actiontype == "evaluate") {
+            data.push({ ItemValue: "厂级", ItemName: "厂级" }, { ItemValue: "部门级", ItemName: "部门级" }, { ItemValue: "班组级", ItemName: "班组级" });
+        } else {
+            //if (currUserRole.indexOf("班组") >= 0) {
+            //    data.push({ ItemValue: "班组级", ItemName: "班组级" });
+            //} else {
+            //    data.push({ ItemValue: "厂级", ItemName: "厂级" }, { ItemValue: "部门级", ItemName: "部门级" });
+            //}
+
+            data.push({ ItemValue: "厂级", ItemName: "厂级" }, { ItemValue: "部门级", ItemName: "部门级" }, { ItemValue: "班组级", ItemName: "班组级" });
+
+        }
+
+
+        $("#DrillLevel").ComboBox({
+            data: data,
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "150px"
+        });
+
+    }
+    function initControl() {
+        ComBoxForData("DRILLTYPE", "MAE_DirllPlanType");
+        ComBoxForData("DRILLMODE", "MAE_DirllMode");
+        getSelfScore(0);
+        getTopScore(0);
+
+        //if (keyValue != "") ID = keyValue;
+        //$("#ID").val(ID);
+
+        //获取表单
+        if (!!keyValue) {
+            var GetUrl ="../../EmergencyPlatform/Drillplanrecord/GetFormJson";
+            if (actiontype == "history") {
+                GetUrl = "../../EmergencyPlatform/Drillplanrecord/GetHistoryFormJson";
+            }
+            $.SetForm({
+                url: GetUrl,
+                param: { keyValue: keyValue },
+                success: function (json) {
+                    var data = json.data;
+                    var file;
+                    if (json.file) {
+                        file = eval("(" + json.file + ")");
+                    }
+                    $("#form1").formDeserialize(data);
+                    if (data.IsConnectPlan == "否") {
+                        document.getElementById("IsConnectPlan2").checked = true;
+                        $("#ReserverPlanName").val(data.DRILLPLANNAME);
+                        $("#ReserverPlan").val(data.DRILLPLANID);
+                    }
+                    else {
+                        document.getElementById("IsConnectPlan1").checked = true;
+                    }
+                    if (data.YLZJFILES != null) YLZJFILES = data.YLZJFILES;
+                    if (data.YLXCFILES != null) YLXCFILES = data.YLXCFILES;
+                    if (data.VideoFiles != null) VideoFiles = data.VideoFiles;
+                    if (data.DrillStepRecordId != null) DrillStepRecordId = data.DrillStepRecordId;
+                    if (data.SelfScore != null) {
+                        getSelfScore(data.SelfScore);
+                        jQuery("#txtSelfScore").text(data.SelfScore + "分");
+                    }
+                    else {
+                        getSelfScore(0);
+                        jQuery("#txtSelfScore").text("0分");
+                    }
+
+                    if (data.TopScore != null) {
+                        getTopScore(data.TopScore);
+                        jQuery("#txtTopScore").text(data.TopScore + "分");
+                    }
+                    else {
+                        getTopScore(0);
+                        jQuery("#txtTopScore").text("0分");
+                    }
+                    if (file) {
+                        if (file.data.length > 0) {
+                            $("#filepic").show();
+                            $("#filevideo").show();
+                            var videohtml = "<ul class=\"images-container\" id=\"images-container1\">";
+                            var picCount = 0;
+                            for (var i = 0; i < file.data.length; i++) {
+                                if (file.data[i].Description == "照片") {
+                                    picCount++;
+                                }
+                                else if (file.data[i].Description == "视频") {
+                                    videohtml += " <li><img src=\"@Url.Content("~/Content/images/album.png")\" alt=\"\" style=\"width:160px;height:120px;cursor:pointer\" onclick=\"fn$play(this)\" data-url=\"" + file.data[i].FilePath + "\"></li>";
+                                }
+                            }
+                            videohtml += "   </ul>";
+                            $("#dndArea3").html(videohtml);
+
+                            if (picCount > 4) {
+                                $('#pic_list_1').cxScroll({ speed: 1000, time: 2000 })
+                            }
+                        }
+                        else {
+                            $("#filepic").hide();
+                            $("#filevideo").hide();
+                        }
+                    }
+                    if (deptcode == data.CREATEUSERDEPTCODE) {
+                        //$("img[name='topscore']").removeAttr("onclick");
+                    }
+                    else {
+                        $("img[name='selfscore']").removeAttr("onclick");
+                    }
+                    if (actiontype == "assessrecord") {
+
+                        $("#AssessPersonName").val("");
+                        $("#AssessPerson").val("");
+                    }
+                }
+            })
+        }
+        else {
+            $("img[name='topscore']").removeAttr("onclick");
+            $("input[name='IsConnectPlan']").eq(0).attr("checked", true);
+        };
+        if (actiontype == "add") {
+            keyValue = newGuid();
+        }
+		file_upload.init({
+            keyValue: YLXCFILES,
+            extensions: 'jpg,gif,bmp,png',
+            isImage: true,
+            multiple: true,
+            el: '#uploader2',
+            fileDir: 'DrillPlanImg'
+        });
+        file_upload.init({
+            keyValue: VideoFiles,
+            extensions: 'mp4,mp3,avi,mc',
+            isImage: false,
+            multiple: false,
+            el: '#uploader5',
+            fileDir: 'DrillPlanImg'
+        });
+
+        file_upload.init({
+            keyValue: YLZJFILES,
+            extensions: '',
+            isImage: false,
+            multiple: true,
+            el: '#uploader1',
+            fileDir: 'DrillPlanImg'
+        });
+        file_upload.init({
+            keyValue: keyValue + "_01",
+            extensions: 'doc,docx,xls,xlsx,zip,rar,txt,ppt,pptx,pdf',
+            isImage: false,
+            multiple: true,
+            el: '#uploader6',
+            fileDir: 'DrillPlanImg'
+        });
+		file_upload.bindFiles(EditFlag, false, YLZJFILES, 'uploader1', EditFlag);
+         file_upload.bindFiles(EditFlag, true, YLXCFILES, 'uploader2', EditFlag);
+         file_upload.bindFiles(EditFlag, false, VideoFiles, 'uploader5', EditFlag);
+         file_upload.bindFiles(EditFlag, false, keyValue + "_01", 'uploader6', EditFlag);
+        file_upload.init({
+            keyValue: keyValue,
+            extensions: '',
+            isImage: false,
+            multiple: true,
+            el: '#uploader',
+            fileDir: 'DrillPlanImg'
+        });
+        file_upload.bindFiles(EditFlag, false, keyValue, 'uploader', EditFlag);
+        GetGrid();
+
+        //选择是否关联演练计划联动
+        $("input[name='IsConnectPlan']").change(function (event) {
+            var checkValue = $(this).val();
+            if (checkValue == "是") {
+                $("#tdDrillPeople1").show();
+                $("#tdDrillPeople2").show();
+                $("#trDRILLPLAN .plan").each(function () {
+                    $(this).show();
+                })
+                $("#trDRILLPLAN .yjya").each(function () {
+                    $(this).hide();
+                })
+                $("#ReserverPlanName").removeAttr("isvalid");
+                $("#DRILLPLANNAME").attr("isvalid", "yes");
+                $("#DRILLTYPE").attr("disabled", "disabled");
+                $("#DRILLMODE").attr("disabled", "disabled");
+                $("#DRILLPLANNAME").val("");
+                if (actiontype == 'add') {
+                    //$("#DRILLMODE").ComboBoxSetValue("3");
+                    $("#OrgDept").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName");
+                    $("#OrgDeptId").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId");
+                    $("#OrgDeptCode").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode");
+                }
+            }
+            else {
+                $("#tdDrillPeople1").show();
+                $("#tdDrillPeople2").show();
+                $("#trDRILLPLAN .plan").each(function () {
+                    $(this).hide();
+                })
+                $("#trDRILLPLAN .yjya").each(function () {
+                    $(this).show();
+                })
+                $("#ReserverPlanName").attr("isvalid", "yes");
+                $("#DRILLPLANNAME").removeAttr("isvalid");
+                $("#DRILLTYPE").removeAttr("disabled");
+                $("#DRILLMODE").removeAttr("disabled");
+                if (actiontype == 'add') {
+                    //$("#DRILLMODE").ComboBoxSetValue("3");
+                    $("#OrgDept").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName");
+                    $("#OrgDeptId").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId");
+                    $("#OrgDeptCode").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode");
+                }
+            }
+        });
+        var IsConnectPlan = $("input[name='IsConnectPlan']:checked").val();
+        if (IsConnectPlan == "是") {
+            $("#trDRILLPLAN .plan").each(function () {
+                $(this).show();
+            })
+            $("#trDRILLPLAN .yjya").each(function () {
+                $(this).hide();
+            })
+            $("#tdDrillPeople1").show();
+            $("#tdDrillPeople2").show();
+            $("#ReserverPlanName").removeAttr("isvalid");
+            $("#DRILLTYPE").attr("disabled", "disabled");
+            $("#DRILLMODE").attr("disabled", "disabled");
+            if (actiontype == 'add') {
+                //$("#DRILLMODE").ComboBoxSetValue("3");
+                $("#OrgDept").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName");
+                $("#OrgDeptId").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId");
+                $("#OrgDeptCode").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode");
+            }
+        }
+        else {
+            $("#tdDrillPeople1").show();
+            $("#tdDrillPeople2").show();
+            $("#trDRILLPLAN .plan").each(function () {
+                $(this).hide();
+            })
+            $("#trDRILLPLAN .yjya").each(function () {
+                $(this).show();
+            })
+            $("#ReserverPlanName").attr("isvalid", "yes");
+            $("#DRILLTYPE").removeAttr("disabled");
+            $("#DRILLMODE").removeAttr("disabled");
+            if (actiontype == 'add') {
+                //$("#DRILLMODE").ComboBoxSetValue("3");
+                $("#OrgDept").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName");
+                $("#OrgDeptId").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId");
+                $("#OrgDeptCode").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode");
+            }
+        }
+
+    }
+
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryjson = {
+            recid: DrillStepRecordId
+        };
+        $gridTable.jqGrid({
+            url: "../../EmergencyPlatform/Drillplanrecordstep/GetPageListJson",
+            datatype: "json",
+            postData: { queryjson: JSON.stringify(queryjson) },
+            height: $(window).height() / 3,
+            width: $(window).width() - 100,
+            colModel: [
+                 { label: '', name: 'departmentcode', hidden: true },
+                 { label: '', name: 'organizecode', hidden: true },
+                 { label: '', name: 'stepid', hidden: true },
+                 {
+                     label: '操作', name: 'Oper', width: 100, align: 'center'
+                 },
+                 {
+                     label: '序号', name: 'sortid', width: 100, align: 'center', sortable: false
+                     , formatter: function (cellvalue, options, rowObject) {
+                         if (cellvalue == "") {
+
+                             var html = '<input type="text" style="width:60px"  class="form-control" id="lblsortid_' + rowObject.Id + '"></input>';
+
+                             return html;
+                         }
+                         else {
+                             return rowObject.sortid == null ? "" : rowObject.sortid;
+                         }
+                     }
+                 },
+                 {
+                     label: '内容', name: 'content', width: 800, align: 'center', sortable: false
+                     , formatter: function (cellvalue, options, rowObject) {
+                         if (cellvalue == "") {
+
+                             var html = '<textarea  class="form-control" id="txtcontent_' + rowObject.Id + '" rows="4" style="width:100%;height:60px"></textarea>';
+
+                             return html;
+                         }
+                         else {
+                             return rowObject.content == null ? "" : rowObject.content;
+                         }
+                     }
+                 },
+                 {
+                     label: '负责人', name: 'dutypersonname', align: 'center', sortable: false, width: 250, editable: true
+                     , formatter: function (cellvalue, options, rowObject) {
+                         if (cellvalue == "") {
+                             var html = ' <span style="color:Red">*</span><input id="dutypersonname_' + rowObject.Id + '" type="text" style="width:90%;" class="form-control" placeholder="请选择姓名" isvalid="yes" onclick="setdutyUserValue(' + rowObject.Id + ');" checkexpession="NotNull" readonly } />';
+                             html += ' <input id="dutyperson_' + rowObject.Id + '" type="hidden" />';
+                             html += ' <input id="stepid_' + rowObject.Id + '" type="hidden" />';
+                             return html;
+                         }
+                         else {
+                             if (cellvalue == null) {
+                                 return "";
+                             }
+                             else {
+                                 return rowObject.dutypersonname;
+                             }
+                         }
+                     }
+                 },
+                 { label: '', name: 'dutyperson', hidden: true },
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.Id).getGridParam('selrow');
+            },
+            loadError: function (xhr, status, error) {
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                var rows = $gridTable.jqGrid("getRowData");//获取当前页记录行数据
+
+                if (actiontype == 'show') {
+                    return "";
+                }
+                else {
+                    $(rows).each(function (i, item) {
+                        var html = "&nbsp;&nbsp;&nbsp;<a id='edit" + i + "' href=javascript:edit('" + i + "','" + item.stepid + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                        html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + i + "','" + item.stepid + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        $("td[aria-describedby='gridTable_Oper']").eq(i).html(html);
+                    });
+                }
+            }
+        });
+    }
+
+    function GetQuestionGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#QuestionTable');
+        var queryjson = {
+            relevanceid: keyValue, //关联其他应用字段
+        };
+        $gridTable.jqGrid({
+            url: "../../QuestionManage/QuestionInfo/GetListJson",
+            postData: { queryJson: JSON.stringify(queryjson) },
+            datatype: "json",
+            height: $(window).height() / 3,
+            width: $(window).width() - 100,
+            colModel: [
+                { label: '主键', name: 'id', index: 'id', width: 100, align: 'center', hidden: true },
+               { label: '问题图片业务id', name: 'questionpic', index: 'questionpic', align: 'center', hidden: true },
+               { label: '问题整改图片业务id', name: 'reformpic', index: 'reformpic', align: 'center', hidden: true },
+                 {
+                     label: '操作', name: 'Oper', width: 100, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:viewdata('" + rowObject.id + "','" + rowObject.flowstate + "')  title='查看'><i class='fa fa-eye'></i></a>";
+
+                         if (rowObject.flowstate == "问题登记" && rowObject.createuserid == currUserId && (actiontype == "edit" || actiontype == "add")) {
+                             html += "&nbsp;&nbsp;&nbsp;<a href=javascript:editdata('" + rowObject.id + "','" + rowObject.flowstate + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+
+                             html += "&nbsp;&nbsp;&nbsp;<a href=javascript:removedata('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         }
+                         return html;
+                     }
+                 },
+                 {
+                     label: '流程状态', name: 'flowstate', index: 'flowstate', width: 100, align: 'center', sortable: true,
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "";
+
+                         if (!!rowObject.flowstate) {
+                             if (rowObject.flowstate == "流程结束") {
+                                 html = "<div style='background-color:green;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='问题流程'>" + rowObject.flowstate + "</a></div>";
+                             }
+                             else if (rowObject.flowstate == "问题整改") {
+                                 var reformplandate = rowObject.reformplandate; //整改截止时间
+
+                                 if (!!reformplandate) {
+
+                                     var d1 = new Date(currentdate.replace(/\-/g, "\/"));  //当前时间
+
+                                     var d2 = new Date(reformplandate.replace(/\-/g, "\/"));  //整改截止时间
+
+                                     var d3 = new Date(SubtractDays(reformplandate, 3).replace(/\-/g, "\/")); //提前三天
+
+                                     html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='问题流程'>" + rowObject.flowstate + "</a>";
+                                     //逾期未整改
+                                     if (d1 > d2) {
+                                         html = "<div style='background-color:red;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='问题流程'>" + rowObject.flowstate + "</a></div>";
+                                     }
+                                     //即将到期未整改
+                                     if (d3 <= d1 && d1 <= d2) {
+                                         html = "<div style='background-color:orange;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;' title='问题流程'>" + rowObject.flowstate + "</a></div>";
+                                     }
+                                 }
+                                 else {
+                                     html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='问题流程'>" + rowObject.flowstate + "</a>";
+                                 }
+                             }
+                             else {
+                                 html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='问题流程'>" + rowObject.flowstate + "</a>";
+                             }
+                         }
+                         return html;
+                     }
+                 },
+                 { label: '问题描述', name: 'questiondescribe', index: 'questiondescribe',align:'center' },
+                 { label: '整改措施', name: 'reformmeasure', index: 'reformmeasure', align: 'center' },
+                 { label: '整改责任单位', name: 'reformdeptname', index: 'reformdeptname', align: 'center' },
+                 { label: '整改责任人', name: 'reformpeoplename', index: 'reformpeoplename', align: 'center' },
+                 {
+                     label: '计划完成日期', name: 'reformplandate', index: 'reformplandate', align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         return formatDate(cellvalue, 'yyyy-MM-dd')
+                     }
+                 },
+                 { label: '验证人', name: 'verifypeoplename', index: 'verifypeoplename', align: 'center' }
+
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            pager: "#QuestionPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.Id).getGridParam('selrow');
+            },
+            loadError: function (xhr, status, error) {
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //删除
+    function del(rowId, keyValue) {
+        var jqTable = $("#gridTable");
+        rowId = jqTable.jqGrid("getGridParam", "selrow");
+        if (keyValue == "") {
+            $('#gridTable').jqGrid('delRowData', rowId);
+            if ($('#gridTable').find("input").length == 0) {
+                typeAction = "";
+            }
+            return;
+        }
+        if (keyValue) {
+            $.RemoveForm({
+                url: "../../EmergencyPlatform/Drillplanrecordstep/RemoveForm",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#gridTable").jqGrid("delRowData", rowId);
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的应急演练！', 0);
+        }
+        if ($('#gridTable').find("input").length == 0) {
+            typeAction = "";
+        }
+    }
+
+
+    function save() {
+        var check = 0;
+        var arr = [];
+        if (typeAction == "add") {
+            var list = $("#gridTable tr")
+            for (var i = 1; i < list.length; i++) {
+                if (list[i].getAttribute("id") != undefined || getAttribute("id") != "") {
+                    var num = parseInt(list[i].getAttribute("id")) + 1;
+                    var lblsortid = $("#lblsortid_" + num).val();
+                    if (lblsortid == null || lblsortid == undefined) {
+                        continue;
+                    }
+                    var SortId = $("#lblsortid_" + num).val();
+                    var Content = $("#txtcontent_" + num).val();
+                    var DutyPersonName = $("#dutypersonname_" + num).val();
+                    var DutyPerson = $("#dutyperson_" + num).val();
+                    var StepId = $("#stepid_" + num).val();
+                    if (SortId == null || SortId == "" || SortId == undefined || Content == null || Content == "" || Content == undefined || DutyPersonName == null || DutyPersonName == "" || DutyPersonName == undefined) {
+                        check++;
+                        continue;
+                    }
+                    arr.push({ Id: StepId, DutyPerson: DutyPerson, DutyPersonName: DutyPersonName, Content: Content, SortId: SortId, DrillStepRecordId: DrillStepRecordId });
+                }
+            }
+        } else {
+            var rowId = $("#gridTable").jqGrid('getRowData').length;
+            var row = $('#gridTable').jqGrid('getRowData');
+
+            for (var i = 1; i < (rowId + 1) ; i++) {
+                var lblsortid = $("#lblsortid_" + i).val();
+                if (lblsortid == null || lblsortid == undefined) {
+                    continue;
+                }
+                var SortId = $("#lblsortid_" + i).val();
+                var Content = $("#txtcontent_" + i).val();
+                var DutyPersonName = $("#dutypersonname_" + i).val();
+                var DutyPerson = $("#dutyperson_" + i).val();
+                var StepId = $("#stepid_" + i).val();
+                if (SortId == null || SortId == "" || SortId == undefined || Content == null || Content == "" || Content == undefined || DutyPersonName == null || DutyPersonName == "" || DutyPersonName == undefined) {
+                    check++;
+                    continue;
+                }
+
+                arr.push({ Id: StepId, DutyPerson: DutyPerson, DutyPersonName: DutyPersonName, Content: Content, SortId: SortId, DrillStepRecordId: DrillStepRecordId });
+            }
+        }
+
+
+        if (check > 0) {
+            dialogMsg('请填写序号或者内容或者责任人！', 0);
+            return;
+        }
+        var postData = JSON.stringify(arr);
+        if (arr.length == 0) {
+            dialogMsg('请新增或修改要保存的信息！', 0);
+            return;
+        }
+        $.post("../../EmergencyPlatform/Drillplanrecordstep/SaveListForm", { param: postData }, function (data) {
+            var obj = JSON.parse(data);
+            if (obj.type == 3)
+                dialogMsg(obj.message, 0);
+            else {
+                dialogMsg(obj.message, 1);
+                $('#gridTable').trigger('reloadGrid');
+            }
+
+        });
+        typeAction = "";
+    }
+    //新增
+    function btn_add() {
+
+        if (typeAction == "edit") {
+            dialogMsg('请先保存需要编辑的脚本！', 0);
+            return;
+        }
+        typeAction = "add";
+        var rowId = $("#gridTable").jqGrid('getRowData').length;
+        var teamid = "";
+        var check = 0;
+        var row = $('#gridTable').jqGrid('getRowData');
+
+        var arr = new Array();
+        for (var i = 1; i < (rowId + 1) ; i++) {
+            var postName = $("#" + i + " input:eq(0)").val();
+            if (postName != null && postName != undefined) {
+                arr.push({ Id: i, value: postName });
+            }
+        }
+        $("#gridTable").addRowData(rowId, { Id: rowId + 1, sortid: "", content: "", dutypersonname: "" }, 'last');
+
+        for (var i = 1; i < (rowId + 1) ; i++) {
+
+            for (var j = 0; j < arr.length; j++) {
+                if (i == arr[j].Id) {
+                    $("#" + i + " input:eq(0)").val(arr[j].value);
+                }
+            }
+        }
+
+    }
+
+    //编辑
+    function edit(rowId, keyvalue) {
+        if (typeAction == "add") {
+            dialogMsg('请先保存需要新增的脚本！', 0);
+            return;
+        }
+        typeAction = "edit";
+        var tab = $("#gridTable");
+        var row = $('#gridTable').jqGrid('getRowData');
+        var rowLength = $("#gridTable").jqGrid('getRowData').length;
+        var IdPK = tab.jqGrid('getGridParam', 'selrow');
+        if (IdPK == null) {
+            dialogMsg('请选择要编辑的脚本！', 0);
+            return;
+        }
+        var checki = 0;
+        if (row[0].Id == "") {
+            checki++;
+        }
+        for (var i = 1; i < (row.length + 1) ; i++) {
+            var Content = $("#txtcontent_" + i).val();
+            if (Content != null && Content != undefined) {
+                checki++;
+                break;
+            }
+            var Sortid = $("#lblsortid_" + i).val();
+            if (Sortid != null && Sortid != undefined) {
+                checki++;
+                break;
+            }
+            var DutyPerson = $("#dutypersonname_" + i).val();
+            if (DutyPerson != null && DutyPerson != undefined) {
+                checki++;
+                break;
+            }
+        }
+
+        if (checki > 0) {
+            dialogMsg('请先保存需要编辑的脚本！', 0);
+            return;
+        }
+        $("#edit" + rowId).hide();
+        rowId = parseInt(rowId);
+        //加上_edit作为修改的特殊标志
+        tab.jqGrid('setRowData', IdPK, { Id: rowId + 1, stepid: "", sortid: "", content: "", dutypersonname: "" });
+        $("#lblsortid_" + (rowId + 1)).val(row[rowId].sortid);
+        $("#txtcontent_" + (rowId + 1)).val(row[rowId].content);
+        $("#dutypersonname_" + (rowId + 1)).val(row[rowId].dutypersonname);
+        $("#dutyperson_" + (rowId + 1)).val(row[rowId].dutyperson);
+        $("#stepid_" + (rowId + 1)).val(keyvalue);
+    }
+    //获取评价记录
+    function getEvaluateGrid(drillrecordid) {
+        var queryJson = {
+            drillrecordid: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridEvaluate');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: "200px",
+            url: "../../EmergencyPlatform/Drillplanrecord/GetEvaluateList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: 'id', name: 'id', hidden: true },
+                { label: '评价人', name: 'evaluateperson', width: 150, align: 'center' },
+                { label: '所属部门', name: 'evaluatedept', width: 180, align: 'center' },
+                { label: '评价意见', name: 'evaluateopinion', width: 200, align: 'center' },
+                { label: '评分', name: 'evaluatescore', align: 'center' },
+                {
+                    label: '评价人签字', name: 'singimg', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var content = !!rowObject.singimg ? rowObject.singimg : "";
+                        var html = "";
+                        if (content == "" || content == undefined) {
+                            var html = "<img  style=\"height:50px;\" />&nbsp;";
+                        } else {
+                            html = "<img style=\"height:50px;\"  src=\"../.." + content.replace("../..","") + "\"/>&nbsp;";
+                        }
+
+                        return html;
+                    }
+                },
+                { label: '评价时间', name: 'evaluatetime', align: 'center', formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            multiboxonly: false,
+            multiselect: false,
+            pager: "#EvaluatePager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //获取评估记录
+    function GetAssessRecordGrid(drillrecordid) {
+        var queryJson = {
+            drillrecordid: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridAssess');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: "200px",
+            url: "../../EmergencyPlatform/Drillplanrecord/GetAssessRecordList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: 'id', name: 'id', hidden: true },
+                { label: '评估人', name: 'assessrecordperson', width: 150, align: 'center' },
+                { label: '所属部门', name: 'assessrecorddept', width: 180, align: 'center' },
+                { label: '评估意见', name: 'assessrecordopinion', width: 200, align: 'center' },
+
+                {
+                    label: '评估人签字', name: 'assessrecordsignimg', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var content = !!rowObject.assessrecordsignimg ? rowObject.assessrecordsignimg : "";
+                        var html = "";
+                        if (content == "" || content == undefined) {
+                            var html = "<img  style=\"height:50px;\" />&nbsp;";
+                        } else {
+                            html = "<img style=\"height:50px;\"  src=\"../.." + content.replace("../..","") + "\"/>&nbsp;";
+                        }
+
+                        return html;
+                    }
+                },
+                {
+                    label: '评估时间', name: 'assessrecordtime', align: 'center', formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' }
+                },
+                 {
+                     label: '评估结果', name: 'assessrecordresult', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                         if (cellvalue == "" || cellvalue == null || cellvalue == undefined) {
+                             return "";
+                         }
+                         if (cellvalue == "1") {
+                             return "通过"
+                         } else {
+                             return "不通过";
+                         }
+                     }
+                 }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            multiboxonly: false,
+            multiselect: false,
+            pager: "#AssessPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //评估
+    function AssessRecordClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if (document.getElementById("AssessRecordResult1").checked == false && document.getElementById("AssessRecordResult2").checked == false) {
+            dialogMsg('请选择评估结果！', 0);
+            return false;
+        }
+        var AssessRecordResult = "";
+        if (document.getElementById("AssessRecordResult1").checked)
+            AssessRecordResult = document.getElementById("AssessRecordResult1").value;
+        else
+            AssessRecordResult = document.getElementById("AssessRecordResult2").value;
+        var IsAssessRecord = "";
+        if (document.getElementById("IsAssessRecord1").checked)
+            IsAssessRecord = document.getElementById("IsAssessRecord1").value;
+        else
+            IsAssessRecord = document.getElementById("IsAssessRecord2").value;
+
+        var assessdata = $("#ASSESSDATA").val();
+        $("#ASSESSDATA").val("");
+        var postData = {
+            AssessRecordSignImg: encodeURIComponent($("#AssessRecordSignImg").attr("src")),
+            AssessRecordTime: $("#AssessRecordTime").val(),
+            AssessRecordPerson: $("#AssessRecordPerson").val(),
+            AssessRecordPersonId: $("#AssessRecordPersonId").val(),
+            AssessRecordOpinion: $("#AssessRecordOpinion").val(),
+            DrillRecordId: keyValue,
+            ASSESSDATA: assessdata,
+            AssessRecordResult: AssessRecordResult,
+            IsAssessRecord: IsAssessRecord,
+            AssessPersonName: $("#AssessPersonName").val(),
+            AssessPerson: $("#AssessPerson").val()
+        };
+        $.SaveForm({
+            url: "../../EmergencyPlatform/Drillplanrecord/AssessRecordSaveForm?keyValue=",
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //评价内容
+    function EvaluateClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var assessdata = $("#ASSESSDATA").val();
+        $("#ASSESSDATA").val("");
+        var postData = {
+            SingImg: encodeURIComponent($("#SignImg").attr("src")),
+            EvaluateTime: $("#EvaluateTime").val(),
+            EvaluatePerson: $("#EvaluatePerson").val(),
+            EvaluatePersonId: $("#EvaluatePersonId").val(),
+            EvaluateOpinion: $("#EvaluateOpinion").val(),
+            EvaluateScore: $("#txtTopScore").text().replace("分", ""),
+            NodeId: $("#NodeId").val(),
+            DrillRecordId: keyValue,
+            ASSESSDATA: assessdata
+        };
+        $.SaveForm({
+            url: "../../EmergencyPlatform/Drillplanrecord/EvaluateSaveForm?keyValue=",
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //保存表单;
+    function AcceptClick(iscommit) {
+        if (!!typeAction) {
+            dialogMsg('请先保存演练脚本！', 0);
+            return;
+        }
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var assessdata = $("#ASSESSDATA").val();
+        $("#ASSESSDATA").val("");
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["ASSESSDATA"] = assessdata;
+        postData["DrillStepRecordId"] = DrillStepRecordId;
+        postData["DRILLTYPENAME"] = $("#DRILLTYPE").attr('data-text');
+        postData["DRILLTYPE"] = $("#DRILLTYPE").attr('data-value');
+        postData["DRILLMODENAME"] = $("#DRILLMODE").attr('data-text');
+        postData["DRILLMODE"] = $("#DRILLMODE").attr('data-value');
+        postData["YLZJFILES"] = YLZJFILES;
+        postData["YLXCFILES"] = YLXCFILES;
+        postData["VideoFiles"] = VideoFiles;
+        postData["IsCommit"] = iscommit;
+        postData["DrillLevel"] = $("#DrillLevel").attr("data-text");
+        postData["SELFSCORE"] = $("#txtSelfScore").text().replace("分", "");
+        postData["IsConnectPlan"] = $("input[name='IsConnectPlan']:checked").val();
+        if (postData["IsConnectPlan"] == '否') {
+            postData["DRILLPLANNAME"] = $("#ReserverPlanName").val();
+            postData["DRILLPLANID"] = $("#ReserverPlan").val();
+        }
+        if (document.getElementById("IsAssessRecord1").checked)
+            postData["IsAssessRecord"] = document.getElementById("IsAssessRecord1").value;
+        else
+            postData["IsAssessRecord"] = document.getElementById("IsAssessRecord2").value;
+        $.SaveForm({
+            url: "../../EmergencyPlatform/Drillplanrecord/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    function selectReserverPlan() {
+        selectCommon({ winObject: window.document.body, domId: "ReserverPlan,ReserverPlanName,DRILLTYPE", checkMode: 1 }, "/EmergencyPlatform/Reserverplan/Select", "选择应急预案名称");
+    }
+
+    function setdutyUserValue(Id) {
+        selectUser({
+            deptId: "", checkMode: 1, mode: 0, winObject: document.body, domId: "dutypersonname_" + Id + ",,dutyperson_" + Id, userIds: $("#dutyperson_" + Id).val(), userIds: ("dutyperson_" + Id), callBack: function () {
+                var num = $("#dutyperson_" + Id).val().length;
+                if (num > 800) {
+                    $("#dutypersonname_" + Id).val("");
+                    $("#dutyperson_" + Id).val("");
+                    dialogMsg('人员选择过多,请重新选择！', 0);
+                }
+            }
+        });
+    }
+
+    function setCompereUser() {
+        selectUser({ deptId: "", checkMode: 0, mode: 0, winObject: document.body, domId: "CompereName,Compere" });
+    }
+
+    function setDrillPeopleUser() {
+        selectUser({
+            deptId: "", checkMode: 1, mode: 0, winObject: document.body, domId: "DrillPeopleName,,DrillPeople", userIds: "DrillPeople", callBack: function () {
+                var num = $("#DrillPeopleName").val().length;
+                if (num > 1000) {
+                    $("#DrillPeopleName").val("");
+                    $("#DrillPeople").val("");
+                    dialogMsg('人员选择过多,请重新选择！', 0);
+                } else {
+                    var drillpeoplename = $("#DrillPeopleName").val();
+                    if (drillpeoplename) {
+                        var count = drillpeoplename.split(',').length;
+                        $("#DRILLPEOPLENUMBER").val(count);
+                    }
+                    else {
+                        $("#DRILLPEOPLENUMBER").val(0);
+                    }
+                }
+            }
+        });
+    }
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入应急步骤',
+            url: '/EmergencyPlatform/Drillplanrecord/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                var option = {
+                    winObj: document.body,
+                    rowId: $("#gridTable").jqGrid('getRowData').length,
+                    gridid: 'gridTable',
+                    DrillPurpose: 'DrillPurpose',
+                    SceneSimulation: 'SceneSimulation',
+                    DrillKeyPoint: 'DrillKeyPoint'
+                };
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(option);
+            },
+            yes: function (index) {
+                typeAction = "add";
+            }
+        });
+
+    }
+
+
+    //应急演练评估表
+    function ShowAssess() {
+        var url = '/EmergencyPlatform/Drillplanrecord/AssessForm?action=' + actiontype + '&keyValue=' + keyValue + '&DrillName=' +  encodeURIComponent($("#NAME").val()) + "&OrganizeDept=" + $("#DEPARTNAME").val() +
+                  "&OrgDept=" + $("#OrgDept").val() +"&DrillType=" + $("#DRILLTYPE").attr("data-text") + "&DrillMode=" + $("#DRILLMODE").attr("data-text") + "&DrillTypeVal=" +
+                  $("#DRILLTYPE").attr("data-value") + "&DrillModeVal=" + $("#DRILLMODE").attr("data-value") + "&CreateUserName=" + $("#CREATEUSERNAME").val() + "&CompereName=" +
+                  $("#CompereName").val() + "&CreateUserId=" + $("#CREATEUSERID").val() + "&DrillTime=" + $("#DRILLTIME").val() + "&CreateDate=" + $("#CREATEDATE").val();
+        if (actiontype == "show") {
+            idx = dialogOpen({
+                id: "Assess",
+                title: '评估表',
+                url: url,
+                width: ($(top.window).width() - 300) + "px",
+                height: ($(top.window).height() - 200) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(idx);
+                }
+            });
+        }
+        else {
+            idx = dialogOpen({
+                id: "Assess",
+                title: '评估表',
+                url: url,
+                width: ($(top.window).width() - 300) + "px",
+                height: ($(top.window).height() - 200) + "px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                    top.layer.close(idx);
+                },
+                cancel: function (index) {
+                }
+            });
+        }
+    }
+
+
+    function getSelfScore(i) {
+        var j = 1;
+        myscore = i;
+        jQuery("#txtSelfScore").text(i + "分");
+        jQuery("img[name='selfscore']").each(function () {
+            if (j <= i) {
+                this.src = "@Url.Content("~/Content/images/start_full.png")";
+            } else {
+                this.src = "@Url.Content("~/Content/images/start_empty.png")";
+            }
+            j = j + 1;
+        });
+    }
+
+    function getTopScore(i) {
+        var j = 1;
+        myscore = i;
+        jQuery("#txtTopScore").text(i + "分");
+        jQuery("img[name='topscore']").each(function () {
+            if (j <= i) {
+                this.src = "@Url.Content("~/Content/images/start_full.png")";
+            } else {
+                this.src = "@Url.Content("~/Content/images/start_empty.png")";
+            }
+            j = j + 1;
+        });
+    }
+
+    function auditCheck() {
+        if ($("#EvaluatePersonId").val() != "") {
+            var signImg = getUserSignPic($("#EvaluatePersonId").val());
+            if (signImg != "" && signImg != undefined) {
+                $("#SignImg").attr("src", "../.." + signImg);
+            }
+        }
+
+    }
+    function auditAssessCheck() {
+        if ($("#AssessRecordPersonId").val() != "") {
+            var signImg = getUserSignPic($("#AssessRecordPersonId").val());
+            if (signImg != "" && signImg != undefined) {
+                $("#AssessRecordSignImg").attr("src", "../.." + signImg);
+            }
+        }
+
+    }
+    function InitCheck() {
+        $("input[name='IsAssessRecord']").change(function (event) {
+            var checkValue = $(this).val();
+            if (checkValue == "1") {
+                $("#tdAssessRecord").show();
+                $("#tdAssessRecord1").show();
+                $("#tdAssessRecord").html("评估人员<font face='宋体'>*</font>");
+                $("#AssessPersonName").attr("isvalid", "yes").attr("checkexpession", "NotNull");
+                $("#ChooseAssessPerson").show();
+            }
+            else {
+                $("#tdAssessRecord").hide();
+                $("#tdAssessRecord1").hide();
+                $("#AssessPerson").val("");
+                $("#AssessPersonName").val("");
+                $("#AssessPersonName").removeAttr("isvalid").removeAttr("checkexpession");
+                $("#tdAssessRecord").html("评估人员");
+                $("#ChooseAssessPerson").hide();
+            }
+        });
+        $("input[name='AssessRecordResult']").change(function (event) {
+            if ($("#AssessRecordPersonId").val() != "") {
+                var signImg = getUserSignPic($("#AssessRecordPersonId").val());
+                if (signImg != "" && signImg != undefined) {
+                    $("#AssessRecordSignImg").attr("src", "../.." + signImg);
+                }
+            }
+            var checkValue = $(this).val();
+            if (checkValue == "1") {//通过
+                document.getElementById("IsAssessRecord1").checked = true;
+                $("#IsAssessRecord1").trigger("change");
+            }
+            else {//不通过
+                document.getElementById("IsAssessRecord2").checked = true;
+                $("#IsAssessRecord2").trigger("change");
+            }
+        });
+    }
+    function ChooseAssessPerson() {
+        selectUser({
+            deptId: "", checkMode: 1, mode: 0, winObject: document.body, domId: "AssessPersonName,,AssessPerson", userIds: "AssessPerson", callBack: function () {
+                var num = $("#AssessPersonName").val().length;
+                if (num > 400) {
+                    $("#AssessPersonName").val("");
+                    $("#AssessPerson").val("");
+                    dialogMsg('人员选择过多,请重新选择！', 0);
+                }
+            }
+        });
+    }
+    function showUserName() {
+        if (!!$("#DrillPeopleName").val()) {
+            var html = $("#DrillPeopleName").val();
+            $("#modalBody").html(html);
+            $("#QdModal").modal('show');
+        } else {
+            dialogMsg('请选择参与人员！', 0);
+        }
+    }
+    //历史记录
+    function historyRecord() {
+        var dlg = dialogOpen({
+            id: 'historyRecord',
+            title: '应急演练记录历史记录',
+            url: '/EmergencyPlatform/Drillplanrecord/HistoryIndex?drillplanId=' + historyid,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        })
+    }
+
+    function AddQuestion() {
+        dialogOpen({
+            id: 'QuestionForm',
+            title: '新增问题',
+            url: '/QuestionManage/QuestionInfo/Form?redirectmodule=drill&relevanceid=' + keyValue,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    function OpenViewFlow(keyValue) {
+        var title = "问题流程图";
+        var rqUrl = "/SystemManage/WorkFlow/Detail?keyValue=" + keyValue + "&mode=0";
+        dialogOpen({
+            id: 'QuestionFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() / 2 + 200) + "px",
+            height: ($(top.window).height() / 2 + 300) + "px",
+            btn: null
+        });
+    }
+
+    //查看视图
+    function viewdata(obj, flowstate) {
+        var rqUrl = "";
+        title = "查看问题";
+
+        //未整改隐患的查看页面
+        if (flowstate == "问题登记") {
+            rqUrl = '/QuestionManage/QuestionInfo/Form?redirectmodule=drill&keyValue=' + obj + '&actiontype=view';
+        }
+        else if (flowstate == "问题整改") {
+            rqUrl = '/QuestionManage/QuestionReform/Form?redirectmodule=drill&keyValue=' + obj + '&actiontype=view';
+        }
+        else if (flowstate == "问题验证") {
+            rqUrl = '/QuestionManage/QuestionVerify/Form?redirectmodule=drill&keyValue=' + obj + '&actiontype=view';
+        }
+        else {
+            rqUrl = '/QuestionManage/QuestionInfo/DoneForm?redirectmodule=drill&keyValue=' + obj + '&actiontype=view';
+        }
+        dialogOpen({
+            id: 'QuestionForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //编辑视图
+    function editdata(obj, flowstate) {
+        var rqUrl = "";
+        title = "问题信息";
+
+        //未整改隐患的查看页面
+        if (flowstate == "问题登记") {
+            rqUrl = '/QuestionManage/QuestionInfo/Form?redirectmodule=drill&keyValue=' + obj + '&actiontype=edit';
+        }
+        else if (flowstate == "问题整改") {
+            rqUrl = '/QuestionManage/QuestionReform/Form?redirectmodule=drill&keyValue=' + obj + '&actiontype=edit';
+        }
+        else if (flowstate == "问题验证") {
+            rqUrl = '/QuestionManage/QuestionVerify/Form?redirectmodule=drill&keyValue=' + obj + '&actiontype=edit';
+        }
+        dialogOpen({
+            id: 'QuestionForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //删除问题
+    function removedata(obj) {
+        $.RemoveForm({
+            url: '../../QuestionManage/QuestionInfo/RemoveForm',
+            param: { keyValue: obj },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        });
+    }
+
+    //减少天数
+    function SubtractDays(date, value) {
+        var d = new Date(date);
+        d.setDate(d.getDate() - value);
+        var m = d.getMonth() + 1;
+        return d.getFullYear() + "-" + m + "-" + d.getDate();
+    }
+</script>
+<style type="text/css">
+    * {
+        margin: 0px auto;
+        padding: 0px;
+    }
+</style>
+<div style="padding-top: 50px; margin-right: 30px;">
+    <div id="divtable" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基础信息</strong>
+            <span class="tools pull-right">
+                <a id="historyRecord" href="javascript:historyRecord(this)" class="btn btn-primary btn-xs">历史记录</a>&nbsp;&nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle" style="width:120px">是否关联演练计划<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="是" checked="checked" id="IsConnectPlan1" name="IsConnectPlan" />&nbsp;<label for="IsConnectPlan">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="否" id="IsConnectPlan2" name="IsConnectPlan" />&nbsp;<label for="IsConnectPlan">否</label>
+                    </td>
+                </tr>
+                <tr id="trDRILLPLAN">
+                    <td class="formTitle plan">应急演练计划<font face="宋体">*</font></td>
+                    <td class="formValue plan">
+                        <input id="ID" type="hidden" class="form-control" />
+                        <input id="ASSESSDATA" type="hidden" class="form-control" /> <!--评估表数据-->
+                        <input id="DRILLPLANNAME" type="text" class="form-control" isvalid="yes" readonly="readonly" checkexpession="NotNull" onclick="selectDrillplan({ winObject: window.document.body, domId: 'DRILLPLANID,DRILLPLANNAME,DEPARTNAME,DEPARTID,,DRILLTYPE,,DRILLMODE,PlanDrillCost', checkMode: 1 });" />
+                        <input id="DRILLPLANID" type="hidden" />
+                        <input id="CREATEUSERNAME" type="hidden" />
+                        <input id="CREATEUSERID" type="hidden" />
+                        <input id="CREATEDATE" type="hidden" />
+                    </td>
+                    <td class="formTitle yjya">演练预案<font face="宋体">*</font></td>
+                    <td class="formValue yjya">
+                        <input id="ReserverPlanName" type="text" class="form-control" readonly="readonly" isvalid="yes" checkexpession="NotNull" onclick="selectReserverPlan()" />
+                        <input id="ReserverPlan" type="hidden" />
+                    </td>
+                    <td class="formTitle">演练级别<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="DrillLevel" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">主持人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CompereName" type="text" class="form-control" readonly="readonly" isvalid="yes" checkexpession="NotNull" onclick="setCompereUser()" />
+                        <input id="Compere" type="hidden" />
+                    </td>
+                    <td class="formTitle">组织部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="OrgDept" type="text" class="form-control" readonly="readonly" isvalid="yes" checkexpession="NotNull" onclick="selectDept('', 0, 0, '组织部门', document.body, 'OrgDept,OrgDeptCode,OrgDeptId')" />
+                        <input id="OrgDeptId" type="hidden" /><input id="OrgDeptCode" type="hidden" />
+                    </td>
+                </tr>
+                <tr>
+
+                    <td class="formTitle">演练名称<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="NAME" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+
+
+                    <td class="formTitle">演练部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DEPARTNAME" type="text" class="form-control" readonly="readonly" isvalid="yes" checkexpession="NotNull" onclick="selectDept('', 1, 0, '演练部门', document.body, 'DEPARTNAME,,DEPARTID')" />
+                        <input id="DEPARTID" type="hidden" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">演练预案类型<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="DRILLTYPE" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+
+                    <td class="formTitle">演练方式<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="DRILLMODE" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">演练计划费用（元）</td>
+                    <td class="formValue">
+                        <input id="PlanDrillCost" type="text" class="form-control"  isvalid="yes" checkexpession="TwoPositiveDoubleOrNull" />
+                    </td>
+
+                    <td class="formTitle">演练实际费用（元）</td>
+                    <td class="formValue">
+                        <input id="DrillCost" type="text" class="form-control" isvalid="yes" checkexpession="TwoPositiveDoubleOrNull"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">演练时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DRILLTIME" type="text" value="@DateTime.Now.ToString("yyyy-MM-dd")" class="form-control input-wdatepicker" isvalid="yes" checkexpession="NotNull" onfocus="WdatePicker()" />
+                    </td>
+
+                    <td class="formTitle">演练地点<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DRILLPLACE" type="text" isvalid="yes" checkexpession="NotNull" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" id="tdDrillPeople1">参与人员<font face="宋体">*</font></td>
+                    <td class="formValue" id="tdDrillPeople2">
+                        <input id="DrillPeopleName" type="text" class="form-control" readonly="readonly" style="float:left;width:87%" isvalid="yes" checkexpession="NotNull" onclick="setDrillPeopleUser()" />
+                        <input id="DrillPeople" type="hidden" />
+                        <a id="btn_more" class="btn btn-primary" style="float:left;" href="javascript:showUserName();"><i class="fa fa-check"></i>&nbsp;更&nbsp;&nbsp;多</a>
+                    </td>
+                    <td class="formTitle">参与人数<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DRILLPEOPLENUMBER" type="text" class="form-control" isvalid="yes" checkexpession="Num" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">主要内容</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="MAINCONTENT" class="form-control" style="height:100px;" maxlength="1000"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">演练目的</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="DrillPurpose" class="form-control" style="height:100px;"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">情景模拟</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="SceneSimulation" class="form-control" style="height:100px;"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">演练要点</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="DrillKeyPoint" class="form-control" style="height:100px;"></textarea>
+                        <input id="NodeId" type="hidden" />
+                    </td>
+                </tr>
+
+            </table>
+
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;演练脚本</strong>
+            <span class="tools pull-right">
+                <a id="save" class="btn btn-primary btn-xs" onclick="save()" style="padding-right:20px">保存</a>
+                <a id="add" class="btn btn-primary btn-xs" onclick="btn_add()" style="padding-right:20px">新增</a>
+                <a id="import" class="btn btn-primary btn-xs" onclick="importData()" style="padding-right:20px">导入</a>
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body" style="text-align:center;">
+            <table class="form" id="gridTable"></table>
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;附件</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">演练方案附件</td>
+                    <td class="formValue" colspan="5">
+                        <div id="uploader" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 150px; margin-bottom: 10px;">
+                            <div class="queueList">
+                                <div id="dndArea" class="placeholder">
+                                    <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display: none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">演练总结附件</td>
+                    <td class="formValue" colspan="5">
+                        <div id="uploader1" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 150px; margin-bottom: 10px;">
+                            <div class="queueList">
+                                <div id="dndArea1" class="placeholder">
+                                    <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display: none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">演练过程附件</td>
+                    <td class="formValue" colspan="5">
+                        <div id="uploader6" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 150px; margin-bottom: 10px;">
+                            <div class="queueList">
+                                <div id="dndArea6" class="placeholder">
+                                    <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display: none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle"> 演练现场图片</td>
+                    <td class="formValue" colspan="5">
+                        <div id="uploader2" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 150px; margin-bottom: 10px;">
+                            <div class="queueList">
+                                <div id="dndArea2" class="placeholder">
+                                    <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display: none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle"> 演练现场视频</td>
+                    <td class="formValue" colspan="5">
+                        <div id="uploader5" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; height: 150px; margin-bottom: 10px;">
+                            <div class="queueList">
+                                <div id="dndArea5" class="placeholder">
+                                    <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display: none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">班组视频</td>
+                    <td class="formValue" colspan="3" id="dndArea3"></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel panel-default" id="reform">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;演练问题及整改</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <a class="btn btn-primary btn-xs" style="margin-bottom:10px" id="btn_Question" onclick="AddQuestion()">新增</a>
+            <table class="form" id="QuestionTable"></table>
+            <div id="QuestionPager"></div>
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;演练评价</strong>
+            <span class="tools pull-right">
+                <a id="save" class="btn btn-primary btn-xs" onclick="ShowAssess()" style="padding-right:20px">应急演练评估表</a>
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form" style="border-collapse:separate;border-spacing:0px 5px">
+                <tr>
+                    <td class="formTitle" style="width:150px"><label style="font-size:medium">自评分:</label></td>
+                    <td class="formValue">
+                        <p class="right" style="border: 0;width:50%;margin-left: 5%;">
+                            <strong></strong>
+                            <div class="score_div">
+                                <i><img onclick="getSelfScore(1)" name="selfscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">1</span></i>
+                                <i><img onclick="getSelfScore(2)" name="selfscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">2</span></i>
+                                <i><img onclick="getSelfScore(3)" name="selfscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">3</span></i>
+                                <i><img onclick="getSelfScore(4)" name="selfscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">4</span></i>
+                                <i><img onclick="getSelfScore(5)" name="selfscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">5</span></i>
+                                <span class="score_span" id="txtSelfScore">0分</span>
+                            </div>
+                        </p>
+                    </td>
+                    <td class="formTitle" width="130px"></td>
+                    <td class="formValue"></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div id="EvaluateRecord" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;评价记录</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div id="AuditDiv" class="gridPanel">
+                <table id="gridEvaluate"></table>
+                <div id="EvaluatePager"></div>
+            </div>
+            <table id="tabEvaluate" class="form" style="border-collapse:separate;border-spacing:0px 5px">
+                <tr>
+                    <td class="formTitle" style="width:150px"><label style="font-size:medium">评价人:</label></td>
+                    <td class="formValue">
+                        <input type="text" id="EvaluatePerson" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" class="form-control" />
+                        <input type="hidden" id="EvaluatePersonId" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" />
+
+                    </td>
+                    <td class="formTitle"><label style="font-size:medium">评价人签名:</label></td>
+                    <td class="formValue">
+                        <img id="SignImg" style="height:50px;" />
+                        <a onclick="auditCheck()" class="btn btn-primary"><i class="fa fa-mail-forward"></i>确认签名</a>
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle"><label style="font-size:medium">上级评分:</label></td>
+                    <td class="formValue">
+                        <p class="right" style="border: 0;width:50%;margin-left: 5%;">
+                            <strong></strong>
+                            <div class="score_div">
+                                <i><img onclick="getTopScore(1)" name="topscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">1</span></i>
+                                <i><img onclick="getTopScore(2)" name="topscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">2</span></i>
+                                <i><img onclick="getTopScore(3)" name="topscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">3</span></i>
+                                <i><img onclick="getTopScore(4)" name="topscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">4</span></i>
+                                <i><img onclick="getTopScore(5)" name="topscore" src="@Url.Content("~/Content/images/start_full.png")"><span style="display:none">5</span></i>
+                                <span class="score_span" id="txtTopScore">0分</span>
+                            </div>
+                        </p>
+                    </td>
+                    <td class="formTitle" width="130px"><label style="font-size:medium">评价时间:</label></td>
+                    <td class="formValue"><input type="text" id="EvaluateTime" value="@DateTime.Now.ToString("yyyy-MM-dd")" class="form-control input-wdatepicker" isvalid="yes" checkexpession="NotNull" onfocus="WdatePicker()" /></td>
+                </tr>
+                <tr>
+                    <td class="formTitle"><label style="font-size:medium">演练评价意见:</label></td>
+                    <td class="formValue" colspan="3"><textarea class="form-control" id="EvaluateOpinion" rows="4" isvalid="yes" checkexpession="LenStrOrNull" length="150"></textarea></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div id="AssessDiv" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;选择评估人</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <table class="form">
+            <tr>
+                <td class="formTitle" style="width:200px;">是否选择评估人员</td>
+                <td class="formValue icheck">
+                    <div class="radio-inline">
+                        <label>
+                            <input type="radio" name="IsAssessRecord" id="IsAssessRecord1" value="1" checked="checked" />&nbsp;&nbsp;是
+                        </label>
+                    </div>
+                    <div class="radio-inline">
+                        <label>
+                            <input type="radio" name="IsAssessRecord" id="IsAssessRecord2" value="0" />&nbsp;&nbsp;否
+                        </label>
+                    </div>
+                </td>
+                <td id="tdAssessRecord" class="formTitle">评估人员<font face="宋体">*</font></td>
+                <td id="tdAssessRecord1" class="formValue">
+                    <div class="input-group" style="width:100%;">
+                        <input id="AssessPersonName" readonly type="text" class="form-control" />
+                        <input id="AssessPerson" type="hidden" class="form-control" />
+                        <span id="ChooseAssessPerson" class="input-group-addon" onclick="ChooseAssessPerson()" title="选择评估人员"><i class='fa fa-gavel'></i></span>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div id="AssessRecord" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;评估信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div id="AssessDiv" class="gridPanel">
+                <table id="gridAssess"></table>
+                <div id="AssessPager"></div>
+            </div>
+            <table id="tabAssessRecord" class="form" style="border-collapse:separate;border-spacing:0px 5px">
+                <tr>
+                    <td class="formTitle" style="width:150px"><label style="font-size:medium">评估人<font face="宋体">*</font></label></td>
+                    <td class="formValue">
+                        <input type="text" id="AssessRecordPerson" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" class="form-control" />
+                        <input type="hidden" id="AssessRecordPersonId" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" />
+
+                    </td>
+                    <td class="formTitle"><label style="font-size:medium">评估人签名<font face="宋体">*</font></label></td>
+                    <td class="formValue">
+                        <img id="AssessRecordSignImg" style="height:50px;" />
+                        @* <a onclick="auditAssessCheck()" class="btn btn-primary"><i class="fa fa-mail-forward"></i>确认签名</a>*@
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="font-size:medium">评估结果<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="AssessRecordResult" id="AssessRecordResult1" value="1" />通过
+                            </label>
+                        </div>
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="AssessRecordResult" id="AssessRecordResult2" value="0" />不通过
+                            </label>
+                        </div>
+                    </td>
+                    <td class="formTitle" width="130px"><label style="font-size:medium">评估时间<font face="宋体">*</font></label></td>
+                    <td class="formValue"><input type="text" id="AssessRecordTime" value="@DateTime.Now.ToString("yyyy-MM-dd")" class="form-control input-wdatepicker" onfocus="WdatePicker()" /></td>
+                </tr>
+                <tr>
+                    <td class="formTitle"><label style="font-size:medium">评估意见</label></td>
+                    <td class="formValue" colspan="3"><textarea class="form-control" id="AssessRecordOpinion" rows="4" isvalid="yes" checkexpession="LenStrOrNull" length="150"></textarea></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+</div>
+<div id="videodiv" style="display:none; text-align:center;background-color:black; height:660px">
+</div>
+<div id="btngroup" class="form-button" style=" top:40px;  text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <a onclick="AcceptClick('0')" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+    &nbsp;&nbsp;
+    <a onclick="AcceptClick('1')" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+    &nbsp;&nbsp;
+</div>
+<div class="modal" id="QdModal">
+    <div class="modal-dialog" style="width: 300px; margin-top: 200px;margin-left:300px;">
+        <div class="modal-content" style="text-align: center;">
+            <div class="modal-header">
+                <h5>发布范围</h5>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
+            <div class="modal-footer">
+                <button id="btnModal" type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>

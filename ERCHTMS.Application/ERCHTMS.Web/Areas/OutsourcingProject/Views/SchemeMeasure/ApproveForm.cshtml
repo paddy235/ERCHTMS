@@ -1,0 +1,703 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+    var orgId = "";
+    var flag = request('flag');
+    if (flag == "proFiles")
+        orgId = request('orgId');
+    else orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    //var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    var keyValue = request('keyValue');
+    var engineerid = request('engineerid');
+    var actiontype = request('actiontype');
+    var contractid = request('contractid'); //关联ID
+    var signImg = "@ERCHTMS.Code.OperatorProvider.Provider.Current().SignImg";//当前用户签名图片
+    var currUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+
+    var orgIddept = top.currUserOrgId;
+    var enTemName = '';
+    var kbsVersion = 0; //0:非康巴什 1:康巴什
+    $(function () {
+        GetKBSVersion();
+        loadSendDept(orgIddept);
+        InitProject();
+        initControl();
+        //审核记录信息
+        GetApproveGrid();
+
+        //提交流程
+        $("#btn_Submit").click(function () {
+            AcceptClick();
+        });
+
+
+        //查看
+        if (actiontype == "view") {
+            $("#btn_Submit").css("display","none");
+           // $(".center-Panel").removeAttr("style");
+           // $(".form-button").css("display", "none");
+            $("#panel4").css("display","none");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+
+        //如果是查看记录过来的请求，隐藏当前的历史记录
+        if (!!contractid)
+        {
+            $("#historyRecord").css("display", "none");
+        }
+
+    });
+
+    // 判断是否康巴什版本
+    function GetKBSVersion() {
+        $.ajax({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson?EnCode=KbsManage",
+            type: "GET",
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                if (data.length == 0) {
+                    kbsVersion = 0;
+                    $('#belongkbs').hide();
+                    
+
+                } else {
+                    kbsVersion = 1;
+                    $('#btn_Export').hide();
+
+                }
+
+            }
+        })
+    }
+    //初始化控件
+    function initControl() {
+        var deptId = "";
+        var deptName = "";
+        var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+        var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+        var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+        //公司级用户取机构对象
+        @*if (roleNames.indexOf("公司级用户") >= 0)
+        {
+            deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";  //机构ID
+            deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeName";//机构名称
+        }
+        else {*@
+            deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId"; //部门ID
+            deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName"; //部门ID
+        //}
+        $("#AUDITTIME").val("@DateTime.Now.ToString("yyyy-MM-dd")");
+        $("#AUDITPEOPLE").val(userName); //审核人姓名
+        $("#AUDITPEOPLEID").val(userId); //审核人ID
+        $("#AUDITDEPTID").val(deptId); //审核部门ID
+        $("#AUDITDEPT").val(deptName); //审核部门名称
+        //工程类型
+        $("#ENGINEERTYPE").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ProjectType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        ////所属区域
+        //$("#ENGINEERAREA").ComboBoxTree({
+        //    url: "../../BaseManage/District/GetTreeJson",
+        //    param: { orgID: orgId, areaIds: "", planId: "" },
+        //    id: "DistrictID",
+        //    text: "DistrictName",
+        //    description: "==请选择==",
+        //    height: "200px"
+        //});
+        //风险等级
+        $("#ENGINEERLEVEL").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ProjectLevel" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        $("#BELONGMAJOR").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "BelongMajor" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        //工程
+        //$("#ENGINEERID").ComboBox({
+        //    url: "../../OutsourcingProject/Outsouringengineer/GetEngineerDataByCurrdeptId?mode=006",
+        //    id: "engineerid",
+        //    text: "engineername",
+        //    description: "==请选择==",
+        //    height: "200px"
+        //}).bind("change", function () {
+        //    var sel = $(this).attr('data-value');
+        //    if (!!sel) {
+        //        GetEngineerInfo($(this).attr('data-value'));
+        //    }
+        //});
+        //获取表单
+        if (!!keyValue) {
+            //当前详情
+            var formUrl = "../../OutsourcingProject/SchemeMeasure/GetFormJson";
+            //历史记录
+            if (!!contractid)
+            {
+                var formUrl = "../../OutsourcingProject/SchemeMeasure/GetHistoryFormJson";
+            }
+            $.SetForm({
+                url: formUrl,
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#EngAreaName").val(data.ENGINEERAREANAME);
+                    $("#ENGINEERLETDEPTID").ComboBoxTreeSetValue(data.ENGINEERLETDEPTID);
+                    $("#BELONGDEPTID").ComboBoxTreeSetValue(data.BELONGDEPTID);
+                    if (data.SummitContent != null && data.SummitContent != undefined) {
+                        $("#SummitContent").val(data.SummitContent);
+                        $("#SummitContent").find("option").each(function (i, dom) {
+                            if (data.SummitContent.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+                    }
+                }
+            })
+        }
+
+        //附件绑定
+        file_upload.bindFiles(false, false, keyValue, "uploader", false);
+
+        if (!!engineerid) {
+            $("#ENGINEERID").attr("readonly", "readonly");
+            GetEngineerInfo(engineerid);
+        }
+    }
+    //获取工程详情
+    function GetEngineerInfo(id) {
+        $.SetForm({
+            url: "../../OutsourcingProject/ToolsCheckMain/GetOutsouringengineerByID",
+            param: { keyValue: id },
+            success: function (data) {
+                $("#form1").formDeserialize(data);
+                if (data != null) {
+                    $("#PROJECTID").val(data.ID);
+                    //$("#ENGINEERID").ComboBoxSetValue(data.ID);
+                }
+            }
+        })
+    }
+
+
+    //三措两案审核列表
+    function GetApproveGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#approveGridTable');
+        $gridTable.jqGrid({
+            url: "../../OutsourcingProject/Aptitudeinvestigateaudit/GetSpecialAuditList?keyValue=" + keyValue,
+            datatype: "json",
+            height: $(window).height() / 2 - 200,
+            autowidth: true,
+            colModel: [
+                //{
+                //    label: '操作', name: 'ID', index: 'ID', width: 120, align: 'center',
+                //    formatter: function (cellvalue, options, rowObject) {
+                //        var html = "<a href=javascript:Detail('" + rowObject.ID + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                //        return html;
+                //    }
+                //},
+                 {
+                     label: '审核部门', name: 'AUDITDEPT', width: 300, align: 'center',
+                 },
+                { label: '审核人', name: 'AUDITPEOPLE', index: 'AUDITPEOPLE', width: 120, align: 'center' },
+                {
+                    label: '审核结果', name: 'AUDITRESULT', index: 'AUDITRESULT', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = rowObject.AUDITRESULT == "0" ? "通过" : "不通过";
+                        return html;
+                    }
+                },
+                {
+                    label: '审核意见', name: 'AUDITOPINION', index: 'AUDITOPINION', width: 150, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.AUDITOPINION) {
+                            var content = rowObject.AUDITOPINION.length > 20 ? rowObject.AUDITOPINION.substring(0, 20) + "......" : rowObject.AUDITOPINION;
+
+                            html = "<div title=" + content + ">" + content + "</div>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '审核时间', name: 'AUDITTIME', index: 'AUDITTIME', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var content = "";
+                        if (!!rowObject.AUDITTIME) {
+                            content = rowObject.AUDITTIME.replace("00:00:00", "");
+                        }
+                        return content;
+                    }
+                },
+                {
+                    label: '签名', name: 'AUDITSIGNIMG', index: 'AUDITSIGNIMG', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var content = !!rowObject.AUDITSIGNIMG ? rowObject.AUDITSIGNIMG : "";
+                        var html = "";
+                        if (content == "" || content == undefined) {
+                            var html = "<img  style=\"height:50px;\" />&nbsp;";
+                        } else {
+                            html = "<img style=\"height:50px;\"  src=\"../.." + content.replace("../..","")+ "\"/>&nbsp;";
+                        }
+
+                        return html;
+                    }
+                }
+            ],
+            pager: false,
+            rowNum: "20",
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+    }
+
+    //审核详情
+    //function Detail(keyValue) {
+    //    dialogOpen({
+    //        id: 'DetailForm',
+    //        title: '三措两案审核详情',
+    //        url: '/OutsourcingProject/Aptitudeinvestigateaudit/Form?keyValue=' + keyValue,
+    //        width: ($(top.window).width() - 200) + "px",
+    //        height: ($(top.window).height() - 200) + "px",
+    //        btn: null
+    //    });
+    //}
+
+    //获取历史记录信息
+    function GetHistoryInfo() {
+        dialogOpen({
+            id: 'HistoryIndexFrm',
+            title: '查看历史记录信息',
+            url: '/OutsourcingProject/SchemeMeasure/HistoryIndex?contractid=' + keyValue,
+            width: ($(top.window).width() -150) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //提交审核表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        var postData = $("#form1").formSerialize(keyValue);
+
+        postData["ENGINEERLETDEPT"] = $("#ENGINEERLETDEPTID").attr("data-text");
+        postData["ENGINEERLETDEPTCODE"] = $("#ENGINEERLETDEPTID").attr("data-code");
+        postData["BELONGDEPTNAME"] = $("#BELONGDEPTID").attr("data-text");
+        postData["BELONGCODE"] = $("#BELONGDEPTID").attr("data-code");
+        postData["ENGINEERAREANAME"] = $("#EngAreaName").val();
+        //审核结果
+        var auditresult = $("input[name='AUDITRESULT']:checked").val();
+        if (auditresult == "" || auditresult == undefined) {
+            dialogAlert("审查结果未勾选,无法进行提交!!!", function () {
+                return false;
+            })
+            return false;
+        }
+        postData["AUDITSIGNIMG"] = encodeURIComponent($("#AuditSignImg").attr("src"));
+        postData["AUDITRESULT"] = auditresult;
+        postData["FlowId"] = $("#FlowId").val();
+        $.SaveForm({
+            url: "../../OutsourcingProject/SchemeMeasure/ApporveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+
+    function exportReport() {  //审批单
+        if (!!contractid) {
+            window.location.href = "../../OutsourcingProject/SchemeMeasure/ExportHistoryWord?historyKeyValue=" + keyValue;
+        }
+        else
+        {
+            window.location.href = "../../OutsourcingProject/SchemeMeasure/ExportWord?keyValue=" + keyValue;
+        }
+
+    }
+    function auditCheck(obj) {
+        var signImg = getUserSignPic(currUserId);
+        if (signImg != "" && signImg != undefined) {
+            $("#AuditSignImg").attr("src", "../.." + signImg);
+        } else {
+            $(obj).get(0).checked = false;
+        }
+
+
+    }
+
+    function InitProject() {
+        var select = $(".ENGINEERNAME");
+        select.html('');
+        select.append('<option value="">请输入外包工程或选择</option>');
+        $('.ENGINEERNAME').comboSelect();
+        $.ajax({
+            url: "../../OutsourcingProject/Outsouringengineer/GetEngineerDataByCurrdeptId?mode=006",
+            type: "GET",
+            //data: { orgCode: orgCode },
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                select.html('');
+                select.append('<option value="">请输入外包工程或选择</option>');
+                if (data) {
+                    for (var i = 0; i < data.length; i++) {
+                        select.append('<option value="' + data[i].engineerid + '">' + data[i].engineername + '</option>');
+                    }
+                }
+                //解决控件重新渲染 input id取不到的问题
+                if (!$(".ENGINEERNAME").attr("id")) {
+                    $(".ENGINEERNAME").attr("id", "ENGINEERNAME");
+                }
+                $('.ENGINEERNAME').comboSelect();
+                // 判断权限是否可以填写
+                //$('#ENGINEERNAME').attr('readonly', 'readonly');
+
+
+            }
+        })
+        $('#ENGINEERNAME').bind("change", function () {
+            //console.log($('#ENGINEERNAME').val())
+            enTemName = $('#ENGINEERNAME').val();
+        });
+        if (actiontype == "approve" || actiontype == "view") {
+            $('.combo-dropdown').hide();
+            $('#ENGINEERNAME').attr('disabled', 'disabled');
+        }
+    }
+
+    //发包部门+用工部门
+    function loadSendDept(orgid) {
+        //发包部门
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 44
+            }
+        );
+        $("#ENGINEERLETDEPTID").ComboBoxTree({
+            url: "../../BaseManage/Department/GetDepartTreeJson",
+            param: { json: json },
+            id: "DepartmentId",
+            text: "FullName",
+            description: "==请选择==",
+            height: "200px"
+        }).bind("change", function () {
+            var value = $(this).attr('data-value');
+            if (value == "" || value == null || value == undefined) {
+                return;
+            }
+
+        });
+
+        $("#BELONGDEPTID").ComboBoxTree({
+            url: "../../BaseManage/Department/GetDepartTreeJson",
+            param: { json: json },
+            id: "DepartmentId",
+            text: "FullName",
+            description: "==请选择==",
+            height: "200px"
+        }).bind("change", function () {
+            var value = $(this).attr('data-value');
+            if (value == "" || value == null || value == undefined) {
+                return;
+            }
+
+        });
+
+    }
+
+
+    function proChange(obj) {
+
+        var projectid = $(obj).val();
+        if (projectid != "" && projectid != null && projectid != undefined) {
+            enTemName = "";
+            $.SetForm({
+                url: "../../OutsourcingProject/Outsouringengineer/GetFormJson",
+                param: { keyValue: projectid },
+                success: function (data) {
+                    $("#form1").formDeserialize(data.data);
+                    $("#ENGINEERLETDEPTID").attr("disabled", "disabled");
+                    $("#EngAreaName").attr("disabled", "disabled");
+                    $("#ENGINEERTYPE").attr("disabled", "disabled");
+                    $("#ENGINEERLEVEL").attr("disabled", "disabled");
+                    $("#ENGINEERCONTENT").attr("disabled", "disabled");
+                }
+            })
+        } else {
+            $('#ENGINEERNAME').val(enTemName);
+            $("#ENGINEERCODE").val("");
+            $("#ENGINEERLETDEPTID").attr("data-text", "==请选择==");
+            $("#ENGINEERLETDEPTID").attr("data-value", "");
+            $("#ENGINEERLETDEPTID div:eq(0)").text("==请选择==");
+            $("#ENGINEERLETDEPTID").attr("disabled", false);
+
+
+            $('#EngAreaName').val("");
+            $('#ENGINEERAREA').val("");
+            $("#EngAreaName").attr("disabled", false);
+
+            $("#ENGINEERTYPE").attr("data-text", "==请选择==");
+            $("#ENGINEERTYPE").attr("data-value", "");
+            $("#ENGINEERTYPE div:eq(0)").text("==请选择==");
+            $("#ENGINEERTYPE").attr("disabled", false);
+
+            $("#ENGINEERLEVEL").attr("data-text", "==请选择==");
+            $("#ENGINEERLEVEL").attr("data-value", "");
+            $("#ENGINEERLEVEL div:eq(0)").text("==请选择==");
+            $("#ENGINEERLEVEL").attr("disabled", false);
+
+            $("#ENGINEERCONTENT").val("");
+            $("#ENGINEERCONTENT").attr("disabled", false);
+
+        }
+
+        if ($(".ENGINEERNAME").val() != "" && $(".ENGINEERNAME").val() != null && $(".ENGINEERNAME").val() != undefined) {
+            $('#PROJECTID').val($(".ENGINEERNAME").val());
+        } else {
+            $('#PROJECTID').val('');
+        }
+    }
+</script>
+<div class="center-Panel" style="margin-top:42px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;工程基本信息&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <a href="#" id="historyRecord" style="font-weight:bold;" onclick="GetHistoryInfo()" class="btn btn-primary btn-xs">历史记录</a></strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">外包工程<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <select id="ENGINEERNAME" class="ENGINEERNAME" readonly onchange="proChange(this)"></select>
+
+                        </td>
+                        <td class="formTitle">工程编号</td>
+                        <td class="formValue">
+                            <input id="ENGINEERCODE" type="text" class="form-control" readonly />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工程类型</td>
+                        <td class="formValue">
+
+                            <div id="ENGINEERTYPE" type="select" class="ui-select" @*isvalid="yes" checkexpession="NotNull"*@ disabled="disabled"></div>
+                        </td>
+                        <td class="formTitle">所属区域</td>
+                        <td class="formValue">
+                            <input id="EngAreaName" type="text" length="300" class="form-control" @*isvalid="yes" checkexpession="LenStr"*@ placeholder="请选择区域" readonly onclick="" />
+                            <input id="ENGINEERAREA" type="hidden" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工程风险等级<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="ENGINEERLEVEL" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" readonly></div>
+                        </td>
+                        <td class="formTitle">责任部门<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="ENGINEERLETDEPTID" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" readonly></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工程内容</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="ENGINEERCONTENT" class="form-control" style="height: 120px;" readonly></textarea>
+                        </td>
+                    </tr>
+
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;方案措施信息（施工方案、应急预案、安全措施、组织措施、技术措施、其他方案）</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-top: 5px; margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">编制人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ORGANIZER" onchange="" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" ondblclick="setOrgValue()" readonly />
+                        </td>
+                        <td class="formTitle">编制时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ORGANIZTIME" type="text" class="form-control"  isvalid="yes" checkexpession="NotNull" readonly />
+                            <input type="hidden" id="PROJECTID" />
+                        </td>
+
+                    </tr>
+                    <tr id="belongkbs">
+                        <td class="formTitle">所属专业<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="BELONGMAJOR" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" readonly></div>
+                        </td>
+                        <td class="formTitle">所属部门<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="BELONGDEPTID" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" readonly></div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td class="formTitle">提交人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SUBMITPERSON" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="setValue()"  />
+                        </td>
+                        <td class="formTitle">提交时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SUBMITDATE" type="text" class="form-control"  isvalid="yes" checkexpession="NotNull" readonly />
+                            @*<input type="hidden" id="PROJECTID" />*@
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">提交内容</td>
+                        <td class="formValue">
+                            <select id="SummitContent" class="form-control selectpicker show-menu-arrow" multiple placeholder="请选择提交内容" disabled="disabled">
+                                @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("SummitContent"))
+                            </select>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td class="formTitle">附件信息</td>
+                        <td class="formValue" colspan="3">
+                            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="uploaderFile" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default" id="panel3">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;审核记录</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-top: 5px; margin-right: 30px;">
+                <table id="approveGridTable"></table>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default" id="panel4">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;审核信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-top: 5px; margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">审核人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="AUDITPEOPLE" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                            <input type="hidden" id="AUDITPEOPLEID" />
+                            <input type="hidden" id="AUDITDEPTID" />
+                            <input type="hidden" id="AUDITDEPT" />
+                            <input type="hidden" id="FlowId" />
+
+                        </td>
+                        <td class="formTitle">审核时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="AUDITTIME" type="text" class="form-control" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" disabled="disabled" readonly isvalid="yes" checkexpession="NotNull" />
+                            <input type="hidden" id="PROJECTID" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">审核结果<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="AUDITRESULT" id="AUDITRESULT1" value="0" onclick="auditCheck(this)" />同意
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="AUDITRESULT" id="AUDITRESULT2" value="1" onclick="auditCheck(this)" />不同意
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">签名<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <img id="AuditSignImg" style="height:50px;" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">审核意见</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="AUDITOPINION" name="AUDITOPINION" class="form-control"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+    &nbsp;&nbsp;
+    <a id="btn_Export" class="btn btn-primary" onclick="exportReport()"><i class="fa fa-mail-forward"></i>&nbsp;导出审批单</a>
+</div>

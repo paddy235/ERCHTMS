@@ -1,0 +1,409 @@
+﻿@using ERCHTMS.Code;
+@{
+    ViewBag.Title = "Statistics";
+    Layout = "~/Views/Shared/_Form.cshtml";
+    var user = OperatorProvider.Provider.Current();
+}
+<script src="~/Content/Scripts/plugins/highcharts/highcharts.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/modules/exporting.js"></script>
+
+<style>
+    table {
+        text-align: center;
+    }
+</style>
+<script>
+    var type = 0;
+    $(function () {
+        $("#DeptId").ComboBoxTree({
+                 url: top.contentPath + "/BaseManage/Department/GetTreeJsonByDeptId?deptId=@user.OrganizeId",
+            description: "==请选择==",
+            allowSearch: true,
+            width: "300px",
+            height: "500px"
+
+        });
+
+        LoadCYLCount();
+        LoadTable();
+
+    })
+
+    function LoadCYLCount(elemt) {
+        $(elemt).addClass("btn-primary").siblings().removeClass("btn-primary")
+        $("#WXX,#div_WXX,#search_WXX").hide();
+        $("#CYL,#tab_CYL,#search_CYL").show();
+
+        type=0
+        var Year = $("#Year").val();
+        var DeptId = $("#DeptId").ComboBoxGetValue();
+        $.ajax({
+            url: "/..@Url.Action("GetCYLCount")",
+            type: "POST",
+            data: { Year: Year, DeptId: DeptId },
+            success: function (data) {
+                var keys = [];
+                var values = [];
+                if (data.Code == 0 && data.Data != null && data.Data.length) {
+
+                        for (var i = 0; i < data.Data.length; i++) {
+                            keys.push(data.Data[i].Key);
+                            values.push(data.Data[i].Value);
+                        }
+
+                }
+                $('#CYL').highcharts({
+                    chart: {
+                        type: 'column'
+                    },
+                    title: {
+                        text: '部门参与率统计'
+                    },
+                    xAxis: {
+                        categories: keys,
+                    },
+                    yAxis: {
+                        allowDecimals: false,
+                        title: {
+                            text: '参与率(单位：%)'
+                        },
+                        labels: {
+                            formatter: function () {
+                                return this.value
+                            }
+                        }
+                    },
+                    exporting: {
+                        enabled: false
+                    },
+                    credits: {
+                        enabled: false
+                    },
+                    tooltip: {
+                        enabled: true,
+                        crosshairs: true,
+                        shared: true,
+                        formatter: function () {
+                            return '<b>月份：' + this.x + '</b><br/>参与率： ' + this.y+'%';
+                        }
+                    },
+                    plotOptions: {
+                        line: {
+                            marker: {
+                                enable: false,
+                                radius: 4,
+
+                                lineWidth: 1
+                            }, dataLabels: {
+                                enabled: true,
+                                formatter: function () {
+                                    //return '安全比： ' + this.y ;
+                                }
+                            }, showInLegend: true
+                        }
+
+
+                    },
+                    series: [{
+                        name: '部门参与率统计',
+                        marker: {
+                            symbol: 'square',
+                            enabled: false,
+                        },
+                        data: values
+
+                    }]
+                    , lang: { noData: "暂无数据可显示!" },
+                    noData: {
+                        position: {
+                            align: 'center',
+                            verticalAlign: 'middle'
+                        },
+                        attr: {
+                            'stroke-width': 1
+                        },
+                        style: {
+                            fontWeight: 'bold',
+                            fontSize: '15px',
+                            color: '#202030'
+                        }
+                    }
+                });
+                },
+                error: function (error) {
+                    console.log(error)
+                    dialogMsg('请求失败！', 0);
+                }
+            });
+    }
+
+
+    function LoadTable() {
+
+        var Year = $("#Year").val();
+        $.ajax({
+            url: "/..@Url.Action("GetDeptCYL")",
+            type: "POST",
+            data: { Year: Year },
+            success: function (data) {
+                var keys = [];
+                var values = [];
+                var deptCounts = 0;
+                if (data.Code == 0 && data.Data != null && data.Data.length>0) {
+                    var theadHtml = '<tr><th colspan="2" style="text-align:right; border-bottom:none; ">部门</th>';
+                    var tbodyHtml = '<tr><th colspan="2" style="text-align:left; border-top:none;">月份</th></tr>';
+                    var monthDept = data.Data[0].MonthData;
+                    if (!!monthDept && monthDept.length > 0) {
+                        for (var j = 0; j < monthDept.length; j++) {
+                            tbodyHtml += '<tr>'
+                            tbodyHtml += '<td colspan="2">' + monthDept[j].Key + '</td>';
+                            for (var x = 0; x < data.Data.length; x++) {
+                                if (j == 0) {
+                                    theadHtml += ' <th rowspan="2">' + data.Data[x].DeptName + '</th>';
+                                }
+                                if (data.Data[x].MonthData[j].Value < 100) {
+                                    tbodyHtml += '<td style="color:red;">' + data.Data[x].MonthData[j].Value +'%'+ '</td>';
+                                } else {
+                                    tbodyHtml += '<td>' + data.Data[x].MonthData[j].Value + '%' +  '</td>';
+                                }
+                            }
+                            tbodyHtml += '</tr>'
+                        }
+                    }
+
+
+                    theadHtml += ' </tr>'
+                    var thmlStr = theadHtml + tbodyHtml;
+                    $("#tab_CYL").html(thmlStr);
+
+
+                    $("#tab_CYL").show();
+                }
+            },
+            error: function (error) {
+                console.log(error)
+                dialogMsg('请求失败！', 0);
+            }
+        });
+    }
+    function Search() {
+        if (type == 0) {
+            LoadCYLCount($("#a_cyl"));
+            LoadTable();
+
+        } else {
+            LoadDangerCount($("#a_wxx"))
+
+        }
+
+    }
+
+    function LoadDangerCount(elemt) {
+        type = 1
+        $("#WXX,#div_WXX,#search_WXX").show();
+        $("#CYL,#tab_CYL,#search_CYL").hide();
+        $(elemt).addClass("btn-primary").siblings().removeClass("btn-primary")
+        var year = $("#WXXYear").val();
+        var month = $("#month").val();
+
+        LoadDangerTable();
+
+
+        $.ajax({
+            url: "/..@Url.Action("GetWXXCount")",
+            type: "POST",
+            data: { Year: year,Month:month },
+            success: function (data) {
+                var keys = [];
+                var values = [];
+                if (data.Code == 0 && data.Data != null && data.Data.length>0) {
+
+                    for (var i = 0; i < data.Data.length; i++) {
+                        keys.push(data.Data[i].Key);
+                        values.push(data.Data[i].Value);
+                    }
+                }
+                LoadWXXCharts(keys, values);
+      
+
+          
+            },
+            error: function (error) {
+                console.log(error)
+                dialogMsg('请求失败！', 0);
+            }
+        });
+    }
+
+    function LoadDangerTable() {
+        var year = $("#WXXYear").val();
+        $.ajax({
+            url: "/..@Url.Action("TableHtml")?year=" + year,
+            type: "GET",
+            datatype:"html",
+            success: function (data) {
+                $("#div_WXX").html(data);
+            },
+            error: function (error) {
+                console.log(error)
+                dialogMsg('请求失败！', 0);
+            }
+        });
+    }
+
+
+    function LoadWXXCharts(keys, values) {
+      $('#WXX').highcharts({
+                    chart: {
+                        type: 'column'
+                    },
+                    title: {
+                        text: '危险观察项统计'
+                    },
+                    xAxis: {
+                        categories: keys,
+                    },
+                    yAxis: {
+                        allowDecimals: false,
+                        min: 0,
+                        title: {
+                            text: '危险项数量'
+                        },
+                        labels: {
+                            formatter: function () {
+                                return this.value
+                            }
+                        }
+                    },
+                    exporting: {
+                        enabled: false
+                    },
+                    credits: {
+                        enabled: false
+                    },
+                    tooltip: {
+                        enabled: true,
+                        crosshairs: true,
+                        shared: true,
+                        formatter: function () {
+                            return '<b>类型：' + this.x + '</b><br/>数量： ' + this.y;
+                        }
+                    },
+                    plotOptions: {
+                        line: {
+                            marker: {
+                                enable: false,
+                                radius: 4,
+                                lineWidth: 1
+                            }, dataLabels: {
+                                enabled: true,
+                                formatter: function () {
+                                    //return '安全比： ' + this.y ;
+                                }
+                            }, showInLegend: true
+                        }
+
+
+                    },
+                    series: [{
+                        name: '观察内容类型',
+                        marker: {
+                            symbol: 'square',
+                            enabled: false,
+                        },
+                        data: values
+
+                    }]
+                    , lang: { noData: "暂无数据可显示!" },
+                    noData: {
+                        position: {
+                            align: 'center',
+                            verticalAlign: 'middle'
+                        },
+                        attr: {
+                            'stroke-width': 1
+                        },
+                        style: {
+                            fontWeight: 'bold',
+                            fontSize: '15px',
+                            color: '#202030'
+                        }
+                    }
+        });
+
+                
+    }
+
+    function ShowTip() {
+        dialogOpen({
+            id: 'Form',
+            title: "参与率说明",
+            url: '/..@Url.Action("ShowTip")',
+            width: "500px",
+            height: "200px",
+            btn: null,
+            callBack: function (iframeId) {
+             
+            }
+        })
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="center-Panel" style="margin-left:10px;">
+
+        <div class="titlePanel">
+            <div class="title-search">
+                <table id="search_CYL">
+                    <tr>
+                        <td>
+                            年份&nbsp;&nbsp;
+                        </td>
+                        <td style="padding-left: 2px;">
+                            @Html.DropDownList("Year", ViewBag.YearList as IEnumerable<SelectListItem>, new { @style = "width:100px;" })
+                        </td>
+                        <td style="padding-left: 2px;">
+                            &nbsp;&nbsp;查看单位&nbsp;&nbsp;
+                        </td>
+                        <td style="padding-left: 2px;">
+                            <div id="DeptId" type="selectTree" style="width:200px;" class="ui-select"></div>
+                        </td>
+                        <td style="padding-left: 2px;">
+                            <a class="btn btn-default" onclick="Search();"><i class="fa fa-refresh"></i>&nbsp;查询</a>
+                        </td>
+                    </tr>
+                </table>
+                <table id="search_WXX">
+                    <tr>
+                        <td>
+                            年份&nbsp;&nbsp;
+                        </td>
+                        <td style="padding-left: 2px;">
+                            @Html.DropDownList("WXXYear", ViewBag.YearList as IEnumerable<SelectListItem>, new { @style = "width:100px;" })
+                        </td>
+                        <td style="padding-left: 2px;">
+                            &nbsp;&nbsp;月份&nbsp;&nbsp;
+                        </td>
+                        <td style="padding-left: 2px;">
+                            @Html.DropDownList("month", ViewBag.MonthList as IEnumerable<SelectListItem>)
+                        </td>
+                        <td style="padding-left: 2px;">
+                            <a class="btn btn-default" onclick="Search();"><i class="fa fa-refresh"></i>&nbsp;查询</a>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="toolbar">
+                <div class="btn-group">
+                    <a id="a_cyl" class="btn btn-default btn-primary" onclick="LoadCYLCount(this);">&nbsp;参与率统计</a>
+                    <a id="a_wxx" class="btn btn-default" onclick="LoadDangerCount(this);">&nbsp;观察危险项统计</a>
+                </div>
+            </div>
+        </div>
+        <div id="CYL" style=" float:left; width:100%; " onclick="ShowTip()"></div>
+        <div id="WXX" style=" float:left; width:100%; "></div>
+        <table id="tab_CYL" style=" float:left; width:100%; display:none;" border="1" cellspacing="0"></table>
+        <div style="width:100%;float:left" id="div_WXX"></div>
+    </div>
+</div>
+

@@ -1,0 +1,280 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    ;
+    var mode = request("mode");
+    var Ids = "@string.Join(",",(new ERCHTMS.Busines.Desktop.DesktopBLL().GetThreeCount(ERCHTMS.Code.OperatorProvider.Provider.Current())))";
+    $.ajaxSetup({
+        async: false
+    });
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 150);
+            }, 200);
+            e.stopPropagation();
+        });
+        if (mode == 1) {
+            $("#add").hide();
+        }
+    }
+    function isRight(roleIds) {
+        var res = false;
+        var arr = top.currUserRoleId.split(',');
+        for (var j = 0; j < arr.length; j++) {
+            if (roleIds.indexOf(arr[j]) >= 0) {
+                res = true;
+                break;
+            }
+        }
+        return res;
+    }
+    //加载表格
+    function GetGrid() {
+
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            height: $(window).height() - 150,
+            autowidth: true,
+            url: "../../PersonManage/ThreePeopleCheck/GetListJson?mode=" + mode,
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:action('show','" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (rowObject.createuserid == top.currUserId && rowObject.issumbit == 0) {
+                            html += "<a href=javascript:action('edit','" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        }
+                        if (rowObject.issumbit == 1 && rowObject.isover == 0) {
+                            if (rowObject.checkdeptid != null) {
+                                if(Ids.indexOf(rowObject.id)>=0){
+                                    html += "<a href=javascript:action('audit','" + rowObject.id + "') title='审核'><i class='fa fa-check'></i></a>";
+                                }
+                                //if (rowObject.checkdeptid == "-3") {
+                                //    if (rowObject.createuserdeptid == top.currUserDeptId && isRight(rowObject.checkroleid)) {
+                                //        html += "<a href=javascript:action('audit','" + rowObject.id + "') title='审核'><i class='fa fa-check'></i></a>";
+                                //    }
+                                //} else {
+                                //    if (rowObject.checkdeptid == top.currUserDeptId && isRight(rowObject.checkroleid)) {
+                                //        html += "<a href=javascript:action('audit','" + rowObject.id + "') title='审核'><i class='fa fa-check'></i></a>";
+                                //    }
+                                //}
+                            }
+
+                        }
+                        if (IsAdmin() || (top.currUserRoleName.indexOf("安全管理员") >= 0) && rowObject.isover == 1 && rowObject.createuserdeptid == top.top.currUserDeptId) {
+                            html += "<a href=javascript:action('del','" + rowObject.id + "')   title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '流程状态', name: 'status', align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a  href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>" + cellvalue + "</a>";
+                        return html;
+
+                    }
+                },
+                { label: '申请人', name: 'createusername', width: 100, align: 'center', sortable: true },
+                { label: '申请时间', name: 'createtime', width: 200, align: 'center', sortable: true },
+                { label: '申请单位类型', name: 'applytype', width: 200, align: 'center', sortable: true },
+                { label: '申请编号', name: 'applysno', width: 200, align: 'center', sortable: true }
+
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            sortname: 't.createtime',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            pager: "#gridPager"
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword").val())
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val("");
+            $("#queryCondition .dropdown-text").html("选择条件").attr("data-value", "");
+            var queryJson = {
+                condition: '',
+                keyword: ''
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    //查看流程图
+    function OpenViewFlow(keyValue) {
+        var title = "流程图";
+        var rqUrl = "/OutsourcingProject/Aptitudeinvestigateinfo/Flow?urltype=10&keyValue=" + keyValue;
+        dialogOpen({
+            id: 'WorkFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null
+        });
+    }
+
+    //查看
+    function action(mode, id) {
+        var title = "";
+        var keyValue = !!id ? id : $('#gridTable').jqGridRowValue('id');
+        if (mode == "del") {
+            if (keyValue) {
+                $.RemoveForm({
+                    url: '../../PersonManage/ThreePeopleCheck/RemoveForm',
+                    param: { keyValue: keyValue },
+                    success: function (data) {
+                        $('#gridTable').trigger('reloadGrid');
+                    }
+                })
+            } else {
+                dialogMsg('请选择需要删除的记录！', 0);
+            }
+        }
+        else if (mode == "add") {
+            dialogOpen({
+                id: 'ThreeForm',
+                title: '新增信息',
+                url: '/PersonManage/ThreePeopleCheck/Form?action=' + mode,
+                width: '1000px',
+                height: ($(top.window).height() - 30) + 'px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        } else {
+            var btn = ["提交", "关闭"];
+            if (mode == "edit") {
+                title = "修改";
+            }
+            if (mode == "show") {
+                title = "查看";
+                btn = null;
+            }
+            if (mode == "audit") {
+                title = "审核";
+            }
+
+            if (checkedRow(keyValue)) {
+                dialogOpen({
+                    id: 'ThreeForm',
+                    title: title + '信息',
+                    url: '/PersonManage/ThreePeopleCheck/Form?action=' + mode + '&keyValue=' + keyValue,
+                    width: '1000px',
+                    height: ($(top.window).height() - 30) + 'px',
+                    btn: btn,
+                    callBack: function (iframeId) {
+                        top.frames[iframeId].AcceptClick();
+                    }
+                })
+            }
+        }
+    }
+
+    //删除
+    function del(id) {
+        var keyValue = !!id ? id : $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../PersonManage/ThreePeopleCheck/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的记录！', 0);
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center" style="padding-left:10px;">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a data-value="createusername">申请人</a></li>
+                                        <li><a data-value="belongdept">申请单位</a></li>
+                                        <li><a data-value="applysno">申请编号</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="action('add')"><i class="fa fa-plus"></i>新增</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript">
+    if (top.currUserRoleName.indexOf("承包商") >= 0 || top.currUserRoleName.indexOf("分包商") >= 0) {
+        $("#add").remove();
+    }
+</script>

@@ -1,0 +1,188 @@
+﻿@{
+    ViewBag.Title = "CaseList";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+
+<script>
+
+    var code = request('code');
+    var caseType = request('caseType');
+    var year = request('year');
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var url = "";
+    $(function () {
+        GetGrid();
+    });
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var colModel = [];
+        var url = "";
+        switch (caseType) {
+            //运行故障统计
+            case "1":
+                colModel.push({
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        var html = "<a href=javascript:show('" + rowObject.id + "','" + rowObject.certificateid + "','" + rowObject.checkfileid + "','" + rowObject.acceptance + "','" + rowObject.organizeid + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        return html;
+                    }
+                });
+                colModel.push({
+                    label: '故障性质及经过', name: 'failurenature', index: 'failurenature', width: 270, align: 'center', sortable: true
+                });
+                colModel.push({
+                    label: '故障原因', name: 'failurereason', index: 'failurereason', width: 200, align: 'center', sortable: true
+                });
+                colModel.push({
+                    label: '采取的措施', name: 'takesteps', index: 'takesteps', width: 260, align: 'center', sortable: true
+                });
+                colModel.push({
+                    label: '处理结果', name: 'handleresult', index: 'handleresult', width: 140, align: 'center', sortable: true
+                });
+                url = "../../EquipmentManage/OperationFailure/GetOperationFailureRecordForSJ";
+                break;
+            //检查次数统计
+            case "2":
+                colModel.push({
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        var html = "<a href=javascript:show('" + rowObject.id + "','" + rowObject.certificateid + "','" + rowObject.checkfileid + "','" + rowObject.acceptance + "','" + rowObject.organizeid + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        return html;
+                    }
+                });
+                colModel.push({
+                    label: '检查时间', name: 'checkendtime', index: 'checkendtime', width: 200, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                });
+
+                colModel.push({
+                    label: '检查名称', name: 'checkdatarecordname', index: 'checkdatarecordname', width: 330, align: 'center', sortable: true
+                });
+                colModel.push({
+                    label: '检查人员', name: 'checkman', index: 'checkman', width: 260, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {                   
+                        var val = cellvalue==null?"":cellvalue;
+                        if (!!val) {
+                            var list = val.split(',');
+                            var nval = "";
+                            $.each(list, function (i, val) {
+                                if (nval.indexOf(val) < 0)
+                                    nval += val + ",";
+                            })
+                            val = nval.substring(0, nval.length - 1);
+                        }
+                        return val;
+                    }
+                });
+                colModel.push({
+                    label: '发现问题和隐患', name: 'count', index: 'count', width: 310, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != "0") {
+                            var count = "<a href=javascript:ShowHiddInfo('" + rowObject.hdid + "','" + rowObject.id + "') style='color:blue; text-decoration:underline'  title='查看隐患'>" + cellvalue + "</a>";
+                            return count;
+                        } else return cellvalue;
+                    }
+                });
+                url = "../../EquipmentManage/SpecialEquipment/GetSafetyCheckRecordForSJ";
+                break;
+            default:
+                break;
+        }
+        var queryJson = JSON.stringify({
+            code: code,
+            year: year
+        })
+        
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: url,
+            postData: { queryJson: queryJson },
+            datatype: "json",
+            mtype: "post",
+            colModel: colModel,
+            viewrecords: true,
+            rowNum: 10,
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+        });
+    }
+
+
+    //查看特种设备关联的隐患记录
+    function ShowHiddInfo(id, keyValue) {
+        var url = '/HiddenTroubleManage/HTBaseInfo/Index?SAFETYCHECKOBJECTID=' + id + "&DeviceId=" + keyValue;
+        var idx = dialogOpen({
+            id: 'HTWindow',
+            title: '隐患列表',
+            url: url,
+            btns: 1,
+            btn: ["关闭"],
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //查看
+    function show(id, CertificateID, CheckFileID, Acceptance, CreateuserOrgid) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看特种设备信息',
+                url: '/EquipmentManage/SpecialEquipment/Form?action=show&actiontype=view&keyValue=' + keyValue + '&CertificateID=' + CertificateID + '&CheckFileID=' + CheckFileID + '&Acceptance=' + Acceptance + '&CreateuserOrgid=' + CreateuserOrgid,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    function exportData() {
+        var queryJson = JSON.stringify({
+            code: code,
+            year: year
+        })
+        switch (caseType) {
+            case "1":
+                location.href = "../../EquipmentManage/OperationFailure/ExportOperationFailureRecordForSJ?queryJson=" + queryJson;
+                break;
+            case "2":
+                location.href = "../../EquipmentManage/SpecialEquipment/ExportSafetyCheckRecordForSJ?queryJson=" + queryJson;
+                break;
+            default:
+
+        }
+        
+    }
+</script>
+<div class="titlePanel" style="height: 40px;">
+</div>
+<div class="toolbar" align="right">
+    <div class="btn-group" style="padding-bottom:15px;padding-right:80px" >
+        <a id="export" class="btn btn-primary" onclick="exportData()"><i class="fa fa-download"></i>&nbsp;导出</a>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

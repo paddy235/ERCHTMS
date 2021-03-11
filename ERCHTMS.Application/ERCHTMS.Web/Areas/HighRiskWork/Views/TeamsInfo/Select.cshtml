@@ -1,0 +1,296 @@
+﻿@{
+    ViewBag.Title = "Select";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var checkMode = request('checkmode');
+    var mode = request('mode');
+    var workids = request('workids');
+    var taskshareid = request('taskshareid');
+    var teamid = request('teamid');
+    var worknames = "";
+
+    $(function () {
+        if (checkMode == 0) {
+            $(".ui-layout-east").remove();
+        }
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        if (!!workids) {
+            workids = top.TeamForm.$("#WorkInfoId").val();
+            worknames = top.TeamForm.$("#WorkInfoName").val();
+        }
+
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 206);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        $("#users").height($(window).height() - 50);
+
+        var arr = [];
+        var arrname = [];
+        if (!!workids) {
+            arr = workids.split(",");
+            arrname = worknames.split(",");
+            $(arr).each(function (m, workid) {
+                $("#users").append("<div id='div" + workid + "'><input type='checkbox' value='" + workid + "' id='" + workid + "' checked='checked' workname='" + decodeURIComponent(arrname[m]) + "' ><label for='" + workid + "'>" + decodeURIComponent(arrname[m]) + "</label></div>");
+            });
+        }
+    }
+
+    function selRow(obj, id, workname) {
+        if (obj.checked) {
+            if (document.getElementById("div" + id) == null) {
+                $("#users").append("<div id='div" + id + "'><input type='checkbox' value='" + id + "' id='" + id + "' checked='checked' workname='" + decodeURIComponent(workname) + "' ><label for='" + id + "'>" + decodeURIComponent(workname) + "</label></div>");
+            }
+        } else {
+            if (document.getElementById("div" + id) != null) {
+                $("#div" + id).remove();
+            }
+        }
+    }
+
+    var selectedRowIndex = -1;
+
+    //加载作业信息列表
+    function GetGrid() {
+        var newArr = new Array();
+        var array = $(top.Form.WorkSpec).jqGrid('getRowData');
+        var workinfoids = "";
+        var tasktype = top.Form.$("#TaskType").val();
+        if (tasktype != "2") {
+            if (!!teamid) {
+                var arrteam = $(top.Form.TeamSpec).jqGrid('getRowData');
+                for (var i = 0; i < arrteam.length; i++) {
+                    workinfoids += arrteam[i].WorkInfoId + ",";
+                }
+                if (!!workinfoids) {
+                    workinfoids = workinfoids.substring(0, workinfoids.length - 1);
+                }
+                for (var i = 0; i < array.length; i++) {
+                    if (workinfoids.indexOf(array[i].Id) >= 0) {
+                        newArr.push(array[i]);
+                    }
+                }
+            }
+            else {
+                newArr = array;
+            }
+        }
+        else {
+            newArr = array;
+        }
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            datatype: "local",
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+                {
+                    label: '操作', name: 'Oper', width: 60, align: 'center', hidden: checkMode == 0 ? true : false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var ischked = "";
+                        if (workids.indexOf(rowObject.Id) >= 0) {
+                            //ischked = "checked='checked'";
+                        }
+                        var html = "";
+                        html = "<input type='checkbox'" + ischked + " onclick=selRow(this,'" + rowObject.Id + "','" + encodeURIComponent(rowObject.WorkName) + "') />";
+                        return html;
+                    }
+                },
+                { label: '作业信息ID', name: 'Id', hidden: true, align: 'center' },
+                { label: '任务分配ID', name: 'TaskShareId', hidden: true, align: 'center' },
+                { label: '作业名称', name: 'WorkName', width: '150', align: 'center', sortable: false },
+                //{ label: '作业类别', name: 'WorkInfoType', width: '120', align: 'center', sortable: false },
+                 {
+                     label: '作业类别', name: 'infotype', width: '100', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                         var val = "";
+                         if (!!rowObject.WorkInfoType && !!rowObject.HandType) {
+                             val = rowObject.WorkInfoType + "," + rowObject.HandType;
+                         }
+                         else if (!!rowObject.WorkInfoType) {
+                             val = rowObject.WorkInfoType;
+                         }
+                         else if (!!rowObject.HandType) {
+                             val = rowObject.HandType;
+                         }
+                         return val;
+                     }
+                 }, 
+                { label: '作业单位类别', name: 'WorkDeptType', width: '150', hidden: true, align: 'center', sortable: false },
+                {
+                    label: '作业单位类别', name: 'CreateUserId', width: '100', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var val = cellvalue;
+                        if (!!rowObject.WorkDeptType) {
+                            if (rowObject.WorkDeptType == "0") {
+                                val = "单位内部";
+                            }
+                            else if (rowObject.WorkDeptType == "1") {
+                                val = "外包单位";
+                            }
+                        }
+                        return val;
+                    }
+                },
+                { label: '作业单位', name: 'WorkDeptName', width: '200', align: 'center', sortable: false },
+                { label: '作业单位id', name: 'WorkDeptId', hidden: true, align: 'center' },
+                { label: '作业单位code', name: 'WorkDeptCode', hidden: true, align: 'center' },
+                { label: '工程名称', name: 'EngineeringName', width: '100', align: 'center', sortable: false },
+                { label: '工程id', name: 'EngineeringId', hidden: true, align: 'center' },
+                {
+                    label: '作业开始时间', name: 'WorkStartTime', width: '120', align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                {
+                    label: '作业结束时间', name: 'WorkEndTime', width: '120', align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                { label: '作业区域', name: 'WorkAreaName', width: '120', align: 'center', sortable: false },
+                { label: '作业地点', name: 'WorkPlace', align: 'center', hidden: true },
+                { label: '作业内容', name: 'WorkContent', width: '250', align: 'center', sortable: false },
+                { label: '工作票号', name: 'WorkTicketNo', align: 'center', hidden: true },
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [10, 20, 30],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                if (checkMode == 0) {
+                    selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                }
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                if (checkMode == 0) {
+                    $(".ui-layout-pane-center").css({ left: "10px", width: "100%" });
+                    $(".ui-jqgrid-view").css({ width: "100%" });
+                    $("#gbox_gridTable").css({ width: "100%" });
+                    $("#gridPager").css({ width: "100%" });
+                    $(".ui-jqgrid-hdiv").css({ width: "100%" });
+                    $(".ui-jqgrid-bdiv").css({ width: "100%" });
+                }
+            }
+        });
+        $gridTable.jqGrid("setGridParam", {
+            datatype: "local",
+            data: newArr,
+            rowNums: newArr.length
+        }).trigger("reloadGrid");
+    }
+
+    //返回选择后的结果并赋值到dom控件,多个值用逗号分隔
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序必须依次为作业信息ID,作业信息名（多选用逗号分隔）
+    function AcceptClick(options) {
+        var winObject = options.winObject;
+        var domId = options.domId;
+        var selVal = new Array();
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var workinfoids = ""; var worknames = "";
+                if (checkMode == 1) {
+                    var arr = $("#users").find("input:checked");
+                    if (arr.length == 0) {
+                        dialogAlert("请选择作业信息！", 2);
+                        return;
+                    } else {
+                        arr.each(function (i, dom) {
+                            workinfoids += dom.id + ",";
+                            worknames += $(dom).attr("WorkName") + ",";
+                        });
+                        workinfoids = workinfoids.substring(0, workinfoids.length - 1);
+                        worknames = worknames.substring(0, worknames.length - 1);
+                    }
+                } else {
+                    if (selectedRowIndex <= 0) {
+                        dialogAlert("请选择作业信息！", 2);
+                        return;
+                    } else {
+                        var rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                        workinfoids = rowObject.Id;
+                        worknames = rowObject.WorkName;
+                    }
+
+                }
+                var ids = domId.split(',');
+                var selVal = new Array(workinfoids, worknames);
+                for (var j = 0; j < ids.length; j++) {
+                    if (ids[j].length >= 0) {
+                        if (ids[j] != "") {
+                            var dom = $(winObject).find("#" + ids[j]).eq(0);
+                            var domlbl = $(winObject).find("#lbl" + ids[j]).eq(0);
+                            if (dom != undefined) {
+                                dom.val(selVal[j]);
+                            }
+                            if (domlbl != undefined) {
+                                domlbl.html(selVal[j]);
+                            }
+                        }
+                    }
+                }
+            }
+            if (options.callBack) {
+                options.callBack();
+            }
+            dialogClose();
+        }
+
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-right: 0px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="lr-replace" class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-east" style="margin-left: 0px;">
+        <div class="west-Panel" style="margin-left: 0px;">
+            <div class="panel-Title">
+                <a href="javascript:selectAll();">已选中的作业信息</a>
+            </div>
+            <div id="users" style="overflow: auto; height: 450px; margin-left: 5px;">
+            </div>
+        </div>
+    </div>
+</div>

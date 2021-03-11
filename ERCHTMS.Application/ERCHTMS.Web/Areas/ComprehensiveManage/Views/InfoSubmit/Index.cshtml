@@ -1,0 +1,229 @@
+@{
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var userAccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account"; //当前用户帐号
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var ehsDeptCode = "@ViewBag.ehsDepartCode";//EHS部门Code   
+    var indexType = request("indexType");
+    //页面代理
+    var lagc = null;
+    //
+    //页面加载完成
+    //
+    $(function () {
+        var winHeight = $(window).height();
+        //
+        //创建页面代理
+        //
+        lagc = new listAgency({
+            hasPowerOper: true,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            },
+            gridId: "gridTable",
+            gridHeight: winHeight - 136,
+            gridOptions: {
+                height: winHeight - 136,
+                url: "../../ComprehensiveManage/InfoSubmit/GetListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'createdate',
+                sortorder: 'desc'
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return buildOper(rowObject);
+                    }
+                },
+                {
+                    label: '报送时间', name: 'starttime', index: 'starttime', width: 300, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy年MM月dd日') + " 至 " + formatDate(rowObject.endtime, 'yyyy年MM月dd日');
+                    }
+                },
+                { label: '报送名称', name: 'infoname', index: 'infoname', width: 300, align: 'center', sortable: true },
+                { label: '类型', name: 'infotype', index: 'infotype', width: 120, align: 'center', sortable: true },
+                {
+                    label: '报送情况', name: 'pct', index: 'pct', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = cellvalue + "%";
+                        if (cellvalue > 0) {
+                            html = "<div style='background-color:green;float:left;width:" + cellvalue + "%'>" + cellvalue + "%</div>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '未报送人数', name: 'remnum', index: 'remnum', width: 120, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = cellvalue;
+                        if (cellvalue > 0)
+                            html = "<div title='" + rowObject.remusername + "'>" + cellvalue + "</div>";
+                        return html;
+                    }
+                }
+            ]
+        });
+        //
+        //绑定页面控件
+        //
+        lagc.bindPageControls({
+            searchId: "btn_Search",
+            resetId: "btn_Reset",
+            refreshId: "refresh",
+            addId: "btn_Add"
+        });
+        //
+        //添加页面事件
+        //
+        lagc.addPageEvents({
+            onSetPowerOper: setPower
+        });
+        //
+        //添加页面跳转地址参数
+        //
+        lagc.addPageGotoUrl({
+            addArg: {
+                title: '添加报送信息',
+                url: '/ComprehensiveManage/InfoSubmit/Form',
+                btn: null
+            },
+            editArg: {
+                title: '编辑报送信息',
+                url: '/ComprehensiveManage/InfoSubmit/Form',
+                btn: null
+            },
+            delArg: { url: '../../ComprehensiveManage/InfoSubmit/RemoveForm' },
+            detailArg: {
+                title: '查看报送信息',
+                url: '/ComprehensiveManage/InfoSubmit/Detail',
+                btn: null
+            }
+        });
+        //
+        //初始化
+        //
+        lagc.initialPage([
+            {
+                data: [{ value: "月报", text: "月报" }, { value: "季报", text: "季报" }, { value: "半年报", text: "半年报" }, { value: "年报", text: "年报" }],
+                ctrl: { Id: 'InfoType', memberId: 'value', memberText: 'text', description: '==全部==' }
+            },
+            {
+                conditionData: { IndexType: indexType }
+            }
+        ]);
+    });    
+    //
+    //权限设置
+    //
+    function setPower() {
+        if (deptCode == ehsDeptCode && (rolename.indexOf("安全管理员") >= 0 || rolename.indexOf("负责人") >= 0 || rolename.indexOf("专工") >= 0)) {//安全管理员、负责人、专工可添加信息报送信息
+            $("#btn_Add").css("display", "");
+        }
+    }
+    //
+    //构造操作链接
+    //
+    function buildOper(rowObject) {
+        var html = "<a href=javascript:detail('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+
+        var hasDel = false;
+        if (rowObject.createuserid == userId) {
+            if (rowObject.issubmit != "是") {
+                html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                hasDel = true;
+            }
+        }
+        if (rowObject.issubmit=="是" && rowObject.submituserid.indexOf(userId) >= 0 && (!rowObject.submiteduserid || rowObject.submiteduserid.indexOf(userId) < 0)) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:refer('" + rowObject.id + "')  title='填报信息'><i class='fa fa-cloud-upload'></i></a>";
+        }
+        if (rolename.indexOf("公司管理员") > 0 && !hasDel) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+        }
+
+        return html;
+    };
+    //
+    //信息填报
+    //
+    function refer(id) {
+        var dlgArg = {
+            id: 'ReferForm',
+            title: '填报信息',
+            url: '/ComprehensiveManage/InfoSubmit/ReferForm?infoId=' + id,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                if (top.frames[iframeId].AcceptClick)
+                    top.frames[iframeId].AcceptClick();
+            },
+            btn: null
+        };
+        dialogOpen(dlgArg);
+    }
+</script>
+<style type="text/css">
+    .ui-select{width:200px;}
+    .formTitle{padding-left:10px;}
+    .titlePanel, .gridPanel {
+        min-width: 1070px;
+    }
+</style>
+<div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+    <div class="panel-Title" style="height:10px;"></div>
+    <div class="titlePanel">
+        <div class="title-search" >
+            <table class="queryform" id="queryArea">
+                <tr>
+                    <td class="formTitle">开始报送时间：</td>
+                    <td class="formValue">
+                        <input id="StartTime" type="text" queryPro="starttime" class="form-control input-wdatepicker" onfocus="WdatePicker()" style="width:100px;display:inline-block;" />-<input id="EndTime" type="text" queryPro="endtime" class="form-control input-wdatepicker" onfocus="WdatePicker()" style="width:100px;display:inline-block;" />
+                    </td>  
+                    <td class="formTitle">类型：</td>
+                    <td class="formValue">
+                        <div id="InfoType" type="select" queryPro="infotype"  class="ui-select" style="width:120px;" />
+                    </td>             
+                    <td class="formTitle">报送名称：</td>
+                    <td class="formValue">
+                        <input id="InfoName" type="text" queryPro="infoname" class="form-control" style="width: 205px;" />
+                        <input id="IndexType" type="hidden" queryPro="indextype" />
+                    </td>    
+                    <td style="padding-left: 20px;">
+                        <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                        <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <a id="refresh" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+                <a id="btn_Add" class="btn btn-default" style="display:none;"><i class="fa fa-plus-square"></i>新增报送要求</a>
+            </div>
+        </div>
+    </div>
+    <div class="gridPanel">
+        <table id="gridTable"></table>
+        <div id="gridPager"></div>
+    </div>
+</div>

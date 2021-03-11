@@ -1,0 +1,329 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+
+<script>
+    var keyValue = request('keyValue');
+    var mode = request('mode');
+    $(function () {
+        initControl();
+    });
+    //选取图标
+    function SelectIcon() {
+        dialogOpen({
+            id: "SelectIcon",
+            title: '选取图标',
+            url: '/AuthorizeManage/Module/Icon?ControlId=Icon',
+            width: "1000px",
+            height: "600px",
+            btn: false
+        })
+    }
+    //初始化控件
+    function initControl() {
+        //分类
+        $("#ItemKind").ComboBox({
+            description: "==请选择==",
+        });
+        //类型
+        $("#ItemType").ComboBox({
+            description: "==请选择==",
+            height:"300px"
+        });
+        //项目
+        $("#ItemName").ComboBox({
+            height: "300px",
+            description: "请选择",
+            allowSearch: true
+        });
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../BaseManage/DataSet/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if(data.IsDefault=="是"){
+                        document.getElementById("yes").checked = true;
+                    } else {
+                        document.getElementById("no").checked = true;
+                    }
+                    if (data.IsOpen =="是") {
+                        document.getElementById("yes1").checked = true;
+                    } else {
+                        document.getElementById("no1").checked = true;
+                    }
+                    if (data.ItemKind.length>0) {
+                       if (data.ItemKind.indexOf("SSJK")>=0) {
+                          document.getElementById("jk").checked = true;
+                       }
+                       if (data.ItemKind.indexOf("DBSX") >= 0) {
+                           document.getElementById("sx").checked = true;
+                       }
+                       if (data.ItemKind.indexOf("AQZB") >= 0) {
+                           document.getElementById("zb").checked = true;
+                      }
+                    }
+                   
+                    $("#ItemName").ComboBoxSetValue(data.ItemCode);
+                    $("#ItemName").attr('data-text', data.ItemName);
+                    $("#ItemName").find('.ui-select-text').html(data.ItemName).css('color', '#000');
+                    if(data.ItemRole.length>0){
+                        if (data.ItemRole.indexOf("领导") >= 0) {
+                            document.getElementById("role1").checked = true;
+
+                        }
+                        if (data.ItemRole.indexOf("一般用户") >= 0) {
+                            document.getElementById("role2").checked = true;
+
+                        }
+                    }
+                    if(mode=="Copy"){
+                        keyValue = "";
+                    }
+                    $("#ItemName").ComboBox({
+                        url: "../../SystemManage/DataItemDetail/GetListByItemCodeJson?ItemCode=" + data.ItemKind,
+                        height: "300px",
+                        description: "请选择",
+                        text: "itemname",
+                        id: "itemvalue",
+                        allowSearch: true
+                    }).bind("change", function () {
+                        $("#ItemCode").val($("#ItemName").attr("data-value"));
+                    });
+                }
+            })
+        }
+        $('.icheck input').iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%'
+        });
+        $('.kind input').on('ifChanged', function (event) {
+            var str = "";
+            $(".kind").find("input:checked").each(function (j,dom) {
+                str += $(this).val() + "$";
+            });
+            $("#ItemName").ComboBox({
+                url: "../../SystemManage/DataItemDetail/GetListByItemCodeJson?ItemCode=" + str,
+                height: "300px",
+                description: "请选择",
+                text: "itemname",
+                id:"itemvalue",
+                allowSearch: true
+            }).bind("change", function () {
+                $("#ItemCode").val($("#ItemName").attr("data-value"));
+            });
+        });
+    }
+    //保存表单;
+    function AcceptClick() {
+        var itemStyle = "";
+        if ($("#ItemStyle").val().length > 0) {
+            $("#ItemStyle").val(encodeURIComponent($("#ItemStyle").val()));
+        }
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if (document.getElementById("yes").checked) {
+            postData["IsDefault"] = "是";
+        } else {
+            postData["IsDefault"] ="否";
+        }
+        if (document.getElementById("yes1").checked) {
+            postData["IsOpen"] ="是";
+        } else {
+            postData["IsOpen"] = "否";
+        }
+        var roles = "";
+        if (document.getElementById("role1").checked) {
+            roles = "公司领导,";
+        }
+        if (document.getElementById("role2").checked) {
+        
+            roles+="一般用户";
+        }
+        postData["ItemRole"] = roles;
+        var str = "";
+        $(".kind").find("input:checked").each(function (j, dom) {
+            str += $(this).val() + ",";
+        });
+        if (str.length>0) {
+            postData["ItemKind"] = str.substring(0,str.length-1);
+        }
+        //if (document.getElementById("jk").checked) {
+        //    postData["ItemKind"] = "SSJK";
+        //} else if (document.getElementById("sx").checked) {
+        //    postData["ItemKind"] = "DBSX";
+        //} else {
+        //    postData["ItemKind"] = "AQZB";
+        //}
+
+        postData["ItemName"] = $("#ItemName").attr("data-text");
+        $.SaveForm({
+            url: "../../BaseManage/DataSet/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    function chooseRole() {
+        if ($('#DeptId').val().length> 0) {
+            selectRole($('#RoleId').val(), $('#DeptId').val(), 1, 2, window.document.body, 'RoleName,RoleId', function () {
+                 
+            });
+        } else {
+            dialogMsg('请先选择所属单位！', 0);
+        }
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">项目分类<font face="宋体" style="color:red;">*</font></td>
+            <td class="formValue icheck kind">
+                <input type="checkbox" value="SSJK" id="jk" name="ItemKind" onclick="alert(1)" />&nbsp;<label for="jk">实时监控</label>&nbsp;&nbsp;&nbsp;
+                <input type="checkbox" value="DBSX" id="sx" name="ItemKind" onclick="alert(2)" />&nbsp;<label for="sx">待办事项</label>
+                <input type="checkbox" value="AQZB" id="zb" name="ItemKind" onclick="alert(3)" />&nbsp;<label for="zb">安全指标</label>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">项目名称<font face="宋体" style="color:red;">*</font></td>
+            <td class="formValue">
+                <div id="ItemName" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+
+                @*<input id="ItemName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />*@
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">项目编码<font face="宋体" style="color:red;">*</font></td>
+            <td class="formValue">
+                <input id="ItemCode" type="text" class="form-control" isvalid="yes" checkexpession="NotNull"/>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">项目类型</td>
+            <td class="formValue icheck">
+                <div id="ItemType" type="select" class="ui-select" >
+                    <ul>
+                        <li data-value="安全检查">安全检查</li>
+                        <li data-value="隐患排查">隐患排查</li>
+                        <li data-value="反违章">反违章</li>
+                        <li data-value="危险源">危险源</li>
+                        <li data-value="事故事件">事故事件</li>
+                        <li data-value="外包工程">外包工程</li>
+                        <li data-value="高风险作业">高风险作业</li>
+                        <li data-value="安全风险">安全风险</li>
+                        <li data-value="预警指标">预警指标</li>
+                        <li data-value="设备设施">设备设施</li>
+                        <li data-value="教育培训">教育培训</li>
+                        <li data-value="外包工程流程">外包工程流程</li>
+                        <li data-value="应急管理">应急管理</li>
+                        <li data-value="问题管理">问题管理</li>
+                        <li data-value="机构人员">机构人员</li>
+                        <li data-value="职业健康">职业健康</li>
+                        <li data-value="安全奖惩">安全奖惩</li>
+                        <li data-value="综合信息">综合信息</li>
+                        <li data-value="NOSA管理">NOSA管理</li>
+                        <li data-value="消防管理">消防管理</li>
+                        <li data-value="标准体系">标准体系</li>
+                        <li data-value="法律法规">法律法规</li>
+                        <li data-value="危大工程">危大工程</li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">所属单位</td>
+            <td class="formValue">
+                <input id="DeptName" type="text" class="form-control" readonly onclick="selectDept('', 1, 13, '选择部门', this.parentNode, 'DeptName,DeptCode,DeptId', $('#DeptId').val());" />
+                <input type="hidden" id="DeptCode" /><input type="hidden" id="DeptId" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">适用范围<font face="宋体" style="color:red;">*</font></td>
+            <td class="formValue icheck">
+                <input type="checkbox" value="公司领导" id="role1" name="ItemRole" />&nbsp;<label for="role1">公司领导</label>&nbsp;&nbsp;&nbsp;
+                <input type="checkbox" value="一般用户" id="role2" name="ItemRole" />&nbsp;<label for="role2">一般用户</label>
+ 
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">适用角色</td>
+            <td class="formValue">
+                <div class="input-group">
+                    <input id="RoleName" type="text" class="form-control" readonly onclick="chooseRole();" value="普通用户" />
+                    <span class="input-group-addon" onclick="$('#RoleName').val(''); $('#RoleId').val('');" title="清除内容">Ⅹ</span>
+                    <input type="hidden" id="RoleId" value="2a878044-06e9-4fe4-89f0-ba7bd5a1bde6" />
+                </div>
+
+               
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">图标</td>
+            <td class="formValue icheck">
+                <div class="input-group">
+                    <input id="Icon" type="text" placeholder="如：../content/images/a_19.png" class="form-control" value="../content/images/a_19.png" />
+                    <span class="input-group-addon" onclick="SelectIcon()" title="选取图标">...</span>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">地址</td>
+            <td class="formValue icheck">
+                <input id="Address" type="text" class="form-control" placeholder="如：../HiddenTroubleManage/HTBaseInfo/Index?mode=qbyh" value="../HiddenTroubleManage/HTBaseInfo/Index?mode=qbyh" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">是否公共<font face="宋体" style="color:red;">*</font></td>
+            <td class="formValue icheck">
+                <input type="radio" value="是" id="yes" name="IsDefault" />&nbsp;<label for="yes">是</label>&nbsp;&nbsp;&nbsp;
+                <input type="radio" value="否" id="no" name="IsDefault" checked="checked" />&nbsp;<label for="no">否</label>
+                &nbsp;&nbsp;&nbsp;<font color="red">注：如果选择是则根据分类默认始终显示,将忽略所属单位的关联</font>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">是否启用<font face="宋体" style="color:red;">*</font></td>
+            <td class="formValue icheck">
+                <input type="radio" value="是" id="yes1" name="IsOpen" checked="checked" />&nbsp;<label for="yes1">是</label>&nbsp;&nbsp;&nbsp;
+                <input type="radio" value="否" id="no1" name="IsOpen"  />&nbsp;<label for="no1">否</label>
+                
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">执行函数</td>
+            <td class="formValue icheck">
+                <input id="Callback" type="text" class="form-control" placeholder="如：openTab" value="top.openTab('', '{Url}','{ItemName}')" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">样式设置</td>
+            <td class="formValue icheck">
+                <textarea id="ItemStyle" class="form-control" rows="5" placeholder="如：<li onclick='{Callback}'><img src='{Icon}'><br><p>{ItemName}<br><span>{Num}</span></p></li>" ><li onclick="{Callback}"><img src='{Icon}'><br><p>{ItemName}<br><span>{Num}</span></p></li>
+                </textarea>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">排序号</td>
+            <td class="formValue icheck">
+                <input id="SortCode" type="text" class="form-control"  />
+            </td>
+        </tr>
+        <tr style="color:red;">
+            <td class="formTitle" style="padding-left:8px;">表达式说明：</td>
+            <td class="formValue">
+                1.{ItemName}:项目名称，{Callback}:执行函数，{Url}:跳转地址，{Icon}:图标地址，{Num}:项目计算的结果。以上表达式程序在执行时会自动计算。<br />
+               
+            </td>
+        </tr>
+    </table>
+</div>

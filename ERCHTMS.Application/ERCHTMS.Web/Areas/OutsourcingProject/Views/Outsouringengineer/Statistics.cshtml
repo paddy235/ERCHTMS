@@ -1,0 +1,329 @@
+﻿@{
+    ViewBag.Title = "外包工程统计";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+@*<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>*@
+<!--第三方统计图start-->
+<script src="~/Content/Scripts/plugins/highcharts/highcharts.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/modules/exporting.js"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var currdeptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var currdeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var flag = 0;
+    $(function () {
+        initPage();
+        drawChart(flag);
+        //查询事件
+        $("#btn_Search").click(function () {
+            drawChart(flag);
+            var deptid = $("#DepartmentName").attr('data-value');
+            var year = $("#Year").val();
+            var $gridTable = $('#gridTable');
+            var $gridTable1 = $('#gridTable1');
+
+            $gridTable.jqGrid('setGridParam', {
+                postData: { deptid: deptid, year: year }, page: 1
+            }).trigger('reloadGrid');
+            $gridTable1.jqGrid('setGridParam', {
+                postData: { deptid: deptid, year: year }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+    })
+    function initPage() {
+        $("#DepartmentName").ComboBox({
+            url: "../../BaseManage/Department/GetContractDept",
+            id: "DepartmentId",
+            text: "FullName",
+            description: "==全部==",
+            height: "200px"
+        })
+        if (rolename.indexOf("承包商") >= 0) {
+            $("#DepartmentName").ComboBoxSetValue(currdeptId);
+            $("#DepartmentName").attr("disabled", "disabled");
+        }
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth($(window).width() - 60);
+                $('#gridTable1').setGridWidth($(window).width() - 60);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    function changeTab(idx, obj) {
+        if (idx == 0) {
+            flag = 0;
+            $("#piecontainer0").show();
+            $("#div0").show();
+
+            $("#piecontainer1").hide();
+            $("#div1").hide();
+        } else {
+            flag = 1;
+            $("#piecontainer0").hide();
+            $("#div0").hide();
+
+            $("#piecontainer1").show();
+            $("#div1").show();
+        }
+        $(".btn1").removeClass("btn-primary");
+        $(obj).addClass("btn-primary");
+        $(".btn1").addClass("btn-default");
+        drawChart(idx);
+    }
+    function drawChart(type) {
+        var deptid = $("#DepartmentName").attr('data-value');
+        var year = $("#Year").val();
+        switch (type) {
+            case 0:
+                loadStatByType(deptid, year);
+                break;
+            case 1:
+                loadStatByState(deptid, year);
+                break;
+            default:
+        }
+    }
+    function loadStatByType(deptid, year) {
+        $.get("OutEngineerStat", { deptid: deptid, year: year }, function (data) {
+            $('#piecontainer0').highcharts({
+                title: {
+                    text: '外包工程类型统计'
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                chart: {
+                    type: 'pie'
+                },
+                tooltip: {
+                    formatter: function () {
+                        return '<b>数量：' + this.y + '个，占比：' + Highcharts.numberFormat(this.percentage, 2) + '%</b> ';
+                    }
+                },
+                plotOptions: {
+                    pie: {
+                        allowPointSelect: true, //点击切换
+                        cursor: 'pointer',
+                        dataLabels: {
+                            enabled: true,
+                            formatter: function () {
+                                return '<b>' + this.point.name + '</b>: ' + Highcharts.numberFormat(this.percentage, 2) + ' %';
+                            }
+                        },
+                        showInLegend: true
+                    }
+                },
+                series: [{
+                    data: eval(data)
+                }]
+                , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        });
+
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../OutsourcingProject/Outsouringengineer/GetTypeList",
+            postData: { deptid: deptid, year: year },
+            datatype: "json",
+            mtype: "get",
+            width: $(window).width()-60,
+            autoheight: true,
+            autowidth: true,
+            colModel: [
+                { label: '工程类型', name: 'name', align: 'center' },
+                {
+                    label: '数量', name: 'num', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        return "<a href=javascript:f_engineerDetail('" + rowObject.value + "','')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '占比', name: 'percent', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != null) {
+                            return cellvalue + '%';
+                        }
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 100,
+            rownumbers: true
+        });
+    }
+    function loadStatByState(deptid, year) {
+        $.get("GetStateCount", { deptid: deptid, year: year }, function (data) {
+            $('#piecontainer1').highcharts({
+                title: {
+                    text: '外包工程状态统计'
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                chart: {
+                    type: 'pie'
+                },
+                tooltip: {
+                    formatter: function () {
+                        return '<b>数量：' + this.y + '个，占比：' + Highcharts.numberFormat(this.percentage, 2) + '%</b> ';
+                    }
+                },
+                plotOptions: {
+                    pie: {
+                        allowPointSelect: true, //点击切换
+                        cursor: 'pointer',
+                        dataLabels: {
+                            enabled: true,
+                            formatter: function () {
+                                return '<b>' + this.point.name + '</b>: ' + Highcharts.numberFormat(this.percentage, 2) + ' %';
+                            }
+                        },
+                        showInLegend: true
+                    }
+                },
+                series: [{
+                    data: eval(data)
+                }]
+                , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        });
+        var $gridTable = $("#gridTable1");
+        $gridTable.jqGrid({
+            url: "../../OutsourcingProject/Outsouringengineer/GetStateList",
+            postData: { deptid: deptid, year: year },
+            datatype: "json",
+            mtype: "get",
+            autoheight: true,
+            autowidth: true,
+            width: $(window).width() - 60,
+            colModel: [
+                { label: '工程状态', name: 'name', align: 'center' },
+                {
+                    label: '数量', name: 'num', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        return "<a href=javascript:f_engineerDetail('','" + rowObject.value + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '占比', name: 'percent', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != null) {
+                            return cellvalue + '%';
+                        }
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 100,
+            rownumbers: true
+        });
+    }
+    function f_engineerDetail(value, EngState) {
+        var name = $("#DepartmentName").attr('data-text');
+        var year = $("#Year").val();
+        top.tablist.newTab({
+            id: '4d44523d-852d-40d6-a9bb-1ef81c844456',
+            url: top.contentPath + "/OutsourcingProject/Outsouringengineer/Index?OutEngType=" + value + "&year=" + year + "&proName=" + name + "&EngState=" + EngState,
+            title: "外包工程管理"
+        });
+    }
+</script>
+<div class="center-Panel">
+    <div class="panel-Title">外包工程统计</div>
+    <div class="titlePanel">
+        <div class="title-search">
+            <table class="queryform">
+                <tr>
+                    <th style="padding-left: 10px;">选择单位</th>
+                    <td style="padding-left: 5px;">
+                        <div id="DepartmentName" type="select" class="ui-select" style="width: 200px;"></div>
+                    </td>
+                    <th style="padding-left: 10px;">时间范围</th>
+                    <td>
+                        <input id="Year" type="text" style="width: 120px; " value="@DateTime.Now.ToString("yyyy")" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy' })" />
+                    </td>
+                    <td style="padding-left: 20px;">
+                        <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>&nbsp;&nbsp;
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <button id="btnType" class="btn btn-primary btn1" type="button" onclick="changeTab(0,this)"><i class="fa fa-exclamation-triangle"></i>&nbsp;外包工程类型统计</button>
+                <button id="btnState" class="btn btn-default btn1" type="button" onclick="changeTab(1,this)"><i class="fa fa-bell-o"></i>&nbsp;外包工程状态统计</button>
+            </div>
+        </div>
+    </div>
+    <div class="portal-panel" style="margin-left: -20px; margin-right: -20px;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="piecontainer0">
+                </div>
+                <div id="piecontainer1">
+                </div>
+            </div>
+        </div>
+        <div class="row" style="margin-left: -10px; margin-right: -10px;">
+            <div class="panel panel-default" style="margin:10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body" id="div0">
+                    <table class="tab" id="gridTable"></table>
+                </div>
+                <div class="panel-body" id="div1">
+                    <table class="tab" id="gridTable1"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+

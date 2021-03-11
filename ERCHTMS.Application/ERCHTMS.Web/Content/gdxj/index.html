@@ -1,0 +1,1289 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="./main.css">
+    <link rel="stylesheet" href="../styles/framework-ui.css">
+    <script src="../scripts/jquery/jquery-1.8.2.min.js"></script>
+    <script src="../../Content/scripts/utils/framework-ui.js"></script>
+   
+    <style type="text/css">
+        .itemul {
+            background-color: #fc0606;
+            z-index: 9999;
+            padding: 10px;
+            display: none;
+            border-radius: 10%;
+        }
+
+        .tab1 {
+            width: 100%;
+            border: 1px solid #ccc;
+        }
+
+            .tab1 td {
+                background-color: white;
+                height: 30px;
+                text-align: center;
+                border: 1px solid #ccc;
+            }
+    </style>
+    <script type="text/javascript">
+        var mode = request("mode");
+        //加载提示框
+        function Loading(bool, text) {
+            if ($("#loading_manage") != undefined) {
+                $("#loading_manage").css("left", ($(window.document.body).width() - $("#loading_manage").width()) / 2 - 54);
+                $("#loading_manage").css("top", ($(window.document.body).height() - $("#loading_manage").height()) / 2);
+                var ajaxbg = $("#loading_background,#loading_manage");
+                if (bool) {
+                    ajaxbg.show();
+                } else {
+                    if ($("#loading_manage").attr('isTableLoading') == undefined) {
+                        ajaxbg.hide();
+                        $(".ajax-loader").hide();
+                    }
+                }
+                if (!!text) {
+                    $("#loading_manage").html(text);
+                } else {
+                    $("#loading_manage").html("请稍候,正在努力加载中…");
+                }
+            }
+
+        };
+        function convertText(text) {
+            return text == null ? "" : text;
+        }
+        function showInfo(id) {
+            var dlg=top.dialogOpen({
+                id: "Detail",
+                title: '工作票详情',
+                url: '/content/gdxj/details.html?keyValue=' + id,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+        function showTicketList(areaCode,grade) {
+            $.get("../../Desktop/GetTicketList", { areaCode: areaCode ,grade:grade}, function (data) {
+                var json = $.parseJSON(data);
+                if(json.type==1){
+                    var html = "<div style='padding:10px'><table style='width: 100%;text-align: center;border: 1px solid #ccc;' cellpadding='0' cellspacing='0' class='tab1' border='1' id='tab1'><tr><td>序号</td><td>票号</td><td>机组</td><td>工作/操作票种类</td><td>工作内容/操作任务</td><td>风险等级</td><td>工作负责人/操作人</td><td>工作开始时间</td><td>批准工作结束时间</td></tr>";
+                    var idx =1;
+                    $(json.resultdata).each(function (j, item) {
+                        html += "<tr><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + idx + "</td><td  style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'><a title='点击查看详情' style='text-decoration:underline;cursor:pointer;' onclick=\"$.currentIframe().showInfo('" + item.id + "')\">" + convertText(item.wt_code) + "</a></td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.unit_name) + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.wt_type_name) + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.content) + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.risk_grade_name) + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + item.work_leader_name + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.permit_start_time).replace("T", " ") + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.act_end_time).replace("T", " ") + "</td></tr>";
+                        idx++;
+                    });
+                    html += "</table>";
+                    var dlg = top.dialogContent({
+                        id:"List",
+                        width: ($(top.window).width()-100)+"px", height: ($(top.window).height() - 100) + "px", content: html, btn: ["关闭"], title: "作业信息", callBack: function (iframeId) {
+                            top.layer.close(dlg);
+                        }
+                    });
+                }
+            });
+        }
+        $(function () {
+            Loading(true, "正在加载分布图……");
+            var arr = new Array();
+            $("img[sno]").each(function (i, dom) {
+                arr.push($(dom).attr("sno"));
+            });
+            if (arr.length > 0) {
+                $.post("../../Desktop/GetAreaStatus", { areaCodes: arr.toString(), mode: mode }, function (data) {
+                    var json = JSON.parse(data);
+                    if(json.type==1){
+                        $(json.resultdata).each(function (i, item) {
+                            var imgs = $("img[sno='" + item.code + "']");
+                            if (imgs != undefined && imgs != null) {
+                                imgs.each(function (k, img0) {
+                                    var img = $(img0);
+                                    var src = img.attr("src")
+                                    if (item.status == "1")//重大风险
+                                    {
+                                        src = src.replace("grey", "red");
+                                    }
+                                    else if (item.status == "2")//较大风险
+                                    {
+                                        src = src.replace("grey", "orange");
+                                    }
+                                    else if (item.status == "3")//一般风险
+                                    {
+                                        src = src.replace("grey", "yellow");
+                                    }
+                                    else if (item.status == "4")//低风险
+                                    {
+                                        src = src.replace("grey", "blue");
+                                    }
+                                    img.attr("src", src);
+                                    var areaCode = item.areacode;
+                                    var html = "";
+                                    var num = "";
+                                    var arr;
+                                    if (item.wxnum != "0" && item.wxnum!=null) {
+                                        img.parent().append('<div class="importAccident"></div>');
+                                        html = "<li>重大危险源：<a onclick=\"top.tablist.newTab({title:'重大危险源',url: '../HazardsourceManage/Hisrelationhd_qd/DangerList?pMode=0&code=" + areaCode + "'})\" title='点击查看详情'>" + item.wxnum + "</a></li>";
+                                    }
+                                    if (item.htnum.length > 0) {
+                                        arr = item.htnum.split(',');
+                                        if (arr[0] != 0) {
+                                            img.next().append('<img class="newIcon" src="./img/icon/lv2.png" alt="">');
+                                            html += "<li>一般隐患：<a onclick=\"top.tablist.newTab({id:'67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0',title:'一般隐患',url: '../HiddenTroubleManage/HTBaseInfo/Index?mode=ybqbyh&code=" + areaCode + "'})\" title='点击查看详情'>" + arr[0] + "</a></li>";
+                                        }
+                                        if (arr[1] != 0) {
+                                            img.next().append('<img class="newIcon" src="./img/icon/lv1.png" alt="">');
+                                            html += "<li>重大隐患：<a onclick=\"top.tablist.newTab({id:'67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0',title:'重大隐患',url: '../HiddenTroubleManage/HTBaseInfo/Index?mode=bigHt&code=" + areaCode + "'})\" title='点击查看详情'>" + arr[1] + "</a></li>";
+                                        }
+                                    }
+                                    if (item.fxnum.length > 0 && mode == 1) {
+                                        arr = item.fxnum.split(',');
+                                        $(arr).each(function (k, num) {
+                                            var grade = ""
+                                            if (k == 0) {
+                                                grade = "重大";
+                                            }
+                                            if (k == 1) {
+                                                grade = "较大";
+                                            }
+                                            if (k == 2) {
+                                                grade = "一般";
+                                            }
+                                            if (k == 3) {
+                                                grade = "低";
+                                            }
+                                            if (num > 0) {
+                                                html += "<li>" + grade + "风险：<a style='text-decoration:underline' onclick=\"top.tablist.newTab({id:'d472030f-3094-4ad8-89cd-90c949fd4d91',title:'" + grade + "风险清单',url: '../RiskDatabase/DangerSource/List?mode=1&year=&level=" + (k + 1) + "&code=" + areaCode + "'})\" title='点击查看详情'>" + num + "</a></li>";
+                                            }
+                                        });
+                                    }
+                                    if (item.fxnum.length > 0 && mode==2) {
+                                        arr = $.parseJSON(item.fxnum);
+                                        $(arr).each(function (k, it) {
+
+                                            if (it.Count > 0) {
+                                                html += "<li>" + it.Grade + "作业：<a onclick=\"showTicketList('" + areaCode + "','" + it.Grade + "')\" title='点击查看详情' style='text-decoration:underline'>" + it.Count + "</a></li>";
+                                            }
+                                        });
+                                    }
+                                    if (html.length > 0) {
+                                        html = "<ul class='itemul'>" + html + "</ul>";
+                                        img.parent().append(html);
+                                    }
+                                });
+                            }
+
+                        });
+                    }
+                    Loading(false);
+                });
+            }
+        });
+    </script>
+
+</head>
+<body>
+    <div class="container">
+        <div class="content" onmousewheel="return zoomimg(this)" id="dragbox">
+            <div class="index-1">
+                <img src="./img/grey/1.png" alt="警务室" sno="110">
+                <div class="word-1">警务室</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-16">
+                <img src="./img/grey/16.png" alt="脱水楼" sno="016">
+                <div class="word-16">脱水楼</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-17">
+                <img src="./img/grey/17.png" alt="石膏库" sno="017">
+                <div class="word-17">石膏库</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-18">
+                <img src="./img/grey/18.png" alt="#1湿除" sno="018">
+                <div class="word-18">#1湿除</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-19">
+                <img src="./img/grey/19(1).png" alt="#1粉仓" sno="019">
+                <div class="word-19">#1粉仓</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-19-1">
+                <img src="./img/grey/19(1).png" alt="#2粉仓" sno="0191">
+                <div class="word-19-1">#2粉仓</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-20">
+                <img src="./img/grey/20(1).png" alt="1-1脱硫塔" sno="020">
+                <div class="word-20">1-1脱硫塔</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-20-1">
+                <img src="./img/grey/20(1).png" alt="2-1脱硫塔" sno="0201">
+                <div class="word-20-1">2-1脱硫塔</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-22">
+                <img src="./img/grey/22.png" alt="输煤程控楼" sno="022">
+                <div class="word-22">输煤程控楼</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-23">
+                <img src="./img/grey/23.png" alt="#2湿除" sno="023">
+                <div class="word-23">#2湿除</div>
+                <!--     <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-24">
+                <img src="./img/grey/24.png" alt="3号带" sno="024">
+                <div class="word-24">3号带</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-24-1">
+                <img src="./img/grey/24-1.png" alt="4号带" sno="0241">
+                <div class="word-24-1">4号带</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-25">
+                <img src="./img/grey/25.png" alt="碎煤机" sno="025">
+                <div class="word-25">碎煤机</div>
+                <!--<img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-26">
+                <img src="./img/grey/26.png" alt="除铁及采样室" sno="026">
+                <div class="word-26">除铁及采样室</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-27">
+                <img src="./img/grey/27.png" alt="输煤交接班室" sno="027">
+                <div class="word-27">输煤交接班室</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-31">
+                <img src="./img/grey/31.png" alt="制氢站" sno="031">
+                <div class="word-31">制氢站</div>
+                <!--   <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-32">
+                <img src="./img/grey/32(1).png" alt="#1引风机房" sno="0321">
+                <div class="word-32">#1引风机房</div>
+                <!-- <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-32-1">
+                <img src="./img/grey/32(1).png" alt="#2引风机房" sno="0322">
+                <div class="word-32">#2引风机房</div>
+                <!-- <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-33">
+                <img src="./img/grey/33(1).png" alt="1号电除尘间" sno="033">
+                <div class="word-33">#1号电除尘间</div>
+                <!-- <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-33-1">
+                <img src="./img/grey/33(1).png" alt="2号电除尘间" sno="0331">
+                <div class="word-33">#2号电除尘间</div>
+                <!-- <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-34">
+                <img src="./img/grey/34.png" alt="电除尘配电室" sno="034">
+                <div class="word-34">电除尘配电室</div>
+                <!--<img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-35">
+                <img src="./img/grey/35(1).png" alt="烟道" sno="0351">
+                <div class="word-35">烟道</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-35-1">
+                <img src="./img/grey/35(2).png" alt="烟囱" sno="0352">
+                <div class="word-35-1">烟囱</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-35-2">
+                <img src="./img/grey/35(3).png" alt="烟道" sno="0353">
+                <div class="word-35-2">烟道</div>
+                <!--     <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-39">
+                <img src="./img/grey/39.png" alt="尿素车间" sno="039">
+                <div class="word-39">尿素车间</div>
+                <!--   <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-40">
+                <img src="./img/grey/40.png" alt="一号锅炉房" sno="040">
+                <div class="word-40">#1锅炉房</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-41">
+                <img src="./img/grey/41.png" alt="机组排水槽" sno="041">
+                <div class="word-41">机组排水槽</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-42">
+                <img src="./img/grey/42.png" alt="精处理中和池" sno="042">
+                <div class="word-42">精处理中和池</div>
+                <!-- <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-43">
+                <img src="./img/grey/43.png" alt="二号锅炉房" sno="043">
+                <div class="word-43">#2锅炉房</div>
+                <!-- <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-44">
+                <img src="./img/grey/44.png" alt="启动锅炉房" sno="044">
+                <div class="word-44">启动锅炉房</div>
+                <!-- <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-45">
+                <img src="./img/grey/45.png" alt="#1渣库" sno="045">
+                <div class="word-45">#1渣库</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-46">
+                <img src="./img/grey/46.png" alt="集控楼" sno="046">
+                <div class="word-46">集控楼</div>
+                <!-- <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-47">
+                <img src="./img/grey/47.png" alt="#2渣库" sno="047">
+                <div class="word-47">#2渣库</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-54">
+                <img src="./img/grey/54.png" alt="热网2号站" sno="054">
+                <div class="word-54">热网2号站</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-55">
+                <img src="./img/grey/55.png" alt="供热首站" sno="055">
+                <div class="word-55">供热首站</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-56">
+                <img src="./img/grey/56.png" alt="煤仓间5号带" sno="056">
+                <div class="word-56">煤仓间5号带</div>
+                <!-- <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-57">
+                <img src="./img/grey/57.png" alt="汽机房" sno="057">
+                <div class="word-57">汽机房</div>
+                <!--  <img class="newIcon1" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-58">
+                <img src="./img/grey/58.png" alt="冷却塔" sno="058">
+                <div class="word-58">冷却塔</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-59">
+                <img src="./img/grey/59.png" alt="循环水泵房" sno="059">
+                <div class="word-59">循环水泵房</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-60">
+                <img src="./img/grey/60.png" alt="化学加药间" sno="060">
+                <div class="word-60">化学加药间</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-61">
+                <img src="./img/grey/61.png" alt="工业废水处理间" sno="061">
+                <div class="word-61">工业废水处理间</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-62">
+                <img src="./img/grey/62.png" alt="过滤间" sno="062">
+                <div class="word-62">过滤间</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-63">
+                <img src="./img/grey/63.png" alt="综合水泵房" sno="063">
+                <div class="word-63">综合水泵房</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-64">
+                <img src="./img/grey/64.png" alt="高效澄清池" sno="064">
+                <div class="word-64">高效澄清池</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-65">
+                <img src="./img/grey/65.png" alt="锅炉补给水处理室" sno="065">
+                <div class="word-65">锅炉补给水处理室</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-66">
+                <img src="./img/grey/66.png" alt="中和水泵房" sno="066">
+                <div class="word-66">中和水泵房</div>
+                <!--     <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-67">
+                <img src="./img/grey/67.png" alt="酸碱罐" sno="067">
+                <div class="word-67">酸碱罐</div>
+                <!--     <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-69">
+                <img src="./img/grey/69.png" alt="化水实验楼" sno="069">
+                <div class="word-69">化水实验楼</div>
+                <!--    <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-70">
+                <img src="./img/grey/70.png" alt="继电器室" sno="070">
+                <div class="word-70">继电器室</div>
+                <!--     <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-71">
+                <img src="./img/grey/71.png" alt="220v室内配电装置" sno="071">
+                <div class="word-71">220v室内配电装置</div>
+                <!-- <img class="newIcon" src="./img/lv2.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-78">
+                <img src="./img/grey/78.png" alt="脱硫电控楼" sno="078">
+                <div class="word-78">脱硫电控楼</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-2">
+                <img src="./img/grey/2.png" alt="大煤场" sno="002">
+                <div class="word-2">大煤场</div>
+                <!-- <img style="top: 60%;" class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-3">
+                <img src="./img/grey/3.png" alt="小煤场" sno="003">
+                <div class="word-3">小煤场</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-4">
+                <img src="./img/grey/4.png" alt="2号转运站" sno="004">
+                <div class="word-4">
+                    2号<br>
+                    转运站
+                </div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-5-1">
+                <img src="./img/grey/5-1.png" alt="斗轮机基础" sno="0051">
+                <div class="word-5-1">斗轮机基础</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-5">
+                <img src="./img/grey/5.png" alt="2号带" sno="005">
+                <div class="word-5">2号带</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-6">
+                <img src="./img/grey/4.png" alt="1号转运站" sno="0041">
+                <div class="word-6">
+                    1号<br>
+                    转运站
+                </div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-7">
+                <img src="./img/grey/7.png" alt="1号带" sno="007">
+                <div class="word-7">1号带</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-8">
+                <img src="./img/grey/8.png" alt="1号采样间" sno="008">
+                <div class="word-8">1号采样间</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-9">
+                <img src="./img/grey/9.png" alt="推煤机库" sno="009">
+                <div class="word-9">
+                    推煤<br>
+                    机库
+                </div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-10">
+                <img src="./img/grey/10.png" alt="干灰库" sno="010">
+                <div class="word-10">干灰库</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-11">
+                <img src="./img/grey/11.png" alt="含煤废水处理室" sno="011">
+                <div class="word-11">
+                    含煤废<br>
+                    水处理室
+                </div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-12">
+                <img src="./img/grey/12.png" alt="3号转运站" sno="012">
+                <div class="word-12">
+                    3号<br>
+                    转运站
+                </div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-13">
+                <img src="./img/grey/13.png" alt="0号带" sno="013">
+                <div class="word-13">0号带</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-14">
+                <img src="./img/grey/14.png" alt="2号煤斗" sno="014">
+                <div class="word-14">2号煤斗</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-15">
+                <img src="./img/grey/15.png" alt="1号煤斗" sno="015">
+                <div class="word-15">1号煤斗</div>
+                <!--     <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+
+            <div class="index-28">
+                <img src="./img/grey/28.png" alt="地磅房" sno="028">
+                <div class="word-28">地磅房</div>
+                <!--    <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-29">
+                <img src="./img/grey/29.png" alt="采样机管控中心" sno="029">
+                <div class="word-29">采样机管控中心</div>
+                <!--    <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-30">
+                <img src="./img/grey/30.png" alt="燃料办公室" sno="030">
+                <div class="word-30">燃料办公室</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-36">
+                <img src="./img/grey/36.png" alt="3号联变" sno="036">
+                <div class="word-36">3号联变</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+
+            <div class="index-37">
+                <img src="./img/grey/37.png" alt="4号联变" sno="037">
+                <div class="word-37">4号联变</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+
+            <div class="index-38">
+                <img src="./img/grey/38.png" alt="食堂" sno="038">
+                <div class="word-38">食堂</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-48">
+                <img src="./img/grey/48.png" alt="1号联变" sno="048">
+                <div class="word-48">1号联变</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+
+            <div class="index-49">
+                <img src="./img/grey/49.png" alt="2号联变" sno="049">
+                <div class="word-49">2号联变</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+
+            <div class="index-50">
+                <img src="./img/grey/50.png" alt="老主控" sno="050">
+                <div class="word-50">老主控</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+
+            <div class="index-51">
+                <img src="./img/grey/51.png" alt="35KV配电室" sno="051">
+                <div class="word-51">35KV配电室</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+
+            <div class="index-52">
+                <img src="./img/grey/52.png" alt="停车场" sno="052">
+                <div class="word-52">停车场</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+
+            <div class="index-53">
+                <img src="./img/grey/53.png" alt="办公楼" sno="053">
+                <div class="word-53">办公楼</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-68">
+                <img src="./img/grey/68(1).png" alt="除盐水箱" sno="068">
+                <div class="word-68">除盐水箱</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-68-1">
+                <img src="./img/grey/68(1).png" alt="除盐水箱" sno="068">
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-72">
+                <img src="./img/grey/72.png" alt="循环水泵房" sno="072">
+                <div class="word-72">循环水泵房</div>
+                <!--   <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-73">
+                <img src="./img/grey/73.png" alt="警卫室" sno="073">
+                <div class="word-73">警卫室</div>
+                <!--    <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+
+            <div class="index-74">
+                <img src="./img/grey/74.png" alt="间冷塔" sno="074">
+                <div class="word-74">间冷塔</div>
+                <!--    <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-75">
+                <img src="./img/grey/75.png" alt="停车场" sno="052">
+                <div class="word-75">停车场</div>
+                <!-- <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-76">
+                <img src="./img/grey/76.png" alt="警卫室" sno="073">
+                <div class="word-76">警卫室</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-77">
+                <img src="./img/grey/77.png" alt="老办公楼" sno="077">
+                <div class="word-77">老办公楼</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-21">
+                <img src="./img/grey/21(1).png" alt="1-2脱硫塔" sno="021">
+                <div class="word-21">1-2脱硫塔</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <div class="index-21-1">
+                <img src="./img/grey/21(1).png" alt="2-2脱硫塔" sno="0211">
+                <div class="word-21-1">2-2脱硫塔</div>
+                <!--  <img class="newIcon" src="./img/lv1.png" alt="">
+                <ul class="itemul">
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                    <li>当前等级:2</li>
+                </ul>
+                <div class="importAccident">
+                </div>-->
+            </div>
+            <!-- <div class="bottom">
+              <ul class="eg">
+                <li><img src="./img/a1.png" alt="">一级风险</li>
+                <li><img src="./img/a2.png" alt="">二级风险</li>
+                <li><img src="./img/a3.png" alt="">三级风险</li>
+                <li><img src="./img/a4.png" alt="">四级风险</li>
+                <li><img src="./img/lv1.png" alt="">一级隐患</li>
+                <li><img src="./img/lv2.png" alt="">二级隐患</li>
+                <li><div class="dangers"></div>重大危险源</li>
+              </ul>
+            </div> -->
+        </div>
+    </div>
+    <script type="text/javascript" src="../scripts/utils/zoom.js"></script>
+</body>
+</html>

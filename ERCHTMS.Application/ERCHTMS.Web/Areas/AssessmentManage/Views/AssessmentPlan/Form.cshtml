@@ -1,0 +1,158 @@
+@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    var mode = request('mode');
+    $(function () {
+        initControl();
+        GetGrid();
+    });
+    //初始化控件
+    function initControl() {
+        $("#AssessStandard").val("发电企业安全生产标准化规范及达标评级标准");
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../AssessmentManage/AssessmentPlan/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+    }
+
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var url = "../../AssessmentManage/AssessmentChapters/GetListDuty";
+        if (mode != "add") {
+            url = "../../AssessmentManage/AssessmentSum/GetListDuty?kid=" + $("#Id").val();
+        }
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 200,
+            url: url,
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'sumid', width: 10, align: 'left', hidden: true },
+                 { label: '设置评审人', name: 'sumname', width: 400, align: 'center', sortable: true },
+                 {
+                     label: '人员选择', name: 'dutyname', width: 200, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         var dutyname = rowObject.dutyname == null ? "" : rowObject.dutyname;
+                         var dutyid = rowObject.dutyid == null ? "" : rowObject.dutyid;
+                         var html = '<input id="dutyname_' + options.rowId + '" type="text" class="form-control"  placeholder="请选择评审人"  isvalid="yes"  onclick="setUserValue(' + options.rowId + ');" checkexpession="NotNull" }  value="' + dutyname + '" />';
+                         html += '<input id="dutyid_' + options.rowId + '" type="hidden"  value="' + dutyid + '" />';
+                         return html;
+                     }
+                 }
+            ],
+            viewrecords: true,
+            rownumbers: false,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    function setUserValue(Id) {
+        selectUser({ deptId: '', checkMode: 0, mode: 2, winObject: window.document.body, domId: "dutyname_" + Id + ",,dutyid_" + Id });
+
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        var data = $("#gridTable").jqGrid('getRowData');
+        var planData = "";
+        var arr = [];
+        if (data.length > 0) {
+            $(data).each(function (i, dom) {
+                var dutyname = $("#dutyname_" + (i + 1)).val();
+                var dutyid = $("#dutyid_" + (i + 1)).val();
+                arr.push({ DutyName: dutyname, DutyID: dutyid, AssessmentPlanID: $("#Id").val(), ChapterID: dom.sumid, SumName: dom.sumname });
+            });
+        }
+        planData = JSON.stringify(arr);
+        postData["dataJson"] = planData;
+        $.SaveForm({
+            url: "../../AssessmentManage/AssessmentPlan/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().window.$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+
+    //特殊字符的处理
+    function showKeyPress(evt) {
+        evt = (evt) ? evt : window.event
+        return checkSpecificKey(evt.keyCode);
+    }
+
+    function checkSpecificKey(keyCode) {
+        var specialKey = "[`~!#$^&*=|{}':;',\\[\\].<>/?~！#￥……&*——|{}【】‘；：”“'。，、？]‘’";
+        var realkey = String.fromCharCode(keyCode);
+        var flg = false;
+        flg = (specialKey.indexOf(realkey) >= 0);
+        if (flg) {
+            dialogMsg('请勿输入特殊字符！"' + realkey + '"', 0);
+            return false;
+        }
+        return true;
+    }
+
+    document.onkeypress = showKeyPress;
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">自评标准<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="AssessStandard" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                <input type="hidden" id="Id" value="@Guid.NewGuid().ToString()" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">计划名称<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="PlanName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">自评时间<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="SelfAssessmentDate" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})" />
+            </td>
+            <td class="formTitle">自评组长<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="TeamLeaderName" type="text" class="form-control" errormsg="自评组长" placeholder="请选择自评组长" isvalid="yes" checkexpession="NotNull" readonly onclick="selectUser({ deptId: '', checkMode: 0, mode: 2, winObject: window.document.body, domId: 'TeamLeaderName,,TeamLeader' });" />
+                <input id="TeamLeader" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td colspan="4">
+                <div class="gridPanel">
+                    <table id="gridTable"></table>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>
+

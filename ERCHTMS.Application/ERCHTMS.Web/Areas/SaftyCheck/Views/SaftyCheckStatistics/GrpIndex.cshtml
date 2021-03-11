@@ -1,0 +1,823 @@
+﻿@{
+    ViewBag.Title = "安全检查统计";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<!--第三方统计图start-->
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/Scripts/plugins/highcharts/highcharts.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/modules/exporting.js"></script>
+
+<style type="text/css">
+    .dropdown-menu > li > a:active {
+        color: rgb(38, 38, 38);
+        background-color: transparent;
+        text-decoration: none;
+    }       
+    .titlePanel .toolbar i{color:#666666;} 
+    .titlePanel .toolbar .btn-primary i{color:#fff;}
+    .ui-row-ltr a{padding-left:0px;}
+</style>
+<script src="~/Content/scripts/business/Common.js"></script>
+<!--第三方统计图end-->
+<script>
+    var state = 1;
+    var firstState = 1;
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    var ctype = ""; var belongdistrict = ""; var year = ""; var owndeptcode = "";
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    $(function () {
+        InitialPage();
+        GetTree();
+        statTJ();
+        //statQS();
+        //statDB();
+    })
+    function GetTree() {
+        var json = JSON.stringify(
+             {
+                 SelectMode: 0,
+                 Mode: 9
+             }
+           );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                deptCode = item.Code;//用户所属部门编码
+                deptId = item.id;
+                _isOrg = item.Sort;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+    //初始化
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //加载区域树
+        var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+        var orgID = "0";
+        if (isSystem == "False") {
+            orgID = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+        }
+        $("#BelongDistrictID").ComboBoxTree({
+            url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + orgID,
+            description: "==全部区域==",
+            height: "180px"
+        });
+        //时间范围
+        $("#TimeScope").ComboBox({
+            id: "id",
+            text: "text",
+            url: "../../HiddenTroubleManage/HTStatistics/QueryTime",
+            description: "",
+            allowSearch: false
+        });
+
+        var curTimeScope = $("#TimeScope-option li:eq(0)").attr("data-value");
+        $("#TimeScope").ComboBoxSetValue(curTimeScope);
+        $("#TimeScope").attr("data-text", curTimeScope);
+        $("#TimeScope").attr("data-value", curTimeScope);
+
+        $(".queryform  tr td:eq(4)").css("display", "none");
+        $(".queryform  tr td:eq(5)").css("display", "none");
+
+        year = $("#TimeScope").attr('data-value');
+        ctype = $("#checkDeptType").val();
+
+        $("#btn_Export").click(function () {
+            ExportNumber();
+        });
+    }
+    function getQueryJson() {
+        ctype = $("#checkDeptType").val();
+        year = $("#TimeScope").attr('data-value');
+        belongdistrict = "";
+        var queryJson = {
+            deptCode:deptCode,
+            ctype : ctype,
+            year : year,
+            belongdistrict : belongdistrict
+        };
+        return queryJson;
+    }
+    function ExportNumber() {
+        var queryJson = JSON.stringify(getQueryJson());
+        var url = "";
+        if (state == 1){
+            url = "../../SaftyCheck/SaftyCheckStatistics/ExportNumber1?queryJson=" + queryJson;
+        } else if(state==2){
+            url = "../../SaftyCheck/SaftyCheckStatistics/ExportNumber1?queryJson=" + queryJson;
+        }
+        else if(state==3){
+            url = "../../SaftyCheck/SaftyCheckStatistics/ExportNumber3?queryJson=" + queryJson;
+        }
+        if(url!="")
+            window.location.href = url;
+    }
+
+    function LoadDataQS() {  
+        $.get("getGrpMonthCheckCount", getQueryJson(), function (data) {
+            var json = eval("(" + data + ")");
+            $('#qscontainer').highcharts({
+                chart: {
+                    type: 'line'
+                },
+                title: {
+                    text: '安全检查次数变化趋势'
+                },
+                xAxis: {
+                    categories: json.y
+                },
+                yAxis: {
+                    allowDecimals: false,
+                    min: 0,
+                    title: {
+                        text: '数量（个）'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value + '个'
+                        }
+                    }
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    enabled: false,
+                    crosshairs: true,
+                    shared: true,
+                    formatter: function () {
+                        return '<b>' + json.y + '</b><br/>检查次数： ' + this.y + '个';
+                    }
+                },
+                plotOptions: {
+                    line: {
+                        marker: {
+                            enable: true,
+                            radius: 4,
+
+                            lineWidth: 1
+                        }, dataLabels: {
+                            enabled: true,
+                            formatter: function () {
+                                return '检查数量： ' + this.y + '个';
+                            }
+                        }, showInLegend: true
+                    }
+
+
+                },
+                series: [{
+                    name: '月份',
+                    marker: {
+                        symbol: 'square'
+                    },
+                    data: json.x
+
+                }]
+                , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        });
+    }
+
+    //趋势图
+    function statQS() {
+        LoadDataQS();
+        binggrid(deptCode, ctype, year, belongdistrict, 'gridTable');
+    }
+
+    function LoadDataTJ() {
+        $.get("getGrpRatherCheckCount", getQueryJson(), function (data) {
+            var json = eval("(" + data + ")");
+            $('#tjcontainer').highcharts({
+                chart: {
+                    type: 'column'
+                },
+                title: {
+                    text: '安全检查次数统计图'
+                },
+                xAxis: {
+                    categories: json.y
+                },
+                yAxis: {
+                    allowDecimals: false,
+                    min: 0,
+                    title: {
+                        text: '数量（个）'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value + '个'
+                        }
+                    },
+                    stackLabels: {
+                        enabled: true,
+                        style: {
+                            fontWeight: 'bold',
+                            color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                        }
+                    }
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true
+                },
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        dataLabels: {
+                            enabled: true,
+                            color: (Highcharts.theme && Highcharts.theme.dataLabelsColor) || 'white',
+                            style: {
+                                textShadow: '0 0 3px black'
+                            }
+                        }
+                    }
+                },
+                series: json.x
+                , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        });
+    }
+    //统计图
+    function statTJ() {        
+        LoadDataTJ();
+        binggrid(deptCode, ctype, year, belongdistrict, 'gridTable1');
+    }
+
+    function LoadDataDB() {        
+        $.get("GetGrpAreaSaftyState", getQueryJson(), function (data) {
+            var json = eval("(" + data + ")");
+            $('#dbcontainer').highcharts({
+                chart: {
+                    type: 'column'
+                },
+                title: {
+                    text: '安全检查次数对比图'
+                },
+                xAxis: {
+                    categories: json.y
+                },
+                yAxis: {
+                    allowDecimals: false,
+                    min: 0,
+                    title: {
+                        text: '数量（个）'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value + '个'
+                        }
+                    },
+                    stackLabels: {
+                        enabled: true,
+                        style: {
+                            fontWeight: 'bold',
+                            color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                        }
+                    }
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true
+                },
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        dataLabels: {
+                            enabled: true,
+                            color: (Highcharts.theme && Highcharts.theme.dataLabelsColor) || 'white',
+                            style: {
+                                textShadow: '0 0 3px black'
+                            }
+                        }
+                    }
+                },
+                series: json.x
+                , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        });
+    }
+    //对比图
+    function statDB() {
+        LoadDataDB();
+        binggridDB(deptCode, ctype, year, belongdistrict, 'gridTable2');
+    }
+    //绑定列表
+    function binggrid(deptCode, ctype, year, belongdistrict, tid) {
+        var $gridTable = $("#" + tid);
+        var data = $gridTable.jqGrid("getGridParam", "data");
+        if (!!data) {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { deptCode: deptCode, year: year, ctype: ctype, belongdistrict: belongdistrict }, page: 1
+            }).trigger('reloadGrid');
+        }
+        else {
+            $gridTable.jqGrid({
+                url: "../../SaftyCheck/SaftyCheckStatistics/GetGrpSaftyList",
+                postData: { deptCode: deptCode, year: year, ctype: ctype, belongdistrict: belongdistrict },
+                datatype: "json",
+                mtype: "post",
+                height: 400,
+                autowidth: true,
+                colModel: [
+                    { label: '月份', name: 'month', align: 'center' },
+                    {
+                        label: '日常安全检查', name: 'rc', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.rc;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(0,'" + rowObject.month + "','日常安全检查')>" + rowObject.rc + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '专项安全检查', name: 'zx', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.zx;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(0,'" + rowObject.month + "','专项安全检查')>" + rowObject.zx + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '季节性安全检查', name: 'jj', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.jj;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(0,'" + rowObject.month + "','季节性安全检查')>" + rowObject.jj + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '节假日前后安全检查', name: 'jjr', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.jjr;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(0,'" + rowObject.month + "','节假日前后安全检查')>" + rowObject.jjr + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '综合安全检查', name: 'zh', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.zh;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(0,'" + rowObject.month + "','综合安全检查')>" + rowObject.zh + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '省公司安全检查', name: 'sj', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.sj;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(0,'" + rowObject.month + "','省公司安全检查')>" + rowObject.sj + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '检查次数', name: 'sum', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.sum;
+                            if (rval > 0) {
+                                //rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(0,'" + rowObject.month + "','')>" + rowObject.sum + "</a>";
+                            }
+                            return rval;
+                        }
+                    }
+                ],
+                rowNum: 100,
+                rownumbers: true,
+                gridComplete: function () {
+                }
+            });
+        }
+    }
+    function binggridDB(deptCode, ctype, year, belongdistrict, tid) {
+        var $gridTable = $("#" + tid);
+        var data = $gridTable.jqGrid("getGridParam", "data");
+        if (!!data) {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { deptCode: deptCode, year: year, ctype: ctype, belongdistrict: belongdistrict }, page: 1
+            }).trigger('reloadGrid');
+        }
+        else {
+            $gridTable.jqGrid({
+                url: "../../SaftyCheck/SaftyCheckStatistics/GetGrpSaftyListDB",
+                postData: { deptCode: deptCode, year: year, ctype: ctype, belongdistrict: belongdistrict },
+                datatype: "json",
+                mtype: "post",
+                height: 400,
+                autowidth: true,
+                colModel: [
+                    { label: '部门', name: 'month', align: 'center' },
+                     {
+                         label: '日常安全检查', name: 'rc', align: 'center',
+                         formatter: function (cellvalue, options, rowObject) {
+                             var rval = rowObject.rc;
+                             if (rval > 0) {
+                                 rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(1,'" + rowObject.deptcode + "','日常安全检查')>" + rowObject.rc + "</a>";
+                             }
+                             return rval;
+                         }
+                     },
+                    {
+                        label: '专项安全检查', name: 'zx', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.zx;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(1,'" + rowObject.deptcode + "','专项安全检查')>" + rowObject.zx + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '季节性安全检查', name: 'jj', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.jj;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(1,'" + rowObject.deptcode + "','季节性安全检查')>" + rowObject.jj + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '节假日前后安全检查', name: 'jjr', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.jjr;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(1,'" + rowObject.deptcode + "','节假日前后安全检查')>" + rowObject.jjr + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '综合安全检查', name: 'zh', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.zh;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(1,'" + rowObject.deptcode + "','综合安全检查')>" + rowObject.zh + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '省公司安全检查', name: 'sj', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.sj;
+                            if (rval > 0) {
+                                rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(1,'" + rowObject.deptid + "','省公司安全检查')>" + rowObject.sj + "</a>";
+                            }
+                            return rval;
+                        }
+                    },
+                    {
+                        label: '检查次数', name: 'sum', align: 'center',
+                        formatter: function (cellvalue, options, rowObject) {
+                            var rval = rowObject.sum;
+                            if (rval > 0) {
+                                //rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoSafetyCheckList(1,'" + rowObject.deptcode + "','')>" + rowObject.sum + "</a>";
+                            }
+                            return rval;
+                        }
+                    }
+                ],
+                rowNum: 100,
+                rownumbers: true,
+                gridComplete: function () {
+
+                }
+            });
+        }
+    }
+
+    //读取检查内容列表
+    function GoSafetyCheckList(qtype, qargs, qval) {
+
+        var qyear = $("#TimeScope").attr("data-text"); //年度
+
+        var qdeptcode = deptCode; //单位
+
+        var url = ""; //请求地址
+
+        var qchecktype = ''; //检查类型
+        //检查类型
+        switch (qval) {
+            case "日常安全检查":
+                qchecktype = '1';
+                break;
+            case "专项安全检查":
+                qchecktype = '2';
+                break;
+            case "节假日前后安全检查":
+                qchecktype = '3';
+                break;
+            case "季节性安全检查":
+                qchecktype = '4';
+                break;
+            case "综合安全检查":
+                qchecktype = '5';
+                break;
+            default:
+                break;
+        }
+        //按月份
+        if (qtype == 0) {
+            qargs = qargs.replace('月', '');
+
+            if (qargs.length == 1) {
+                qargs = "0" + qargs;
+            }
+            var qyearmonth = qyear + "-" + qargs; //年-月 2018-01
+            if (qval == "省公司安全检查") {
+                var st = new Date(qyearmonth + "-01");
+                var et = new Date(qyearmonth + "-01").DateAdd('m', 1).DateAdd('d', -1);
+                var stStr = formatDate(st, 'yyyy-MM-dd');
+                var etStr = formatDate(et, 'yyyy-MM-dd');
+                url = '/SaftyCheck/SaftyCheckDataRecord/ZXGrpIndex?st=' + stStr + '&et=' + etStr + "&deptid=" + deptId;
+            }
+            else
+                url = '/SaftyCheck/SaftyCheckDataRecord/IndexView?pfrom=1&code=' + qdeptcode + '&ctype=' + qchecktype + '&qyearmonth=' + qyearmonth;
+        }
+        else//按单位
+        {
+            //查询条件：单位、年度、检查类型
+            if (qval == "省公司安全检查") {                
+                var stStr = qyear+"-01-01";
+                var etStr = qyear + "-12-31";
+                url = '/SaftyCheck/SaftyCheckDataRecord/ZXGrpIndex?st=' + stStr + '&et=' + etStr + "&deptid=" + qargs;
+            }
+            else
+                url = '/SaftyCheck/SaftyCheckDataRecord/IndexView?pfrom=1&qdeptcode=' + qargs + '&ctype=' + qchecktype + '&qyear=' + qyear;
+        }
+        var idx = dialogOpen({
+            id: 'CheckWindow',
+            title: '安全检查列表',
+            url: url,
+            btns: 1,
+            btn: ["关闭"],
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 50) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //跳转到指定模块菜单
+    function OpenNav(Navid) {
+        top.$("#nav").find('a#' + Navid).trigger("click");
+    }
+    function query() {
+        if (state == 1) {
+            statTJ();
+        }
+        if (state == 2) {
+            statQS();
+        }
+        if (state == 3) {
+            statDB();
+        }
+    }
+    function reset() {
+        //时间范围
+        var curTime = $("#TimeScope-option li:eq(0)").attr("data-value");
+        $("#TimeScope").ComboBoxSetValue(curTime);
+        $("#TimeScope").attr("data-text", curTime);
+        $("#TimeScope").attr("data-value", curTime);
+        //区域范围
+        $("#BelongDistrictID").find("div").html("==请选择==");
+        $("#BelongDistrictID").find("div").attr("style", "color:#999;")
+        $("#BelongDistrictID").removeAttr("data-text");
+        $("#BelongDistrictID").removeAttr("data-value");
+        $("#BelongDistrictID").removeAttr("data-code");
+        $("#BelongDistrictID").removeAttr("data-dept");
+        //检查类型
+        $("button[data-id='SaftyCheckType']").removeClass().addClass("btn dropdown-toggle btn-default bs-placeholder");
+        $("button[data-id='SaftyCheckType']").attr("title", "请选择");
+        $("button[data-id='SaftyCheckType'] span:eq(0)").text("请选择");
+        ctype = "";
+        $("button[data-id='SaftyCheckType']").next().find("ul li").each(function (index, ele) {
+            $(this).removeClass();
+        });
+        //单位
+        $("#DeptCode").val(""); $("#DeptName").val("");
+        $("#checkDeptType").val("");
+
+        query();
+    }
+</script>
+<div class="ui-layout"style="height: 100%; width: 100%;" id="layout">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a href="javascript:selectAll();">组织机构树</a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">
+                <sqan id="CheckOfTypeName">检查表信息</sqan>
+                <div class="btn-group" id="forShow" style="float: right;">
+                </div>
+            </div>
+            <div class="titlePanel">
+                <div style="margin-top: 10px;">
+                    <div class="row">
+                        <table style="width: 100%;" class="queryform">
+                            <tr>
+                                <td style="width: 100px; font-weight: bold;" align="right">检查单位：</td>
+                                <td style="width: 100px;">
+                                    <select id="checkDeptType" class="selectpicker show-menu-arrow form-control">
+                                        <option value="">==全部==</option>
+                                        <option value="省公司">省公司</option>
+                                        <option value="电厂">电厂</option>
+                                    </select>
+                                </td>
+                                <td style="font-weight: bold;display:none;" align="right">检查表类型：</td>
+                                <td style="display:none;">
+                                    <select id="SaftyCheckType" class="selectpicker show-menu-arrow form-control">
+                                        <option value="" selected="selected">全部</option>
+                                    </select>
+                                </td>
+                                <td style="display:none;" align="right">区域范围：</td>
+                                <td style="display:none;">
+                                    <div id="BelongDistrictID" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull">
+                                    </div>
+                                </td>
+                                <td style="padding-left: 10px;width:80px;" align="right">时间范围：</td>
+                                <td style="padding-left: 5px;width:120px;">
+                                    <div id="TimeScope" type="select" class="ui-select" style="width: 100px;"></div>
+                                </td>
+                                <td>
+                                    <a id="btn_Search" class="btn btn-primary" onclick="query()"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                    &nbsp;<a id="btn_Reset" class="btn btn-primary" onclick="reset()"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                                    &nbsp;<a id="btn_Export" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;导出</a>
+                                </td>
+                                <td align="right">
+                                    <div class="toolbar">
+                                        <div class="btn-group">
+                                            <button id="btntj" class="btn btn-primary btn10" type="button" onclick="state = 1; $('#divTJ').show(); $('#divQS').hide(); $('#divDB').hide(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); query();"><i class="fa fa fa-pie-chart"></i>&nbsp;统计图</button>
+                                            <button id="btnqs" class="btn btn-default btn10" type="button" onclick="state = 2; $('#divQS').show(); $('#divTJ').hide(); $('#divDB').hide(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); query();"><i class="fa fa fa-area-chart"></i>&nbsp;趋势图</button>
+                                            <button id="btndb" class="btn btn-default btn10" type="button" onclick="state = 3; $('#divQS').hide(); $('#divTJ').hide(); $('#divDB').show(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); query();"><i class="fa fa fa-area-chart"></i>&nbsp;对比图</button>
+
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div id="divQS" style="display: none;">
+                <div class="panel panel-default" style="margin-top: 10px;">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计图表</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="qscontainer" style="margin: 10px;"></div>
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计数据</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTable" style="width:95%;"></table>
+                    </div>
+                </div>
+            </div>
+            <div id="divDB" style="display: none;">
+                <div class="panel panel-default" style="margin-top: 10px;">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计图表</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="dbcontainer" style="margin: 10px;"></div>
+                    </div>
+                </div>
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计数据</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTable2" style="width:95%;"></table>
+                    </div>
+                </div>
+            </div>
+            <div id="divTJ">
+                <div class="panel panel-default" style="margin-top: 10px;">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计图表</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="tjcontainer" style="margin: 10px;"></div>
+                    </div>
+                </div>                
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计数据</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTable1" style="width:95%;"></table>
+                    </div>
+                </div>
+            </div>            
+        </div>
+    </div>
+</div>
+

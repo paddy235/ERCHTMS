@@ -1,0 +1,727 @@
+﻿@{
+    ViewBag.Title = "用户管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var _parentId = "";
+    var _isOrg = "Organize";
+    var deptId = request('deptId');
+    var deptCode = request('deptCode');
+    var checkMode = request('checkMode');
+    var mode = request('mode');
+    var userIds = request('userIds');
+    var userKind = request('userKind');
+    var eliminateUserIds = request('eliminateUserIds');
+    var special = request('special');
+    var side = request('side');
+    var rolename = request('rolename');
+    var projectid = request('projectid');
+    var istree = request('istree');
+    var deptIds = request('deptIds');
+    var controlObj = request("controlObj");
+    var state = 0;
+    var containchild = 0;//是否包含子部门  0:不包含  1:包含
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    $(function () {
+        $.ajaxSetup({ async: false });
+        if (userIds == "tz") {//通知公告
+            userIds = top.Form.$("#UserId").val();
+        } else if (userIds == "me") { //会议纪要，简报
+            userIds = top.Form.$("#IssuerUserIdList").val();
+        } else if (userIds == "dh") { //动火记录负责人
+            userIds = top.Sikp.$("#ExecuteUserId").val();
+        }
+        else if (userIds == "js") { //会议纪要，简报
+            userIds = top.Details.$("#ReceiveUserIds").val();
+        }
+        else if (userIds == "commonzy") {//通用高风险作业 ，作业人员
+            userIds = top.Form.$("#WorkUserIds").val();
+        } else if (userIds == "scaffoldzy") {//脚手架搭设
+            userIds = top.Form.$("#SetupPersonIds").val();
+        }
+        else if (userIds == "scaffoldtwozy") {//脚手架验收
+            userIds = top.Form.$("#SetupChargePersonIds").val();
+        }
+        else if (userIds == "scaffoldthreezy") {//脚手架拆除
+            userIds = top.Form.$("#DismentlePersonsIds").val();
+        }
+        else if (userIds == "sidetask") {//旁站监督任务
+            userIds = top.WorkForm.$("#WorkUserIds").val();
+        }
+        else if (top.obsForm != undefined) {
+            if (top.obsForm.$("#" + userIds) != undefined && top.obsForm.$("#" + userIds).val() != undefined) {
+                userIds = top.obsForm.$("#" + userIds).val();
+            }
+        }
+        else if (userIds == "trainrole") {//安全会议参会人
+            userIds = top.Role.$("#UserId").val();
+        }
+        if (checkMode == 0) {
+            $(".ui-layout-east").remove();
+            $("#btnAll").remove();
+            $("#btnClear").remove();
+        }
+        InitialPage();
+        if (istree == '0') {
+            $("#tree_div").hide();
+        } else {
+            $("#tree_div").show();
+            GetTree();
+        }
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 141.5);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+
+            }, 200);
+            e.stopPropagation();
+        });
+        $("#users").height($(window).height() - 50);
+        //编辑进来默认赋值之前已选择的人员(针对于人员多选)
+        if (checkMode == 1) {
+
+            var arr = [];
+            if (!!userIds) {
+                $.ajax({
+                    url: "../../BaseManage/User/GetUserJson",
+                    data: { UserIDs: userIds },
+                    type: "post",
+                    dataType: "JSON",
+                    async: false,
+                    success: function (result) {
+                        if (result.length > 0) {
+                            $.each(result, function (i, dom) {
+                                if (document.getElementById("div" + dom.account) == null) {
+                                    $("#users").append("<div id='div" + dom.account + "'  data-value='user'><input type='checkbox' value='" + dom.account + "' id='" + dom.userid + "' checked='checked' title='" + decodeURIComponent(dom.realname) + "' deptId='" + dom.departmentid + "' deptCode='" + dom.departmentcode + "' deptName='" + decodeURIComponent(dom.deptname) + "'  signimg='" + dom.signimg + "'  ><label for='" + dom.userid + "'>" + decodeURIComponent(dom.realname) + "</label></div>");
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            $("#lblselect").html("已选中用户(" + $("#users").find("input:checked").length + "人)");
+        }
+
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+           {
+               Ids: deptId,
+               SelectMode: checkMode,
+               Mode: mode
+           }
+         );
+        var item = {
+            height: $(window).height() - 35,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            //url: "../../BaseManage/Department/GetDeptTreeJson?Ids=" + deptId + "&checkMode=" + checkMode + "&mode=" + mode,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = item.Sort;
+                deptId = item.id;
+                state = 0;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        _parentId = $(".bbit-tree-node-text").eq(0).attr("data-code");
+        //加载用户组
+        var o = {
+            height: $(window).height() - 35,
+            url: "../../RoutineSafetyWork/UserGroupManage/GetTreeListJson",
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                state = 1;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#UserGroup").treeview(o);
+    }
+    function selRow(obj, account, name, id, deptId, deptCode, deptName, mobile, signimg) {
+        if (obj.checked) {
+            if (document.getElementById("div" + account) == null) {
+                $("#users").append("<div id='div" + account + "'  data-value='user'><input type='checkbox' value='" + account + "' id='" + id + "' checked='checked' title='" + decodeURIComponent(name) + "' deptId='" + deptId + "' deptCode='" + deptCode + "' deptName='" + decodeURIComponent(deptName) + "' mobile='" + mobile + "'  signimg='" + signimg + "' ><label for='" + id + "'>" + decodeURIComponent(name) + "</label></div>");
+            }
+        } else {
+            if (document.getElementById("div" + account) != null) {
+                $("#div" + account).remove();
+            }
+        }
+    }
+    var selectedRowIndex = -1;
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+            keyword: $("#txt_Keyword").val(),
+            code: _parentId,
+            state: 0,
+            containchild: document.getElementById("chkdept").checked ? 1 : 0
+        }
+        if (!!userKind) {
+            queryJson["userKind"] = userKind;
+        }
+        if (!!eliminateUserIds) {
+            queryJson["eliminateUserIds"] = eliminateUserIds;
+        }
+        if (!!special) {
+            queryJson["special"] = special;
+        }
+        if (!!side) {
+            queryJson["side"] = side;
+        }
+        if (!!rolename) {
+            queryJson["rolename"] = rolename;
+        }
+        if (!!projectid) {
+            queryJson["projectid"] = projectid;
+        }
+
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1,
+            url: "../../BaseManage/User/GetNoTransferJson",
+            datatype: "json",
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+                { label: '身份证号', name: 'IdentifyID', hidden: true },
+               { label: '主键', name: 'UserId', hidden: true }, { label: '', name: 'DepartmentId', hidden: true }, { label: '', name: 'DepartmentCode', hidden: true }, { label: '', name: 'OrganizeCode', hidden: true }, { label: '', name: 'DeptCode', hidden: true },
+                {
+                    label: '操作', name: 'Oper', index: 'Account', width: 60, align: 'center', hidden: true, sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var ischked = "";
+                        //alert(userIds + "----" + rowObject.Account);
+                        if (userIds.indexOf(rowObject.UserId) >= 0) {
+                            ischked = "checked='checked'";
+                        }
+                        var html = "";
+                        var mobile = rowObject.Mobile == undefined || rowObject.Mobile == null ? "" : rowObject.Mobile;
+                        html = "<input type='checkbox'" + ischked + " onclick=selRow(this,'" + rowObject.Account + "','" + encodeURIComponent(rowObject.RealName) + "','" + rowObject.UserId + "','" + rowObject.DepartmentId + "','" + rowObject.DepartmentCode + "','" + encodeURIComponent(rowObject.DeptName) + "','" + mobile + "') />";
+                        return html;
+                    }
+                },
+                { label: '账户', name: 'Account', index: 'Account', width: 100, align: 'center', sortable: true },
+
+                { label: '姓名', name: 'RealName', index: 'RealName', width: 100, align: 'center', sortable: true },
+                {
+                    label: '性别', name: 'Gender', index: 'Gender', width: 45, align: 'center', sortable: true
+                },
+                { label: '手机', name: 'Mobile', index: 'Mobile', width: 100, align: 'center', sortable: true },
+                {
+                    label: '公司', name: 'OrganizeName', index: 'OrganizeName', width: 200, align: 'center', sortable: true
+
+                },
+                {
+                    label: '部门', name: 'DeptName', index: 'DeptName', width: 100, align: 'center', sortable: true
+
+                },
+                { label: '岗位', name: 'DutyName', index: 'DutyName', width: 100, align: 'center', sortable: true },
+                { label: '签名图片', name: 'SignImg', index: 'SignImg', hidden: true, align: 'center', sortable: true }
+
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [10, 20, 30],
+            pager: "#gridPager",
+            sortname: 'CreateDate desc,userid',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            multiselect: checkMode == 0 ? false : true,
+            gridview: true,
+            onSelectRow: function (rowid, status) {
+                if (checkMode == 0) {
+                    selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                    // alert($gridTable.jqGrid("getRowData", selectedRowIndex).Account);
+                } else {
+                    var rowObject = $gridTable.jqGrid('getRowData', rowid);
+                    var mobile = rowObject.Mobile == undefined || rowObject.Mobile == null ? "" : rowObject.Mobile;
+                    selRow($gridTable.find(".jqgrow").eq(rowid - 1).find("input:checkbox").eq(0).get(0), rowObject.Account, encodeURIComponent(rowObject.RealName), rowObject.UserId, rowObject.DepartmentId, rowObject.DepartmentCode, encodeURIComponent(rowObject.DeptName), mobile, rowObject.SignImg);
+                    $("#lblselect").html("已选中用户(" + $("#users").find("input:checked").length + "人)");
+                }
+            },
+            onSelectAll: function (aRowids, status) {
+                $(aRowids).each(function (i, item) {
+                    var rowObject = $gridTable.jqGrid('getRowData', item);
+                    var mobile = rowObject.Mobile == undefined || rowObject.Mobile == null ? "" : rowObject.Mobile;
+                    selRow($gridTable.find(".jqgrow").eq(i).find("input:checkbox").eq(0).get(0), rowObject.Account, encodeURIComponent(rowObject.RealName), rowObject.UserId, rowObject.DepartmentId, rowObject.DepartmentCode, encodeURIComponent(rowObject.DeptName), mobile, rowObject.SignImg);
+                });
+                $("#lblselect").html("已选中用户(" + $("#users").find("input:checked").length + "人)");
+            },
+
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                if ($("#itemTree").html().length == 0 && checkMode == 0) {
+                    $(".ui-layout-west").hide(); $(".ui-layout-pane-center").css({ left: "10px", width: "100%" }); $(".ui-jqgrid-view").css({ width: "100%" });
+                    $("#gbox_gridTable").css({ width: "100%" }); $("#gridPager").css({ width: "100%" }); $(".ui-jqgrid-hdiv").css({ width: "100%" });
+                    $(".ui-jqgrid-bdiv").css({ width: "100%" });
+
+                }
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            containchild = $("#chkdept").is(":checked") ? 1 : 0;
+            state = $("#lidept").hasClass("active") ? 0 : 1;
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword").val()),
+                code: _parentId,
+                state: state,
+                containchild: containchild
+            }
+            queryJson["rolename"] = rolename;
+            queryJson["userKind"] = userKind;
+            queryJson["eliminateUserIds"] = eliminateUserIds;
+            if (!!special) {
+                queryJson["special"] = special;
+            }
+            if (!!side) {
+                queryJson["side"] = side;
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+        $("#btnAll").click(function () {
+            containchild = $("#chkdept").is(":checked") ? 1 : 0;
+            state = $("#lidept").hasClass("active") ? 0 : 1;
+            if (state == 0) {
+                if ($("#itemTree").find("div[class*='bbit-tree-selected']").length == 0) {
+                    dialogMsg('请先选择部门！', 0);
+                    return false;
+                }
+            }
+            else {
+                if ($("#UserGroup").find("div[class*='bbit-tree-selected']").length == 0) {
+                    dialogMsg('请先选择用户组！', 0);
+                    return false;
+                }
+            }
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword").val()),
+                code: _parentId,
+                state: state,
+                containchild: containchild
+            }
+            $.ajax({
+                url: "../../BaseManage/User/GetNoTransferJson?rows=1000000&page=1&queryJson=" + JSON.stringify(queryJson),
+                type: "Get",
+                async: false,
+                dataType: "json",
+                success: function (data) {
+                    if (data.rows.length > 0) {
+                        $.each(data.rows, function (i, dom) {
+                            if (document.getElementById("div" + dom.Account) == null) {
+                                $("#users").append("<div id='div" + dom.Account + "' data-value='user'><input type='checkbox' value='" + dom.Account + "' id='" + dom.UserId + "' checked='checked' title='" + decodeURIComponent(dom.RealName) + "' deptId='" + dom.DepartmentId + "' deptCode='" + dom.DepartmentCode + "' deptName='" + decodeURIComponent(dom.DeptName) + "' mobile='" + dom.Mobile + "' signimg='" + dom.SignImg + "' ><label for='" + dom.UserId + "'>" + decodeURIComponent(dom.RealName) + "</label></div>");
+                            }
+                        });
+                    }
+                },
+                error: function (result) {
+                    dialogMsg("请先选择数据.", 0);
+                }
+            });
+            $("#lblselect").html("已选中用户(" + $("#users").find("input:checked").length + "人)");
+
+        })
+        $("#btnClear").click(function () {
+            $("#users").find("div[data-value='user']").remove();
+            $("#lblselect").html("已选中用户(0人)");
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    //返回选择后的结果并赋值到dom控件,多个值用逗号分隔
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序必须依次为用户名称,用户账号，用户Id,部门Id,部门Code,部门名称,手机号（多选用逗号分隔）
+    function AcceptClick(options) {
+
+        var winObject = options.winObject;
+        var domId = options.domId;
+        var selVal = new Array();
+        if (winObject != undefined && domId != undefined) {
+            var userNames = ""; var userAccounts = ""; var userIds = ""; var deptIds = ""; var deptCodes = ""; var deptNames = ""; var mobiles = ""; var sex = ""; var idcard = ""; var signimg = "";
+            if (domId.length > 0) {
+
+                if (checkMode == 1) {
+                    var arr = $("#users").find("input:checked");
+                    if (arr.length == 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+
+                        arr.each(function (i, dom) {
+                            userNames += dom.title + ",";
+                            userAccounts += dom.value + ",";
+                            userIds += dom.id + ",";
+                            deptIds += $(dom).attr("deptId") + ",";
+                            deptCodes += $(dom).attr("deptCode") + ",";
+                            deptNames += $(dom).attr("deptName") + ",";
+                            if ($(dom).attr("mobile") != undefined || $(dom).attr("mobile") != null) {
+                                if ($(dom).attr("mobile").length > 0) {
+                                    if (mobiles == "")
+                                        mobiles = $(dom).attr("mobile");
+                                }
+                            }
+
+                            sex += $(dom).attr("sex") + ",";
+                            idcard += $(dom).attr("idcard") + ",";
+                            signimg += $(dom).attr("signimg") + ',';
+                        });
+                        userNames = userNames.substring(0, userNames.length - 1);
+                        userAccounts = userAccounts.substring(0, userAccounts.length - 1);
+                        userIds = userIds.substring(0, userIds.length - 1);
+                        deptIds = deptIds.substring(0, deptIds.length - 1);
+                        deptCodes = deptCodes.substring(0, deptCodes.length - 1);
+                        deptNames = deptNames.substring(0, deptNames.length - 1);
+                        mobiles = mobiles.length > 0 ? mobiles.substring(0, mobiles.length - 1) : "";
+                        sex = sex.substring(0, sex.length - 1);
+                        idcard = idcard.substring(0, idcard.length - 1);
+                        signimg = signimg.substring(0, signimg.length - 1);
+                    }
+                } else {
+                    if (selectedRowIndex <= 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+                        var rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                        userNames = rowObject.RealName;
+                        userAccounts = rowObject.Account;
+                        userIds = rowObject.UserId;
+                        deptIds = rowObject.DepartmentId;
+                        deptCodes = rowObject.DepartmentCode;
+                        deptNames = rowObject.DeptName;
+                        mobiles = rowObject.Mobile == undefined ? "" : rowObject.Mobile;
+                        sex = rowObject.Gender;
+                        idcard = rowObject.IdentifyID;
+                        signimg = rowObject.SignImg;
+                    }
+
+                }
+                var ids = domId.split(',');
+                var selVal = new Array(userNames, userAccounts, userIds, deptIds, deptCodes, deptNames, mobiles, sex, idcard, signimg);
+                for (var j = 0; j < ids.length; j++) {
+                    if (ids[j].length >= 0) {
+                        if (ids[j] != "") {
+                            var dom = $(winObject).find("#" + ids[j]).eq(0);
+                            var domlbl = $(winObject).find("#lbl" + ids[j]).eq(0);
+                            if (dom != undefined) {
+                                dom.val(selVal[j]);
+                            }
+                            if (domlbl != undefined) {
+                                domlbl.html(selVal[j]);
+                            }
+                        }
+                    }
+                }
+            }
+            if (options.callBack) {
+                options.callBack(userNames, userAccounts, deptCodes);
+            }
+            dialogClose();
+        }
+
+    }
+
+
+    function AcceptDifferentClick(winObject, domId, dfferentID, describe) {
+        var selVal = new Array();
+
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var userNames = ""; var userAccounts = ""; var userIds = ""; var deptIds = ""; var deptCodes = ""; var deptNames = ""; var mobiles = "";
+                if (checkMode == 1) {
+                    var arr = $("#users").find("input:checked");
+                    if (arr.length == 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+
+                        arr.each(function (i, dom) {
+                            userNames += dom.title + ",";
+                            userAccounts += dom.value + ",";
+                            userIds += dom.id + ",";
+                            deptIds += $(dom).attr("deptId") + ",";
+                            deptCodes += $(dom).attr("deptCode") + ",";
+                            deptNames += $(dom).attr("deptName") + ",";
+                            mobiles += $(dom).attr("mobile") + ",";
+                        });
+                        userNames = userNames.substring(0, userNames.length - 1);
+                        userAccounts = userAccounts.substring(0, userAccounts.length - 1);
+                        userIds = userIds.substring(0, userIds.length - 1);
+                        deptIds = deptIds.substring(0, deptIds.length - 1);
+                        deptCodes = deptCodes.substring(0, deptCodes.length - 1);
+                        deptNames = deptNames.substring(0, deptNames.length - 1);
+                        mobiles = mobiles.length > 0 ? mobiles.substring(0, mobiles.length - 1) : "";
+                    }
+                } else {
+                    if (selectedRowIndex <= 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+                        var rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                        userNames = rowObject.RealName;
+                        userAccounts = rowObject.Account;
+                        userIds = rowObject.UserId;
+                        deptIds = rowObject.DepartmentId;
+                        deptCodes = !!rowObject.DepartmentCode ? rowObject.DepartmentCode : rowObject.OrganizeCode; //如果当前部门编码为空则采用组织机构编码
+                        deptNames = !!rowObject.DeptName ? rowObject.DeptName : rowObject.OrganizeName;//同上
+                        mobiles = rowObject.Mobile == undefined ? "" : rowObject.Mobile;
+                    }
+
+                }
+                var ids = domId.split(',');
+
+                var selVal = new Array(userNames, userAccounts, userIds, deptIds, deptCodes, deptNames, mobiles);
+
+                var differentObj = $(winObject).find("#" + dfferentID);
+
+                //判断
+                if (selVal[2] == differentObj.val()) {
+                    dialogAlert("当前选择的人员不能与" + describe + "相同", 2);
+                }
+                else {
+                    for (var j = 0; j < ids.length; j++) {
+                        if (ids[j].length >= 0) {
+                            if (ids[j] != "") {
+                                var dom = $(winObject).find("#" + ids[j]).eq(0);
+
+                                if (dom != undefined) {
+                                    //当目标对象和当前值相同的时候
+                                    dom.val(selVal[j]);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+            dialogClose();
+        }
+
+    }
+
+
+    //对多个dom进行赋值
+
+    //返回选择后的结果并赋值到dom控件,多个值用逗号分隔
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序必须依次为用户名称,用户账号，用户Id,部门Id,部门Code,部门名称,手机号（多选用逗号分隔）
+    function AcceptMuchClick(options) {
+        var winObject = options.winObject;
+        var domId = options.domId;
+        var selVal = new Array();
+
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var userNames = ""; var userAccounts = ""; var userIds = ""; var deptIds = ""; var deptCodes = ""; var deptNames = ""; var mobiles = ""; var sex = ""; var idcard = "";
+                //多选
+                if (checkMode == 1) {
+                    var arr = $("#users").find("input:checked");
+                    if (arr.length == 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+                        arr.each(function (i, dom) {
+                            userNames += dom.title + ",";
+                            userAccounts += dom.value + ",";
+                            userIds += dom.id + ",";
+                            if (deptIds.indexOf($(dom).attr("deptId")) < 0) {
+                                deptIds += $(dom).attr("deptId") + ",";
+                                deptCodes += $(dom).attr("deptCode") + ",";
+                                deptNames += $(dom).attr("deptName") + ",";
+                            }
+                            mobiles += $(dom).attr("mobile") + ",";
+                            sex += $(dom).attr("sex") + ",";
+                            idcard += $(dom).attr("idcard") + ",";
+                        });
+                        userNames = userNames.substring(0, userNames.length - 1);
+                        userAccounts = userAccounts.substring(0, userAccounts.length - 1);
+                        userIds = userIds.substring(0, userIds.length - 1);
+                        deptIds = deptIds.substring(0, deptIds.length - 1);
+                        deptCodes = deptCodes.substring(0, deptCodes.length - 1);
+                        deptNames = deptNames.substring(0, deptNames.length - 1);
+                        mobiles = mobiles.length > 0 ? mobiles.substring(0, mobiles.length - 1) : "";
+                        sex = sex.substring(0, sex.length - 1);
+                        idcard = idcard.substring(0, idcard.length - 1);
+                    }
+                } else {
+                    if (selectedRowIndex <= 0) {
+                        dialogAlert("请选择用户！", 2);
+                        return;
+                    } else {
+                        var rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                        userNames = rowObject.RealName;
+                        userAccounts = rowObject.Account;
+                        userIds = rowObject.UserId;
+                        deptIds = rowObject.DepartmentId;
+                        deptCodes = rowObject.DepartmentCode;
+                        deptNames = rowObject.DeptName;
+                        mobiles = rowObject.Mobile == undefined ? "" : rowObject.Mobile;
+                        sex = rowObject.Gender;
+                        idcard = rowObject.IdentifyID;
+                    }
+
+                }
+                var ids = domId.split(',');
+
+                //ids : field1|1,field2|0...(field1表示要赋值的字段，1表示selVal的索引值)
+                //用户姓名、用户账号、用户id、部门id、部门code、部门名称、电话、性别、身份证号
+                var selVal = new Array(userNames, userAccounts, userIds, deptIds, deptCodes, deptNames, mobiles, sex, idcard);
+                for (var j = 0; j < ids.length; j++) {
+                    if (ids[j].length >= 0) {
+                        var objKeyName = ids[j].split('|')[0];
+                        var objIndex = ids[j].split('|')[1];
+                        var objValue = selVal[objIndex];
+                        var dom = $(winObject).find("#" + objKeyName).eq(0);
+                        if (dom != undefined) {
+                            dom.val(objValue);
+                            if (!!controlObj) {
+                                var tempControl = controlObj.split(',');
+                                for (var m = 0; m < tempControl.length; m++) {
+                                    if (!!tempControl[m] && objKeyName == tempControl[m]) {
+                                        dom.attr("disabled", "disabled");
+                                    }
+                                }
+                            }
+                        }
+                        var domlbl = $(winObject).find("#lbl" + objKeyName).eq(0);
+                        if (domlbl != undefined) {
+                            domlbl.html(objValue);
+                        }
+                    }
+                }
+            }
+            if (options.callBack) {
+                options.callBack();
+            }
+            dialogClose();
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div id="tree_div" class="ui-layout-west">
+        <div class="west-Panel">
+            <ul class="nav nav-tabs" id="ulTabs">
+                <li id="lidept" class="active">
+                    <a data-toggle="tab" href="#tab1">按部门</a>
+                </li>
+                <li>
+                    <a data-toggle="tab" href="#tab2">按用户组</a>
+                </li>
+            </ul>
+            <div class="tab-content">
+                <div id="tab1" class="tab-pane active">
+                    <div id="itemTree"></div>
+
+                </div>
+                <div id="tab2" class="tab-pane">
+                    <div id="UserGroup" style="overflow: auto; height: 600px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-right: 0px;">
+            <div class="panel-Title">用户信息</div>
+
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a data-value="Account">账户</a></li>
+                                        <li><a data-value="RealName">姓名</a></li>
+                                        <li><a data-value="Mobile">手机</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            </td>
+                            <td style="padding-left: 50px">
+                                是否包含子部门
+                                <input type="checkbox" id="chkdept" />
+                            </td>
+                            <td style="padding-left: 15px">
+                                <a id="btnAll" class="btn btn-info">选择全部人员</a>
+                            </td>
+                            <td style="padding-left: 15px">
+                                <a id="btnClear" class="btn btn-info">取消选择</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="lr-replace" class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                @*<div class="alert alert-danger" style="text-align: left; margin-bottom: 3px; padding: 5px;">
+                        <i class="fa fa-question-circle alert-dismissible" style="position: relative; top: 1px; font-size: 15px;"></i>
+                        注：请点击要选择的数据行，然后再点击“确认”按钮
+                    </div>
+                *@
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-east" style="margin-left: 0px;">
+        <div class="west-Panel" style="margin-left: 0px;">
+            <div class="panel-Title">
+                <lable id="lblselect">已选中的用户</lable>
+            </div>
+            <div id="users" style="overflow: auto; height: 450px; margin-left: 5px;">
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+

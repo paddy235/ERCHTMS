@@ -1,0 +1,92 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var workId = request('workId');
+    var dangerId = request('dangerId');
+    var riskId = request('riskId');
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../RiskDatabase/Measures/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+        if (top.win0.workId.length > 0) {
+            $("#WorkId").val(top.win0.workId);
+            $("#DangerId").val(top.win0.dangerId);
+            $("#RiskId").val(top.win0.$("#Id").val());
+        }
+        if (top.win0.tCode.length>0) {
+            $("#Content").val(decodeURIComponent(top.win0.tContent));
+            $("#TypeCode").val(top.win0.tCode);
+            $("#TypeName").val(decodeURIComponent(top.win0.tName));
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if (!!keyValue) {
+            $.SaveForm({
+                url: "../../RiskDatabase/Measures/Save?keyValue=" + keyValue,
+                param: postData,
+                loading: "正在保存数据...",
+                success: function () {
+                    top.win0.$("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            var rowId = top.win0.$("#gridTable").jqGrid('getRowData').length + 1;
+            postData["Id"] = rowId; postData["WorkId"] = ""; postData["TypeCode"] = $("#TypeCode").val();
+            top.win0.$(".unwritten").hide();
+            top.win0.$("#gridTable").addRowData(rowId, postData);
+            var idx=dialogConfirm("新增成功，是否继续新增？", function (isSure) {
+                if (isSure) {
+                    $("#Content").val('');
+                    $("#TypeCode").val(''); $(".filter-option").html("请选择类型"); $(".btn-default").attr("title", "请选择类型");
+                    $(".inner").find("li").removeClass("selected");
+                    $("#TypeName").val('');
+                    top.layer.close(idx);
+                } else {
+                    top.layer.close(top.win0.idx1);
+                }
+            });
+        }
+       
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">措施类型</td>
+            <td class="formValue">
+                <select id="TypeCode" class="selectpicker show-menu-arrow form-control" onchange="$('#TypeName').val($('#TypeCode').find('option:selected').text())">
+                    <option value="">请选择类型</option>
+                    @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("MeasureType"))
+                </select>
+                <input type="hidden" id="TypeName" /><input type="hidden" id="RiskId" /><input type="hidden" id="DangerId" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">具体措施</td>
+            <td class="formValue">
+                <textarea id="Content"  class="form-control" rows="5" ></textarea>
+            </td>
+        </tr>
+    </table>
+</div>

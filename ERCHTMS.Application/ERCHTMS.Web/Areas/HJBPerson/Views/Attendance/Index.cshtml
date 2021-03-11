@@ -1,0 +1,346 @@
+﻿@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+<link type="text/css" rel="stylesheet" href="~/Content/styles/kbscss/common.css">
+<link type="text/css" rel="stylesheet" href="~/Content/styles/kbscss/dilog.css">
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+
+
+<script>
+
+    var selectType = "";
+    var selectStatus = "";
+    var deptCode = "";
+    var timenuw = "@DateTime.Now";
+    var _parentId = "";
+    var _isOrg = "";
+    var times = "";
+
+    $(function () {
+        $("#StartTime").val(timenuw);
+       // window.setInterval("GetTimeNew()", 1000);
+        GetTree();
+        InitialPage();
+        GetGrid();
+        //BindComUserCount();
+    });
+       
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: "@ViewBag.Mode"
+            }
+        );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = item.Sort;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 170);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 277);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    var rowlist;
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            selectStatus: selectStatus,
+            startTime: $("#StartTime").val(),
+            code: _parentId,
+            isOrg: _isOrg,
+            Search: $("#txt_Keyword").val()
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 277,
+            url: "../../HJBPerson/Attendance/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'departmentid', index: 'departmentid', width: 250, align: 'center', hidden: true, sortable: false },
+                { label: '序号', name: 'r', index: 'r', width: 250, align: 'center', hidden: false, sortable: false },
+                {
+                    label: '单位名称', name: 'deptname', index: 'deptname', width: 500, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (rowObject.depttype == "临时") {
+                            html = "<img src=\"../../Content/img/tempimg.png\"/>" + "&nbsp;" + cellvalue;
+                        }
+                        else {
+                            html = "<img src=\"../../Content/img/changxieImg.png\"/>" + cellvalue;
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '应出勤人数（人）', name: 'answer', index: 'answer', width: 300, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a style=\"color: blue;\" href='javascript:ShowUserInfo(\"" + rowObject.departmentid + "\",\"" + 0 + "\")'> " + rowObject.answer + " </a>";
+                        return html;
+                    }
+                },
+                {
+                    label: '实际出勤人数（人）', name: 'realcount', index: 'realcount', width: 400, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.realcount) {
+                            var html = "<a style=\"color: blue;\" href='javascript:ShowUserInfo(\"" + rowObject.departmentid + "\",\"" + 1 + "\")'> " + rowObject.realcount + " </a>";
+                            return html;
+                        }
+                        else {
+                            var html = "<a style=\"color: blue;\" href='javascript:ShowUserInfo(\"" + rowObject.departmentid + "\",\"" + 1 + "\")'> " + "" + " </a>";
+                            return html;
+                        }
+                    }
+                },
+                {
+                    label: '未出勤人数（人）', name: 'notnum', index: 'notnum', width: 400, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.realcount) {
+                            var num = parseInt(Number(rowObject.answer) - Number(rowObject.realcount))
+                            html = "<a style=\"color: red;\" href='javascript:ShowUserInfo(\"" + rowObject.departmentid + "\",\"" + 2 + "\")'> " + num + " </a>";
+                        }
+                        else {
+                            html = "<a style=\"color: red;\" href='javascript:ShowUserInfo(\"" + rowObject.departmentid + "\",\"" + 2 + "\")'> " + rowObject.answer + " </a>";
+                        }
+                        return html;
+                    }
+                },
+            ],
+            viewrecords: true,
+            loadonce: true,
+            rowNum: 1000,
+            //rowList: [1000],
+            //pager: "#gridPager",
+            sortname: 'sortcode asc,deptname asc,deptcode ',
+            sortorder: 'asc',
+            rownumbers: false,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+
+            },
+            loadComplete: function () {
+                var datarow = { "deptname": "合计", "answer": "0", "realcount": "0", "departmentid": "0" }
+                $('#gridTable').addRowData("-1", datarow, "first");
+
+                var ycount = 0; var scount = 0;
+                var rowArr = $('#gridTable').getRowData();
+                for (var i = 0; i < rowArr.length; i++) {
+                    var ynom = $(rowArr[i].answer).html();
+                    ycount = parseInt(ycount + Number(ynom))
+                    var snom = $(rowArr[i].realcount).html();
+                    scount = parseInt(scount + Number(snom))
+                }
+
+                var rowData = $('#gridTable').jqGrid("getRowData", "-1")
+                rowData.deptname = "合计";
+                rowData.answer = ycount;
+                rowData.realcount = scount;
+                $("#ComUserSum").html(parseInt(ycount - Number(scount)) + "人");
+                $('#gridTable').jqGrid("setRowData", "-1", rowData)
+                rowlist = $('#gridTable').getRowData();
+                if (rowlist != null && rowlist.length == 1) {//表示选中单位暂时没有人员
+                    rowlist = null;
+                    dialogMsg('该单位暂时没有人员信息！', 1);
+                    //alert("该单位暂时没有人员信息！");
+                    return false;
+                }
+            }
+        });
+    }
+       
+    //查看
+    function ShowUserInfo(deptid, mode) {
+        var ComType = $("#ComType option:selected").text() == "==请选择==" ? "" : $("#ComType option:selected").text();
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '查看',
+            url: '/HJBPerson/Attendance/ListInfo?DeptCode=' + deptid + "&Mode=" + mode + "&startTime=" + $("#StartTime").val() + "&ComType=" + ComType + "&code=" + _parentId,
+            width: '1000px',
+            height: '800px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        })
+    }
+
+    //查询
+    function f_search() {
+
+        var url = "../../HJBPerson/Attendance/GetTimeNew";
+        $.post(url, {}, function (data) {
+            times = data;
+            var et = $("#StartTime").val();
+            if (times != "") {
+                if (et > times && et != "") {
+                    dialogMsg('查询时间不能大于当前时间！', 2);
+                    return false;
+                }
+                var queryJson = {
+                    selectStatus: selectStatus,
+                    startTime: $("#StartTime").val(),
+                    ComType: $("#ComType option:selected").text() == "==请选择==" ? "" : $("#ComType option:selected").text(),
+                    code: _parentId,
+                    isOrg: _isOrg
+                }
+                $("#gridTable").setGridParam({ url: top.contentPath + "/HJBPerson/Attendance/GetPageListJson" });
+                $("#gridTable").setGridParam({ datatype: 'json', page: 1 })
+                    .jqGrid('setGridParam', { page: 1, postData: { queryJson: JSON.stringify(queryJson) } })
+                    .trigger("reloadGrid");
+                //BindComUserCount();
+            }
+        });
+    }
+   
+    //未考勤人员统计
+    function BindComUserCount() {
+        var queryJson = {
+            startTime: $("#StartTime").val(),
+            ComType: $("#ComType option:selected").text() == "==请选择==" ? "" : $("#ComType option:selected").text()
+        }
+        var url = top.contentPath + "/HJBPerson/Attendance/GetComNameUserCount";
+        $.post(url, { queryJson: JSON.stringify(queryJson) }, function (data) {
+            $("#ComUserSum").html(data + "人");
+        });
+    }
+    //导出数据
+    function exp() {
+        var queryJson = {
+            selectStatus: selectStatus,
+            startTime: $("#StartTime").val(),
+            deptCode: deptCode,
+            ComType: $("#ComType option:selected").text() == "==请选择==" ? "" : $("#ComType option:selected").text()
+        }
+        window.location.href = "../../HJBPerson/Attendance/ExportUserList?condition=&queryJson=" + JSON.stringify(queryJson);
+    }
+
+    
+    
+
+
+
+</script>
+
+
+
+
+<div class="main">
+    <div class="main_top">
+        <div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+            <div class="ui-layout-west">
+                <div class="west-Panel">
+                    <div class="panel-Title">
+                        <div class="col-md-10">
+                            部门
+                        </div>
+                        <div class="col-md-2 text-right" style="padding-right: 8px;">
+                            <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor: pointer;" title="展开/收起"></i>
+                        </div>
+                    </div>
+                    <div id="itemTree"></div>
+                </div>
+            </div>
+            <div class="ui-layout-center">
+                <div class="center-Panel" style="height: 60px;">
+                    <div style="margin-top: 5px;">
+                        <div class="row" style="margin-top: 5px; margin-bottom: 5px;">
+                            <div id="type" class="col-md-12">
+                                <label>外包单位考勤统计</label>
+                            </div>
+                            <div style="float:right;">
+                                <label style="">缺勤总人数：</label>
+                                <label id="ComUserSum" style="padding-right:20px; color:blue;"></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="center-Panel">
+                    <div class="titlePanel">
+                        <div class="title-search">
+                            <table>
+                                <tr>
+                                    <td style="padding-left: 10px; font-weight: bold;">日期：</td>
+                                    <td style="width: 186px;">
+                                        <input id="StartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm:ss '})">
+                                    </td>
+                                    <td style="padding-left: 10px; font-weight: bold;">单位类型：</td>
+                                    <td>
+                                        <select style="width:120px;" id="ComType">
+                                            <option>==请选择==</option>
+                                            <option>长协单位</option>
+                                            <option>临时单位</option>
+                                        </select>
+                                    </td>
+
+                                    <td style="padding-left: 5px;">
+                                        <a id="btn_Search" class="btn btn-primary" onclick="f_search()"><i class="fa fa-search"></i>查询</a>
+                                        <a id="btn_SearchAll" onclick="reload()" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;重置</a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                @*<a id="search" class="btn btn-default" onclick="f_search()"><i class="fa fa-refresh"></i>刷新</a>*@
+                                @*<a id="exp" class="btn btn-default" onclick="exp()"><i class="fa"></i>导出</a>*@
+                                <a id="exp" onclick="exp()" class="btn btn-primary">&nbsp;导出</a>
+                            </div>
+                        </div>
+                        @*<script>$('.toolbar').authorizeButton()</script>*@
+                    </div>
+                    <div class="gridPanel">
+                        <table id="gridTable"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+

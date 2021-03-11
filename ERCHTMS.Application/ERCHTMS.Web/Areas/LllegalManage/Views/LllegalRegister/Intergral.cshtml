@@ -1,0 +1,427 @@
+﻿@{
+    ViewBag.Title = "积分档案";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script src="~/Content/scripts/business/Common.js"></script>
+<script src="~/Content/scripts/business/Grid.js"></script>
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<script>
+    var _parentId = "";
+    var _isOrg = "";
+    var _deptId = "";
+    var authValue = 0;
+    $(function () {
+
+        //resize重设布局;
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#div1').setGridWidth($(window).width() * 0.99);
+                $('#div2').setGridWidth($(window).width() * 0.99);
+                $('#gridTable').setGridWidth($('.center-Panel').width());
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $('#gridTable1').setGridWidth($('.center-Panel').width() * 0.82);
+                $("#gridTable1").setGridHeight($(window).height() - 170);
+                $("#itemTree").height($(window).height() - 90);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //获取权限
+        $.ajax({
+            type: "get",
+            url: "../../LllegalManage/LllegalRegister/GetCurOperAuthByItemCode?itemcode=LllegalPointRecoverAuth",
+            success: function (data) {
+                if (!!data) {
+                    authValue = parseFloat(data);
+                    if (authValue > 0) {
+                        $("#PointRecover").css("display", "");
+                    }
+                }
+            }
+        });
+        //单位积分档案
+        GetGrid();
+        //人员积分档案
+        GetTree();
+        GetPersonGrid();
+
+        $("#gridTable1").setGridWidth($('.center-Panel:eq(1)').width() * 0.82);
+        $("#itemTree").setTreeWidth($(window).width() * 0.15);
+        $("#itemTree").height($(window).height());
+
+    });
+
+
+    function resize() {
+        $("#gridTable").setGridWidth($(".center-Panel").width());
+        $("#gridTable").setGridHeight($(window).height() - 170);
+        $('#gridTable1').setGridWidth($(".center-Panel").width() * 0.82);
+        $("#gridTable1").setGridHeight($(window).height() - 170);
+        $("#itemTree").setTreeWidth($(window).width() * 0.15);
+        $("#itemTree").height($(window).height() - 90);
+    }
+
+    //加载组织机构树
+    function GetTree() {
+
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 0
+            }
+        );
+        var item = {
+            height: $(window).height() - 90,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.Code;
+                _isOrg = item.Sort;
+                _deptId = item.id;
+                $('#btn_Search1').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable1').setGridWidth($('.center-Panel').width() * 0.82);
+            $("#gridTable1").setGridHeight($(window).height() - 170);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var Year = $("#Year").val();
+        $gridTable.jqGrid({
+            url: "../../LllegalManage/LllegalRegister/GetDataDeptWZY",
+            postData: { Year: $("#Year").val() },
+            datatype: "json",
+            height: $(window).height() - 120,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'DepartmentId', hidden: true },
+                { label: '公司Id', name: 'OrganizeId', hidden: true },
+                { label: 'Sort', name: 'Sort', hidden: true },
+                { label: 'HasChild', name: 'HasChild', hidden: true },
+                { label: "单位", name: "FullName", align: "center", sortable: false },
+                { label: "部门编号", name: "EnCode", align: "center", sortable: false, hidden: true },
+                {
+                    label: "人员考核次数", name: "PersonWZNum", align: "center", sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue > 0) return "<span style='color:red'>" + cellvalue + "</span>";
+                        else return cellvalue;
+                    }
+                },
+                {
+                    label: "人员违章扣分", name: "PersonWZScore", align: "center", sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue > 0) return "<span style='color:red'>" + cellvalue + "</span>";
+                        else return cellvalue;
+                    }
+                },
+                {
+                    label: "部门违章扣分", name: "DeptWZScore", align: "center", sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue > 0) return "<span style='color:red'>" + cellvalue + "</span>";
+                        else return cellvalue;
+                    }
+                },
+                {
+                    label: "部门违章积分", name: "DepartWZJF", align: "center", sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var jf = parseFloat(rowObject.DeptScore) - parseFloat(rowObject.DeptWZScore);
+                        if (jf > 0) return "<span style='color:blue'>" + jf + "</span>";
+                        else return jf;
+                    }
+                },
+                {
+                    label: "人员积分", name: "UserWZScore", align: "center", sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        Year = $("#Year").val();
+                        return "<a href=javascript:DialogOpenShow('/LllegalManage/LllegalRegister/IntergralPerson?action=show&Year=" + Year + "&DeptId=" + rowObject.DepartmentId + "','查看人员积分','',''," + true + ") style='color:blue; text-decoration:underline'  title='查看'>详情</a>";
+                    }
+                }
+            ],
+            treeGrid: true,
+            treeGridModel: "nested",
+            ExpandColumn: "EnCode",
+            rowNum: "all",
+            rownumbers: true,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: {
+                    Year: $("#Year").val()
+                }
+            }).trigger('reloadGrid');
+        });
+        //查询回车事件
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+    //加载人员积分表格
+    function GetPersonGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable1 = $('#gridTable1');
+        $gridTable1.jqGrid({
+            url: "../../LllegalManage/LllegalRegister/GetDataPersonWZY",
+            postData: { Year: $("#pYear").val(), _parentId: _parentId },
+            datatype: "json",
+            height: $(window).height() - 120,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'userid', hidden: true },
+                {
+                    label: "单位", name: "deptname", align: "center", sortable: true
+                },
+                {
+                    label: "姓名", name: "realname", align: "center", sortable: true
+                },
+                {
+                    label: "人员考核次数", name: "personwznum", align: "center", sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = cellvalue;
+                        if (cellvalue > 0) {
+                            html = '<a style=\"text-decoration: underline;color: blue;\"  href=javascript:openLllegalList("' + rowObject.userid + '",0)>' + cellvalue + '</a>';
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: "人员违章扣分", name: "personwzscore", align: "center", sortable: true
+                },
+                {
+                    label: "人员奖励次数", name: "awardnum", align: "center", sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = cellvalue;
+                        if (cellvalue > 0) {
+                            html = '<a style=\"text-decoration: underline;color: blue;\"  href=javascript:openLllegalList("' + rowObject.userid + '",1)>' + cellvalue + '</a>';
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: "人员奖励积分", name: "awardscore", align: "center", sortable: true
+                },
+                {
+                    label: "人员违章积分", name: "persontotal", align: "center", sortable: true
+                }
+            ],
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            pager: "#gridPager1",
+            sortname: 'persontotal asc,personwzscore ',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search1").click(function () {
+            $gridTable1.jqGrid('setGridParam', {
+                postData: {
+                    Year: $("#pYear").val(),
+                    _parentId: _parentId
+                }
+            }).trigger('reloadGrid');
+        });
+        //查询回车事件
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+
+    //
+    //打开链接
+    //
+    function openLllegalList(userid, type) {
+        var url = "";
+        if (type == 0)
+        {
+            url = '/LllegalManage/LllegalRegister/SdIndex?Qtype=ryjf&Year=' + $("#pYear").val() + "&wzperson=" + userid;
+        }
+        if (type == 1) {
+            url = '/LllegalManage/LllegalRegister/SdIndex?Qtype=ryjf&Year=' + $("#pYear").val() + "&awardperson=" + userid;
+        }
+        dialogOpen({
+            id: 'LllegalList',
+            title: '违章列表',
+            url: url,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px"
+        });
+    }
+
+    //导出
+    function exported() {
+        var Year = $("#Year").val();
+        location.href = "../../LllegalManage/LllegalRegister/Export?Year=" + Year;
+    }
+
+
+    //积分提醒设置
+    function setting() {
+        dialogOpen({
+            id: "SetForm",
+            title: '积分提醒设置',
+            url: '/LllegalManage/LllegalRegister/RemindForm?keyValue=',
+            width: ($(top.window).width() / 2) + "px",
+            height: ($(top.window).height() / 2) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+
+    //积分恢复
+    function pointRecover() {
+        dialogOpen({
+            id: "PointRecover",
+            title: '积分恢复',
+            url: '/LllegalManage/LllegalPointRecover/Index?Year=' + $("#Year").val(),
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+
+    //积分恢复记录
+    function recoverRecord() {
+        dialogOpen({
+            id: "RecoverRecord",
+            title: '积分恢复记录',
+            url: '/LllegalManage/LllegalPointRecover/RecordIndex',
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+</script>
+
+
+<div class="center-Panel">
+    <div class="panel-Title">积分档案</div>
+    <ul class="nav nav-tabs">
+        <li class="active"><a id="tab1" href="#div1" onclick="resize()" data-toggle="tab">单位积分档案</a></li>
+        <li><a id="tab2" href="#div2" onclick="resize()" data-toggle="tab">人员积分档案</a></li>
+    </ul>
+    <div class="tab-content">
+        <div id="div1" class="tab-pane active">
+            <div class="center-Panel" style="padding:10px;">
+                <div class="titlePanel">
+                    <div class="title-search">
+                        <table>
+                            <tr>
+                                <td>违章年度:</td>
+                                <td>
+                                    <input id="Year" type="text" style="width: 100px" value="@DateTime.Now.ToString("yyyy")" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy' })" />
+                                </td>
+                                <td style="padding-left: 5px;">
+                                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="toolbar">
+                        <div class="btn-group">
+                            <a class="btn btn-default" onclick="recoverRecord()"><i class="fa fa-search"></i>积分恢复记录</a>
+                            <a class="btn btn-default" id="PointRecover" style="display:none;" onclick="pointRecover()"><i class="fa fa-reply"></i>积分恢复</a>
+                            <a class="btn btn-default" onclick="setting()"><i class="fa fa-gear"></i>&nbsp;积分提醒设置</a>
+                            <a class="btn btn-default" onclick="javascript:$('#gridTable').trigger('reloadGrid');"><i class="fa fa-refresh"></i>刷新</a>
+                        </div>
+                        @*<script>$('.toolbar').authorizeButton()</script>*@
+                    </div>
+                </div>
+                <div class="gridPanel">
+                    <table id="gridTable"></table>
+                </div>
+            </div>
+        </div>
+        <div id="div2" class="tab-pane">
+            <div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+                <div class="ui-layout-west" style="width:16%;float:left;">
+                    <div class="west-Panel">
+                        <div class="panel-Title">
+                            <div class="col-md-10">
+                                组织机构
+                            </div>
+                            <div class="col-md-2 text-right" style="padding-right:8px;">
+                                @*<i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>*@
+                            </div>
+                        </div>
+                        <div id="itemTree">
+                        </div>
+                    </div>
+                </div>
+                <div class="ui-layout-center" style="width:83%;float:left;margin-left:5px;">
+                    <div class="center-Panel">
+                        <div class="titlePanel">
+                            <div class="title-search">
+                                <table>
+                                    <tr>
+                                        <td>违章年度:</td>
+                                        <td>
+                                            <input id="pYear" type="text" style="width: 100px" value="@DateTime.Now.ToString("yyyy")" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy' })" />
+                                        </td>
+                                        <td style="padding-left: 5px;">
+                                            <a id="btn_Search1" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="toolbar">
+                                <div class="btn-group">
+                                    <a class="btn btn-default" onclick="javascript:$('#gridTable1').trigger('reloadGrid');"><i class="fa fa-refresh"></i>刷新</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="gridPanel">
+                            <table id="gridTable1"></table>
+                            <div id="gridPager1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,362 @@
+﻿@{;
+    ViewBag.Title = "添加考核信息";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+@*<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+    <link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+    <script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+    <script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>*@
+<script>
+    var UserName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";//当前用户
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户
+    var keyValue = request('keyValue'); // 安全考核主键
+    var keyValue_evaluate = request('keyValue_evaluate'); // 考核信息主键
+    var actiontype = request('actiontype');
+    var evaluatetype = request('evaluatetype');
+    var engineerData = [];
+    $(function () {
+        $('#SAFETYASSESSMENTID').val(keyValue);
+        $("#SCORETYPE").val(evaluatetype);
+
+        $('#EVALUATEDEPTNAME_person').val("0");
+        $('#EVALUATEDEPT_person').val("0");
+
+        if (!!keyValue_evaluate) {
+            $('#btn_SubmitAgain').hide();
+        }
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+
+        //取消
+        $("#btn_Cancle").click(function () {
+            dialogClose();
+        });
+        //提交
+        $("#btn_Submit").click(function () {
+            AcceptClick();
+
+        });
+
+        //继续提交
+        $("#btn_SubmitAgain").click(function () {
+            AcceptClickAgain();
+
+        });
+
+        // 选项切换
+        $('#EVALUATETYPE').change(function () {
+            $('#EVALUATEDEPTNAME_person').val("");
+            $('#EVALUATEDEPT_person').val("");
+            $('#EVALUATEDEPTNAME_dept').val("");
+            $('#EVALUATEDEPT_dept').val("");
+            if ($(this).val() == '1' || $(this).val() == '3') {
+                $('#evaluate_seldept').show(); 
+                $('#evaluate_selperson').hide();
+
+                $('#EVALUATEDEPTNAME_person').val("0");
+                $('#EVALUATEDEPT_person').val("0");
+                
+            } else {
+                $('#evaluate_seldept').hide();
+                $('#evaluate_selperson').show();
+
+                $('#EVALUATEDEPTNAME_dept').val("0");
+                $('#EVALUATEDEPT_dept').val("0");
+            }
+        });
+
+        if (actiontype == 'view') {
+            $('#btn_html').hide();
+            $("input").attr("readonly", "readonly");
+            $("textarea").attr("readonly", "readonly");
+            $('#EVALUATEDEPTNAME_person').attr("onclick", "");
+            $('#EVALUATEDEPTNAME_dept').attr("onclick", "");
+            $('#EVALUATETYPE').attr("disabled", "disabled");
+        }
+
+
+        if (!!keyValue_evaluate) {
+            //当前详情
+            var formUrl = "../../OutsourcingProject/SafetyAssessment/GetScoreFormJson";
+            $.SetForm({
+                url: formUrl,
+                param: { keyValue: keyValue_evaluate },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.EVALUATETYPE == '1' || data.EVALUATETYPE == '3') {
+                        $('#evaluate_seldept').show();
+                        $('#evaluate_selperson').hide();
+                        $('#EVALUATEDEPTNAME_dept').val(data.EVALUATEDEPTNAME); 
+                        $('#EVALUATEDEPT_dept').val(data.EVALUATEDEPT);
+                        $('#EVALUATEDEPTNAME_person').val("0");
+                        $('#EVALUATEDEPT_person').val("0");
+                    } else {
+                        $('#evaluate_seldept').hide();
+                        $('#evaluate_selperson').show();
+                        $('#EVALUATEDEPTNAME_person').val(data.EVALUATEDEPTNAME);
+                        $('#EVALUATEDEPT_person').val(data.EVALUATEDEPT);
+                        $('#EVALUATEDEPTNAME_dept').val("0");
+                        $('#EVALUATEDEPT_dept').val("0");
+                    }
+                        
+
+                    $('#ExamineDept').val(data.EXAMINEDEPT);
+                    $('#ExamineDeptId').val(data.EXAMINEDEPTID);
+                    $('input[name="EVALUATETYPE"][value="' + data.EvaluateType + '"]').attr("checked", true);
+
+                }
+            })
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if ($('#EVALUATETYPE').val() == '1' || $('#EVALUATETYPE').val() == '3') {
+            postData.EVALUATEDEPTNAME = $('#EVALUATEDEPTNAME_dept').val();
+            postData.EVALUATEDEPT = $('#EVALUATEDEPT_dept').val();
+
+        } else {
+           
+            postData.EVALUATEDEPTNAME = $('#EVALUATEDEPTNAME_person').val();
+            postData.EVALUATEDEPT = $('#EVALUATEDEPT_person').val();
+            if ($('#EVALUATEDEPT_person').val() == '' || $('#EVALUATEDEPT_person').val() == null) {
+                postData.EVALUATEDEPT = '-1';
+            }
+        }
+        postData.EVALUATETYPENAME = $('#EVALUATETYPE option:selected').text();
+        var urlsav = "../../OutsourcingProject/SafetyAssessment/SaveScoreForm";
+        if (!!keyValue_evaluate) {
+            urlsav = "../../OutsourcingProject/SafetyAssessment/SaveScoreForm?keyValue=" + keyValue_evaluate;
+            
+        }
+        
+        $.SaveForm({
+            url: urlsav,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                top.$("#Form").get(0).contentWindow.$("#gridTableEvaluate").trigger("reloadGrid");
+            }
+        });
+    }
+
+    function SelectItem() {
+        dofromList = dialogOpen({
+            id: "Items",
+            title: "选择安全考核标准",
+            url: '/OutsourcingProject/Safestandarditem/selectitems?pType=1',
+            width: ($(top.window.top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dofromList);
+            }
+        });
+    }
+
+    /// 再次保存
+    function AcceptClickAgain() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if ($('#EVALUATETYPE').val() == '1' || $('#EVALUATETYPE').val() == '3') {
+            postData.EVALUATEDEPTNAME = $('#EVALUATEDEPTNAME_dept').val();
+            postData.EVALUATEDEPT = $('#EVALUATEDEPT_dept').val();
+
+        } else {
+            
+            postData.EVALUATEDEPTNAME = $('#EVALUATEDEPTNAME_person').val();
+            postData.EVALUATEDEPT = $('#EVALUATEDEPT_person').val();
+
+            if ($('#EVALUATEDEPT_person').val() == '' || $('#EVALUATEDEPT_person').val() == null) {
+                postData.EVALUATEDEPT = '-1';
+            }
+        }
+        postData.EVALUATETYPENAME = $('#EVALUATETYPE option:selected').text();
+        
+
+
+        SaveAgain({
+            url: "../../OutsourcingProject/SafetyAssessment/SaveScoreForm",
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                top.$("#Form").get(0).contentWindow.$("#gridTableEvaluate").trigger("reloadGrid");
+                //$('#EVALUATETYPE').val("1");
+                //$('#EVALUATEDEPTNAME_dept').val("");
+                //$('#EVALUATEDEPT_dept').val("");
+                //$('#SCORE').val("");
+                //$('#EVALUATESCORE').val("");
+                //$('#EVALUATECONTENT').val("");
+                //$('#EVALUATEOTHER').val("");
+            }
+        });
+    }
+
+    /// 再次保存
+    function SaveAgain(options) {
+        var defaults = {
+            url: "",
+            param: [],
+            type: "post",
+            dataType: "json",
+            loading: "正在处理数据...",
+            success: null,
+            close: true
+        };
+        var options = $.extend(defaults, options);
+        Loading(true, options.loading);
+        if ($('[name=__RequestVerificationToken]').length > 0) {
+            options.param["__RequestVerificationToken"] = $('[name=__RequestVerificationToken]').val();
+        }
+        window.setTimeout(function () {
+            $.ajax({
+                url: options.url,
+                data: options.param,
+                type: options.type,
+                dataType: options.dataType,
+                contentType: options.contentType || 'application/x-www-form-urlencoded',
+                success: function (data) {
+                    top.$("#Form").get(0).contentWindow.$("#gridTableEvaluate").trigger("reloadGrid");
+                    $('#EVALUATETYPE').val("1");
+                    $('#EVALUATEDEPTNAME_dept').val("");
+                    $('#EVALUATEDEPT_dept').val("");
+                    $('#SCORE').val("");
+                    $('#EVALUATESCORE').val("");
+                    $('#EVALUATECONTENT').val("");
+                    $('#EVALUATEOTHER').val("");
+                    $('#evaluate_seldept').show();
+                    $('#evaluate_selperson').hide();
+                    $('#EVALUATEDEPTNAME_person').val("0");
+                    $('#EVALUATEDEPT_person').val("0");
+                    if (data.type == "3" || data.success == false) {
+                        Loading(false);
+                    } else {
+                        Loading(false);
+                    }
+
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    Loading(false);
+                    dialogMsg(errorThrown, -1);
+                },
+                beforeSend: function () {
+                },
+                complete: function () {
+                    Loading(false);
+                    if (options.complete)
+                        options.complete();
+                }
+            });
+        }, 500);
+    }
+
+
+</script>
+<div class="center-Panel">
+    <div id="div1"></div>
+    <div class="panel panel-default">
+        @*<div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息</strong>
+            <span class="tools pull-right">考核单位（部门）、考核人员、连带考核单位（部门）、连带考核人员
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>*@
+        <input type="hidden" value="" id="SAFETYASSESSMENTID" />
+        <input type="hidden" value="" id="SCORETYPE" />
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">被考核对象类别<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <select id="EVALUATETYPE" class="form-control" value="1">
+                                <option value="1">考核单位（部门）</option>
+                                <option value="2">考核人员</option>
+                                <option value="3">连带考核单位（部门）</option>
+                                <option value="4">连带考核人员</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr id="evaluate_seldept">
+                        <td class="formTitle">被考核对象<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <div style="float:left;width:75%;">
+                                <input id="EVALUATEDEPTNAME_dept" type="text" readonly="readonly" class="form-control" isvalid="yes" checkexpession="NotNull"  />
+                                <input id="EVALUATEDEPT_dept" type="hidden" />
+                            </div>
+                            <div style="float:left;margin-left:26px;margin-top:3px;">
+                                <a href="javascript:void()" onclick="selectDept('', 1, 0, '选择部门', document.body, 'EVALUATEDEPTNAME_dept,EVALUATEDEPT_dept,DeptId', $('#EVALUATEDEPT_dept').val())"  class="btn btn-primary btn-xs btn10">选择部门</a>
+                            </div> 
+                        </td>
+                    </tr>
+                    <tr id="evaluate_selperson" style="display:none;">
+                        <td class="formTitle">被考核对象<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <div style="float:left;width:75%;">
+                                <input id="EVALUATEDEPTNAME_person" type="text" class="form-control" isvalid="yes" checkexpession="NotNull"  />
+                                <input id="EVALUATEDEPT_person" type="hidden" />
+                            </div>
+                            <div style="float:left;margin-left:26px;margin-top:3px;">
+                                <a href="javascript:void();" onclick="selectUser({ deptId: '', userIds: $('#EVALUATEDEPT_person').val(), checkMode: 1, mode: 2, winObject: window.document.body, domId: 'EVALUATEDEPTNAME_person,,EVALUATEDEPT_person' });" class="btn btn-primary btn-xs btn10">选择人员</a>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">考核金额（元）</td>
+                        <td class="formValue" colspan="3">
+                            <div style="float:left;width:75%;">
+                                <input id="SCORE" type="text" class="form-control" isvalid="yes" checkexpession="TwoPositiveDoubleOrNull" />
+                            </div>
+
+                            <div style="float:left;margin-left:26px;margin-top:3px;">
+                                <a href="javascript:SelectItem()" class="btn btn-primary btn-xs btn10">考核标准</a>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">考核积分（分）</td>
+                        <td class="formValue" colspan="3">
+                            <input id="EVALUATESCORE" type="text" class="form-control" isvalid="yes" checkexpession="TwoPositiveDoubleOrNull"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">考核绩效</td>
+                        <td class="formValue" colspan="3">
+                            <input id="EVALUATECONTENT" type="text" class="form-control" maxlength="500" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">考核其他</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="EVALUATEOTHER" class="form-control"  style="height: 120px;" maxlength="500"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="form-button" id="btn_html" style=" text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+        <div style="float:right;">
+            <a id="btn_SubmitAgain" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; ">&nbsp;继&nbsp;续&nbsp;添&nbsp;加</a>
+            &nbsp; &nbsp;
+            <a id="btn_Submit" class="btn btn-primary" style="background-color: #5CB85C; border-color: #5CB85C; ">&nbsp;确&nbsp;&nbsp;认</a>
+            &nbsp; &nbsp;
+            <a id="btn_Cancle" class="btn btn-primary" style="background-color: #BCBCBC; border-color: #BCBCBC; ">&nbsp;取&nbsp;&nbsp;消</a>
+            &nbsp; &nbsp;
+        </div>
+    </div>
+
+</div>
+
+

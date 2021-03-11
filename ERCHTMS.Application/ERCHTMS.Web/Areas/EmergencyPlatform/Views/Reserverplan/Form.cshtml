@@ -1,0 +1,294 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var type = request('type');
+    var action = request('action');
+    var FILEPS = "@Guid.NewGuid().ToString()";
+    var FILES = "@Guid.NewGuid().ToString()";
+    $(function () {
+        initControl();
+        if (action == "show") {
+            $("input").attr("readonly", "readonly");
+            $("input").attr("disabled", "disabled");
+            $("div").attr("disabled", "disabled");
+            $("textarea").attr("disabled", "disabled");
+        }
+    });
+
+    //初始化控件
+    function initControl() {
+        $("#HandleTr").hide();
+        $("#PLANTYPE").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "MAE_PlanType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "150px",
+            allowSearch: true
+        }).bind("change", function () {
+            if ($(this).attr("data-value") == "3") {
+                $("#HandleTr").show();
+            } else {
+                $("#HandleTr").hide();
+            }
+        });
+        $("#PlanTypeHandle").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "HandlePlanType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "150px",
+            allowSearch: true
+        })
+        //ComBoxForData("PLANTYPE", "MAE_PlanType")
+        //是否审核
+        $("#ISAUDIT").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "MAE_IsAudit" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "150px"
+        });
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../EmergencyPlatform/Reserverplan/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#PLANTYPE").ComboBoxSetValue(data.PLANTYPE);
+                    $("#PLANTYPE").trigger("change");
+                    $("#PlanTypeHandle").ComboBoxSetValue(data.PlanTypeHandleCode);
+                    $("#ISAUDIT").ComboBoxSetValue(data.ISAUDIT);
+                    $("#orgxztype").val(data.ORGXZTYPE);
+                    if (data.FILES != null)
+                        FILES = data.FILES;
+                    if (data.FILEPS != null)
+                        FILEPS = data.FILEPS;
+                }
+            })
+        }
+
+        ShowOrEdit(action, "uploader", FILES);
+        ShowOrEdit(action, "uploader1", FILEPS);
+    }
+
+    function setUserBZValue() {
+        selectUser({ deptId: "", checkMode: 0, mode: 0, winObject: document.body, domId: 'USERNAME_BZ,,USERID_BZ,DEPARTID_BZ,,DEPARTNAME_BZ' });
+    }
+    function setUserSHValue() {
+        selectUser({ deptId: "", checkMode: 0, mode: 0, winObject: document.body, domId: 'USERNAME_SH,,USERID_SH,DEPARTID_SH,,DEPARTNAME_SH' });
+    }
+    //保存表单;
+    function AcceptClick() {
+
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var USERNAME_BZ = $("#USERNAME_BZ").val();
+        if (USERNAME_BZ.length > 500) {
+            dialogMsg('编制人长度过长！', 0);
+            return;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["ISAUDIT"] = $("#ISAUDIT").attr('data-value');
+        postData["ISAUDITNAME"] = $("#ISAUDIT").attr('data-text');
+        postData["PLANTYPE"] = $("#PLANTYPE").attr('data-value');
+        postData["PLANTYPENAME"] = $("#PLANTYPE").attr('data-text');
+        postData["FILEPS"] = FILEPS;
+        postData["PlanTypeHandle"] = $("#PlanTypeHandle").attr('data-text');
+        postData["PlanTypeHandleCode"] = $("#PlanTypeHandle").attr('data-value');
+        postData["ORGXZTYPE"] = $("#orgxztype option:selected").val();
+        postData["ORGXZNAME"] = $("#orgxztype option:selected").text();
+        var Files = GetFile(FILES);
+        if (Files == "") {
+            dialogMsg('请上传应急预案附件！', 0);
+            return;
+        }
+        postData["FILES"] = Files;
+        $.SaveForm({
+            url: "../../EmergencyPlatform/Reserverplan/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    function xzry() {
+        //var userids = "";
+        selectUser({ deptId: '', userIds: 'USERID_BZ', checkMode: 1, mode: 0, winObject: window.document.body, domId: 'USERNAME_BZ,,USERID_BZ' });
+    }
+
+</script>
+<div style="margin-left: 10px; margin-right: 10px;">
+
+
+    <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;基础信息</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body" style="height:280px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle" style="width:100px;">应急预案名称<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="NAME" type="text" maxlength="15" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                        <td class="formTitle">应急预案类型<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="PLANTYPE" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                        </td>
+                    </tr>
+                    <tr id="HandleTr">
+                        <td class="formTitle">现场处置方案类型</td>
+                        <td class="formValue" colspan="3">
+                            <div id="PlanTypeHandle" type="select" class="ui-select"></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">是否评审<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="ISAUDIT" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                        </td>
+                        <td class="formTitle">编制人</td>
+                        <td class="formValue">
+                            <input id="USERID_BZ" type="hidden" class="form-control" />
+                            <input id="USERNAME_BZ" type="text" class="form-control" style="width:80%;float:left"  placeholder="多个人用(英文)逗号隔开" />
+                            <input type="button" class="btn btn-primary" onclick="xzry()" value="选 择" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">编制部门<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DEPARTID_BZ" type="hidden" class="form-control" />
+
+                            <input id="DEPARTNAME_BZ" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" onclick="selectDept('', 0, 0, '编制部门', document.body, 'DEPARTNAME_BZ,,DEPARTID_BZ')" readonly />
+                        </td>
+                        <td class="formTitle">编制时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DATATIME_BZ" value="@DateTime.Now.ToString("yyyy-MM-dd ")" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="formTitle">审核人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="USERNAME_SH" type="text" style="width:80%;float:left" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                            <input id="USERID_SH" type="hidden" class="form-control"/>
+                            <input type="button" class="btn btn-primary" onclick="setUserSHValue()" value="选 择" />
+                        </td>
+                        <td class="formTitle">审核部门<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ID" type="hidden" class="form-control" />
+                            <input id="DEPARTID_SH" type="hidden" class="form-control" />
+                            <input id="DEPARTNAME_SH" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" onclick="selectDept('', 0, 0, '审核部门', document.body, 'DEPARTNAME_SH,,DEPARTID_SH')"  readonly/>
+
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">审核时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DATATIME_SH" type="text" isvalid="yes" checkexpession="NotNull" value="@DateTime.Now.ToString("yyyy-MM-dd ")" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                        </td>
+
+                        <td class="formTitle">单位性质<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <select id="orgxztype" class=" show-menu-arrow form-control">
+                                <option value="1" selected>单位内部</option>
+                                <option value="2">外包单位</option>
+                            </select>
+                        </td>
+
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;应急预案附件</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table class="form">
+
+                    <tr>
+                        <td class="formTitle">应急预案附件<font face="宋体">*</font></td>
+                        <td class="formValue" colspan='3'>
+                            <div id="uploader" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                                <div class="queueList" style="height: 200px;">
+                                    <div id="dndArea" class="placeholder">
+                                        <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display: none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;应急预案评审附件</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">应急预案<br />评审附件</td>
+                        <td class="formValue" colspan='3'>
+                            <div id="uploader1" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                                <div class="queueList" style="height: 200px;">
+                                    <div id="dndArea1" class="placeholder">
+                                        <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display: none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+
+</div>

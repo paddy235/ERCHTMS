@@ -1,0 +1,152 @@
+﻿@{
+    ViewBag.Title = "Leave";
+    Layout = "~/Views/Shared/_Form.cshtml";
+    ERCHTMS.Busines.SystemManage.DataItemDetailBLL di = new ERCHTMS.Busines.SystemManage.DataItemDetailBLL();
+}
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script type="text/javascript">
+    var keyValue = request('keyValue');
+    var userId = request('userId');
+    var isEpiboly = request('isEpiboly');//是否外包
+    var deptid = request('deptid');
+    var apiUrl = "@di.GetItemValue("WebApiUrl", "AppSettings")";
+    var isGxhs = "@di.GetItemValue("广西华昇版本")";
+    var action = request('action');
+    $(function () {
+        initControl();
+        if (action == "show") {
+            $("#userselect").hide();
+            $("#UserName").css("width", "360px");
+            $("form,:input").attr('readonly', 'readonly');
+            $("#LeaveTime").attr('disabled', 'disabled');
+          
+        }
+    });
+
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (action == "show") {
+            $.SetForm({
+                url: "../../PersonManage/LeaveApprove/GetLeaveInfo",
+                param: { userid: keyValue },
+                success: function (data) {
+                    if (data != null && data.length>0) {
+                        var dt = eval(data);
+                        $("#UserId").val(dt[0].userid);
+                        $("#UserName").val(dt[0].username);
+                        $("#LeaveTime").val(dt[0].leavetime);
+                        $("#DepartureReason").val(dt[0].departurereason);
+                    }
+                }
+            })
+        } else {
+            if (!!keyValue) {
+                $.SetForm({
+                    url: "../../PersonManage/blacklist/GetFormJson",
+                    param: { keyValue: keyValue },
+                    success: function (data) {
+                        $("#form1").formDeserialize(data);
+                        var users = $.currentIframe().window.$('#gridTable').jqGridRowValue('realname');
+                        users = users.replace('<div class="blacklist" title="黑名单用户">', "");
+                        $("#UserName").val(users.replace('</div>', ''));
+                        $("#UserId").val($.currentIframe().window.$('#gridTable').jqGridRowValue('userid'));
+                    }
+                })
+            } else {
+                $("#UserId").val(userId);
+                var data = $.currentIframe().window.$("#gridTable");
+                if (data.jqGridRowValue("userid").length > 0) {
+                    $("#UserId").val(data.jqGridRowValue("userid"));
+                    $("#UserName").val(data.jqGridRowValue("username"));
+                }
+            }
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if (isEpiboly == "0") {
+            dialogConfirm("确认离厂吗？", function (isSure) {
+                if (isSure) {
+                    $.SaveForm({
+            url: "../../PersonManage/Person/Leave?leaveTime=" + $("#LeaveTime").val(),
+            param: { userId: $("#UserId").val(), DepartureReason: $("#DepartureReason").val() },
+            loading: "正在处理...",
+            success: function (data) {
+                if (isGxhs.length > 0) {
+                    $.post(apiUrl + "/synctrain/DeleteUsers", { userIds: $("#UserId").val() }, function (data) {
+                        console.log(data.message);
+                    });
+                }
+                $.currentIframe().window.$("#gridTable").trigger("reloadGrid");
+            }
+        })
+                }
+            });
+        } else {
+            //外包人员离场
+            var postData = {};
+            postData["LeaveTime"] = $("#LeaveTime").val();
+            postData["LeaveReason"] = $("#DepartureReason").val();
+            postData["LeaveUserIds"] = $("#UserId").val();
+            postData["LeaveUserNames"] = $("#UserName").val();
+            postData["LeaveDeptId"] = deptid;
+
+            dialogConfirm("确认提交？", function (isSure) {
+                if (isSure) {
+                    $.SaveForm({
+                        url: "../../PersonManage/LeaveApprove/Leave",
+                        param: postData,
+                        loading: "正在处理...",
+                        success: function (data) {
+                            if (data == false) {
+                                $.post("../../PersonManage/Person/Leave?leaveTime=" + $("#LeaveTime").val(), { userId: $("#UserId").val(), DepartureReason: $("#DepartureReason").val() }, function (data) {
+                                    if (isGxhs.length > 0) {
+                                        $.post(apiUrl + "/synctrain/DeleteUsers", { userIds: $("#UserId").val() }, function (data) {
+                                            
+                                        });
+                                    }
+                                })
+                            } else {
+                                top.refreshWork();//刷新首页待办事项
+                            }
+                            $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                            dialogMsg("操作成功！", 1);
+                        }
+                    })
+                }
+
+            });
+        }
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 10px;">
+    <div class="row">
+        <div class="col-sm-4 control-label">离厂人员<font face="宋体" style="color:red;">*</font>：</div>
+        <div class="col-sm-8" id="form1">
+            <div class="input-group">
+                <textarea id="UserName" class="form-control" isvalid="yes" checkexpession="NotNull" rows="2" readonly="readonly"></textarea>
+                <input type="hidden" id="UserId" />
+                <span id="userselect" class="input-group-addon" onclick="NoTransferselectUser({ deptId: '', deptCode: '', checkMode: 1, mode: 2, winObject: this.parentNode, domId: 'UserName,UserId' })" title="选择用户">...</span>
+            </div>
+
+        </div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+        <div class="col-sm-4 control-label">离厂时间<font face="宋体" style="color:red;">*</font>：</div>
+        <div class="col-sm-8" id="form1">
+            <input id="LeaveTime" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" />
+
+        </div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+        <div class="col-sm-4 control-label">离厂原因：</div>
+        <div class="col-sm-8" id="form1">
+            <input id="DepartureReason" type="text" class="form-control" maxlength="200" />
+
+        </div>
+    </div>
+</div>

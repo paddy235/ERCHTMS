@@ -1,0 +1,2356 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>  
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var orgcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var organizeid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    var keyValue = request('keyValue');
+    var actiontype = request("actiontype");
+    //证书附件ID
+    var CertificateID = request("CertificateID");
+    //检查记录附件ID
+    var CheckFileID = request("CheckFileID");
+    //检查验收附件
+    var Acceptance = request("Acceptance");
+    //创建用户机构ID 仅省级页面会用到
+    var CreateuserOrgid = request("CreateuserOrgid");
+
+    var isClick = 0;
+    var isClick1 = 0;
+    var isClick2 = 0;//设备人员显示
+    var eqType = "";//初始化时设备类型
+    $(function () {
+        if (roleNames.indexOf("承包商") >= 0) {
+            //不可更改字段
+            $("#DistrictId").attr("readonly", "readonly");
+            //$("#EquipmentName").attr("readonly", "readonly");
+            $("#Affiliation").attr("readonly", "readonly");
+            $("#EquipmentType").attr("readonly", "readonly");
+            $("#EPIBOLYDEPTID").attr("readonly", "readonly");
+            $("#EPIBOLYPROJECTID").attr("readonly", "readonly");
+            $("#Specifications").attr("readonly", "readonly");
+            $("#IsCheck").attr("readonly", "readonly");
+            $("#CertificateNo").attr("readonly", "readonly");
+
+        }
+        //默认隐藏
+        $(".form:eq(0) tr:eq(5)").css("display", "none");
+        $(".form:eq(0) tr:eq(5) td").each(function (index, ele) {
+            $(this).css("display", "none");
+        });
+        $("#EPIBOLYDEPTID").removeAttr("isvalid");
+        $("#EPIBOLYPROJECTID").removeAttr("isvalid");
+        initControl();
+        GetGrid();
+        GetMaintainingRecord();
+        GetoperationFailure();
+        GetBulletin();
+        Gethiddenbase();
+        //GetOperUserTable();
+        GetGridTechnology();
+        GetGridExamine();
+    });
+    //初始化控件
+    function initControl() {
+
+        if (actiontype == "view") {
+            $("input").attr("readonly", "readonly");
+            $("#DistrictId").attr("readonly", "readonly");
+            $("#Affiliation").attr("readonly", "readonly");
+            $("#EPIBOLYDEPTID").attr("readonly", "readonly");
+            $("#EPIBOLYPROJECTID").attr("readonly", "readonly");
+            $("#EquipmentName").removeAttr("readonly");
+            $("#addHid").css("display", "none");
+            $("#addTechnology").css("display", "none");
+            $("#addExamine").css("display", "none");
+        }
+        var orgID = "";
+        if (roleNames.includes("省级用户")) {
+            orgID = CreateuserOrgid;
+        }
+        else {
+            orgID = top.currUserOrgId;
+        }
+        //区域
+        $("#DistrictId").ComboBoxTree({
+            url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + orgID,
+            height: "300px",
+            description: "==请选择=="
+        }).bind("change", function () {
+            var areaId = $("#DistrictId").attr("data-value");
+            bangEqName(areaId, "");
+        });
+        //外包单位
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 89
+            }
+        );
+        $("#EPIBOLYDEPTID").ComboBoxTree({
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            description: "请选择",
+            height: "150px"
+        });
+        $("#EPIBOLYDEPTID").ComboBoxTreeSetValue(organizeid);
+        if ($("#EPIBOLYDEPTID").attr('data-deptnature') == "承包商") {
+            $("#Affiliation").val(2);
+        } else {
+            $("#Affiliation").val(1);
+        }
+        //$("#EPIBOLYDEPTID").ComboBox({
+        //    url: "../../BaseManage/Department/GetOutProjectByAll",
+        //    id: "DepartmentId",
+        //    text: "FullName",
+        //    description: "==请选择==",
+        //    height: "200px"
+        //});
+        $("#EPIBOLYDEPTID").bind("change", function () {
+            var sel = $(this).attr('data-value');
+            if (!!sel) {
+                if (sel.indexOf("_") >= 0) {
+                    $("#EPIBOLYDEPTID").html("");
+                    $("#EPIBOLYDEPTID").ComboBoxTree({
+                        url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+                        description: "请选择",
+                        height: "150px"
+                    });
+                    dialogMsg('该节点不允许选择！', 0);
+                    return false;
+                }
+                $("#EmployDeptId").ComboBoxTreeSetValue(sel);
+                if ($("#EPIBOLYDEPTID").attr('data-deptnature') == "承包商") {
+                    $("#Affiliation").val(2);
+                } else {
+                    $("#Affiliation").val(1);
+                }
+                //外包工程
+                $("#EPIBOLYPROJECTID").html("");
+                $("#EPIBOLYPROJECTID").ComboBox({
+                    url: "../../OutsourcingProject/Outsouringengineer/GetEngineerDataByWBId?deptId=" + sel,
+                    id: "engineerid",
+                    text: "engineername",
+                    description: "==请选择==",
+                    height: "150px"
+                })
+            } else {
+                $("#EPIBOLYPROJECTID").html("");
+                $("#EPIBOLYPROJECTID").ComboBox({
+                    description: "==请选择=="
+                })
+                //$("#EPIBOLYPROJECT").ComboBoxSetValue("");
+                //$("#EPIBOLYPROJECT").attr("data-text", "==请选择==");
+            }
+        });
+        $("#EmployDeptId").ComboBoxTree({
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            description: "请选择",
+            height: "150px"
+        }).bind("change", function () {
+            var sel = $(this).attr('data-value');
+            if (!!sel) {
+                if (sel.indexOf("_") >= 0) {
+                    $("#EmployDeptId").html("");
+                    $("#EmployDeptId").ComboBoxTree({
+                        url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+                        description: "请选择",
+                        height: "150px"
+                    });
+                    return false;
+                }
+            }
+        });
+        $("#EmployDeptId").ComboBoxTreeSetValue(organizeid);
+
+        $("#RelWord").bind("blur", function () {
+            $("#gridTableHiddStd").jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ equipmentname: $(this).val(), orgcode: orgcode }) }, page: 1
+            }).trigger('reloadGrid');
+        })
+
+        //$("#Affiliation").ComboBox({
+        //    url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+        //    param: { EnCode: "AFFILIATION" },
+        //    id: "ItemValue",
+        //    text: "ItemName",
+        //    description: "==请选择==",
+        //    height: "200px"
+        //});
+        $("#EquipmentType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "EQUIPMENTTYPE" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        }).bind("change", function () {
+            var sel = $(this).attr('data-value');
+            if (!!sel) {
+                $("#EquipmentKind").html("");
+                $("#EquipmentKind").ComboBox({
+                    description: "==请选择=="
+                })
+                $("#EquipmentBreed").html("");
+                $("#EquipmentBreed").ComboBox({
+                    description: "==请选择=="
+                })
+                //设备类别
+                $("#EquipmentKind").ComboBox({
+                    url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+                    param: { EnCode: "EquipmentKind", Remark: sel },
+                    id: "ItemValue",
+                    text: "ItemName",
+                    description: "==请选择==",
+                    height: "200px"
+                }).bind("change", function () {
+                    var sel1 = $(this).attr('data-value');
+                    if (!!sel1) {
+                        $("#EquipmentBreed").html("");
+                        $("#EquipmentBreed").ComboBox({
+                            description: "==请选择=="
+                        })
+                        //设备品种
+                        $("#EquipmentBreed").ComboBox({
+                            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+                            param: { EnCode: "EquipmentBreed", Remark: sel1 },
+                            id: "ItemValue",
+                            text: "ItemName",
+                            description: "==请选择==",
+                            height: "200px"
+                        })
+                    } else {
+                        $("#EquipmentBreed").html("");
+                        $("#EquipmentBreed").ComboBox({
+                            description: "==请选择=="
+                        })
+                    }
+                });
+            } else {
+                $("#EquipmentKind").html("");
+                $("#EquipmentKind").ComboBox({
+                    description: "==请选择=="
+                })
+                $("#EquipmentBreed").html("");
+                $("#EquipmentBreed").ComboBox({
+                    description: "==请选择=="
+                })
+            }
+            });
+        $("#EquipmentKind").ComboBox({
+            description: "==请选择==",
+        });
+        $("#EquipmentBreed").ComboBox({
+            description: "==请选择==",
+        });
+        $("#State").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "EQUIPMENTSTATE" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        }).bind("change", function () {
+            State = $(this).attr('data-text');
+            if (State == "离厂") {
+                $("#Departure").show();
+                $("#DepartureTime").attr("isvalid", "yes");
+                $("#DepartureTime").val('@DateTime.Now.ToString("yyyy-MM-dd")');
+            }
+            else {
+                $("#Departure").hide();
+                $("#DepartureTime").removeAttr("isvalid");
+            }
+        });
+        $("#IsCheck").ComboBox({
+            description: "==请选择==",
+        });
+        keyValue = keyValue.length == 0 ? newGuid() : keyValue;
+        //证书附件ID
+        CertificateID = CertificateID.length == 0 ? newGuid() : CertificateID;
+        $("#CertificateID").val(CertificateID);
+
+        //检查验收附件ID
+        if (Acceptance == null || Acceptance == "null") {
+            Acceptance = newGuid();
+        } else {
+            Acceptance = Acceptance.length == 0 ? newGuid() : Acceptance;
+        }
+        $("#Acceptance").val(Acceptance);
+        //证书附件
+        file_upload.init({
+            keyValue: CertificateID, fileNumLimit: 1, extensions: 'jpg,gif,bmp,png,pdf', isImage: false, el: '#uploader'
+        });
+        $("#AcceptState").ComboBox({
+            description: "==请选择=="
+        });
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../EquipmentManage/SpecialEquipment/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    if (data != null) {
+                        var EquipmentName = data.EquipmentName;
+                        data.EquipmentName = EquipmentName.replace(/\s/g, "");
+                    }
+                    $("#form1").formDeserialize(data);
+                    if (data != null) {
+                        bangEqName(data.DistrictId, data.EquipmentName);
+                        eqType = data.Affiliation;
+                        if (eqType == "2") {
+                            $(".form:eq(0) tr:eq(5)").removeAttr("style");
+                            $(".form:eq(0) tr:eq(5) td").each(function (index, ele) {
+                                $(this).removeAttr("style");
+                            });
+                            $("#EPIBOLYDEPTID").attr("isvalid", "yes");
+                            $("#EPIBOLYPROJECTID").attr("isvalid", "no");
+                        }
+                        $("#EPIBOLYDEPTID").ComboBoxSetValue(data.EPIBOLYDEPTID);
+                        $("#EPIBOLYDEPT").val(data.EPIBOLYDEPT);
+                        if (actiontype == "view") {
+                            var text = $("#EPIBOLYDEPTID").attr("data-text");
+                            if (text == null || text == "" || text == "undefined" || text == "null") {
+                                $("#EPIBOLYDEPTID div:eq(0)").text(data.EPIBOLYDEPT);
+                            }
+                        }
+                        //外包工程
+                        $("#EPIBOLYPROJECTID").ComboBox({
+                            url: "../../OutsourcingProject/Outsouringengineer/GetEngineerDataByWBId?deptId=" + data.EPIBOLYDEPTID,
+                            id: "engineerid",
+                            text: "engineername",
+                            description: "==请选择==",
+                            height: "150px"
+                        })
+                        if (data.EPIBOLYPROJECTID != null) {
+                            $("#EPIBOLYPROJECTID").ComboBoxSetValue(data.EPIBOLYPROJECTID);
+                            $("#EPIBOLYPROJECT").val(data.EPIBOLYPROJECT);
+                        }
+                        //if (data.EPIBOLYPROJECTID != "" && ($("#EPIBOLYPROJECTID").attr("data-text") == "" || $("#EPIBOLYPROJECTID").attr("data-text") == undefined)) {
+                        //    $("#EPIBOLYPROJECTID").attr("data-text", data.EPIBOLYPROJECT);
+                        //    $("#EPIBOLYPROJECTID").attr("data-value", data.EPIBOLYPROJECTID);
+                        //    $("#EPIBOLYPROJECTID div:eq(0)").text(data.EPIBOLYPROJECT);
+                        //}
+
+
+                        $("#EquipmentKind").ComboBox({
+                            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+                            param: { EnCode: "EquipmentKind", Remark: data.EquipmentType },
+                            id: "ItemValue",
+                            text: "ItemName",
+                            description: "==请选择==",
+                            height: "200px"
+                        });
+                        $("#EquipmentKind").ComboBoxSetValue(data.EquipmentKind);
+
+                        $("#EquipmentBreed").ComboBox({
+                            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+                            param: { EnCode: "EquipmentBreed", Remark: data.EquipmentKind },
+                            id: "ItemValue",
+                            text: "ItemName",
+                            description: "==请选择==",
+                            height: "200px"
+                        });
+                        $("#EquipmentBreed").ComboBoxSetValue(data.EquipmentBreed);
+
+                        if (data.Acceptance == "" || data.Acceptance == "null" || data.Acceptance == null) {
+                            $("#Acceptance").val(Acceptance);
+                        } else {
+                            Acceptance = data.Acceptance;
+                        }
+                        if (!!data.RelWord) {
+                            GetRiskAssessGrid(data.RelWord);
+                            GetHidStdGrid(data.RelWord);
+                        }
+
+                        if (data.ControlMajor != null && data.ControlMajor != undefined) {
+                            $("#ControlMajor").val(data.ControlMajor);
+                            $("#ControlMajor").find("option").each(function (i, dom) {
+                                data.ControlMajor = "," + data.ControlMajor + ",";
+                                if (data.ControlMajor.indexOf("," + dom.value + ",") >= 0 && dom.value.length > 0) {
+                                    $(dom).attr("selected", "selected");
+                                }
+                            });
+                        }
+
+                        GetHiddBaseGrid(data.Id);
+
+                    }
+                }
+            })
+        }
+
+        $("#State").trigger("change");
+        //检查记录附件ID
+        CheckFileID = $("#CheckFileID").val().length == 0 ? newGuid() : $("#CheckFileID").val();
+        $("#CheckFileID").val(CheckFileID);
+        file_upload.init({
+            keyValue: Acceptance, fileNumLimit: 1, extensions: '', isImage: false, el: '#uploader9'
+        });
+        //绑定证书附件
+        var isDel = actiontype == "view" ? false : true;
+        file_upload.bindFiles(isDel, false, CertificateID, "uploader", isDel);
+        file_upload.bindFiles(isDel, false, Acceptance, "uploader9", isDel);
+        $("#tab2").click(function () {
+            if (isClick == 0) {
+                //设备相关文档附件
+                file_upload.init({
+                    keyValue: keyValue, extensions: 'doc,docx,xls,xlsx,zip,jpg,gif,bmp,png,pdf', isImage: false, el: '#uploader2'
+                });
+                //设备检验记录附件
+                file_upload.init({
+                    keyValue: CheckFileID, extensions: 'doc,docx,xls,xlsx,zip,jpg,gif,bmp,png,pdf', isImage: false, el: '#CheckRecord'
+                });
+                //绑定设备档案安全技术附件
+                file_upload.bindFiles(isDel, false, keyValue, "uploader2", isDel);
+                //绑定检查记录附件
+                file_upload.bindFiles(isDel, false, CheckFileID, "CheckRecord", isDel);
+                isClick = 1;
+            }
+
+        });
+        //特种设备人员
+        $("#tab3").click(function () {
+            if (isClick2 == 0) {
+                isClick2 = 1;
+                GetOperUserTable();
+            } else {
+                var $gridTable = $('#OperUserTable');
+                var UserIds = $("#SecurityManagerUserID").val();
+                UserIds += "," + $("#OperUserID").val();
+                var queryJson = {
+                    UserIds: UserIds
+                };
+                $gridTable.jqGrid('setGridParam', {
+                    postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+                }).trigger('reloadGrid');
+            }
+
+        });
+    }
+    function loadFrom() {
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../EquipmentManage/SpecialEquipment/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    if (data != null) {
+                        $('#CheckDate').val(data.CheckDate);
+                        $('#CheckDateCycle').val(data.CheckDateCycle);
+                        $('#NextCheckDate').val(data.NextCheckDate);
+                        $('#ExamineUnit').val(data.ExamineUnit);
+                    }
+                }
+            })
+        }
+    }
+    //加载关联风险辨识评估信息
+    function GetRiskAssessGrid(equipmentname) {
+        var selectedRowIndex = 0;
+        var queryJson = { orgcode: orgcode, equipmentname: equipmentname };
+        var $gridTable = $('#gridTableAssess');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 'auto',
+            loadui: 'block',
+            url: "../../RiskDatabase/RiskAssess/GetAssessPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '危险源及危害因素', name: 'riskdesc', index: 'riskdesc', width: 890, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return rowObject.dangersource + rowObject.riskdesc;
+                    }
+                },
+                {
+                    label: '操作', name: 'oper', width: 120, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:ShowRiskAssessInfo('" + rowObject.id + "')  style='text-decoration:underline;color:blue;'  title='查看风险辨识评估信息'>查看</a>";
+                        return html;
+                    }
+                }],
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5, 50],
+            pager: "gridPagerAssess",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //查看风险辨识评估信息
+    function ShowRiskAssessInfo(id) {
+        var url = '/RiskDatabase/RiskAssess/Show?keyValue=' + id;
+        var idx = dialogOpen({
+            id: 'RiskAssessInfo',
+            title: '风险辨识评估信息',
+            url: url,
+            btns: 1,
+            btn: ["关闭"],
+            width: ($(top.window).width() - 250) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //加载关联隐患排查标准
+    function GetHidStdGrid(equipmentname) {
+        var selectedRowIndex = 0;
+        var queryJson = { equipmentname: equipmentname, orgcode: orgcode };
+        var $gridTable = $('#gridTableHiddStd');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 'auto',
+            loadui: 'block',
+            url: "../../EquipmentManage/Equipment/GetHidStdJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                { label: '事故隐患描述(简题)', name: 'hiddesc', hidden: true },
+                { label: '整改措施', name: 'hidmeasure', hidden: true },
+                {
+                    label: '排查标准', name: 'stdname', index: 'stdname', width: 890, align: 'center', sortable: true
+                },
+            ],
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5, 50],
+            pager: "gridPagerHiddStd",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //登记隐患
+    function btn_add() {
+        var grid = $('#gridTableHiddStd');
+        var deviceName = encodeURIComponent($("#EquipmentName").val());
+        var deviceNo = $("#EquipmentNo").val();
+        var hidStdId = grid.jqGridRowValue('id');
+        //if (!hidStdId)
+        //    dialogAlert("请选择排查标准！", 2);
+        //else {
+        var hidDesc = encodeURIComponent(grid.jqGridRowValue('hiddesc'));
+        var hidMeasure = encodeURIComponent(grid.jqGridRowValue("hidmeasure"));
+        var districtid = $("#DistrictId").attr("data-code");
+        var districname = encodeURIComponent($("#DistrictId").attr("data-text"));
+        var url = "/HiddenTroubleManage/HTBaseInfo/Form?SAFETYCHECKOBJECTID=&SAFETYCHECKTYPE=&deviceid=" + keyValue + "&devicecode=" + deviceNo + "&devicename=" + deviceName + "&hiddescribe=" + hidDesc + "&changemeasure=" + hidMeasure + "&districtid=" + districtid + "&districname=" + districname;
+        var idx = dialogOpen({
+            id: 'HidForm',
+            title: '新增隐患',
+            url: url,
+            width: ($(top.window).width() - 150) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null
+        });
+        //}
+    }
+    function ReloadHiddBaseGrid() {
+        $('#gridTableHiddBase').trigger("reloadGrid");
+    }
+    //加载关联隐患记录
+    function GetHiddBaseGrid(deviceId) {
+        var queryJson = {
+            DeviceId: deviceId
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTableHiddBase');
+        $gridTable.jqGrid({
+            height: 'auto',
+            autowidth: true,
+            loadui: 'block',
+            postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../HiddenTroubleManage/HTBaseInfo/GetListJson",
+            datatype: "json",
+            colModel: [
+                { label: '隐患编码', name: 'hidcode', index: 'hidcode', width: 150, align: 'center', sortable: true },
+                { label: '隐患级别', name: 'hidrankname', index: 'hidrankname', width: 150, align: 'center', sortable: true },
+                {
+                    label: '检查日期', name: 'checkdate', index: 'checkdate', width: 150, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '排查单位', name: 'checkdepartname', index: 'checkdepartname', width: 200, align: 'center', sortable: true },
+                { label: '事故隐患简题', name: 'hiddescribe', index: 'hiddescribe', width: 260, align: 'center', sortable: false },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:ShowHiddBaseInfo('" + rowObject.id + "')  style='text-decoration:underline;color:blue;'  title='查看普通设备关联的隐患记录'>查看</a>";
+                        return html;
+                    }
+                }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5, 50],
+            pager: "gridPagerHiddBase",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //查看普通设备关联的隐患记录
+    function ShowHiddBaseInfo(id) {
+        var url = '/HiddenTroubleManage/HTBaseInfo/Form?keyValue=' + id + '&actiontype=view';
+        var idx = dialogOpen({
+            id: 'HTWindow',
+            title: '隐患登记信息',
+            url: url,
+            btns: 1,
+            btn: ["关闭"],
+            width: ($(top.window).width() - 250) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //加载日常使用状况记录
+    function GetGrid() {
+        var queryJson = {
+            equipmentid: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable1');
+        $gridTable.jqGrid({
+            height: 200,
+            width: ($(top.window).width() - 170),
+            //autowidth: true,
+            loadui: 'block',
+            url: "../../EquipmentManage/DailyUseRecord/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        var html = "<a href=javascript:show('" + rowObject.id + "','0')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (roleNames.indexOf("承包商") >= 0 || roleNames.indexOf("班组") >= 0) {
+
+                        } else {
+                            if (actiontype == "view") {
+
+                            } else {
+                                html += "<a href=javascript:btn_edit('" + rowObject.id + "','0')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                                html += "<a href=javascript:btn_delete('" + rowObject.id + "','0')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                            }
+                        }
+
+                        return html;
+                    }
+                },
+                //{ label: '登记人员', name: 'registeruser', index: 'registeruser', width: 80, align: 'center', sortable: true },
+                //{
+                //    label: '登记时间', name: 'registerdate', index: 'registerdate', width: 90, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                //        return formatDate(cellvalue, 'yyyy-MM-dd');
+                //    }
+                //},
+                { label: '运行是否正常', name: 'isnormal', index: 'isnormal', width: 100, align: 'center', sortable: true, },
+                {
+                    label: '异常情况描述', name: 'abnormalsituation', index: 'abnormalsituation', width: 300, align: 'center', sortable: true
+                },
+                {
+                    label: '异常处理措施', name: 'treatmentmeasures', index: 'treatmentmeasures', width: 300, align: 'center', sortable: true
+                },
+                {
+                    label: '处理结果', name: 'processresult', index: 'processresult', width: 300, align: 'center', sortable: true
+                }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5],
+            pager: "#gridPager",
+            sortname: 'registerdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+    }
+
+    //编辑
+    function btn_edit(obj, type) {
+        var keyValue = obj;
+        var title = "编辑日常使用状况记录";
+        var url = "/EquipmentManage/DailyUseRecord/Form?keyValue=";
+        if (type == "1") {
+            title = "编辑维护保养记录";
+            url = "/EquipmentManage/MaintainingRecord/Form?keyValue=";
+        } else if (type == "2") {
+            title = "编辑运行故障记录";
+            url = "/EquipmentManage/OperationFailure/Form?keyValue=";
+        }
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form1',
+                title: title,
+                url: url + keyValue,
+                width: "660px",
+                height: ($(top.window).height() - 150) + "px",
+                callBack: function (iframeId) {
+                    top.Form1.window.AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_delete(obj, type) {
+        var keyValue = obj;
+        var url = "../../EquipmentManage/DailyUseRecord/RemoveForm";
+        if (type == "1") {
+            url = "../../EquipmentManage/MaintainingRecord/RemoveForm";
+        } else if (type == "2") {
+            url = "../../EquipmentManage/OperationFailure/RemoveForm";
+        }
+        if (keyValue) {
+            $.RemoveForm({
+                url: url,
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    if (type == "0") {
+                        $('#gridTable1').trigger('reloadGrid');
+                    } else if (type == "1") {
+                        $('#MaintainingRecord').trigger('reloadGrid');
+                    } else {
+                        $('#operationFailure').trigger('reloadGrid');
+                    }
+
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的特种设备基本信息表！', 0);
+        }
+    }
+    //查看
+    function show(id, type, bulletinid) {
+        var w = "660px";
+        var h = ($(top.window).height() - 150) + "px";
+        var keyValue = id;
+        var title = "查看日常使用状况记录";
+        var url = "/EquipmentManage/DailyUseRecord/Form?action=show&actiontype=view&keyValue=";
+        if (type == "1") {
+            title = "查看维护保养记录";
+            url = "/EquipmentManage/MaintainingRecord/Form?action=show&actiontype=view&keyValue=";
+        } else if (type == "2") {
+            title = "查看运行故障记录";
+            url = "/EquipmentManage/OperationFailure/Form?action=show&actiontype=view&keyValue=";
+        } else if (type == "3") {
+            title = "查看事故记录";
+            url = "/AccidentEvent/Bulletin_deal/Form?action=show&actiontype=view&keyValue=" + bulletinid + "&keyValuedeal=";
+            w = "1200px";
+            h = "900px";
+        }
+
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form1",
+                title: title,
+                url: url + keyValue,
+                width: w,
+                height: h,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //查看隐患视图
+    function viewdata(obj, atype, workstream) {
+        var rqUrl = "";
+        var title = "";
+
+        //未整改隐患的查看页面
+        if (workstream == "隐患登记") {
+            if (atype == "0") {
+                title = "查看隐患";
+                rqUrl = '/HiddenTroubleManage/HTBaseInfo/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else  //已整改的查看页面
+            {
+                title = "已整改隐患查看";
+                rqUrl = '/HiddenTroubleManage/HTBaseInfo/NewForm?keyValue=' + obj + '&actiontype=view';
+            }
+        }
+        else if (workstream == "隐患评估") {
+            title = "查看隐患";
+            rqUrl = '/HiddenTroubleManage/HTApproval/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "隐患整改") {
+            title = "查看隐患";
+            rqUrl = '/HiddenTroubleManage/HTChangeInfo/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "隐患验收") {
+            title = "查看隐患";
+            rqUrl = '/HiddenTroubleManage/HTAcceptInfo/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (workstream == "整改效果评估" || workstream == "整改结束") {
+            title = "查看隐患";
+            rqUrl = '/HiddenTroubleManage/HTEstimate/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else {
+            title = "查看违章";
+            rqUrl = '/HiddenTroubleManage/HTBaseInfo/Form?keyValue=' + obj + '&actiontype=view';
+        }
+
+        dialogOpen({
+            id: 'HidForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //加载维护保养记录
+    function GetMaintainingRecord() {
+        var queryJson = {
+            equipmentid: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#MaintainingRecord');
+        $gridTable.jqGrid({
+            height: 200,
+            width: ($(top.window).width() - 170),
+            //autowidth: true,
+            loadui: 'block',
+            postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../EquipmentManage/MaintainingRecord/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        var html = "<a href=javascript:show('" + rowObject.id + "','1')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (roleNames.indexOf("承包商") >= 0 || roleNames.indexOf("班组") >= 0) {
+
+                        } else {
+                            if (actiontype == "view") {
+
+                            } else {
+                                html += "<a href=javascript:btn_edit('" + rowObject.id + "','1')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                                html += "<a href=javascript:btn_delete('" + rowObject.id + "','1')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                            }
+                        }
+
+                        return html;
+                    }
+                }, {
+                    label: '维护保养名称', name: 'recordname', index: 'recordname', width: 190, align: 'center', sortable: true
+                },
+                {
+                    label: '维护保养时间', name: 'maintainingdate', index: 'maintainingdate', width: 100, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                //{ label: '维护保养人员', name: 'maintaininguser', index: 'maintaininguser', width: 100, align: 'center', sortable: true },
+                { label: '维护保养单位', name: 'maintainingdept', index: 'maintainingdept', width: 180, align: 'center', sortable: true },
+                {
+                    label: '维护保养项目(内容)和方法', name: 'maintainingcontent', index: 'maintainingcontent', width: 230, align: 'center', sortable: true
+                },
+                {
+                    label: '保养结果', name: 'maintainingresult', index: 'maintainingresult', width: 200, align: 'center', sortable: true
+
+                },
+                //{
+                //    label: '结果验证', name: 'resultproving', index: 'resultproving', width: 160, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                //        if (cellvalue.length > 10) {
+                //            return cellvalue.substring(0, 10);
+                //        } else {
+                //            return cellvalue;
+                //        }
+                //    }
+                //},
+                {
+                    label: '附件', name: 'file', width: 100, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:GetFile('" + rowObject.id + "','0')  style='text-decoration:underline;color:blue;' >查看</a>";
+                        return html;
+                    }
+                }
+                //{ label: '登记人员', name: 'registeruser', index: 'registeruser', width: 80, align: 'center', sortable: true },
+                //{
+                //    label: '登记时间', name: 'registerdate', index: 'registerdate', width: 80, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                //        return formatDate(cellvalue, 'yyyy-MM-dd');
+                //    }
+                //}
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5],
+            pager: "#MaintainingRecordPager",
+            sortname: 'registerdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+    }
+
+    //加载运行故障记录
+    function GetoperationFailure() {
+        var queryJson = {
+            equipmentid: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#operationFailure');
+        $gridTable.jqGrid({
+            height: 200,
+            width: ($(top.window).width() - 170),
+            //autowidth: true,
+            loadui: 'block',
+            postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../EquipmentManage/OperationFailure/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        var html = "<a href=javascript:show('" + rowObject.id + "','2')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (roleNames.indexOf("承包商") >= 0 || roleNames.indexOf("班组") >= 0) {
+
+                        } else {
+                            if (actiontype == "view") {
+
+                            } else {
+                                html += "<a href=javascript:btn_edit('" + rowObject.id + "','2')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                                html += "<a href=javascript:btn_delete('" + rowObject.id + "','2')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                            }
+                        }
+
+                        return html;
+                    }
+                }, {
+                    label: '运行故障名称', name: 'recordname', index: 'recordname', width: 130, align: 'center', sortable: true
+                },
+                //{ label: '登记人员', name: 'registeruser', index: 'registeruser', width: 80, align: 'center', sortable: true },
+                //{
+                //    label: '登记时间', name: 'registerdate', index: 'registerdate', width: 80, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                //        return formatDate(cellvalue, 'yyyy-MM-dd');
+                //    }
+                //},
+                {
+                    label: '故障性质及经过', name: 'failurenature', index: 'failurenature', width: 270, align: 'center', sortable: true
+                },
+                {
+                    label: '故障原因', name: 'failurereason', index: 'failurereason', width: 200, align: 'center', sortable: true
+                },
+                {
+                    label: '采取的措施', name: 'takesteps', index: 'takesteps', width: 260, align: 'center', sortable: true
+                },
+                {
+                    label: '处理结果', name: 'handleresult', index: 'handleresult', width: 140, align: 'center', sortable: true
+                }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5],
+            pager: "#operationFailurePager",
+            sortname: 'registerdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //加载事故记录
+    function GetBulletin() {
+        var queryJson = {
+            equipmentid: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#Bulletin');
+        $gridTable.jqGrid({
+            height: 200,
+            width: ($(top.window).width() - 170),
+            //autowidth: true,
+            loadui: 'block',
+            postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../EquipmentManage/OperationFailure/GetBulletinPageListJson",
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 60, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "','3','" + rowObject.bulletinid + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        return html;
+                    }
+                },
+
+                {
+                    label: '事故名称', name: 'sgname_deal', index: 'sgname_deal', width: 180, align: 'center', sortable: true
+                },
+                {
+                    label: '事故时间', name: 'happentime_deal', index: 'happentime_deal', width: 180, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:ss:mm');
+                    }
+                },
+                {
+                    label: '事故等级', name: 'sglevelname_deal', index: 'sglevelname_deal', width: 280, align: 'center', sortable: true
+                },
+                {
+                    label: '简要经过', name: 'jyjg', index: 'jyjg', width: 250, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue.length > 10) {
+                            return cellvalue.substring(0, 10);
+                        } else {
+                            return cellvalue;
+                        }
+                    }
+                },
+            {
+                label: '调查报告', name: 'file', width: 150, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                    var html = "<a href=javascript:GetFile('" + rowObject.dcbgfiles + "','1')  style='text-decoration:underline;color:blue;' >查看</a>";
+                    return html;
+                }
+            }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5],
+            pager: "#BulletinPager",
+            sortname: 't.happentime_deal',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //加载关联隐患记录
+    function Gethiddenbase() {
+        var queryJson = {
+            equipmentid: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#hiddenbase');
+        $gridTable.jqGrid({
+            height: 200,
+            width: ($(top.window).width() - 170),
+            //autowidth: true,
+            loadui: 'block',
+            postData: { keyValue: keyValue },
+            url: "../../SaftyCheck/SaftyCheckDataRecord/GetPageListJsonByTz",
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '检查时间', name: 'checkendtime', index: 'checkendtime', width: 200, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                }, {
+                    label: '检查名称', name: 'checkdatarecordname', index: 'checkdatarecordname', width: 330, align: 'center', sortable: true
+                },
+            {
+                label: '检查人员', name: 'checkman', index: 'checkman', width: 260, align: 'center', sortable: true,
+                formatter: function (cellvalue, options, rowObject) {
+                    var val = cellvalue == null ? "" : cellvalue;
+                    if (!!val) {
+                        var list = val.split(',');
+                        var nval = "";
+                        $.each(list, function (i, val) {
+                            if (nval.indexOf(val) < 0)
+                                nval += val + ",";
+                        })
+                        val = nval.substring(0, nval.length - 1);
+                    }
+                    return val;
+                }
+            },
+                {
+                    label: '问题数量和隐患', name: 'count', index: 'count', width: 310, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != "0") {
+                            var count = "<a href=javascript:ShowHiddInfo('" + rowObject.id + "') style='color:blue; text-decoration:underline'  title='查看隐患'>" + cellvalue + "</a>";
+                            return count;
+                        } else return cellvalue;
+                    }
+                }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5],
+            pager: "#hiddenbasePager",
+            sortname: 'checkendtime',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //查看特种设备关联的隐患记录
+    function ShowHiddInfo(id) {
+        var url = '/HiddenTroubleManage/HTBaseInfo/Index?SAFETYCHECKOBJECTID=' + id + "&DeviceId=" + keyValue;
+        var idx = dialogOpen({
+            id: 'HTWindow',
+            title: '隐患列表',
+            url: url,
+            btns: 1,
+            btn: ["关闭"],
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //加载设备作业人员信息
+    function GetOperUserTable() {
+        var UserIds = $("#SecurityManagerUserID").val();
+        UserIds += "," + $("#OperUserID").val();
+        var queryJson = {
+            UserIds: UserIds
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#OperUserTable');
+        $gridTable.jqGrid({
+            height: 200,
+            width: ($(top.window).width() - 160),
+            //autowidth: true,
+            loadui: 'block',
+            postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../EquipmentManage/OperationFailure/GetUserPageListJson",
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'userid', hidden: true },
+                 {
+                     label: '姓名', name: 'realname', width: 200, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         return '<a  title="点击查看更多信息" href="javascript:showUser(\'' + rowObject.userid + '\')\" style="text-decoration:underline;color:blue;">' + cellvalue + '</a>';
+                     }
+                 },
+                 {
+                     label: '单位/部门', name: 'deptname', width: 350, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         if (cellvalue != null) {
+                             return "<div id='" + rowObject.userid + "'>" + cellvalue + "</div>";
+                         }
+                     }
+                 },
+                 {
+                     label: '证书名称', name: 'certname', width: 230, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         if (cellvalue != null) {
+                             var endDate = new Date(rowObject.enddate);
+                             var warnDate = new Date('@DateTime.Now.AddMonths(3).ToString("yyyy-MM-dd HH:mm:ss")');
+
+                             if (endDate < new Date()) {
+                                 return "<div class='data-danger' title='证书已过期'>" + cellvalue + "</div>";
+                             }
+                             else if (endDate < warnDate && endDate > new Date()) {
+                                 return "<div class='data-warn' title='证书即将过期'>" + cellvalue + "</div>";
+                             }
+                             else {
+                                 return cellvalue;
+                             }
+                         } else {
+                             return "";
+                         }
+                     }
+                 },
+                 {
+                     label: '证书编号', name: 'certnum', width: 150, align: 'center'
+                 },
+                 {
+                     label: '发证日期', name: 'senddate', width: 90, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                         return formatDate(cellvalue, 'yyyy-MM-dd');
+                     }
+                 },
+                 {
+                     label: '失效日期', name: 'enddate', width: 90, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                         return formatDate(cellvalue, 'yyyy-MM-dd');
+                     }
+                 },
+                 { label: '发证机关', name: 'sendorgan', width: 120, align: 'center' }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [1, 3, 5],
+            pager: "#OperUserPager",
+            sortname: 'realname,deptname',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#info").text($("#info").text() + $gridTable.getGridParam('userData').count + "%");
+                var arr = new Array("oper", "realname", "gender", "mobile", "deptname");
+                Merger("OperUserTable", arr);
+            }
+        });
+    }
+    //合并单元格//问题所在：
+    function Merger(gridName, arr) {
+        //得到显示到界面的id集合
+        var mya = $("#" + gridName + "").getDataIDs();
+        //数据总行数
+        var length = mya.length;
+        //定义合并行数
+        var rowSpanTaxCount = 1;
+        $(arr).each(function (i, item) {
+            var CellName = item;
+            for (var i = 0; i < length; i += rowSpanTaxCount) {
+                //从当前行开始比对下面的信息
+                var before = $("#" + gridName + "").jqGrid('getRowData', mya[i]);
+                rowSpanTaxCount = 1;
+                for (j = i + 1; j <= length; j++) {
+                    //和上边的信息对比 如果值一样就合并行数+1 然后设置rowspan 让当前单元格隐藏
+                    //alert(mya[j]);
+                    var end = $("#" + gridName + "").jqGrid('getRowData', mya[j]);
+                    if (before[CellName] == end[CellName]) {
+                        rowSpanTaxCount++;
+                        $("#" + gridName + "").setCell(mya[j], CellName, '', { display: 'none' });
+                    } else {
+                        break;
+                    }
+                }
+                $("#" + gridName + "").setCell(mya[i], CellName, '', '', { rowspan: rowSpanTaxCount });
+            }
+        });
+    }
+    //保存表单;
+    function AcceptClick() {
+        if ($("#EquipmentName").val() == "") {
+            dialogMsg('请输入设备名称！', 0);
+            return false;
+        }
+
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        $("#EPIBOLYDEPT").val($("#EPIBOLYDEPTID").attr("data-text"));
+        $("#EPIBOLYPROJECT").val($("#EPIBOLYPROJECTID").attr("data-text"));
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["DistrictCode"] = $("#DistrictId").attr("data-code");
+        postData["District"] = $("#DistrictId").attr("data-text");
+        //postData["EquipmentName"] = $("#EquipmentName").attr("data-text");
+        $.SaveForm({
+            url: "../../EquipmentManage/SpecialEquipment/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //获取设备编号
+    function setNo() {
+
+        var Affiliation = $("#Affiliation").val();//$("#Affiliation").attr('data-value');
+        if (Affiliation == "2") {
+            $(".form:eq(0) tr:eq(5)").removeAttr("style");
+            $(".form:eq(0) tr:eq(5) td").each(function (index, ele) {
+                $(this).removeAttr("style");
+            });
+            $("#EPIBOLYDEPTID").attr("isvalid", "yes");
+            $("#EPIBOLYPROJECTID").attr("isvalid", "no");
+            $("#uploader").find(".filelist").eq(0).remove();
+            file_upload.init({
+                keyValue: CertificateID, fileNumLimit: 1, extensions: 'jpg,gif,bmp,png,pdf', isImage: false, el: '#uploader'
+            });
+        }
+        else {
+            $(".form:eq(0) tr:eq(5)").css("display", "none");
+            $(".form:eq(0) tr:eq(5) td").each(function (index, ele) {
+                $(this).css("display", "none");
+            });
+            $("#EPIBOLYDEPTID").removeAttr("isvalid");
+            $("#EPIBOLYPROJECTID").removeAttr("isvalid");
+            $("#EPIBOLYDEPT").val("");
+            $("#EPIBOLYDEPTID").val("");
+            $("#EPIBOLYPROJECT").val("");
+            $("#EPIBOLYPROJECTID").val("");
+        }
+        var EquipmentType = $("#EquipmentType").attr('data-value');
+        if (Affiliation != null && EquipmentType != null && Affiliation.length > 0 && EquipmentType.length > 0) {
+            //设备编号组成部分(所属关系、设备类别、叠加数字)
+            var a, b, c;
+            switch (Affiliation) {
+                case "1":
+                    a = "T1-";
+                    break;
+                case "2":
+                    a = "T2-";
+                    break;
+                default:
+                    a = "T1-";
+                    break;
+            }
+            switch (EquipmentType) {
+                case "1"://锅炉
+                    b = "GL";
+                    break;
+                case "2"://压力容器
+                    b = "RQ";
+                    break;
+                case "3"://压力管道
+                    b = "GD";
+                    break;
+                case "4"://起重机械
+                    b = "QZ";
+                    break;
+                case "5"://场（厂）内专用机动车辆
+                    b = "CL";
+                    break;
+                case "6"://安全附件
+                    b = "FJ";
+                    break;
+                case "7"://电梯
+                    b = "DT";
+                    break;
+                case "8"://压力管道元件
+                    b = "YJ";
+                    break;
+                case "9"://客运索道
+                    b = "SD";
+                    break;
+                case "10"://大型游乐设施
+                    b = "SS";
+                    break;
+                default:
+                    break;
+            }
+            //处理得到c
+            $.ajax({
+                url: '../../EquipmentManage/SpecialEquipment/GetEquipmentNo',
+                data: { EquipmentNo: a + b, orgcode: orgcode },
+                type: "GET",
+                async: false,
+                dataType: "JSON",
+                success: function (result) {
+                    var no = parseInt(result) + 1;
+                    //获取设备编号，修改时初始化设备类型的值不变
+                    if (actiontype == "edit" && eqType == Affiliation) {
+                        no = parseInt(result)
+                    }
+                    switch (no.toString().length) {
+                        case 1:
+                            no = "00" + no;
+                            break;
+                        case 2:
+                            no = "0" + no;
+                            break;
+                        default:
+                    }
+                    $("#EquipmentNo").val(a + b + no);
+                }
+            });
+        } else {
+            $("#EquipmentNo").val("");
+        }
+    }
+    function setDate() {
+        var CheckDate = $("#CheckDate").val();
+        var CheckDateCycle = $("#CheckDateCycle").val();
+        if (!CheckDateCycle) { }
+        else if (!(/(^[1-9]\d*$)/.test(CheckDateCycle))) {
+            dialogMsg('检验周期请输入整数！', 0);
+            $("#CheckDateCycle").val("");
+        } else {
+            if (CheckDate != null && CheckDate.length > 0 && CheckDate.indexOf("-") > 0) {
+                var date = new Date(CheckDate.replace(/-/g, "/"));
+                date.setDate(date.getDate() + parseInt(CheckDateCycle));
+                var retime = date.getFullYear() + "-" + ("00" + (date.getMonth() + 1).toString()).substr(("00" + (date.getMonth() + 1).toString()).length - 2, 2) + "-" + ("00" + date.getDate().toString()).substr(("00" + date.getDate().toString()).length - 2, 2);
+                $("#NextCheckDate").val(retime);
+            }
+        }
+
+    }
+    //查看维护记录附件
+    function GetFile(keyValue, type) {
+        if (isClick1 != keyValue) {
+            $("#modalBody").html("");
+            var html = '<div id="uploader1" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;"><div class="queueList">';
+            html += '<div id="dndArea1" class="placeholder">';
+            html += '<div class="filePicker" style="margin-left:25px; margin-top:10px;"></div></div></div>';
+            html += '<div class="statusBar" style="display:none;">';
+            html += ' <div class="progress">';
+            html += '<span class="text">0%</span>';
+            html += '<span class="percentage"></span>';
+            html += '</div>';
+            html += '<div class="info"></div>';
+            html += '</div>';
+            html += '</div>';
+            $("#modalBody").append(html);
+            //维护记录附件
+            file_upload.init({
+                keyValue: keyValue, extensions: 'doc,docx,xls,xlsx,zip', isImage: false, el: '#uploader1'
+            });
+            var b = type == "0" ? true : false;
+            //绑定维护记录附件
+            file_upload.bindFiles(b, false, keyValue, "uploader1", false);
+            isClick1 = keyValue;
+        }
+        $("#MaintainingRecordFile").modal('show');
+    }
+    //查看
+    function showUser(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form1",
+                title: '查看人员档案',
+                url: '/PersonManage/Person/Form?action=show&keyValue=' + keyValue,
+                width: "900px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //删除空格
+    function delKg() {
+        var EquipmentName = $("#EquipmentName").attr('data-value');
+        $("#EquipmentName").attr('data-value', EquipmentName.replace(/\s/g, ""))
+    }
+    function bangEqName(areaId, TOOLSNAME) {
+
+        //$("#EquipmentName").attr("data-text", "");
+        //$("#EquipmentName").attr("data-value", "");
+
+        //$("#EquipmentName").html()
+        //绑定设备名称
+        //$("#EquipmentName").ComboBox({
+        //    url: top.contentPath + "/RiskDatabase/RiskAssess/GetEquipmentJson?areaId=" + areaId,
+        //    id: "namevalue",
+        //    height: "300px",
+        //    text: "equipmentname",
+        //    allowSearch: true,
+        //    description: "==请选择=="
+        //});
+        $.ajax({
+            url: top.contentPath + "/RiskDatabase/RiskAssess/GetEquipmentJson?areaId=" + areaId,
+            success: function (data, status) {
+                $("#tdEqSelect").html("");
+                $("#tdEqSelect").append("<select id='EquipmentName' class='form-control'></select>");
+                $("#EquipmentName").append(
+                         "<option></option>");
+                $.each(eval(data), function (index, item) {
+                    $("#EquipmentName").append(
+                        "<option value=" + item.namevalue + ">" + item.equipmentname + "</option>");
+                })
+
+                $('#EquipmentName').comboSelect();
+                if (TOOLSNAME != "") {
+                    $("#EquipmentName").val(TOOLSNAME);
+                }
+                if (actiontype == "view" || roleNames.indexOf("承包商") >= 0) {
+                    $("#EquipmentName").attr("disabled", "disabled");
+                }
+            }
+        })
+    }
+
+    //------------------------安全技术交底------------------------------
+    //加载表格
+    function GetGridTechnology() {
+        var queryJson = {
+            equipmentid: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTableTechnology');
+        $gridTable.jqGrid({
+            height: 200,
+            width: ($(top.window).width() - 170),
+            //autowidth: true,
+            loadui: 'block',
+            postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../EquipmentManage/EquipmentTechnology/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        html = "<a href=javascript:showTechnology('" + rowObject.id + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                        if (actiontype == "edit") {
+                            html += "<a href=javascript:btn_editTechnology('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:btn_deleteTechnology('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '技术资料和文件名称', name: 'technologyname', index: 'technologyname', width: 400, align: 'center', sortable: true },
+                {
+                    label: '填报时间', name: 'createdate', index: 'createdate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '备注', name: 'remaek', index: 'remaek', width: 400, align: 'center', sortable: true }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5],
+            pager: "#gridPagerTechnology",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //查看
+    function showTechnology(keyValue) {
+        var idx0 = dialogOpen({
+            id: 'Sikp',
+            title: '查看技术资料和文件',
+            url: '/EquipmentManage/EquipmentTechnology/Form?actiontype=view&keyValue=' + keyValue,
+            width: '60%',
+            height: '50%',
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(idx0);
+            }
+        });
+    }
+    //新增
+    function btn_addTechnology() {
+        dialogOpen({
+            id: 'Sikp',
+            title: '添加技术资料和文件',
+            url: '/EquipmentManage/EquipmentTechnology/Form?actiontype=add&pId=' + keyValue,
+            width: '60%',
+            height: '50%',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_editTechnology(keyValue) {
+        //var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Sikp',
+                title: '编辑技术资料和文件',
+                url: '/EquipmentManage/EquipmentTechnology/Form?actiontype=edit&keyValue=' + keyValue,
+                width: '60%',
+                height: '50%',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_deleteTechnology(keyValue) {
+        //var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../EquipmentManage/EquipmentTechnology/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTableTechnology').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的技术资料和文件！', 0);
+        }
+    }
+    //------------------------检验信息------------------------------
+    //加载表格
+    var s = 0;
+    function GetGridExamine() {
+        var queryJson = {
+            equipmentid: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTableExamine');
+        $gridTable.jqGrid({
+            height: 200,
+            width: ($(top.window).width() - 170),
+            //autowidth: true,
+            loadui: 'block',
+            postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../EquipmentManage/EquipmentExamine/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        html = "<a href=javascript:showExamine('" + rowObject.id + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                        if (actiontype == "edit") {
+                            html += "<a href=javascript:btn_editExamine('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:btn_deleteExamine('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '检验单位', name: 'examineunit', index: 'examineunit', width: 300, align: 'center', sortable: true },
+                { label: '检验类别', name: 'examinetype', index: 'examinetype', width: 100, align: 'center', sortable: true },
+                {
+                    label: '检验时间', name: 'examinedate', index: 'examinedate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '检验周期', name: 'examineperiod', index: 'examineperiod', width: 100, align: 'center', sortable: true },
+                {
+                    label: '下次检验时间', name: 'examinedate', index: 'examinedate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        s++;
+                        //return formatDate(cellvalue, 'yyyy-MM-dd');
+                        //获取开始时间
+                        var CheckDate = rowObject.examinedate;
+                        //获取时间周期
+                        var days = rowObject.examineperiod;
+                        var endDate = "";
+                        if (!days) {
+                        }
+                        else if (!(/^[+]?\d+$/.test(days))) {
+                            return "";
+                        } else {
+                            if (CheckDate != null && CheckDate.length > 0 && CheckDate.indexOf("-") > 0) {
+                                var date = new Date(CheckDate.replace(/-/g, "/"));
+                                date.setDate(date.getDate() + parseInt(days));
+                                endDate = date.getFullYear() + "-" + ("00" + (date.getMonth() + 1).toString()).substr(("00" + (date.getMonth() + 1).toString()).length - 2, 2) + "-" + ("00" + date.getDate().toString()).substr(("00" + date.getDate().toString()).length - 2, 2);
+                            }
+                        }
+                        var warnDate = new Date('@DateTime.Now.AddDays(5).ToString("yyyy-MM-dd")');
+                        
+                        if (endDate != "") {
+                            if (s == 1) {
+                                endDate = new Date(endDate);//下次检测时间
+                                if (endDate < new Date('@DateTime.Now.ToString("yyyy-MM-dd 00:00:00")')) {
+                                    return "<div class='data-danger' title='逾期未检查'>" + formatDate(endDate, 'yyyy-MM-dd') + "</div>";
+                                }
+                                else if ((endDate < warnDate && endDate > new Date()) || (endDate - new Date('@DateTime.Now.ToString("yyyy-MM-dd 00:00:00")') == 0)) {
+                                    return "<div class='data-warn' title='即将到期未检查'>" + formatDate(endDate, 'yyyy-MM-dd') + "</div>";
+                                }
+                                else {
+                                    return formatDate(endDate, 'yyyy-MM-dd');
+                                }
+                            }
+                            else {
+                                return formatDate(endDate, 'yyyy-MM-dd');
+                            }
+                        } else {
+                            return "";
+                        }
+                    }
+                },
+                { label: '检验结论', name: 'examineverdict', index: 'examineverdict', width: 100, align: 'center', sortable: true },
+                { label: '检验报告编号', name: 'reportnumber', index: 'reportnumber', width: 200, align: 'center', sortable: true }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [2, 3, 5],
+            pager: "#gridPagerExamine",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //查看
+    function showExamine(keyValue) {
+        var idx0 = dialogOpen({
+            id: 'Sikp',
+            title: '查看检验信息',
+            url: '/EquipmentManage/EquipmentExamine/Form?actiontype=view&keyValue=' + keyValue,
+            width: '60%',
+            height: '50%',
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(idx0);
+            }
+        });
+    }
+    //新增
+    function btn_addExamine() {
+        dialogOpen({
+            id: 'Sikp',
+            title: '添加检验信息',
+            url: '/EquipmentManage/EquipmentExamine/Form?actiontype=add&pId=' + keyValue,
+            width: '60%',
+            height: '50%',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_editExamine(keyValue) {
+        //var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Sikp',
+                title: '编辑检验信息',
+                url: '/EquipmentManage/EquipmentExamine/Form?actiontype=edit&keyValue=' + keyValue,
+                width: '60%',
+                height: '50%',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_deleteExamine(keyValue) {
+        //var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../EquipmentManage/EquipmentExamine/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTableExamine').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的检验信息！', 0);
+        }
+    }
+</script>
+<div style="margin-left: 10px; margin-right: 10px;">
+    <ul class="nav nav-tabs">
+        <li class="active"><a href="#BaseInfo" data-toggle="tab">特种设备基本信息</a></li>
+        <li style="display: none;"><a href="#ExpandInfo" data-toggle="tab">扩展属性</a></li>
+        <li><a id="tab2" href="#EquipmentSafeFile" data-toggle="tab">特种设备安全技术档案</a></li>
+        <li><a id="tab3" href="#EquipmentOperUser" data-toggle="tab">特种设备作业人员信息</a></li>
+    </ul>
+    <div class="tab-content" style="padding-top: 15px;">
+        <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px;">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">所属区域<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="DistrictId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                        <input id="District" type="hidden" class="form-control" /><input id="DistrictCode" type="hidden" class="form-control" />
+                    </td>
+                    <td class="formTitle">使用地点</td>
+                    <td class="formValue">
+                        <input id="EmploySite" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="300" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">设备名称<font face="宋体">*</font></td>
+                    <td class="formValue" id="tdEqSelect">
+                        <select id="EquipmentName" class="form-control"></select>
+                    </td>
+                    <td class="formTitle">设备内部编号<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="EquipmentNo" type="text" class="form-control" isvalid="yes" checkexpession="NotNull"  placeholder="请选择所属单位和设备种类自动生成设备内部编号"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">设备种类<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="EquipmentType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" onchange="setNo()"></div>
+                    </td>
+                    <td class="formTitle">设备类别</td>
+                    <td class="formValue">
+                        <div id="EquipmentKind" type="select" class="ui-select" isvalid="no" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">设备品种</td>
+                    <td class="formValue">
+                        <div id="EquipmentBreed" type="select" class="ui-select" isvalid="no" checkexpession="NotNull"></div>
+                    </td>
+                    <td class="formTitle">规格型号<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="Specifications" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">所属单位<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        @*<div id="EPIBOLYDEPTID" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>*@
+                        <input type="hidden" id="EPIBOLYDEPT" />
+                        <div id="EPIBOLYDEPTID" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"  onchange="setNo()"></div>
+
+                        <input type="hidden" id="Affiliation"/>
+                        @*<div id="Affiliation" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" onchange="setNo()"></div>*@
+                    </td>
+                    <td class="formTitle">使用单位</td>
+                    <td class="formValue">
+                        <div id="EmployDeptId" type="select" class="ui-select" isvalid="no" checkexpession="NotNull"></div>
+                        <input type="hidden" id="EmployDept" />
+                    </td>
+                </tr>
+                <tr>
+
+                    <td class="formTitle">外包工程</td>
+                    <td class="formValue">
+                        <div id="EPIBOLYPROJECTID" type="select" class="ui-select" isvalid="no" checkexpession="NotNull"></div>
+                        <input type="hidden" id="EPIBOLYPROJECT" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">管控部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ControlDept" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDept('', 0, 0, '选择管控部门', document.body, 'ControlDept,ControlDeptCode,ControlDeptID');" />
+                        <input id="ControlDeptID" type="hidden" />
+                        <input id="ControlDeptCode" type="hidden" />
+                    </td>
+                    <td class="formTitle" id="td_title_controlmajor">管控专业</td>
+                    <td class="formValue" id="td_value_controlmajor">
+                        @*<div id="ControlMajor" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>*@
+                        <select id="ControlMajor" class="form-control selectpicker show-menu-arrow" multiple placeholder="请选择专业类别">
+                            @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("SpecialtyType"))
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">安全管理人员<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="SecurityManagerUser" type="text" class="form-control" style="width: 85%; display: inline-block;" isvalid="yes" checkexpession="NotNull" readonly />
+                        <input id="SecurityManagerUserID" type="hidden" />
+                        <a id="btn_Select" class="btn btn-primary" href="javascript:selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'SecurityManagerUser,,SecurityManagerUserID,ControlDeptId,ControlDeptCode,ControlDept,Telephone', userKind: 2  });" style="background-color: #2e99d4; border-color: #2e99d4; display: inline-block; vertical-align: top; line-height: 14px;">&nbsp;选&nbsp;&nbsp;择</a>
+                    </td>
+                    <td class="formTitle">联系电话</td>
+                    <td class="formValue">
+                        <input id="Telephone" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">操作人员</td>
+                    <td class="formValue">
+                        <input id="OperUser" type="text" class="form-control" style="width: 85%; display: inline-block;" isvalid="no" checkexpession="NotNull" readonly />
+                        <input id="OperUserID" type="hidden" />
+                        <a id="btnUser" class="btn btn-primary" href="javascript:selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'OperUser,,OperUserID', userKind: 2  });" style="background-color: #2e99d4; border-color: #2e99d4; display: inline-block; vertical-align: top; line-height: 14px;">&nbsp;选&nbsp;&nbsp;择</a>
+                    </td>
+                    <td class="formTitle">操作人员证书编号</td>
+                    <td class="formValue">
+                        <input id="CertificateNumber" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">最近检验日期<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CheckDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" onblur="setDate()" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                    <td class="formTitle">检验周期(天)<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CheckDateCycle" type="text" class="form-control" onblur="setDate()" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle">下次检验日期<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="NextCheckDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" disabled="disabled" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                    <td class="formTitle">使用状态<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="State" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">设备注册代码</td>
+                    <td class="formValue">
+                        <input id="EquipmentRegisterNo" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="300" />
+                    </td>
+                    <td class="formTitle">使用登记证编号</td>
+                    <td class="formValue">
+                        <input id="CertificateNo" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="300" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">维保单位</td>
+                    <td class="formValue">
+                        <input id="MaintainUnit" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="300" />
+                    </td>
+                    <td class="formTitle">设备所在地</td>
+                    <td class="formValue">
+                        <input id="Location" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="300" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">购置时间</td>
+                    <td class="formValue">
+                        <input id="PurchaseTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                    </td>
+                    <td class="formTitle">出厂编号</td>
+                    <td class="formValue">
+                        <input id="FactoryNo" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">出厂年月</td>
+                    <td class="formValue">
+                        <input id="FactoryDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                    </td>
+                    <td class="formTitle">制造单位名称</td>
+                    <td class="formValue">
+                        <input id="OutputDeptName" type="text" class="form-control" />
+                    </td>
+
+                </tr>
+                <tr></tr>
+                <tr>
+                    <td class="formTitle">关联词</td>
+                    <td class="formValue">
+                        <input id="RelWord" type="text" class="form-control" />
+                    </td>
+                    <td class="formTitle">是否检查验收<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="IsCheck" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull">
+                            <ul>
+                                <li data-value="是">是</li>
+                                <li data-value="否">否</li>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                <tr id="Departure">
+                    <td class="formTitle">离厂时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DepartureTime" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                    <td class="formTitle">离厂原因</td>
+                    <td class="formValue">
+                        <input id="DepartureReason" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">使用登记证书</td>
+                    <td class="formValue">
+                        <input id="CertificateID" type="hidden" />
+                        <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                            <div class="queueList">
+                                <div id="dndArea" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="formTitle">检查验收附件</td>
+                    <td class="formValue">
+                        <input id="Acceptance" type="hidden" />
+                        <div id="uploader9" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                            <div class="queueList">
+                                <div id="dndArea9" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;风险辨识评估信息</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTableAssess"></table>
+                        <div id="gridPagerAssess"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;隐患排查标准</strong>
+                        <span class="tools pull-right">
+                            <a id="addHid" onclick="btn_add()" style="cursor:pointer;"><i class="fa fa-plus"></i>&nbsp;登记隐患</a>&nbsp;&nbsp;
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTableHiddStd"></table>
+                        <div id="gridPagerHiddStd"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;隐患登记信息</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTableHiddBase"></table>
+                        <div id="gridPagerHiddBase"></div>
+                    </div>
+                </div>
+            </div>            
+        </div>
+        <div id="ExpandInfo" class="tab-pane" style="display: none;">
+            <div class="app_layout app_preview" style="border-top: 1px solid #ccc;" id="frmpreview"></div>
+        </div>
+        <div id="EquipmentSafeFile" class="tab-pane">
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;特种设备的设计文件、产品质量合格证明、安装及使用维护保养说明、监督检验证明等相关技术资料和文件</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                        @*<div id="uploader2" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                        <div class="queueList">
+                            <div id="EquipmentFile" class="placeholder">
+                                <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                            </div>
+                        </div>
+                        <div class="statusBar" style="display:none;">
+                            <div class="progress">
+                                <span class="text">0%</span>
+                                <span class="percentage"></span>
+                            </div>
+                            <div class="info"></div>
+                        </div>
+                    </div>*@
+                        
+
+                    <div class="panel-body">
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <a id="addTechnology" class="btn btn-default" onclick="btn_addTechnology()" style="cursor:pointer;"><i class="fa fa-plus"></i>&nbsp;新增技术资料和文件</a>
+                            </div>
+                        </div>
+                        <table id="gridTableTechnology"></table>
+                        <div id="gridPagerTechnology"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;特种设备的定期检验记录</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <input id="CheckFileID" type="hidden" />
+                    @*<div id="CheckRecord" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+            <div class="queueList">
+                <div id="CheckRecordFile" class="placeholder">
+                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                </div>
+            </div>
+            <div class="statusBar" style="display:none;">
+                <div class="progress">
+                    <span class="text">0%</span>
+                    <span class="percentage"></span>
+                </div>
+                <div class="info"></div>
+            </div>
+        </div>*@
+
+
+                    <div class="panel-body">
+                        <table class="form">
+                            <tr>
+                                <td class="formTitle">检验单位</td>
+                                <td class="formValue">
+                                    <input id="ExamineUnit" type="text" class="form-control" checkexpession="LenStrOrNull" length="300" isvalid="yes" />
+                                </td>
+                                <td class="formTitle">报检日期</td>
+                                <td class="formValue">
+                                    <input id="ReportExamineDate" type="text" class="form-control input-wdatepicker" readonly  onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="no" checkexpession="NotNull" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">监察单上报日期</td>
+                                <td class="formValue">
+                                    <input id="ExamineAppearDate" type="text" class="form-control input-wdatepicker" readonly  onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="no" checkexpession="NotNull" />
+                                </td>
+                                <td class="formTitle">受理状态</td>
+                                <td class="formValue">
+                                    <div id="AcceptState" type="select" class="ui-select" isvalid="no" checkexpession="NotNull">
+                                        <ul>
+                                            <li data-value="受理">受理</li>
+                                            <li data-value="未受理">未受理</li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <a id="addExamine" class="btn btn-default" onclick="btn_addExamine()" style="cursor:pointer;"><i class="fa fa-plus"></i>&nbsp;新增检验信息</a>
+                            </div>
+                        </div>
+                        <table id="gridTableExamine"></table>
+                        <div id="gridPagerExamine"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;特种设备的定期自行检查记录</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="hiddenbase"></table>
+                        <div id="hiddenbasePager"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;特种设备的日常使用状况记录</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTable1"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;特种设备及其附属仪器仪表的维护保养记录</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="MaintainingRecord"></table>
+                        <div id="MaintainingRecordPager"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;特种设备的运行故障记录</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="operationFailure"></table>
+                        <div id="operationFailurePager"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;特种设备的事故记录</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="Bulletin"></table>
+                        <div id="BulletinPager"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="EquipmentOperUser" class="tab-pane">
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;特种设备作业人员信息</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="btn-group">
+                            <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                            <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                            <ul class="dropdown-menu">
+                                <li style="width:200px;"><a style="float:left">证书已过期</a><div style="float: left; margin-left:12px; background-color: red; height: 22px; width: 80px;"></div></li>
+                                <li style="width:200px;"><a style="float:left">证书即将过期</a><div style="float: left; background-color: orange; height: 22px; width: 80px;"></div></li>
+
+                            </ul>
+                        </div>
+                        <table id="OperUserTable"></table>
+                        <div id="OperUserPager"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal" id="MaintainingRecordFile">
+    <div class="modal-dialog" style="width:500px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header">
+                <h5>查看附件信息</h5>
+            </div>
+            <div class="modal-body" id="modalBody">
+
+            </div>
+            <div class="modal-footer">
+                <button id="btnModal" type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>

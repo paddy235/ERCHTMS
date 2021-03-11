@@ -1,0 +1,178 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script>
+;
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 145);
+            }, 200);
+            e.stopPropagation();
+        });
+        initYears();
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 141,
+            url: "../../PersonManage/UserScore/GetRankListJson",
+            postData: { year: $("#yearCondition").find('.dropdown-text').attr('data-value') },
+            datatype: "json",
+            colModel: [
+                { label: '姓名', name: 'realname',  width: 150, align: 'center', sortable: true },
+                { label: '性别', name: 'gender', width: 100, align: 'center', sortable: true },
+                {
+                    label: '身份证号', name: 'identifyid', width: 200, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var idcard;
+                        if (cellvalue != null) {
+                            var value = cellvalue.toString();
+                            var sta = value.substring(0, 4);
+                            var end = value.substring(value.length - 4, value.length);
+                            idcard = sta + "**********" + end;
+                        }
+                        if (cellvalue != null) {
+                            return "<div id='" + rowObject.userid + "'>" + idcard + "</div>";
+                        } else {
+                            return "<div id='" + rowObject.userid + "'></div>";
+                        }
+
+                    }
+                },
+                { label: '单位/部门', name: 'deptname', width: 350, align: 'center', sortable: true },
+                {
+                    label: '年度积分', name: 'score', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != null && cellvalue != undefined) {
+                            return parseInt($gridTable.getGridParam('userData').score) + cellvalue;
+                        } else {
+                            return $gridTable.getGridParam('userData').score;
+                        }
+
+                    }
+                }
+            ],
+            rownumWidth: 60,
+            userdata: "userdata",
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'score',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true 
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        $("#yearCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#yearCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword").val())
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson), year: $("#yearCondition").find('.dropdown-text').attr('data-value') }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val("");
+            $("#queryCondition .dropdown-text").html("选择条件").attr("data-value", "");
+            $("#userType .dropdown-text").html("人员类型").attr("data-value", "");
+            var queryJson = {
+                condition: '',
+                keyword: ''
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    function exportData() {
+        window.location.href = "ExportScoreRank";
+    }
+    function initYears() {
+        var year = new Date().getFullYear();
+        var html = "";
+        for (var j = 0;j<=5; j++) {
+            html+='<li><a data-value="' + (year-j) + '">' + (year-j) + '年</a></li>';
+        }
+     
+        $("#ulYear").html(html);
+    }
+</script>
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            <tr>
+                <td>
+                    <div id="queryCondition" class="btn-group">
+                        <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                        <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a data-value="RealName">姓名</a></li>
+                            <li><a data-value="deptname">单位名称</a></li>
+                            <li><a data-value="identifyid">身份证号</a></li>
+                        </ul>
+                    </div>
+                </td>
+                <td style="padding-left:5px;">
+                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                </td>
+
+                <td style="padding-left:5px;">
+                    <div id="yearCondition" class="btn-group">
+                        <a class="btn btn-default dropdown-text" data-toggle="dropdown" data-value="2018">2018年</a>
+                        <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                        <ul class="dropdown-menu" id="ulYear">
+                          
+                        </ul>
+                    </div>
+                </td>
+
+                <td style="padding-left: 5px;">
+                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                    <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="toolbar">
+        <div class="btn-group">
+            <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+            <a id="export" class="btn btn-default" onclick="exportData()"><i class="fa fa-download"></i>&nbsp;导出</a>
+        </div>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

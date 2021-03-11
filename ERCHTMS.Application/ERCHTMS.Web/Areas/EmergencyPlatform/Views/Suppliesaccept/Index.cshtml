@@ -1,0 +1,359 @@
+@{;
+    ViewBag.Title = "应急物资领用申请";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script>
+    var _parentId = "";
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var DeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolenames="@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//角色
+    var dbsx = request("dbsx");
+    $(function () {
+        InitialPage();
+        GetGrid();
+        GetTree();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+
+    //加载树
+    var deptCode = "";//部门编码
+    function GetTree() {
+        var json = JSON.stringify(
+                       {
+                           SelectMode: 0,
+                           Mode: 0
+                       }
+              );
+        url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+        //加载组织机构树
+        var item = {
+            height: $(window).height() - 65,
+            url: url,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化部门树
+        $("#itemTree").treeview(item);
+
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            applyperson: $("#ApplyPerson").val(),
+            suppliesname: $("#SuppliesName").val(),
+            code: _parentId,
+            dbsx: dbsx
+        }
+        $gridTable.jqGrid({
+            autowidth: true,
+            postData: { queryJson: JSON.stringify(queryJson) },
+            height: $(window).height() - 170,
+            url: "../../EmergencyPlatform/Suppliesaccept/GetPageList",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'id', align: 'left', sortable: true, hidden: true },
+                 { label: '创建人', name: 'createuserid', index: 'createuserid', align: 'center', sortable: true, hidden: true },
+                  { label: '创建人部门code', name: 'createuserdeptcode', index: 'createuserdeptcode', align: 'center', sortable: true, hidden: true },
+                  { label: '创建人组织code', name: 'createuserorgcode', index: 'createuserorgcode', align: 'center', sortable: true, hidden: true },
+                  {
+                      label: '操作', name: 'Oper', align: 'center', width: 200,
+                      formatter: function (cellvalue, options, rowObject) {
+                          var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                          //当issaved为0,则为登记状态，可以编辑，反之则无法编辑
+                          if (UserId == rowObject.createuserid && rowObject.issubmit == "0") {
+                              html += "<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>&nbsp;";
+                              html += "<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>&nbsp;";
+                          }
+                          if (rowObject.status == "1" && rowObject.approveuserids.indexOf(UserId) >= 0) {
+                              html += "<a href=javascript:approve('" + rowObject.id + "')  title='审批'><i class='fa fa-check'></i></a>";
+                          }
+                          if (rowObject.status == "2" && rolenames.indexOf("公司管理员") >= 0) {
+                              html += "<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>&nbsp;";
+                          }
+                          return html;
+                      }
+                  },
+                  {
+                      label: '流程状态', name: 'status', align: 'center', width: 200, formatter: function (cellvalue, options, rowObject) {
+                          var applystatename = "";
+                          switch (cellvalue) {
+                              case 0:
+                                  applystatename = "申请中";
+                                  break;
+                              case 1:
+                                  applystatename = "审批中";
+                                  break;
+                              case 2:
+                                  applystatename = "审批不通过";
+                                  break;
+                              case 3:
+                                  applystatename = "审批通过";
+                                  break;
+                              default:
+
+                          }
+                          var html = "<a  href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>" + applystatename + "</a>";
+                          return html;
+                      }
+                  },
+                { label: '物资名称', name: 'suppliesname', index: 'suppliesname', align: 'center', sortable: true, width: 500 },
+                { label: '申请人', name: 'applyperson', index: 'applyperson', align: 'center', sortable: true, width: 200 },
+                { label: '申请部门', name: 'applydept', index: 'applydept', align: 'center', sortable: true, width: 200 },
+                { label: '申请时间', name: 'applydate', index: 'applydate', align: 'center', sortable: true }],
+            viewrecords: true,
+            rowNum: 30,
+            // rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            multiselect: false,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            loadError: function (xhr, status, error) {
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                ////隐藏搜索框
+                var title = $(".ui-filter-text");
+
+                title.trigger("click");
+            }
+            var queryJson = {
+                applyperson: $("#ApplyPerson").val(),
+                suppliesname: $("#SuppliesName").val(),
+                code: _parentId,
+                dbsx:dbsx
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加应急物资申领',
+            url: '/EmergencyPlatform/Suppliesaccept/Form?action=add',
+            width: ($(top.window).width() - 150) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑应急物资申领',
+                url: '/EmergencyPlatform/Suppliesaccept/Form?action=edit&keyValue=' + keyValue,
+                width: ($(top.window).width() - 150) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../EmergencyPlatform/Suppliesaccept/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的应急物资申领！', 0);
+        }
+    }
+
+    //查看
+    function show() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看物资申领信息',
+                url: '/EmergencyPlatform/Suppliesaccept/Form?action=show&keyValue=' + keyValue,
+                width: ($(top.window).width() - 150) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    function approve(id) {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '审批物资申领信息',
+                url: '/EmergencyPlatform/Suppliesaccept/Form?action=audit&keyValue=' + keyValue,
+                width: ($(top.window).width() - 150) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //查看流程图
+    function OpenViewFlow(keyValue) {
+        var title = "应急物资领用申请流程图";
+        var rqUrl = "/EmergencyPlatform/Suppliesaccept/Flow?keyValue=" + keyValue;
+        dialogOpen({
+            id: 'WorkFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null
+        });
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">应急物资领用申请</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle">申请人：</td>
+                                                <td class="formValue">
+                                                    <input id="ApplyPerson" type="text" class="form-control" placeholder="请输入申请人" style="width: 200px;" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">物资名称：</td>
+                                                <td class="formValue">
+                                                    <input id="SuppliesName" type="text" class="form-control" placeholder="请输入物资名称" style="width: 200px;" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

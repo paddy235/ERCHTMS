@@ -1,0 +1,374 @@
+﻿@{
+    ViewBag.Title = "危险点管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<style type="text/css">
+    .ui-jqgrid tr.jqgrow td {
+        white-space: normal !important;
+        height: auto;
+        vertical-align: text-top;
+    }
+</style>
+
+<script>
+    var areaCode = "";
+    var areaId = "";
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //layout布局
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+               
+            }, 200);
+            e.stopPropagation();
+        });
+       
+       
+    }
+    function show(workId, dangerId, areaId, workName, dangerName, areaName, obj) {
+        $(obj).parent().parent().addClass("active");
+        var $gridTable = $("#gridTable");
+        var json ={ workId: workId, dangerId: dangerId, areaId: areaId };
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(json) },
+        }).trigger('reloadGrid');
+        var title = "";
+        if (areaName.length>0) {
+            title += "&nbsp;&nbsp;位置：" + areaName;
+        }
+        if (dangerName.length > 0) {
+            title += "->"+dangerName;
+        }
+        if (workName.length > 0) {
+            title += "->" + workName;
+        }
+        $("#pelTitle").html(title);
+    }
+    //加载树
+    function GetTree() {
+        var o = {
+            onnodeclick: function (item) {
+                areaCode = item.code;
+                areaId = item.id;
+          
+                //展开下级
+               // $(".bbit-tree-selected").children('.bbit-tree-ec-icon').trigger("click");
+                $('#btn_Search').trigger("click");
+            },
+            height: $(window).height()-50,
+            method: "GET",
+            datatype: "json",
+            url: "../../RiskDatabase/DangerSource/GetAreaTreeJson?parentId=0"
+        };
+        $("#itemTree").treeview(o);
+    }
+    //查看
+    function show(id) {
+      var idx0= dialogOpen({
+            id: "win0",
+            title: "风险辨识评估信息",
+            url: '/RiskDatabase/Risk/Show?keyValue=' + id,
+            width: ($(top.window).width() - 80) + "px",
+            height: ($(top.window).height() - 20) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx0);
+            }
+        });
+
+    }
+    //编辑
+    function edit(id) {
+        dialogOpen({
+            id: "win",
+            title: "风险辨识评估",
+            url: '/RiskDatabase/Risk/Details?keyValue=' + id,
+            width: ($(top.window).width() - 80) + "px",
+            height: ($(top.window).height() - 20) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+
+    }
+    //删除
+    function del(id) {
+        var keyValue = !!id ? id : $("#gridTable").jqGridRowValue("id");
+        if (keyValue) {
+            $.RemoveForm({
+                url: "../../RiskDatabase/Risk/RemoveForm",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的数据！', 0);
+        }
+    }
+    var isAll = false;
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGridEx({
+            url: "../../RiskDatabase/Risk/GetPageListJson",
+            height: $(window).height() - 170,
+            autowidth: true,
+            rowNum:30,
+            isAuth: true,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true }, { label: '', name: 'areaid', hidden: true },
+                { label: '', name: 'createuserid', hidden: true }, { label: '', name: 'createuserdeptcode', hidden: true }, { label: '', name: 'createuserorgcode', hidden: true },
+               {
+                   label: '操作', name: 'Oper', index: 'Oper', width: 100, align: 'center', sortable: false,
+                   formatter: function (cellvalue, options, rowObject) {
+                       var html = "";
+                       html += "<a href=javascript:show('" + rowObject.id + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                       html += "<a href=javascript:edit('" + rowObject.id + "')  title='修改' name='edit'><i class='fa fa-pencil-square-o'></i></a>";
+                       html += "<a href=javascript:del('" + rowObject.id + "')  title='删除' name='delete'><i class='fa fa-trash-o'></i></a>";
+                       return html;
+                   }
+               },
+        
+               { label: '风险类别', name: 'risktype', width: 150, align: 'center' },
+               { label: "所属区域", name: "areaname", width: 100, align: "center" },
+               { label: "工作任务", name: "worktask", width: 100, align: "center" },
+               { label: "工序", name: "process", width: 100, align: "center" },
+               { label: "设备名称", name: "equipmentname", width: 100, align: "center" },
+               { label: "部件", name: "parts", width: 100, align: "center" },
+               { label: '风险点', name: 'majorname', width: 150, align: 'center', hidden: true },
+               { label: '职业病危害因素', name: 'description', width: 200, align: 'center', hidden: true },
+                {
+                    label: "危险源/故障类型", name: "faultordanger", width: 100, align: "center",
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.riskType == "设备") {
+                            if (rowObject.faulttype == null) return "";
+                            else return rowObject.faulttype;
+                        } else {
+                            if (rowObject.dangersource == null) return "";
+                            else return rowObject.dangersource;
+                        }
+                    }
+                },
+               {
+                   label:"危险源", name: "dangersource", width: 100, align: "center"
+               },
+               { label: "故障类型", name: "faulttype", width: 100, align: "center" },
+               { label: '危害因素', name: 'riskdesc', width: 300, align: 'center', headerAlign: 'center' },
+               { label: '危害后果', name: 'result', width: 150, align: 'center' },
+               { label: '风险值', name: 'itemr', width: 80, align: 'center' },
+               { label: '风险等级', name: 'grade', width: 80, align: 'center' },
+               { label: "管控层级", name: "levelname", width: 100, align: "center" },
+               { label: "管控责任单位", name: "deptname", align: "center" },
+               { label: "管控责任岗位", name: "postname", align: "center" },
+               { label: "创建时间", name: "createdate", align: "center" }
+            ],
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                var objData = $gridTable.getRowData(rowid);
+                areaId = objData.AreaId;
+                areaName = objData.AreaName;
+            },
+            gridComplete: function () {
+                if ($("#RiskType").val() == "职业病危害" && !isAll) {
+                    $gridTable.showCol(["majorname", "description", "dangersource"]);
+                    $gridTable.hideCol(["riskdesc", "faultordanger", "result", "worktask", "process", "equipmentname", "parts", "faulttype"]);
+                } else if ($("#RiskType").val() == "作业" && !isAll) {
+                    $gridTable.showCol(["worktask", "process", "dangersource", "result", "riskdesc"]);
+                    $gridTable.hideCol(["majorname", "faultordanger", "description", "equipmentname", "parts", "faulttype"]);
+                } else if ($("#RiskType").val() == "设备" && !isAll) {
+                    $gridTable.showCol(["equipmentname", "parts", "faulttype", "result", "riskdesc"]);
+                    $gridTable.hideCol(["majorname", "faultordanger", "description", "worktask", "process", "dangersource"]);
+                } else if (($("#RiskType").val() == "区域" && !isAll) || ($("#RiskType").val() == "管理" && !isAll)) {
+                    $gridTable.showCol(["dangersource", "result", "riskdesc"]);
+                    $gridTable.hideCol(["equipmentname", "faultordanger", "parts", "majorname", "description", "worktask", "process", "faulttype"]);
+                } else {
+                    $gridTable.showCol(["faultordanger","riskdesc", "result"]);
+                    $gridTable.hideCol(["equipmentname", "parts", "majorname", "description", "worktask", "process", "faulttype", "dangersource"]);
+                }
+            },
+            sortname: 'createdate desc,id',
+            sortorder: 'desc'
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            isAll = false;
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ areaId: areaId, keyWord: $("#txtKeyword").val(), grade: $("#Grade").val(), riskType: $("#RiskType").val() }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            isAll = true;
+            $("#txtKeyword").val(""); $("#Grade").val(""); $("#RiskType").val(""); $("button[data-id='RiskType']").find(".filter-option").text('请选择'); $("button[data-id='Grade']").find(".filter-option").text('请选择');
+            $(".inner li").removeClass("selected");
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({keyWord: "", accType: "", grade: "",riskType:"" })}, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        idx=dialogOpen({
+            id: "Import",
+            title: '导入风险库',
+            url: '/RiskDatabase/DangerSource/ImportList',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                 top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    GetTree();
+                    $("#gridTable").jqGrid('setGridParam', {
+                       postData: { keyWord: "", accType: "", grade: "",areaid:"" }
+                   }).trigger('reloadGrid');
+                }
+                
+            }
+        });
+    }
+    //辨识评估
+    function addDanger(workId, dangerId, areaId, workName, dangerName, areaName) {
+        var idx0 = dialogOpen({
+            id: "win",
+            title: "风险辨识评估",
+            url: '/RiskDatabase/Risk/Details?keyValue=&workId=' + workId + "&dangerId=" + dangerId + "&areaId=" + areaId + "&workName=" + encodeURIComponent(workName) + "&dangerName=" + encodeURIComponent(dangerName) + "&areaName=" + encodeURIComponent(areaName),
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 80) + "px",
+            callBack: function (iframeId) {
+                //GetTree();
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                //top.layer.close(idx0);
+            }
+        });
+    };
+    function exportExcel() {
+        var queryJson = JSON.stringify({ areaId: areaId, keyWord: $("#txtKeyword").val(), grade: $("#Grade").val(), riskType: $("#RiskType").val() });
+        //window.location.href = "../../RiskDatabase/Risk/ExportExcel?queryJson=" + queryJson + "&fileName=风险清单";
+        $.ajax({
+            url: '../../RiskDatabase/Risk/ExportExcel?queryJson=' + queryJson + '&fileName=风险清单',
+            dataType: "JSON",
+            success: function (result) {
+
+                window.location.href = "../../Utility/DownloadFile?filePath=~/Resource/Temp/" + result.resultdata;
+                Loading(false);
+            }
+        });
+    }
+    
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+            <div class="col-md-10">
+                区域信息
+            </div>
+            <div class="col-md-2 text-right" style="padding-right:8px;">
+               <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+            </div>
+           </div>
+            <div id="itemTree" style="overflow: auto; height:500px; ">
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title" id="pelTitle">风险辨识评估</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                风险类别&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                <select id="RiskType" class="selectpicker show-menu-arrow form-control">
+                                    <option value="">请选择</option>
+                                    <option value="作业">作业</option>
+                                    <option value="设备">设备</option>
+                                    <option value="区域">区域</option>
+                                    <option value="管理">管理</option>
+                                    <option value="工器具及危化品">工器具及危化品</option>
+                                </select>
+                            </td>
+                            <td>
+                                &nbsp;&nbsp;风险等级&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                <select id="Grade" class="selectpicker show-menu-arrow form-control">
+                                    <option value="">请选择</option>
+                                    <option value="重大风险">重大风险</option>
+                                    <option value="较大风险">较大风险</option>
+                                    <option value="一般风险">一般风险</option>
+                                    <option value="低风险">低风险</option>
+                                </select>
+                            </td>
+                            @*<td>
+                                &nbsp;事故类别&nbsp;
+                            </td>
+                            <td>
+                                <select id="AccidentType" class="selectpicker show-menu-arrow form-control" multiple>
+                                    <option value="" >请选择</option>
+                                    @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("AccidentType"))
+                                </select>
+                            </td>*@
+                            <td width="10"></td>
+                            <td>  
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入危害因素或危害后果进行搜索" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        @*<a id="lr-replace" class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        @{
+                            if (new ERCHTMS.Busines.AuthorizeManage.AuthorizeBLL().HasOperAuthority(ERCHTMS.Code.OperatorProvider.Provider.Current(), Request.Cookies["currentmoduleId"].Value,"add"))
+                            {
+                                @Html.Raw("<a id='lr-add' class='btn btn-default' onclick=addDanger('','','','','','')><i class='fa fa-plus'></i>&nbsp;新增</a>");
+                            }
+                        }
+                        
+                       <a id="lr-edit" class="btn btn-default" onclick="importData()"><i class="fa fa-file-excel-o"></i>&nbsp;导入</a>*@
+                        @*<a id="lr-delete" class="btn btn-default" onclick="del()"><i class="fa fa-trash-o"></i>&nbsp;删除</a>
+    <a id="lr-detail" class="btn btn-default" onclick="btn_detail()"><i class="fa fa-list-alt"></i>&nbsp;详细</a>*@
+                    </div>
+                  
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+            <script>$('.toolbar').authorizeButton();</script>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,260 @@
+@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script>
+    var keyValue = request('keyValue');
+    var mode = request('mode');
+    
+    $(function () {
+        initControl();
+        GetGrid();
+    });
+    //初始化控件
+    function initControl() {
+        $("#id").val(keyValue.length > 0 ? keyValue : '@Guid.NewGuid().ToString()');
+
+        //页面一加载，默认是大项
+        $("#Content,#ReviewWay,#ChaptersParentID").attr("isvalid", "no");
+        if (mode != "add") {
+            $("#ruleType").attr("disabled", "disabled");
+            if (mode == "view") {
+                $("#sp1").attr("style", "display:none");
+            }
+            else {
+                $("#sp1").attr("style", "");
+            }
+        }
+        else {
+            $("#ruleType").removeAttr("disabled")
+            $("#sp1").attr("style", "");
+        }
+
+        var queryJson = {
+        }
+        //所属大项
+        $("#ChaptersParentID").ComboBox({
+            url: "../../AssessmentManage/AssessmentChapters/GetListJson",
+            param: { queryJson: JSON.stringify(queryJson) },
+            id: "Id",
+            text: "ChaptersName",
+            description: "==请选择==",
+            height: "150px"
+        });
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../AssessmentManage/AssessmentChapters/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.Content == null) {
+                        $("#ruleType").val("1");
+                    }
+                    else {
+                        $("#ruleType").val("2");
+                    }
+                    if ($("#ruleType").val() == "2") {
+                        $("#td1,#td2,#tr1,#tr2,#tr3").attr("style", "");
+                    }
+                    else {
+                        $("#td1,#td2,#tr1,#tr2,#tr3").attr("style", "display:none");
+                    }
+                }
+            })
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+       
+        var postData = $("#form1").formSerialize(keyValue);
+        if ($("#ruleType").val() == "1") {
+            postData["ChaptersParentID"] = "-1";
+        }
+        else {
+            postData["ChaptersParentID"] = $("#ChaptersParentID").attr('data-value');
+        }
+        $.SaveForm({
+            url: "../../AssessmentManage/AssessmentChapters/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 250,
+            url: "../../AssessmentManage/AssessmentStandard/GetDataListJson",
+            datatype: "json",
+            postData: { chaptersId: keyValue },
+            colModel: [
+                { label: '主键', name: 'Id', width: 10, align: 'left', hidden: true },
+                  {
+                      label: '操作', name: 'Oper', width: 80, align: 'center',
+                      formatter: function (cellvalue, options, rowObject) {
+                          var html = "";
+                          if (mode != "view") {
+                              html += "<a href=javascript:edit()  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                              html += "<a href=javascript:del()  title='删除'><i class='fa fa-trash-o'></i></a>";
+                          }
+                          return html;
+                      }
+                  },
+                {
+                    label: '创建时间', name: 'CreateDate', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '评分标准', name: 'Content', width: 340, align: 'center', sortable: false }],
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [5,10],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    function changedata() {
+        if ($("#ruleType").val() == "2") {
+            $("#td1,#td2,#tr1,#tr2,#tr3").attr("style", "");
+            $("#Content,#ReviewWay,#ChaptersParentID").attr("isvalid", "yes");
+        }
+        else {
+            $("#td1,#td2,#tr1,#tr2,#tr3").attr("style", "display:none");
+            $("#Content,#ReviewWay,#ChaptersParentID").attr("isvalid", "no");
+        }
+    }
+
+    //新增
+    function addStandard() {
+        dialogOpen({
+            id: 'Sikp',
+            title: '添加评分标准',
+            url: '/AssessmentManage/AssessmentStandard/Form?pid=' + $("#id").val(),
+            width: '500px',
+            height: '300px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //编辑
+    function edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('Id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑评分标准',
+                url: '/AssessmentManage/AssessmentStandard/Form?keyValue=' + keyValue,
+                width: '500px',
+                height: '300px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('Id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../AssessmentManage/AssessmentStandard/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的评分标准！', 0);
+        }
+    }
+
+   
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">项类型<font face="宋体">*</font><input id="id" type="hidden" /></td>
+            <td class="formValue">
+                <select id="ruleType" class="selectpicker show-menu-arrow form-control" style="width: 80px;" onchange="changedata()" >
+                    <option value="1" selected="selected">大项</option>
+                    <option value="2">小项</option>
+                </select>
+            </td>
+            <td id="td1" class="formTitle" style="display: none">所属大项<font face="宋体">*</font></td>
+            <td id="td2" class="formValue" style="display: none">
+                <div id="ChaptersParentID" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" ></div>
+            </td>
+
+        </tr>
+        <tr>
+            <td class="formTitle">要素号<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="MajorNumber" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+            </td>
+            <td class="formTitle">评审项目<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="ChaptersName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr style="display: none" id="tr1">
+            <td class="formTitle">考评内容<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <textarea id="Content" class="form-control" isvalid="yes" checkexpession="NotNull" style="min-height: 120px;"></textarea>
+            </td>
+        </tr>
+        <tr style="display: none" id="tr2">
+            <td class="formTitle">评审方法<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <textarea id="ReviewWay" class="form-control" isvalid="yes" checkexpession="NotNull" style="min-height: 100px;"></textarea>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">标准分值<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input type="text" id="Score" class="form-control" isvalid="yes" checkexpession="Num"></textarea>
+            </td>
+        </tr>
+        <tr style="display: none" id="tr3">
+            <td colspan="4">
+                <div class="panel panel-default" style="margin-top: 20px;">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;评分标准&nbsp;&nbsp;</strong>
+                        <span class="tools" id="sp1">
+                            <a href="javascript:addStandard()" class="btn btn-primary btn-xs">新增</a>&nbsp;&nbsp;
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTable"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>

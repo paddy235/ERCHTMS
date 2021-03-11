@@ -1,0 +1,977 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>我的桌面</title>
+    <!--框架必需start-->
+    @*<link href="~/Content/styles/framework-ui.css" rel="stylesheet" />*@
+    <script src="~/Content/Scripts/jquery/jquery-1.10.2.min.js"></script>
+    <link href="~/Content/styles/font-awesome.min.css" rel="stylesheet" />
+    @*<script src="~/Content/Scripts/utils/framework-ui.js"></script>*@
+    @System.Web.Optimization.Styles.Render("~/Content/styles/framework-ui.css")
+    @System.Web.Optimization.Scripts.Render("~/Content/scripts/utils/js")
+    <!--框架必需end-->
+    <!--bootstrap组件start-->
+    <link href="~/Content/scripts/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <script src="~/Content/scripts/bootstrap/bootstrap.min.js"></script>
+    <!--bootstrap组件end-->
+
+    <script src="~/Content/Scripts/plugins/highcharts/highcharts.js"></script>
+    <script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>
+    <script src="~/Content/Scripts/plugins/highcharts/modules/exporting.js"></script>
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+        <script src="~/content/scripts/bootstrap/html5shiv.js"></script>
+        <script src="~/content/scripts/bootstrap/respond.min.js"></script>
+        <script src="~/content/scripts/bootstrap/jquery.placeholder.min.js"></script>
+        <script src="~/content/scripts/bootstrap/json2.js" type="text/javascript"></script>
+    <![endif]-->
+    <link href="~/Content/scripts/plugins/jqgrid/jqgrid.css" rel="stylesheet" />
+    <script src="~/Content/scripts/plugins/jqgrid/jqgrid.min.js"></script>
+    <script src="~/Content/scripts/utils/framework-ui.js"></script>
+
+    <link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+    <script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+    <!--屏幕截图start-->
+    @*<script language="javascript" src="~/Content/scripts/plugins/capture/jquery.md5.js"></script>
+        <script language="javascript" src="~/Content/scripts/plugins/capture/jquery.json-2.3.min.js"></script>
+        <script language="javascript" src="~/Content/scripts/plugins/capture/niuniucapture.js"></script>
+        <script language="javascript" src="~/Content/scripts/plugins/capture/capturewrapper.js"></script>*@
+    <!--屏幕截图end-->
+    <!--即时通讯start-->
+    @*<link rel="stylesheet" href="~/Content/scripts/layim/css/layui.css">
+        <script src="~/Content/scripts/plugins/signalr/jquery.signalR-2.2.0.min.js"></script>
+        <script src="@BSFramework.Util.Config.GetValue("SignalRUrl")/hubs"></script>
+        <script src="~/Content/scripts/layim/layui.js"></script>
+        @System.Web.Optimization.Scripts.Render("~/Content/scripts/business/webim")*@
+    <!--即时通讯end-->
+
+    <style type="text/css">
+        .tab0 {
+            width: 100%;
+            border: 1px solid #ccc;
+        }
+
+            .tab0 td {
+                background-color: #f7f7f7;
+                height: 40px;
+                text-align: center;
+                border: 1px solid #ccc;
+                width: 16.666%;
+            }
+
+            .tab0 th {
+                background-color: #f7f7f7;
+                height: 40px;
+                text-align: center;
+                border-color: #ccc;
+                width: 16.666%;
+            }
+
+        .tab1 {
+            width: 100%;
+            border: 1px solid #ccc;
+        }
+
+            .tab1 td {
+                background-color: white;
+                height: 30px;
+                border: 1px solid #ccc;
+            }
+
+        .tab3 td {
+            text-align: center;
+        }
+
+        a {
+            color: black;
+        }
+
+        .stat_number {
+            text-decoration: underline;
+        }
+    </style>
+
+    <script>
+        var mode = 0;
+        var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+        $(function () {
+            InitialPage();
+            drawChart();
+            drawTable();
+            //stat();
+        })
+        function drawTable() {
+            $.post("../Home/GetAllRiskSate", function (data) {
+                var json = eval("(" + data + ")");
+                var html = "";
+                $(json).each(function (i, item) {
+                    html += "<tr class='tr_0 tr" + item.code + "'><td>" + item.name + "</td><td>" + item.fxScore + "</td><td>" + item.jcScore + "</td><td>" + item.htScore + "</td><td>" + item.score + "</td></tr>";
+                });
+                $("#tabSum").append(html);
+            });
+        }
+        //隐患曝光台和风险排名
+        function rank() {
+            //隐患曝光
+            $.post("../HiddenTroubleManage/HTStatistics/QueryExposureHid", { num: 6 }, function (data) {
+                var obj = eval("(" + data + ")");
+                var html = "";
+                if (null != obj && obj.length > 0) {
+                    for (var i = 0; i < obj.length; i++) {
+                        var tempValue = obj[i].hiddescribe.length > 12 ? obj[i].hiddescribe.substring(0, 10) : obj[i].hiddescribe;
+
+                        var url = obj[i].filepath != null ? obj[i].filepath.replace("~", "..") : "#";
+
+                        html += "<div class=\"col-md-2\" style=\"text-align:center;\"><a href=javascript:viewdata('" + obj[i].id + "','" + obj[i].addtype + "','" + obj[i].workstream + "') class='stat_number' title='点击查看详情'><img src=\"" + url + "\" style=\"width:200px; height:150px;\" /><br /> " + tempValue + "</div>"
+                    }
+                    $("#exposureTB").html(html);
+                }
+            });
+            //风险排名
+            $.post("../RiskDatabase/risk/GetRiskRank", function (data) {
+                var arr = eval(data);
+                var html = "";
+                $(arr).each(function (i, dom) {
+                    html += "<tr><td align='center'>" + (i + 1) + "</td><td align='left'>" + dom.riskdesc + "</td><td align='center'>" + dom.grade + "</td><td align='center'>" + dom.itemr + "</td><td align='center'>" + dom.risktype + "</td><td align='center'>" + dom.result + "</td><td align='center'>" + (dom.postname == null ? "" : dom.postname) + "</td><td align='center'>" + dom.deptname + "</td></tr>";
+                });
+                $("#tabRank").append(html);
+            });
+        }
+        function stat() {
+            var orgCode = $("#selDept").val();
+            var orgId = $(selDept.options[selDept.selectedIndex]).attr("orgId");
+            //风险统计指标
+            $.post("../RiskDatabase/risk/GetHomeStat", { orgCode: orgCode, orgId: orgId }, function (data) {
+                var arr = eval(data);
+                $(".risk").each(function (i, dom) {
+                    if (parseInt(arr[i]) == 0) {
+                        $(dom).html($(dom).attr("title") + "：" + arr[i]);
+                    } else {
+                        if (i < arr.length - 1) {
+                            $(dom).html($(dom).attr("title") + "：<a href=javascript:openTab('d472030f-3094-4ad8-89cd-90c949fd4d91','" + top.contentPath + "/RiskDatabase/DangerSource/List?mode=1&year=&level=" + i + "&orgCode=" + orgCode + "&orgId=" + orgId + "','安全风险清单') class='stat_number' title='点击查看详情'>" + arr[i] + "</a>");
+                        } else {
+                            if (arr[i] > 0) {
+                                $(dom).html($(dom).attr("title") + "：<font color='red'><b>" + arr[i] + "%</b></font>");
+                            } else {
+                                $(dom).html($(dom).attr("title") + "：<font color='green'><b>" + arr[i] + "%</b></font>");
+                            }
+                        }
+                    }
+
+                });
+            });
+            //安全检查统计指标
+            $.post("../SaftyCheck/SaftyCheckData/GetCheckStat", { orgCode: $("#selDept").val(), orgId: $(selDept.options[selDept.selectedIndex]).attr("orgId") }, function (data) {
+                var arr = eval(data);
+                $(".check").each(function (i, dom) {
+                    if (parseInt(arr[i].num) == 0) {
+                        $(dom).html($(dom).attr("title") + "：" + arr[i].num);
+                    } else {
+                        $(dom).html($(dom).attr("title") + "：<a href=javascript:openIndex('" + i + "') class='stat_number' title='点击查看详情'>" + arr[i].num + "</a>");
+
+                    }
+                });
+            });
+
+
+            //隐患相关统计指标
+            $.post("../HiddenTroubleManage/HTStatistics/QueryHomeHidWorkIndex", { orgCode: $("#selDept").val(), orgId: $(selDept.options[selDept.selectedIndex]).attr("orgId") }, function (data) {
+                var obj = eval("(" + data + ")");
+                var html = "";
+                if (null != obj && obj.length > 0) {
+
+                    for (var i = 0; i < obj.length; i++) {
+                        var val1 = "";
+                        var val2 = "";
+                        var val3 = "";
+                        var val4 = "";
+                        switch (obj[i].itemvalue) {
+                            case "全部隐患":
+                                val1 = "qbyh";
+                                val2 = "qbyzg";
+                                val3 = "qbwzg";
+                                val4 = "qbyqwzg";
+                                break;
+                            case "I级重大隐患":
+                                val1 = "yjqbyh";
+                                val2 = "yjzdyzg";
+                                val3 = "yjzdwzg";
+                                val4 = "yjzdyqwzg";
+                                break;
+                            case "II级重大隐患":
+                                val1 = "erjqbyh";
+                                val2 = "erjzdyzg";
+                                val3 = "erjzdwzg";
+                                val4 = "erjzdyqwzg";
+                                break;
+                            case "一般隐患":
+                                val1 = "ybqbyh";
+                                val2 = "ybyzg";
+                                val3 = "ybwzg";
+                                val4 = "ybyqwzg";
+                                break;
+                        }
+                        var mark1 = "0";
+                        if (parseInt(obj[i].total) > 0) {
+                            mark1 = "<a href=javascript:openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0','../HiddenTroubleManage/HTBaseInfo/Index?mode=" + val1 + "','隐患工作指标') class='stat_number' title='点击查看详情'>" + obj[i].total + "</a>";
+                        }
+                        var mark2 = "0";
+                        if (parseInt(obj[i].yzgsl) > 0) {
+                            mark2 = "<a href=javascript:openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0','../HiddenTroubleManage/HTBaseInfo/Index?mode=" + val2 + "','隐患工作指标') class='stat_number' title='点击查看详情'>" + obj[i].yzgsl + "</a>";
+                        }
+
+                        var mark3 = "0";
+                        if (parseInt(obj[i].wzgsl) > 0) {
+                            mark3 = "<a href=javascript:openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0','../HiddenTroubleManage/HTBaseInfo/Index?mode=" + val3 + "','隐患工作指标') class='stat_number' title='点击查看详情'>" + obj[i].wzgsl + "</a>";
+                        }
+                        var mark4 = "0";
+                        if (parseInt(obj[i].yqwzgsl) > 0) {
+                            mark4 = "<a href=javascript:openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0','../HiddenTroubleManage/HTBaseInfo/Index?mode=" + val4 + "','隐患工作指标') class='stat_number' title='点击查看详情'>" + obj[i].yqwzgsl + "</a>";
+                        }
+
+                        html += "<tr><td>" + obj[i].itemvalue + "</td><td>" + mark1 + "</td><td>" + mark2 + "</td><td>" + mark3 + "</td><td>" + mark4 + "</td><td>" + obj[i].yhzgl + "%</td></tr>";
+                    }
+                    $("#hidBody").html(html);
+                }
+            });
+            if (top.currUserRoleName.indexOf("集团用户") >= 0) {
+                getAllStat();
+            } else {
+                //待办事项
+                getWork();
+            }
+
+
+        }
+        function getAllStat() {
+            $.post("../Home/GetAllWorkState", function (data) {
+                $("#tabWorkSum").find(".tr_0").remove();
+                var json = eval("(" + data + ")");
+                var html = "";
+                $(json).each(function (i, item) {
+                    html += "<tr class='tr_0 tr" + item.code + "'><td>" + item.name + "</td><td>" + item.yjfx + "</td><td>" + item.ejfx + "</td><td>" + item.jccs + "</td><td>" + item.ybyh + "</td><td>" + item.zdyh1 + "</td><td>" + item.zdyh2 + "</td><td>" + item.yzgs + "</td><td>" + item.wzgs + "</td><td>" + item.zgl + "</td></tr>";
+                });
+                $("#tabWorkSum").append(html);
+
+                var code = $("#selDept").val();
+                if (code.length > 0) {
+                    $(".tr_0").hide();
+                    $(".tr" + code).show();
+                } else {
+                    $(".tr_0").show();
+                }
+            });
+        }
+        //待办事项
+        function getWork() {
+            var urls = new Array("", "../HiddenTroubleManage/HTApproval/Index", "../HiddenTroubleManage/HTChangeInfo/Index",
+                "../HiddenTroubleManage/HTExtension/Index", "../HiddenTroubleManage/HTAcceptInfo/Index", "../HiddenTroubleManage/HTEstimate/Index", "/ERCHTMS/RiskDatabase/RiskPlan/List");
+            var ids = new Array("", "18e2a7d1-73f6-484c-b2c7-c77f88f0f3e1", "98210480-3531-4441-a913-2ccb93e2f605",
+                "2a9d84a3-01b3-4faa-b8d8-0a601355ceab", "8463a55b-cc36-439a-bcab-f8fb993c0190", "f87023f5-c1ca-4d8d-a57b-0354f052a02e", "7b040bd0-7561-4f87-8967-49c0f969702a");
+            var titles = new Array("", "隐患评估", "隐患整改", "延期审(核)批", "隐患验收", "整改效果评估", "风险辨识评估计划");
+            $.post("../Home/GetWorkList", { mode: mode }, function (data) {
+                var arr = eval(data);
+                var html = "";
+                $(arr).each(function (i, item) {
+                    if (item == 0) {
+                        $("#work").find("label").eq(i).html(item);
+                    } else {
+                        if (i != 0) {
+                            $("#work").find("label").eq(i).html("<a href=javascript:openTab('" + ids[i] + "','" + urls[i] + "?mode=" + mode + "','" + titles[i] + "') class='stat_number' title='点击查看详情'>" + item + "</a>");
+                        }
+                        else {
+                            var itemcheck = new Array();
+                            itemcheck = item.split(',');
+                            $("#work").find("label").eq(i).html("<a href='#' class='stat_number' title='点击查看详情'>" + itemcheck[0] + "</a>");
+                            $("#work").find("label").eq(i).attr("onclick", "showBigTrb('" + itemcheck[1] + "','" + itemcheck[2] + "','" + itemcheck[3] + "','" + itemcheck[4] + "','" + itemcheck[5] + "')");
+                        }
+                    }
+
+                });
+                $(".tab1").append(html);
+            });
+
+        }
+
+        //查看隐患详情
+        function viewdata(obj, atype, workstream) {
+            var rqUrl = "";
+            var title = "";
+
+            //未整改隐患的查看页面
+            if (workstream == "隐患登记") {
+                if (atype == "0") {
+                    title = "查看隐患";
+                    rqUrl = '/HiddenTroubleManage/HTBaseInfo/Form?keyValue=' + obj + '&actiontype=view';
+                }
+                else  //已整改的查看页面
+                {
+                    title = "已整改隐患查看";
+                    rqUrl = '/HiddenTroubleManage/HTBaseInfo/NewForm?keyValue=' + obj + '&actiontype=view';
+                }
+            }
+            else if (workstream == "隐患评估") {
+                title = "查看隐患";
+                rqUrl = '/HiddenTroubleManage/HTApproval/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患整改") {
+                title = "查看隐患";
+                rqUrl = '/HiddenTroubleManage/HTChangeInfo/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患验收") {
+                title = "查看隐患";
+                rqUrl = '/HiddenTroubleManage/HTAcceptInfo/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "整改效果评估" || workstream == "整改结束") {
+                title = "查看隐患";
+                rqUrl = '/HiddenTroubleManage/HTEstimate/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else {
+                title = "查看违章";
+                rqUrl = '/HiddenTroubleManage/HTBaseInfo/Form?keyValue=' + obj + '&actiontype=view';
+            }
+
+            dialogOpen({
+                id: 'HidForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: null
+            });
+        }
+
+        //初始化
+        function InitialPage() {
+            if (top.currUserRoleName.indexOf("集团用户") >= 0) {
+                $("#btnSpace").hide();
+                $("#dbsw").hide();
+                $.post("../BaseManage/Organize/GetDTList", function (data) {
+                    var json = eval("(" + data + ")");
+                    var html = "<option value='' orgId=''>全部</option>";
+                    $(json).each(function (i, item) {
+                        html += "<option value='" + item.encode + "' orgId='" + item.orgid + "'>" + item.fullname + "</option>";
+                    });
+                    $("#selDept").html(html);
+                });
+            } else {
+
+                $("#divDept").hide();
+                $("#tabSum").remove();
+                $("#tabWorkSum").remove();
+            }
+            $('#desktop').height($(window).height() - 22);
+            $(window).resize(function (e) {
+                window.setTimeout(function () {
+                    $('#desktop').height($(window).height() - 22);
+                }, 200);
+                e.stopPropagation();
+            });
+            if (roleNames.indexOf("负责人") < 0) {
+                $("#btnWorks").remove();
+            }
+            var width = ($(window).width() / 3) - 30;
+            $("#divFX").width(width); $("#divJC").width(width); $("#divSGYH").width(width);
+
+
+        }
+        var isWork = false;//双控工作ajax请求加载标识
+        var isRank = false;//隐患曝光与风险排名ajax请求加载标识
+        //导航切换
+        function changeTab(idx, obj) {
+            $(".con0").hide();
+            $(".con0").eq(idx).show();
+            $(".btn1").removeClass("btn-primary");
+            $(obj).addClass("btn-primary");
+            $(".btn1").addClass("btn-default");
+            //双控工作
+            if (idx == 1) {
+                if (!isWork) {
+                    isWork = true;
+                    stat();
+                }
+
+            }
+            //隐患曝光与风险排名
+            if (idx == 3) {
+                if (!isRank) {
+                    isRank = true;
+                    rank();
+                }
+            }
+        }
+
+        //待办事项切换
+        function changeWork(idx, obj) {
+
+            $(".btn2").removeClass("btn-primary");
+            $(obj).addClass("btn-primary");
+            $(".btn2").addClass("btn-default");
+            mode = idx;
+            getWork();
+        }
+
+        function openTab(id, url, title) {
+            if (top.$.tab != undefined) {
+                top.$.tab.addTab(id, url, title);
+            } else {
+                top.tablist.newTab({ id: id, title: title, closed: true, icon: "fa fa-list-alt", url: url, moduleIdCookie: true });
+            }
+        }
+
+        //列表详情
+        function openIndex(index) {
+            var ctype = "";
+            if (index > 0) {
+                ctype = parseInt(index);
+            }
+            var title = "安全检查";
+            switch (ctype) {
+                case 1:
+                    title = "日常" + title;
+                    break;
+                case 2:
+                    title = "专项" + title;
+                    break;
+                case 3:
+                    title = "节假日前后" + title;
+                    break;
+                case 4:
+                    title = "季节性" + title;
+                    break;
+                case 5:
+                    title = "综合" + title;
+                    break;
+                default:
+            }
+            var url = '/SaftyCheck/SaftyCheckDataRecord/IndexView?ctype=' + ctype;
+            var idx = dialogOpen({
+                id: "win0",
+                title: title + "列表",
+                url: url,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(idx);
+                }
+            });
+        }
+
+        function showBigTrb(val1, val2, val3, val4, val5) {
+            var title = "安全检查";
+            var url = '../SaftyCheck/SaftyCheckDataRecord/check?rcnum=' + val1 + "&zxnum=" + val2 + "&jjrnum=" + val3 + "&jjnum=" + val4 + "&zhnum=" + val5 + "&mode=" + mode;
+            openTab("3e3772fb-e1c2-42c9-9f98-fb0477158845", url, "待办安全检查");
+        }
+        function openPage(title, url) {
+            var idx = dialogOpen({
+                id: "warn",
+                title: title,
+                url: url,
+                width: "900px",
+                height: ($(top.window).height() - 200) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(idx);
+                }
+            });
+        }
+
+    </script>
+
+    <script type="text/javascript">
+        var chatObj = {};
+        var uId = top.currUserId;
+        var apiUrl = "@BSFramework.Util.Config.GetValue("ApiServiceUrl")";
+        var signalRUrl = "@BSFramework.Util.Config.GetValue("SignalRUrl")";
+
+        function chatLine(id, title, x, y, plotBands) {
+            $(id).highcharts({
+                chart: {
+                    type: 'line'
+                    //,events: {
+                    //    click: function (event) {
+                    //        alert('x: ' + event.yAxis[0].value);
+                    //       }
+
+                    //     }
+                },
+                legend: {
+                    enabled: false
+                },
+                title: {
+                    text: title,
+                    align: 'center',
+                    style: { fontWeight: 'bold' }
+                },
+                xAxis: {
+                    categories: x
+                },
+                yAxis: {
+                    gridLineDashStyle: 'longdash',
+                    allowDecimals: false,
+                    gridLineColor: "#c7d3da",
+                    min: 0,
+                    max: 100,
+                    tickInterval: 10,
+                    title: {
+                        text: '分值'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value;
+                        }
+                    }
+                    , plotBands: plotBands
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true,
+                    formatter: function () {
+                        return '<b>' + this.x + '</b><br/>分值： ' + this.y;
+                    }
+                },
+                plotOptions: {
+                    line: {
+                        marker: {
+                            radius: 3,
+                            lineColor: '#666666',
+                            lineWidth: 1
+                        },
+                        dataLabels: {
+                            enabled: true,
+                            formatter: function () {
+                                return this.y;
+                            }
+                        }
+                    }
+                },
+                series: [{
+                    name: '月份',
+                    marker: {
+                        symbol: 'square'
+                    },
+                    data: y,
+                    point: {
+                        events: {
+                            'click': function () {
+                                var time = x[this.x].replace(".", "-") + "-01";
+                                if (id == "#divFX") {
+                                    openPage('安全风险', '/Home/SafetyRisk?time=' + time);
+                                }
+                                if (id == "#divJC") {
+                                    openPage('安全检查', '/Home/SafetyCheck?time=' + time);
+                                }
+                                if (id == "#divSGYH") {
+                                    openPage('隐患排查', '/Home/SafetyTide?time=' + time);
+                                }
+                                if (id == "#divQS") {
+                                    openPage('预警趋势', '/Home/SafetyWarn?time=' + time);
+                                }
+                            }
+                        }
+                    }
+
+                }]
+           , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        }
+        function drawChart() {
+            $.post("../home/GetPlotBands", { colors: "#fae0d9,#ffebd6,#ffffe0,#ccebff" }, function (res) {
+                var plotBands = eval(res);
+
+                //预警指数
+                var selDept = document.getElementById("selDept");
+                $.get("../home/GetWarnValue", { orgCode: $("#selDept").val(), orgId: $(selDept.options[selDept.selectedIndex]).attr("orgId") }, function (data) {
+                    var json = eval("(" + data + ")");
+                    var colors = new Array("#ff9937", "#ff8686", "#91d4ff", "#5ae6b6");
+                    var descs = new Array("危险", "较危险", "较安全", "安全");
+                    var newPlotBands = new Array();
+                    $(plotBands).each(function (i, item) {
+                        newPlotBands.push({ from: item.from, to: item.to, color: colors[i], thickness: 30 });
+                    });
+                    $("#divStatus").html("<div onclick=\"openPage('安全生产预警详情', '/Home/SafetyWarn')\" style='cursor:pointer;z-index:10;'>目前处于" + descs[json.index] + "的状态<br /><font>点击查看详情</font></div>");
+                    var html = "<tr>";
+                    for (var j = 0; j < colors.length; j++) {
+                        html += "<td style=\"width:40px; height:10px;background-color:" + colors[j] + "\">&nbsp;</td><td style='width:60px;'>" + descs[j] + "&nbsp;&nbsp;</td>";
+                    }
+                    html += "</tr>";
+                    $("#tabTips").html(html);
+                    $("#divImg").highcharts({
+                        chart: {
+                            type: 'gauge',
+                            plotBackgroundColor: '#ffffff',
+                            plotBackgroundImage: null,
+                            plotBorderWidth: 0,
+                            plotShadow: false,
+                            backgroundColor: '#ffffff'
+                        },
+                        title: {
+                            text: "",
+                            align: 'left'
+                        },
+                        exporting: { enabled: false },
+                        pane: {
+                            startAngle: -90,
+                            endAngle: 90,
+                            background: [{
+                                backgroundColor: '#fff',
+                                borderWidth: 0,
+                                outerRadius: '100%',
+                                innerRadius: '0%'
+                            }]
+                        },
+                        yAxis: {
+                            min: 0,
+                            max: 100,
+                            minorTickInterval: 'auto',
+                            minorTickWidth: 1,
+                            minorTickLength: 10,
+                            minorTickPosition: 'inside',
+                            minorTickColor: '#fff',
+
+                            tickInterval: 10,
+                            tickWidth: 2,
+                            tickPosition: 'inside',
+                            tickLength: 40,
+                            tickColor: '#fff',
+                            labels: {
+                                step: 1,
+                                rotation: 'auto',
+                                distance: 10
+                            },
+                            title: {
+                                text: json.score + "分",
+                                style: {
+                                    fontSize: "25px",
+                                    fontWeight: "bold",
+                                }
+                            },
+                            plotBands: newPlotBands
+                        },
+                        plotOptions: {
+                            gauge: {
+                                dataLabels: {
+                                    y: 5,
+                                    borderWidth: 0,
+                                    useHTML: true
+                                },
+                                dial: {
+                                    backgroundColor: '#F8A338',
+                                    radius: '80%'
+                                },
+                                pivot: {
+                                    backgroundColor: '#F8A338',
+                                },
+                                events: {
+                                    click: function (event) {
+                                        updateDial(event);//点击仪表盘
+                                    }
+                                }
+                            }
+                        },
+                        series: [{
+                            name: '预警指数',
+                            data: [json.score],
+                            dataLabels: {
+                                formatter: function () {
+
+                                }
+                            }
+                        }],
+                        tooltip: {
+                            valueSuffix: '分',
+                            enabled: true
+                        }
+                    });
+                });
+
+                //安全预警趋势图
+                $.post("../home/GetRiskTrend", { orgCode: $("#selDept").val(), orgId: $(selDept.options[selDept.selectedIndex]).attr("orgId") }, function (riskVal) {
+                    var json = eval("(" + riskVal + ")");
+                    chatLine("#divQS", "安全生产指标预警指数趋势图", json.x, json.y, plotBands);
+                });
+
+                //安全风险
+                $.post("../home/GetRiskValues", { orgCode: $("#selDept").val(), orgId: $(selDept.options[selDept.selectedIndex]).attr("orgId") }, function (riskVal) {
+                    var json = eval("(" + riskVal + ")");
+                    chatLine("#divFX", "安全风险", json.x, json.y, plotBands);
+
+                });
+
+                //隐患排查
+                $.post("../home/GetHiddenValues", { orgCode: $("#selDept").val(), orgId: $(selDept.options[selDept.selectedIndex]).attr("orgId") }, function (data) {
+                    var json = eval("(" + data + ")");
+                    chatLine("#divSGYH", "隐患排查", json.x, json.y, plotBands);
+                });
+
+                //安全检查
+                $.post("../home/GetSafeCheckWarningM", { orgCode: $("#selDept").val(), orgId: $(selDept.options[selDept.selectedIndex]).attr("orgId") }, function (data) {
+                    var json = eval("(" + data + ")");
+                    chatLine("#divJC", "安全检查", json.x, json.y, plotBands);
+                });
+
+            });
+        }
+        function setDept(obj) {
+
+            drawChart();
+            stat();
+            var code = $(obj).val();
+            if (code.length > 0) {
+                $(".tr_0").hide();
+                $(".tr" + code).show();
+            } else {
+                $(".tr_0").show();
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="border" id="desktop" style="margin:0px; background: #fff; overflow-y: auto; overflow-x: auto; ">
+        <div class="portal-panel" style="margin-left:0px;">
+            <div class="row" style="margin-top: 0px; position:fixed;z-index:10000;width:100%; background-color:white; padding-top:5px;">
+                <div class="col-md-8">
+                    <div class="btn-group">
+                        <button id="btnWarn" class="btn btn-primary btn1" type="button" onclick="changeTab(0,this)"><i class="fa fa-exclamation-triangle"></i>&nbsp;安全工作预警</button>
+                        <button id="btnWork" class="btn btn-default btn1" type="button" onclick="changeTab(1,this)"><i class="fa fa-bell-o"></i>&nbsp;双控工作</button>
+                        <button id="btnSpace" class="btn btn-default btn1" type="button" onclick="changeTab(2,this)"><i class="fa fa fa-area-chart"></i>&nbsp;四色空间分布图</button>
+                        <button id="btnRank" class="btn btn-default btn1" type="button" onclick="changeTab(3,this)"><i class="fa fa-paw"></i>&nbsp;隐患曝光与风险排名</button>
+                    </div>
+                </div>
+                <div class="col-md-4 text-right" id="divDept">
+                    单位：<select class="form-control" id="selDept" style="width:200px; display:inline" onchange="setDept(this)">
+                        <option value="" orgid=""></option>
+                    </select> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                </div>
+
+            </div>
+            <!---安全工作预警--->
+            <div class="row con0" id="con1" style="position:relative; top:30px;">
+                <table cellpadding="3" cellspacing="3" style="margin-top:10px; width:100%;">
+                    <tr>
+                        <td valign="bottom" align="center">
+                            <div id="divImg" title="点击查看详情" onclick="openPage('安全生产预警详情', '/Home/SafetyWarn')" style="margin-top:50px;">
+
+                            </div>
+                            <div style="position: relative; left: -15px; top: -170px; z-index:1000; font-size:18px; font-weight:bold;z-index:10;" id="divStatus">目前处于安全状态</div>
+                            <div style="position: relative; left: -15px; top: -130px; z-index: 1000; width: 280px;">
+                                <table id="tabTips" cellpadding="5" cellspacing="10" style="width:100%; padding-top:8px;"></table>
+                            </div>
+                        </td>
+                        <td colspan="2" valign="top">
+                            <div id="divColors" class="row">
+                                <div class="col-xs-2 text-right">
+                                    <button type="button" class="btn btn-warning" style="background-color: #fae0d9; border-color: #ff9937; "></button>危险
+                                </div>
+                                <div class="col-xs-2 text-right">
+                                    <button type="button" class="btn btn-primary" style="background-color: #ffebd6; border-color: #ffcccc; "></button>警告
+                                </div>
+                                <div class="col-xs-2 text-right">
+                                    <button type="button" class="btn btn-blue1" style="background-color: #ffffe0; border-color: #ffebd6; "></button>注意
+                                </div>
+                                <div class="col-xs-2 text-right">
+                                    <button type="button" class="btn btn-gray1" style="background-color: #ccebff; border-color: #ccebff; "></button>安全
+                                </div>
+                            </div>
+                            <div id="divQS" class="row">
+                                <center style="margin-top:50px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="3">
+                            <table cellpadding="0" cellspacing="0" class="tab1 tab3" border="1" style="width:100%;" id="tabSum">
+                                <tr style="font-weight: bold;">
+                                    <td align="center">单位</td>
+                                    <td align="center">安全风险得分</td>
+                                    <td align="center">安全检查得分</td>
+                                    <td align="center">隐患排查得分</td>
+                                    <td align="center">预警指数</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td valign="top" style="width:33%;"><div id="divFX"><center style="margin-top:50px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center></div></td>
+                        <td valign="top" style="width:33%;"><div id="divJC"><center style="margin-top:50px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center></div></td>
+                        <td valign="top" style="width:33%;"><div id="divSGYH"><center style="margin-top:50px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center></div></td>
+                    </tr>
+                </table>
+
+            </div>
+            <!---工作指标--->
+            <div class="row con0" style="overflow: hidden; margin-bottom: 10px; display: none;position:relative; top:30px;" id="con2">
+                <div style="width: 80%; float: left;">
+                    <div class="portal-panel-title" style="font-weight: bold; color: #41b1c6;">
+                        <i class="fa fa-hand-pointer-o"></i>&nbsp;&nbsp;工作指标
+                    </div>
+                    <div class="row" style="margin-right: 80px; margin-top: 10px;">
+
+                        <table cellpadding="0" cellspacing="0" class="tab0" border="1">
+                            <!---风险工作指标--->
+                            <tr>
+                                <td class="risk cell" title="现有风险">现有风险</td>
+                                <td class="risk cell" title="一级风险">一级风险</td>
+                                <td class="risk cell" title="二级风险">二级风险</td>
+                                <td class="risk cell" title="三级风险">三级风险</td>
+                                <td class="risk cell" title="四级风险">四级风险</td>
+                                <td class="risk" title="本年风险同比增长">本年风险同比增长</td>
+                            </tr>
+
+                            <!---安全检查工作指标--->
+                            <tr>
+                                <td class="check cell" title="安全检查条数">安全检查条数</td>
+                                <td class="check cell" title="日常检查">日常检查</td>
+                                <td class="check cell" title="专项检查">专项检查</td>
+                                <td class="check cell" title="节假日检查">节假日检查</td>
+                                <td class="check cell" title="季节性检查">季节性检查</td>
+                                <td class="check cell" title="综合性检查">综合性检查</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <!---隐患排查工作指标--->
+                    <div class="row" style="margin-right:80px; margin-top:10px;">
+                        <table cellpadding="0" cellspacing="0" class="tab0" border="1">
+                            <tr style="font-weight:bold;">
+                                <td class="cell">隐患指标</td>
+                                <td class="cell">总数量</td>
+                                <td class="cell">已整改</td>
+                                <td class="cell">未整改</td>
+                                <td class="cell">逾期未整改</td>
+                                <td>整改率</td>
+                            </tr>
+                             
+                            <tbody id="hidBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="row" style="margin-right:80px; margin-top:10px;">
+                        <table cellpadding="0" cellspacing="0" class="tab1 tab3" border="1" style="width:100%;" id="tabWorkSum">
+                            <tr style="font-weight: bold;">
+                                <td align="center">单位</td>
+                                <td align="center">一级风险数量</td>
+                                <td align="center">二级风险数量</td>
+                                <td align="center">安全检查次数</td>
+                                <td align="center">一般隐患数</td>
+                                <td align="center">I级重大隐患数</td>
+                                <td align="center">II级重大隐患数</td>
+                                <td align="center">已整改隐患数</td>
+                                <td align="center">未整改隐患数</td>
+                                <td align="center">隐患整改率(%)</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <!---待办事项--->
+                <div style="width: 20%; float: left;" id="dbsw">
+                    <div class="portal-panel-title" style="font-weight: bold; color: #41b1c6">
+                        <i class="fa fa-bullhorn"></i>&nbsp;&nbsp;待办事项
+                        &nbsp;&nbsp;&nbsp;&nbsp;
+                        <div class="btn-group" id="btnWorks">
+                            <button id="btnMe" class="btn btn-primary btn-xs btn2" type="button" onclick="changeWork(0,this)">&nbsp;我的</button>
+                            <button id="btnAll" class="btn btn-default btn-xs btn2" type="button" onclick="changeWork(1, this)">&nbsp;全部</button>
+                        </div>
+                    </div>
+                    <div class="portal-panel-content" style="overflow: hidden;" id="work">
+                        <div style="line-height: 39px; border-bottom: 1px solid #ccc;">
+                            <a href="#" style="text-decoration: none;">待执行安全检查数</a>
+                            <label style="float: right">100</label>
+                        </div>
+                        <div style="line-height: 39px; border-bottom: 1px solid #ccc;">
+                            <a href="#" style="text-decoration: none;">待评估隐患数</a>
+                            <label style="float: right"></label>
+                        </div>
+                        <div style="line-height: 39px; border-bottom: 1px solid #ccc;">
+                            <a href="#" style="text-decoration: none;">待整改隐患数</a>
+                            <label style="float: right"></label>
+                        </div>
+                        <div style="line-height: 39px; border-bottom: 1px solid #ccc;">
+                            <a href="#" style="text-decoration: none;">待审(核)批整改延期隐患数</a>
+                            <label style="float: right"></label>
+                        </div>
+                        <div style="line-height: 39px; border-bottom: 1px solid #ccc;">
+                            <a href="#" style="text-decoration: none;">待复查验收隐患数</a>
+                            <label style="float: right"></label>
+                        </div>
+                        <div style="line-height: 39px; border-bottom: 1px solid #ccc;">
+                            <a href="#" style="text-decoration: none;">待效果评估隐患数</a>
+                            <label style="float: right"></label>
+                        </div>
+                        <div style="line-height: 39px; border-bottom: 1px solid #ccc;">
+                            <a href="#" style="text-decoration: none;">进行中风险计划数</a>
+                            <label style="float: right"></label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!---四色空间分布图--->
+            <div class="row con0" id="con3" style="display: none; position: relative; top: 30px;">
+                <img src="../Resource/Images/space.jpg" />
+            </div>
+
+            <!---隐患曝光与风险排名--->
+            <div class="row con0" id="con4" style="margin-top: 10px; display: none; position: relative; top: 30px;">
+                <!---隐患曝光台--->
+                <table style="width:100%;" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="border-bottom: 1px solid #ccc; font-size: 16px; color: #666; line-height: 45px; font-weight: bold; color: #41b1c6;"><i class="fa fa-sun-o" id="iRank"></i>&nbsp;&nbsp;隐患曝光台</td>
+                        <td style="border-bottom: 1px solid #ccc; text-align: right; font-size: 16px; color: #666; line-height: 45px;  "><a onclick="openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0', '../HiddenTroubleManage/HTBaseInfo/Index?mode=1', '隐患台账')" style="cursor:pointer">+更多</a></td>
+                    </tr>
+                </table>
+                <div class="row" style="margin-right:80px; margin-top:10px; height:180px;" id="exposureTB">
+                    暂无数据
+                </div>
+                <!---风险排名--->
+                <div id="rank" class="row">
+                    <table style="width:100%;" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td style="border-bottom: 1px solid #ccc; font-size: 16px; color: #666; line-height: 45px; font-weight: bold; color: #41b1c6;"><i class="fa fa-line-chart" id="iRank"></i>&nbsp;&nbsp;风险排名</td>
+                            <td style="border-bottom: 1px solid #ccc; text-align: right; font-size: 16px; color: #666; line-height: 45px;  "><a onclick="openTab('d472030f-3094-4ad8-89cd-90c949fd4d91','/ERCHTMS/RiskDatabase/DangerSource/List?mode=1','风险清单排名')" style="cursor:pointer">+更多</a></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="row" style="margin-right: 80px; margin-top: 10px; margin-bottom: 10px;">
+                    <table cellpadding="0" cellspacing="0" class="tab1" border="1" style="width:100%;" id="tabRank">
+                        <tr style="font-weight: bold;">
+                            <td style="width: 40px;" align="center">排名</td>
+                            <td align="center">风险描述</td>
+                            <td style="width: 70px;" align="center">风险级别</td>
+                            <td style="width: 60px;" align="center">风险值</td>
+                            <td align="center" style="width: 110px;">风险类别</td>
+                            <td align="center" style="width: 200px;">风险后果</td>
+                            <td style="width: 120px;" align="center">岗位</td>
+                            <td style="width: 150px;" align="center">管控责任单位</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

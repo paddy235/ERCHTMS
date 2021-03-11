@@ -1,0 +1,392 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+<script>
+    ;
+    $(function () {
+        InitialPage();
+        GetGrid();
+        //加载是否超标数据
+        $("#Status").ComboBox({
+            url: top.contentPath + "/CarManage/Carinfo/GetWzStatus",
+            id: "itemValue",
+            text: "itemName",
+            height: '100px',
+            description: "==请选择==",
+            allowSearch: true
+        });
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 108.5);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../CarManage/BusinessCar/GetListJson",
+            postData: { queryJson: JSON.stringify({ Type: "2" }) },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                { label: '主键', name: 'createuserid', hidden: true },
+                { label: '主键', name: 'createdate', hidden: true },
+                { label: '主键', name: 'modifyuserid', hidden: true },
+                { label: '主键', name: 'modifydate', hidden: true },
+                { label: '主键', name: 'createuserdeptcode', hidden: true },
+                { label: '主键', name: 'createuserorgcode', hidden: true },
+                {
+                    label: '操作',
+                    name: 'Oper',
+                    width: 160,
+                    align: 'center',
+                    sortable: false
+                },
+                {
+                    label: '车牌号',
+                    name: 'carno',
+                    index: 'carno',
+                    width: 200,
+                    align: 'center'
+                },
+                
+                {
+                    label: '内部编号',
+                    name: 'model',
+                    index: 'model',
+                    width: 200,
+                    align: 'center'
+                },
+               
+                //{
+                //    label: '下次年检日期',
+                //    name: 'nextinsperctiondate',
+                //    index: 'nextinsperctiondate',
+                //    width: 200,
+                //    align: 'center',
+                //    formatter: function (cellvalue, options, rowObject) {
+                //        return formatDate(cellvalue, 'yyyy-MM-dd');
+                //    }
+                //},
+                {
+                    label: '车辆定位',
+                    name: 'cardw',
+                    index: 'cardw',
+                    sortable: false,
+                    width: 200,
+                    align: 'center'
+                },
+                {
+                    label: '进出厂记录',
+                    name: 'jclog',
+                    index: 'jclog',
+                    sortable: false,
+                    width: 200,
+                    align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href='javascript:pass(\"" + rowObject.id + "\")'> 查看 </a>";
+                        return html;
+
+                    }
+                },
+                {
+                    label: '违章记录',
+                    name: 'wzlog',
+                    index: 'wzlog',
+                    sortable: false,
+                    width: 200,
+                    align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.znum == 0) {
+                            return "0";
+                        } else {
+                            var html = "<a href='javascript:QueryWzList(\"" + rowObject.carno + "\")'>" + rowObject.znum + "条（" + rowObject.num + " 条未处理 ）</a>";
+                            return html;
+                        }
+
+                    }
+                },
+
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            userdata: "userdata",
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                gridqx($gridTable);
+                var ids = $("#gridTable").getDataIDs();
+                //for (var i = 0; i < ids.length; i++) {
+                //    var rowData = $("#gridTable").getRowData(ids[i]);
+                //    var nexttime = rowData.nextinsperctiondate;
+                //    var now = new Date();
+                //    var nowday = now.getFullYear() + "-" + (now.getMonth() + 1) + "-" + now.getDate();
+                //    var day = dattdifference(nowday, nexttime);
+                //    if (day <= 30 && day >= 0) { //超标则标黄
+                //        $('#' + ids[i]).find("td").eq(9).css("background-color", "#ffa500");
+                //    } else if (day < 0) {
+                //        $('#' + ids[i]).find("td").eq(9).css("background-color", "#ff0000");
+                //    } else {
+                //        $('#' + ids[i]).find("td").eq(9).css("background-color", "#ffffff");
+                //    }
+
+                //}
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value);
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword").val()),
+                Type: "2",
+                WzStatus: $("#Status").attr('data-value')
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val("");
+            $("#queryCondition .dropdown-text").html("选择条件").attr("data-value", "");
+            $("#Status").attr("data-text", "===全部===");
+            $("#Status").attr("data-value", "");
+            $("#Status div:eq(0)").text("===全部===");
+            var queryJson = {
+                condition: '',
+                keyword: '',
+                Type: "2"
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+    //计算连个时间中的差值
+    function dattdifference(sDate1, sDate2) {
+        var dateSpan, tempDate, iDays;
+        sDate1 = Date.parse(sDate1);
+        sDate2 = Date.parse(sDate2);
+        dateSpan = sDate2 - sDate1;
+        //dateSpan = Math.abs(dateSpan);
+        iDays = Math.floor(dateSpan / (24 * 3600 * 1000));
+        return iDays;
+    }
+
+    //查看过岗记录
+    function pass(keyValue) {
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看车辆进出记录',
+                url: '/CarManage/Carinlog/BusinessForm?cid=' + keyValue,
+                width: '1000px',
+                height: '800px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //新增
+    function btn_add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加商务公车信息表',
+            url: '/CarManage/BusinessCar/Form',
+            width: '1000px',
+            height: '800px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //查看
+    function show() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看商务公车信息表',
+                url: '/CarManage/BusinessCar/Form?action=show&keyValue=' + keyValue,
+                width: '1000px',
+                height: '800px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+
+
+    }
+    //编辑
+    function edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑商务公车信息表',
+                url: '/CarManage/BusinessCar/Form?keyValue=' + keyValue,
+                width: '1000px',
+                height: '800px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../CarManage/BusinessCar/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的商务公车信息！', 0);
+        }
+    }
+
+    var idx;
+    function importData() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入公车',
+            url: '/CarManage/BusinessCar/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                var queryJson = {
+                    condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                    keyword: $.trim($("#txt_Keyword").val()),
+                    Type: "2"
+                }
+                $('#gridTable').jqGrid('setGridParam', {
+                    postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+                }).trigger('reloadGrid');
+
+
+            }
+        });
+    }
+
+    //查看违章记录
+    function QueryWzList(carno) {
+        if (checkedRow(carno)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看违章记录',
+                url: '/CarManage/Carinfo/ViolationRecord?carno=' + carno,
+                width: '1000px',
+                height: '600px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+</script>
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            <tr>
+                <td>查询条件:</td>
+                <td style="padding-left: 10px">
+                    <div id="queryCondition" class="btn-group">
+                        <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                        <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a data-value="CarNo">车牌号</a></li>
+                        </ul>
+                    </div>
+                </td>
+                <td style="padding-left: 10px">
+                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                </td>
+                <td style="padding-left: 5px">
+                    违章异常
+                </td>
+                <td style="padding-left: 10px">
+                    <div id="Status" style="width: 200px;" type="select" class="ui-select"></div>
+                </td>
+                <td style="padding-left: 5px;">
+                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                    <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                </td>
+                @*<td style="padding-left: 10px">
+                    <div class="btn-group">
+                        <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                        <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li style="width: 220px;">
+                                <a style="float: left">车辆逾期未年检</a>
+                                <div style="float: left; background-color: red; height: 22px; width: 80px; margin-left: 12px;"></div>
+                            </li>
+                            <li style="width: 220px;">
+                                <a style="float: left">车辆年检即将到期</a>
+                                <div style="float: left; background-color: orange; height: 22px; width: 80px;"></div>
+                            </li>
+
+                        </ul>
+                    </div>
+                </td>*@
+            </tr>
+        </table>
+    </div>
+    <div class="toolbar">
+        <div class="btn-group">
+            <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+            @*<a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+            <a id="imp" class="btn btn-default" onclick="importData()"><i class="fa fa-superscript"></i>导入</a>*@
+        </div>
+        <script>$('.toolbar').authorizeButton()</script>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

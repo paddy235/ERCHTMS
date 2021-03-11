@@ -1,0 +1,126 @@
+﻿@{
+    ViewBag.Title = "SumIndex";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+<script>
+    ;
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 150);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 150,
+            url: "../../AssessmentManage/AssessmentSum/GetSumUpPageJson",
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', width: 10, align: 'left', hidden: true },
+                   {
+                       label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                       formatter: function (cellvalue, options, rowObject) {
+                           var html = "";
+                           if (rowObject.isupdate == "1") {//1表示有权限
+                               html += "<a href=javascript:goToPage('" + rowObject.id + "')  title='撰写综述'><i class='fa fa-calendar-plus-o'></i></a>";
+                           }
+                           if (rowObject.report == "1")//1表示有权限
+                               html += "<a href=javascript:goReport('" + rowObject.id + "')  title='生成报告'><i class='fa fa-paste'></i></a>";
+                           return html;
+                       }
+                   },
+                { label: '计划名称', name: 'planname', width: 400, align: 'center', sortable: true },
+                { label: '自评组长', name: 'teamleadername', width: 120, align: 'center', sortable: false },
+                { label: '自评总结进度', name: 'progress', width: 150, align: 'center', sortable: false },
+                { label: '自评状态', name: 'status', width: 80, align: 'center', sortable: false }],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 25, 30],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //撰写综述
+    function goToPage(planid) {
+        dialogOpen({
+            id: 'summarize',
+            title: '综述',
+            url: '/AssessmentManage/AssessmentSum/SumUp?planid=' + planid,
+            width: "600px",
+            height: "700px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+
+    //生成报告
+    function goReport(planid) {
+        $.SaveForm({
+            url: "../../AssessmentManage/AssessmentSum/SavePlanStatusInfo?planid=" + planid,
+            param: { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val() },
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; padding-left:5px;">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td></td>
+                            <td style="padding-left: 5px;"></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

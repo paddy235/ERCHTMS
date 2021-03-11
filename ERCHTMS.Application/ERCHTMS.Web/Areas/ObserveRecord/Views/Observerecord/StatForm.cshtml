@@ -1,0 +1,884 @@
+﻿@{
+    ViewBag.Title = "统计分析";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script src="~/Content/Scripts/plugins/highcharts/highcharts.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/modules/exporting.js"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/common.js"></script>
+
+<script>
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var safeJjx = 0;
+    var flag = "zb";
+    $(function () {
+        InitPage();
+        GetJjx();
+        loadStatByType("", "", "","");
+        //查询事件
+        $("#btn_Search").click(function () {
+            StaQuery(flag);
+        });
+    })
+    function InitPage() {
+        $("#DepartmentName").ComboBox({
+            url: "../../BaseManage/Department/GetContractDept",
+            id: "DepartmentId",
+            text: "FullName",
+            description: "==全部==",
+            height: "200px"
+        })
+    }
+    //饼状图
+    function loadStatByType(deptCode, year, quarter,month) {
+        $.get("GetSafetyStat", { deptCode: deptCode, year: year, quarter: quarter, month: month },
+            function (data) {
+                var data = eval("(" + data + ")");
+                $('#piecontainer0').highcharts({
+                    title: {
+                        text: '安全行为与不安全行为占比'
+                    },
+                    exporting: {
+                        enabled: false
+                    },
+                    credits: {
+                        enabled: false
+                    },
+                    chart: {
+                        type: 'pie'
+                    },
+                    tooltip: {
+                        formatter: function () {
+                            return '<b>数量：' + this.y + '个，占比：' + Highcharts.numberFormat(this.percentage, 2) + '%</b> ';
+                        }
+                    },
+                    plotOptions: {
+                        pie: {
+                            allowPointSelect: true, //点击切换
+                            cursor: 'pointer',
+                            dataLabels: {
+                                enabled: true,
+                                formatter: function () {
+                                    return '<b>' + this.point.name + '</b>: ' + Highcharts.numberFormat(this.percentage, 2) + ' %';
+                                }
+                            },
+                            showInLegend: true
+                        }
+                    },
+                    series: [{
+                        data: data.pie
+                    }]
+                    , lang: { noData: "暂无数据可显示!" },
+                    noData: {
+                        position: {
+                            align: 'center',
+                            verticalAlign: 'middle'
+                        },
+                        attr: {
+                            'stroke-width': 1
+                        },
+                        style: {
+                            fontWeight: 'bold',
+                            fontSize: '15px',
+                            color: '#202030'
+                        }
+                    }
+                });
+                loadTable(data.table);
+            });
+    }
+    //饼状图表格
+    function loadTable(tableData) {
+        $("#gridTable1").html("");
+        var html = "";
+        var total1 = 0;
+        var total2 = 0;
+
+        html += "<tr align=\"center\"  style=\"font-weight: bold; height:35px;\">";
+        html += "<td  rowspan=\"2\">观察类别</td>";
+        html += "<td  colspan=\"2\">安全行为</td>";
+        html += "<td  colspan=\"2\">不安全行为</td>";
+        html += "<td colspan=\"2\">员工安全建议</td>";
+        html += "</tr>";
+        html += "<tr style=\"font-weight: bold; height:35px;\">";
+        html += "<td>数量</td>";
+        html += "<td>占安全行为总量的比例</td>";
+        html += "<td>数量</td>";
+        html += "<td>占不安全行为总量的比例</td>";
+        html += "<td>数量</td>";
+        html += "<td>占建议总量的比例</td>";
+        html += "</tr>";
+
+        for (var i = 0; i < tableData.length; i++) {
+            html += "<tr>";
+            html += "<td>" + tableData[i].observetypename + "</td>";
+            html += "<td>" + tableData[i].safenum + "</td>";
+            html += "<td>" + (parseFloat(tableData[i].safeper) * 100).toFixed(2) + "%</td>";
+            html += "<td>" + tableData[i].notsafenum + "</td>";
+            html += "<td>" + (tableData[i].notsafeper * 100).toFixed(2) + "%</td>";
+            html += "<td>" + tableData[i].notsafenum + "</td>";
+            html += "<td>" + (tableData[i].ideaper * 100).toFixed(2) + "%</td>";
+            html += "</tr>";
+            total1 += tableData[i].safenum;
+            total2 += tableData[i].notsafenum;
+        }
+        html += "<tr>";
+        html += "<td>总计</td>";
+        html += "<td>" + total1 + "</td>";
+        if ((total1 + total2) > 0) {
+            html += "<td>" + ((total1 / (total1 + total2)).toFixed(4) * 100).toFixed(2) + "%</td>";
+        } else {
+            html += "<td>0%</td>";
+        }
+        html += "<td>" + total2 + "</td>";
+        if ((total1 + total2) > 0) {
+            html += "<td>" + ((total2 / (total1 + total2)).toFixed(4) * 100).toFixed(2) + "%</td>";
+        } else {
+            html += "<td>0%</td>";
+        }
+        html += "<td>" + total2 + "</td>";
+        html += "<td> 100 %</td>";
+        html += "</tr>";
+
+        html += "<tr>";
+        html += "<td>行为总数</td>";
+        html += "<td colspan='2'>" + (total1 + total2) + "</td>";
+        html += "<td>安全行为比例</td>";
+        if ((total1 + total2) > 0) {
+            html += "<td>" + ((total1 / (total1 + total2)).toFixed(4) * 100).toFixed(2) + "%</td>";
+        } else {
+            html += "<td>0%</td>";
+        }
+        html += "<td>不安全行为比例</td>";
+        if ((total1 + total2) > 0) {
+            html += "<td>" + ((total2 / (total1 + total2)).toFixed(4) * 100).toFixed(2) + "%</td>";
+        } else {
+            html += "<td>0%</td>";
+        }
+        html += "</tr>";
+        $("#gridTable1").append(html);
+
+    }
+
+    function Stat(type, obj) {
+        $(".btn1").removeClass("btn-primary");
+
+        $(obj).addClass("btn-primary");
+        $(".btn1").addClass("btn-default");
+        $("#stat_type_select").val("1");
+        $("#month_th").hide();
+        $("#month_td").hide();
+        $("#quarter_th").show();
+        $("#quarter_td").show();
+        $("#quarter").val("");
+        $("#month_select").val("");
+        StaQuery(type);
+    }
+
+    function StaQuery(type) {
+        switch (type) {
+            case "zb":
+                flag = "zb";
+                loadStatByType($("#DeptCode").val(), $("#Year").val(), $("#quarter").val(), $("#month_select").val());
+                $("#piecontainer1").hide();
+                $("#gridTable2").hide();
+                $("#piecontainer0").show();
+                $("#gridTable1").show();
+                //$("#quarter_th").show();
+                //$("#quarter_td").show();
+                $("#piecontainer2").hide();
+                $("#safetable").hide();
+                $("#notsafetable").hide();
+                $("#stat_type").show();
+                $("#stat_type_td").show();
+                $("#stattable").show();
+                //$("#month_th").hide();
+                //$("#month_td").hide();
+                break;
+            case "qs":
+                flag = "qs";
+                loadQsStat($("#DeptCode").val(), $("#Year").val());
+                $("#quarter_th").hide();
+                $("#quarter_td").hide();
+                $("#piecontainer0").hide();
+                $("#gridTable1").hide();
+                $("#piecontainer1").show();
+                $("#gridTable2").show();
+                $("#piecontainer2").hide();
+                $("#safetable").hide();
+                $("#notsafetable").hide();
+                $("#stat_type").hide();
+                $("#stat_type_td").hide();
+                $("#stattable").show();
+                //$("#month_th").hide();
+                //$("#month_td").hide();
+                break;
+            case "db":
+                flag = "db";
+                loadDbStat();
+                $("#piecontainer0").hide();
+                $("#gridTable1").hide();
+                $("#piecontainer1").hide();
+                $("#gridTable2").hide();
+                $("#piecontainer2").show();
+                $("#safetable").show();
+                $("#notsafetable").show();
+                $("#stattable").hide();
+                $("#stat_type").show();
+                $("#stat_type_td").show();
+                //$("#quarter_th").show();
+                //$("#quarter_td").show();
+                //$("#month_th").hide();
+                //$("#month_td").hide();
+                break;
+            default:
+                break;
+        }
+    }
+    //查询该电厂是否设置安全警戒线,没有取默认
+    function GetJjx() {
+        $.SetForm({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "obsjjx" },
+            success: function (data) {
+
+                for (var i = 0; i < data.length; i++) {
+                    if (orgCode == data[i].ItemCode && data[i].EnabledMark == 1) {
+                        safeJjx = data[i].ItemValue;
+                    }
+                }
+            }
+        })
+        //$.get("../../SystemManage/DataItemDetail/GetDataItemListJson", { EnCode: "obsjjx"},
+        //   function (data) {
+        //       debugger;
+
+        //   });
+    }
+
+    //观察分析对比图
+    function loadDbStat() {
+        $.get("GetUntiDbStat", { "year": $("#Year").attr('data-value'), deptCode: $("#DeptCode").val(), issafety: 1, quarter: $("#quarter").val(), month: $("#month_select").val() }, function (data) {
+            var json = eval("(" + data + ")");
+            $('#Line3').highcharts({
+                chart: {
+                    type: 'column',
+                    borderWidth: 0
+                },
+                title: {
+                    text: '各部门安全行为对比图'
+                },
+                xAxis: {
+                    categories: json.y
+                },
+                yAxis: {
+                    lineWidth: 1,
+                    minorGridLineWidth: 0,
+                    minorTickInterval: 'auto',
+                    minorTickWidth: 1,
+                    gridLineDashStyle: 'longdash',
+                    allowDecimals: false,
+                    min: 0,
+                    title: {
+                        text: '数量'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value + '个'
+                        }
+                    },
+                    stackLabels: {
+                        enabled: true,
+                        style: {
+                            fontWeight: 'bold',
+                            color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                        }
+                    }
+
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true
+                },
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        dataLabels: {
+                            enabled: true,
+                            color: (Highcharts.theme && Highcharts.theme.dataLabelsColor) || 'white',
+                            style: {
+                                textShadow: '0 0 3px black'
+                            }
+                        }
+                    }
+                },
+                series: json.x
+                , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+            loadDbSafeTabel(json.table, json.totalSum);
+        });
+        $.get("GetUntiDbStat", { "year": $("#Year").attr('data-value'), deptCode: $("#DeptCode").val(), issafety: 0,quarter:$("#quarter").val(), month: $("#month_select").val() }, function (data) {
+            var json = eval("(" + data + ")");
+            $('#Line4').highcharts({
+                chart: {
+                    type: 'column',
+                    borderWidth: 0
+                },
+                title: {
+                    text: '各部门不安全行为对比图'
+                },
+                xAxis: {
+                    categories: json.y
+                },
+                yAxis: {
+                    lineWidth: 1,
+                    minorGridLineWidth: 0,
+                    minorTickInterval: 'auto',
+                    minorTickWidth: 1,
+                    gridLineDashStyle: 'longdash',
+                    allowDecimals: false,
+                    min: 0,
+                    title: {
+                        text: '数量'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value + '个'
+                        }
+                    },
+                    stackLabels: {
+                        enabled: true,
+                        style: {
+                            fontWeight: 'bold',
+                            color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                        }
+                    }
+
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true
+                },
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        dataLabels: {
+                            enabled: true,
+                            color: (Highcharts.theme && Highcharts.theme.dataLabelsColor) || 'white',
+                            style: {
+                                textShadow: '0 0 3px black'
+                            }
+                        }
+                    }
+                },
+                series: json.x
+              , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+            loadDbNotSafeTabel(json.table, json.totalSum);
+        });
+    }
+    function loadDbNotSafeTabel(tableData, totalSum) {
+        $("#gridTable4").html("");
+        var html = "";
+        html += "<tr align=\"center\"  style=\"font-weight: bold; height:35px;\">";
+        html += "<td>单位</td><td>不安全行为</td><td>占比</td>";
+        html += "</tr>";
+        for (var i = 0; i < tableData.length; i++) {
+
+            html += "<td>" + tableData[i].name + "</td>";
+            html += "<td>" + tableData[i].total + "</td>";
+            if (tableData[i].total == 0 || totalSum == 0) {
+                html += "<td>0%</td>";
+            } else {
+                html += "<td>" + ((tableData[i].total / totalSum) * 100).toFixed(2) + "%</td>";
+            }
+            html += "</tr>";
+        }
+        $("#gridTable4").append(html);
+    }
+    function loadDbSafeTabel(tableData, totalSum) {
+        $("#gridTable3").html("");
+        var html = "";
+        html += "<tr align=\"center\"  style=\"font-weight: bold; height:35px;\">";
+        html += "<td>单位</td><td>安全行为</td><td>占比</td>";
+        html += "</tr>";
+        for (var i = 0; i < tableData.length; i++) {
+
+            html += "<td>" + tableData[i].name + "</td>";
+            html += "<td>" + tableData[i].total + "</td>";
+            if (tableData[i].total == 0 || totalSum == 0) {
+                html += "<td>0%</td>";
+            } else {
+                html += "<td>" + ((tableData[i].total / totalSum) * 100).toFixed(2) + "%</td>";
+            }
+            html += "</tr>";
+        }
+        $("#gridTable3").append(html);
+    }
+    /*
+   *不安全行为占比月度趋势图与不安全行为占比总计趋势图
+   */
+    function loadQsStat(deptCode, year) {
+        $.get("GetQsStat", { deptCode: deptCode, year: year }, function (data) {
+            var json = eval("(" + data + ")");
+            var array = new Array();
+
+            //数据源
+            for (var i = 0; i < json.y.length; i++) {
+                array.push({
+                    name: json.z[i], data: json.y[i], marker: {
+                        symbol: 'square'
+                    }
+                });
+            }
+            loadQsTable(json.table);
+            $('#Line1').highcharts({
+                chart: {
+                    type: 'line'
+                },
+                title: {
+                    text: '安全行为观察七个维度不安全行为占比情况%'
+                },
+                xAxis: {
+                    categories: json.x
+                },
+                yAxis: {
+                    allowDecimals: false,
+                    min: 0,
+                    title: {
+                        text: '占比（%）'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value + '%'
+                        }
+                    }
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true,
+                    valueSuffix: '%'
+                },
+                series: array
+                , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+            $('#Line2').highcharts({
+                chart: {
+                    type: 'line'
+                },
+                title: {
+                    text: '不安全行为比例控制%'
+                },
+                xAxis: {
+                    categories: json.x
+                },
+                yAxis: {
+                    //allowDecimals: false,
+                    min: 0,
+                    max: 100,
+                    title: {
+                        text: '占比（%）'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value + '%'
+                        }
+                    },
+                    plotLines: [{
+                        value: safeJjx == 0 ? 60 : safeJjx,
+                        color: 'red',
+                        width: 1,
+                        label: {
+                            text: '警戒线:' + (safeJjx == 0 ? 60 : safeJjx) + "%",
+                            align: 'center',
+                            style: {
+                                color: 'gray'
+                            }
+                        }
+
+                    }]
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true,
+                    valueSuffix: '%'
+                },
+                series: [{
+                    name: "不安全行为占比",
+                    data: json.data,
+                    marker: {
+                        symbol: 'square'
+                    }
+                }]
+               , lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        });
+    }
+    /*
+    *不安全行为占比表格
+    */
+    function loadQsTable(tableData) {
+
+        $("#gridTable2").html("");
+        var html = "";
+        html += "<tr align=\"center\"  style=\"font-weight: bold; height:35px;\">";
+        html += "<td>     </td>";
+        html += "<td>一月</td><td>二月</td><td>三月</td><td>四月</td>";
+        html += "<td>五月</td><td>六月</td><td>七月</td><td>八月</td>";
+        html += "<td>九月</td><td>十月</td><td>十一月</td><td>十二月</td>";
+        html += "</tr>";
+        for (var i = 0; i < tableData.length; i++) {
+            var str = "";
+            html += "<tr>";
+            if (i == 0) {
+                html += "<td>不安全行为总数</td>";
+            }
+            else if (i == 1) {
+                html += "<td>行为总数</td>";
+            } else {
+                html += "<td>不安全比</td>";
+                str = "%";
+            }
+            html += "<td>" + tableData[i].m1 + str + "</td>";
+            html += "<td>" + tableData[i].m2 + str + "</td>";
+            html += "<td>" + tableData[i].m3 + str + "</td>";
+            html += "<td>" + tableData[i].m4 + str + "</td>";
+            html += "<td>" + tableData[i].m5 + str + "</td>";
+            html += "<td>" + tableData[i].m6 + str + "</td>";
+            html += "<td>" + tableData[i].m7 + str + "</td>";
+            html += "<td>" + tableData[i].m8 + str + "</td>";
+            html += "<td>" + tableData[i].m9 + str + "</td>";
+            html += "<td>" + tableData[i].m10 + str + "</td>";
+            html += "<td>" + tableData[i].m11 + str + "</td>";
+            html += "<td>" + tableData[i].m12 + str + "</td>";
+            html += "</tr>";
+        }
+        $("#gridTable2").append(html);
+    }
+
+    function warningsetting() {
+        $("#safejjx").val(safeJjx == 0 ? 60 : safeJjx);
+        $('#pop').show();
+    }
+    function btnchangeJjx() {
+        var controlObj = $("#safejjx").val();
+        if (controlObj.length == 0 || controlObj == null || controlObj == undefined) {
+            dialogMsg('请输入警戒值', 0);
+            return;
+        }
+        reg = /^[-+]?\d+$/;
+        if (!reg.test($("#safejjx").val())) {
+            dialogMsg('请输入正确的警戒值,范围0-100', 0);
+            return;
+        } else {
+            if ($("#safejjx").val() > 100 || $("#safejjx").val() < 0) {
+                dialogMsg('请输入正确的警戒值,范围0-100', 0);
+                return;
+            }
+        }
+        $.ajax({
+            url: "../../ObserveRecord/Observerecord/SaveJjx",
+            data: { ItemValue: $("#safejjx").val(), ItemCode: orgCode },
+            dataType: "JSON",
+            type: "post",
+            success: function () {
+                $('#pop').hide();
+                GetJjx();
+                //loadStatByType("", "", "");
+                ////查询事件
+                $("#btnProject").click();
+                //$.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    function exportTable() {
+        window.location.href = "../../Observerecord/Observerecord/exportTable?type=" + flag + "&deptcode=" + $("#DeptCode").val() + "&year=" + $("#Year").val() + "&quarter=" + $("#quarter").val();
+        //window.location.href = "../../Observerecord/Observerecord/exportTable?html=" + $("#gridTable1").html();
+    }
+
+    function changeType(obj) {
+        var value = $(obj).val();
+        switch (value) {
+            case "1":
+                $("#quarter_th").show();
+                $("#quarter_td").show();
+                $("#month_th").hide();
+                $("#month_td").hide();
+                break;
+            case "2":
+                $("#quarter_th").hide();
+                $("#quarter_td").hide();
+                $("#month_th").show();
+                $("#month_td").show();
+                break;
+            default:
+
+        }
+    }
+</script>
+<style>
+    .pop {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 100;
+        display:;
+    }
+
+    .pop-conetnt {
+        position: absolute;
+        top: 40%;
+        left: 40%;
+        transform: translateX(-50%) translateY(-50%);
+        background: #fff;
+        border-radius: 4px;
+    }
+
+    .pop_login {
+        width: 520px;
+        height: 300px;
+    }
+</style>
+<div class="center-Panel">
+    <div class="panel-Title">统计分析</div>
+    <div class="titlePanel">
+        <div class="title-search">
+            <table class="queryform">
+                <tr id="QueryTab">
+                    <th style="padding-left: 10px;">选择单位</th>
+                    <td style="padding-left: 5px;">
+                        <input type="hidden" id="DeptCode" />
+                        <input id="DepartmentName" type="text" class="form-control" placeholder="请选择单位" readonly onclick="selectDept('', 0, 0, '选择单位', window.document.body, 'DepartmentName,DeptCode');" style="width: 200px;"/>
+                    </td>
+                    <th style="padding-left: 10px;">年度</th>
+                    <td style="padding-left: 10px;">
+                        <input id="Year" type="text" style="width: 120px; " value="@DateTime.Now.ToString("yyyy")" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy' })" />
+                    </td>
+                    <th id="stat_type" style="padding-left: 10px;">统计类型</th>
+                    <td id="stat_type_td" style="padding-left: 10px;">
+                        <select id="stat_type_select" onchange="changeType(this)">
+                            <option value="1">季度统计</option>
+                            <option value="2">月度统计</option>
+                        </select>
+                    </td>
+                    <th id="quarter_th" style="padding-left: 10px;">季度</th>
+                    <td id="quarter_td" style="padding-left: 10px;">
+                        <select id="quarter">
+                            <option value="">全部</option>
+                            <option value="1">第一季度</option>
+                            <option value="2">第二季度</option>
+                            <option value="3">第三季度</option>
+                            <option value="4">第四季度</option>
+                        </select>
+                    </td>
+                    <th id="month_th" style="padding-left: 10px; display:none;">月度</th>
+                    <td id="month_td" style="padding-left: 10px; display: none;">
+                        <select id="month_select">
+                            <option value="">全部</option>
+                            <option value="01">1</option>
+                            <option value="02">2</option>
+                            <option value="03">3</option>
+                            <option value="04">4</option>
+                            <option value="05">5</option>
+                            <option value="06">6</option>
+                            <option value="07">7</option>
+                            <option value="08">8</option>
+                            <option value="09">9</option>
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="12">12</option>
+                        </select>
+                    </td>
+                    <td style="padding-left: 20px;">
+                        <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>&nbsp;&nbsp;
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <button id="btnUnit" class="btn btn-primary btn1" onclick="Stat('zb',this)" type="button"><i class="fa fa-exclamation-triangle"></i>&nbsp;观察行为占比</button>
+                <button id="btnCompared" class="btn btn-default btn1" onclick="Stat('db',this)" type="button"><i class="fa fa-bell-o"></i>&nbsp;观察分析对比图</button>
+                <button id="btnProject" class="btn btn-default btn1" onclick="Stat('qs',this)" type="button"><i class="fa fa-bell-o"></i>&nbsp;不安全比趋势图</button>
+            </div>
+            <script>$('.toolbar').authorizeButton()</script>
+        </div>
+    </div>
+    <div class="portal-panel" style="margin-left: -20px; margin-right: -20px;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="piecontainer0">
+                </div>
+                <div id="piecontainer1">
+                    <div id="Line2" style="width:49%;float:left;"></div>
+                    <div id="Line1" style="width: 49%; float:left;"></div>
+                </div>
+                <div id="piecontainer2">
+                    <div id="Line3" style="width:49%;float:left;"></div>
+                    <div id="Line4" style="width: 49%; float:left;"></div>
+                </div>
+            </div>
+        </div>
+        <div id="stattable" class="row" style="margin-left: -10px; margin-right: -10px;">
+            <div class="panel panel-default" style="margin:10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <table cellpadding="0" cellspacing="0" class="table1" border="1" style="width:100%; " id="gridTable1"></table>
+                    <table cellpadding="0" cellspacing="0" class="table1" border="1" style="width:100%; " id="gridTable2"></table>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="safetable" class="portal-panel" style="margin-left: -20px; margin-right: -20px; display: none; ">
+            <div class="row" style="margin-left: -10px; margin-right: -10px;">
+                <div class="panel panel-default" style="margin:10px;">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;各部门安全行为排名</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table cellpadding="0" cellspacing="0" class="table1" border="1" style="width:100%; " id="gridTable3"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="notsafetable" class="portal-panel" style="margin-left: -20px; margin-right: -20px; display: none; ">
+            <div class="row" style="margin-left: -10px; margin-right: -10px;">
+                <div class="panel panel-default" style="margin:10px;">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;各部门不安全行为排名</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table cellpadding="0" cellspacing="0" class="table1" border="1" style="width:100%; " id="gridTable4"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="pop" id="pop" style="display: none; padding-top: 50px; " onclick="$('#pop').hide()">
+        <div class="pop-conetnt pop_login" onclick="event.stopPropagation();">
+            <div class="row" style="margin-left: -10px; margin-right: -10px;">
+                <div class="panel panel-default" style="margin:10px;">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;设置安全警戒线</strong>
+                    </div>
+                    <div class="panel-body" id="div0">
+                        <label>安全警戒线(%)</label>
+                        <input type="text" id="safejjx" />
+                    </div>
+                    <div style=" text-align: right;  z-index: 1000;">
+                        <a onclick="btnchangeJjx()" id="btnSave" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+                        &nbsp;&nbsp;
+                        <a onclick="$('#pop').hide()" id="btnCommit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;取&nbsp;&nbsp;消</a>
+                        &nbsp;&nbsp;
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+

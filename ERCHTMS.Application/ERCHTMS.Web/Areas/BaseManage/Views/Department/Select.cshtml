@@ -1,0 +1,228 @@
+﻿@{
+    ViewBag.Title = "选择部门";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var deptId = request('deptId');
+    var checkMode = request('checkMode');
+    var mode = request('mode');
+    var deptIds = request('deptIds');
+    var type = request('type');
+    var showDb = request('showDb');
+    var args = request('args');
+    $(function () {
+        initControl();
+    })
+    //初始化数据
+    function initControl() {
+        var json = JSON.stringify(
+             {
+                 Ids: deptId,
+                 SelectMode: checkMode,
+                 Mode: mode,
+                 DeptIds: deptIds
+             }
+           );
+        var item = {
+            cascadecheck: !!showDb ? true : false,
+            // height: 540,
+            showcheck: true,
+            //url: "../../BaseManage/Department/GetDeptTreeJson?Ids=" + deptId + "&checkMode=" + checkMode + "&mode=" + mode + "&deptIds=" + deptIds
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json + "&deptType="+type
+            //,isTool: false
+            ////自定义工具栏
+            //,nodeTools: [{
+            //    text: '编辑', img: "test.png", callback: function (i) {
+            //        alert(i);
+            //    }
+            //}]
+        };
+        $("#DeptTree").treeview(item);
+
+        $("#btnSearch").click(function () {
+            var json = JSON.stringify(
+                {
+                    Ids: deptId,
+                    SelectMode: checkMode,
+                    Mode: mode,
+                    DeptIds: deptIds,
+                    KeyWord: $("#txt_Keyword").val()
+                }
+            );
+            var item = {
+                cascadecheck: !!showDb ? true : false,
+                // height: 540,
+                showcheck: true,
+                //url: "../../BaseManage/Department/GetDeptTreeJson?Ids=" + deptId + "&checkMode=" + checkMode + "&mode=" + mode + "&deptIds=" + deptIds
+                url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json + "&deptType=" + type 
+                //,isTool: false
+                ////自定义工具栏
+                //,nodeTools: [{
+                //    text: '编辑', img: "test.png", callback: function (i) {
+                //        alert(i);
+                //    }
+                //}]
+            };
+            $("#DeptTree").treeview(item);
+        })
+        
+    }
+
+
+    //返回选择后的结果并赋值到dom控件
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序依次为部门名称,部门Code，部门Id（多选用逗号分隔）
+    //callback:回调函数
+    function AcceptClick(winObject, domId, _win, callback) {
+        var selVal = new Array();
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+
+                var deptTree = $("#DeptTree");
+                if (checkMode == 1) {
+                    if (deptTree.getCheckedImgs().indexOf('1') >= 0 || deptTree.getCheckedImgs().indexOf('2') >= 0) {
+                        dialogMsg('所选节点存在虚节点,请重新选择！', 0);
+                        return;
+                    }
+                    else
+                    {
+                        selVal = new Array(deptTree.getCheckedTexts(), deptTree.getCheckedValues(), deptTree.getCheckedIds());
+                    }
+                } else {
+                    var currentNode = deptTree.getCurrentNode();
+                    if (currentNode!=null) {
+                        if (type == "highrisk") {
+                            if (currentNode.Nature == "厂级") {
+                                dialogMsg('该节点不允许选择！', 0);
+                                return;
+                            }
+                        }
+                        if (type == "hseobserve") {
+                            if (currentNode.Nature == "班组" || currentNode.parentnodes=="0") {
+                                dialogMsg('只能选择部门节点！', 0);
+                                return;
+                            }
+                        }
+                        if (parseInt(currentNode.img) > 0) {
+                            dialogMsg('该节点不允许选择！', 0);
+                            return;
+                        }
+
+                        var manager = "";
+                        var managerId = "";
+                        var isOrg = "0";
+
+                        if (currentNode.manager != undefined && currentNode.manager != null) {
+                            var arr = currentNode.manager.split(',');
+                            if (arr.length > 0) {
+                                manager = arr[0]; managerId = arr[1]; isOrg = arr[2];
+                            }
+                        }
+                        selVal = new Array(currentNode.text, currentNode.value, currentNode.id, manager, managerId, isOrg, currentNode.DeptType);
+                    }
+
+                }
+                console.log(selVal);
+                var ids = domId.split(',');
+                for (var j = 0; j < ids.length; j++) {
+                    if (ids[j].length > 0) {
+                        var dom = $(winObject).find("#" + ids[j]).eq(0);
+                        if (dom != undefined) {
+                            var type =$(dom).attr("type")
+                            switch (type) {
+                                case "select":
+                                    dom.ComboBoxSetValue(selVal[j]);
+                                    break;
+                                default:
+                                    dom.val(selVal[j]);
+                                    break;
+                            }
+                        }
+                    }
+
+                }
+            }
+            if (checkMode == 1) {
+                if (deptTree.getCheckedTexts().length == 0) {
+                    dialogMsg("请选择单位", 0);
+                    return;
+                }
+            } else {
+                if (deptTree.getCurrentNode()==null) {
+                    dialogMsg("请选择单位", 0);
+                    return;
+                }
+            }
+
+            if (_win != undefined) {
+                if (typeof (_win.callBackSelect) == "function") {
+                    _win.callBackSelect();
+                }
+
+            }
+            if (callback) {
+                callback(selVal);
+            }
+            dialogClose();
+        }
+    }
+
+
+
+    function PostSubmit(winObject, domId, callback) {
+        var selVal = new Array();
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var deptTree = $("#DeptTree");
+                if (checkMode == 1) {
+                    selVal = new Array(deptTree.getCheckedTexts(), deptTree.getCheckedValues(), deptTree.getCheckedIds());
+                } else {
+                    var currentNode = deptTree.getCurrentNode();
+                    var manager = "";
+                    var managerId = "";
+                    if (currentNode.manager != undefined && currentNode.manager != null) {
+                        var arr = currentNode.manager.split(',');
+                        if (arr.length > 0) {
+                            manager = arr[0]; managerId = arr[1];
+                        }
+                    }
+                    selVal = new Array(currentNode.text, currentNode.value, currentNode.id, manager, managerId);
+                }
+                var ids = domId.split(',');
+                $.ajax({
+                    url: "../../BaseManage/Department/GetType?keyValue=" + currentNode.id,
+                    type: "post",
+                    dataType: "json",
+                    async: false,
+                    success: function (data) {
+                        if (data == true) {
+                            for (var j = 0; j < ids.length; j++) {
+                                if (ids[j].length > 0) {
+                                    var dom = $(winObject).find("#" + ids[j]).eq(0);
+                                    if (dom != undefined) {
+                                        dom.val(selVal[j]);
+                                    }
+                                }
+
+                            }
+                        }
+                        else {
+                            dialogMsg('此节点不能选择！', 2);
+                        }
+                    },
+                });
+            }
+            if (callback) {
+                callback();
+            }
+            dialogClose();
+        }
+    }
+</script>
+<div style="display:flex;margin:10px 20px">
+ <label style="text-align: right;width: 50px;font-size:larger">名称</label>   <input id="txt_Keyword" type="text" class="form-control"  placeholder="请输入要查询关键字" style="width: 300px;margin:0 20px 0 20px" />
+    <a id="btnSearch" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+</div>
+<div style="margin: 10px;">
+    <div id="DeptTree"></div>
+</div>

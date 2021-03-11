@@ -1,0 +1,182 @@
+﻿@{
+    ViewBag.Title = "CheckIndex";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script> ;
+    var keyValue = request('keyValue');
+    var indexdeal = request('indexdeal');//首页待办跳转 
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 136.5);
+            }, 200);
+            e.stopPropagation();
+        });
+     
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 142,
+            postData: { queryJson: getQueryJson() }, page: 1,
+            url: "../../HighRiskWork/SuperviseTask/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                {
+                    label: '操作', name: 'Oper', width: 80, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:show('" + rowObject.workid + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                        return html;
+                    }
+                },
+                {
+                    label: '监督状态', name: 'supervisestate', width: 100, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var val = "";
+                        if (cellvalue == "1") {
+                            val = "创建监督";
+                        }
+                        else if (cellvalue == "2") {
+                            val = "未监督";
+                        } else {
+                            val = "已监督";
+                        }
+                        return val;
+                    }
+                },
+                {
+                    label: '作业类别', name: 'taskworktype', width: 200, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var val = "";
+                        if (!!rowObject.taskworktype && !!rowObject.handtype) {
+                            val = rowObject.taskworktype + "," + rowObject.handtype;
+                        }
+                        else if (!!rowObject.taskworktype) {
+                            val = rowObject.taskworktype;
+                        }
+                        else if (!!rowObject.handtype) {
+                            val = rowObject.handtype;
+                        }
+                        return val;
+                    }
+                },
+                {
+                    label: '作业时间', name: 'taskworkstarttime', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.taskworkendtime, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                { label: '作业单位', name: 'taskdept', width: 200, align: 'center', sortable: false },
+                { label: '作业地点', name: 'taskworkplace', width: 100, align: 'center', sortable: false },
+                { label: '旁站监督单位', name: 'fullname', width: 150, align: 'center', sortable: true },
+                { label: '旁站监督员', name: 'taskusername', width: 150, align: 'center', sortable: true },
+                {
+                    label: '监督时长', name: 'timelong', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.tasklevel == "0") {
+                            cellvalue = "-";
+                        }
+                        else {
+                            if (cellvalue == null) {
+                                cellvalue = "0";
+                            }
+                        }
+                        return cellvalue;
+                    }
+                }],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 25, 30],
+            pager: "#gridPager",
+            sortname: 'supervisestate asc,createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+
+        });
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var query = {
+            parentid: keyValue,
+            sideuser: $("#TaskUserId").val(),
+            mytask: indexdeal
+        }
+        return JSON.stringify(query);
+    }
+
+    //查看详情
+    function show(keyValue) {
+        var idx = dialogOpen({
+            id: "SecondForm",
+            title: "查看旁站监督任务",
+            url: '/HighRiskWork/SuperviseTask/Form?keyValue=' + keyValue + "&mode=view",
+            width: ($(top.window).width() - 400) + "px",
+            height: ($(top.window).height() - 300) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td class="formTitle">旁站监督员:</td>
+                            <td class="formValue">
+                                <input id="TaskUserName" type="text" class="form-control" errormsg="旁站监督员" placeholder="请选择旁站监督人员" isvalid="yes" checkexpession="NotNull" onclick="selectSuperviseUser(window.document.body, ',TaskUserId,TaskUserName,,');" readonly />
+                                <input id="TaskUserId" type="hidden" />
+                            </td>
+                            <td style="width: 10px;"></td>
+                            <td>
+                                <div class="ui-filter-list-bottom">
+                                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+

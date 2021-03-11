@@ -1,0 +1,210 @@
+@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<style>
+    .form .formTitle {
+        width: 110px;
+    }
+</style>
+<script>
+    var pteamname = top.Form.window.staffpteamname;
+    var pteamid = top.Form.window.staffpteamid;
+    var taskusername = top.Form.window.stafftaskusername;
+    var pstarttime = top.Form.window.staffpstarttime;
+    var pendtime = top.Form.window.staffpendtime;
+    var workinfoname = top.Form.window.staffworkinfoname;
+    var taskuserid = top.Form.window.stafftaskuserid;
+    var specialtytype = top.Form.window.staffspecialtytype;
+
+
+
+    var taskshareid = request('taskshareid');
+    var tasktype = request("tasktype");
+    var mode = request('mode');
+    var issynchronization = request('issynchronization');//是否是同步的数据
+
+    var rolenames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName"; //当前用户角色
+    var deptid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var deptname = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var deptcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+
+    $(function () {
+        //专业类别
+        $("#SpecialtyType").ComboBox({
+            param: { EnCode: "SpecialtyType" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "======请选择======",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+
+
+        if (rolenames.indexOf("班组") > 0) {
+            $("#PTeamName").val(deptname);
+            $("#PTeamCode").val(deptcode);
+            $("#PTeamId").val(deptid);
+            $("#PTeamName").attr("disabled", "disabled");
+        }
+        else {
+            $("#PTeamName").val(pteamname);
+        }
+        if (tasktype == "2") {
+            $("#sp1").html("旁站监督单位");
+            $("#PTeamName").attr("placeholder", "请选择旁站监督单位");
+        }
+
+        if (mode == "edit") {
+            $("#PTeamId").val(pteamid);
+            $("#TaskUserId").val(taskuserid);
+            if (issynchronization == "1")//是同步的数据
+            {
+                $("#PTeamName").attr("disabled", "disabled");
+                $("#WorkInfoName").attr("disabled", "disabled");
+            }
+        }
+        $("#TaskUserName").val(taskusername);
+        $("#PStartTime").val(pstarttime);
+        $("#PEndTime").val(pendtime);
+        $("#WorkInfoName").val(workinfoname);
+
+        if (mode != "add") {
+            $("#SpecialtyType").ComboBoxSetValue(specialtytype);
+            $.ajax({
+                url: '../../SystemManage/DataItemDetail/GetListByCodeJson',
+                data: { itemCode: "SpecialtyType" },
+                dataType: "JSON",
+                async: false,
+                success: function (result) {
+                    if (!!result) {
+                        var arr = eval(result);
+                        $(arr).each(function (i, item) {
+                            if (item.itemvalue == specialtytype) {
+                                $("#SpecialtyType div:eq(0)").text(item.itemname);
+                                return false;
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+
+        if (mode == "view") {
+            $("#form1 input,textarea,select, .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+    });
+
+    //选择旁站监督班组
+    function selectCompany() {
+        if (tasktype == "0" || tasktype == "1") {
+            selectDept(workdeptid, 0, 12, '选择旁站监督班组', document.body, 'PTeamName,PTeamCode,PTeamId');
+        }
+        else {
+            selectDept('&type=sidework', 0, 3, '选择旁站监督单位', document.body, 'PTeamName,PTeamCode,PTeamId');
+        }
+    }
+
+    //返回选择后的结果并赋值到dom控件
+    //callback:回调函数
+    function AcceptClick(callback) {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if (callback) {
+            var spteamname = $("#PTeamName").val();
+            var spteamid = $("#PTeamId").val();
+            var spteamcode = $("#PTeamCode").val();
+            var staskusername = $("#TaskUserName").val();
+            var staskuserid = $("#TaskUserId").val();
+            var spstarttime = $("#PStartTime").val();
+            var spendtime = $("#PEndTime").val();
+            var sworkinfoname = $("#WorkInfoName").val();
+            var sworkinfoid = $("#WorkInfoId").val();
+            var sspecialtytype = $("#SpecialtyType").attr("data-value");
+            callback({ pteamname: spteamname, pteamid: spteamid, pteamcode: spteamcode, taskusername: staskusername, taskuserid: staskuserid, pstarttime: spstarttime, pendtime: spendtime, workinfoname: sworkinfoname, workinfoid: sworkinfoid, specialtytype: sspecialtytype });
+        }
+        dialogClose();
+    }
+
+    //选择作业信息
+    function selectWork() {
+        var pteamname = $("#PTeamName").val();
+        if (!!pteamname) {
+            var pteamid = "";
+            if (tasktype != "2") {
+                pteamid = $("#PTeamId").val();
+            }
+            selectWorkInfo({ taskshareid: taskshareid, teamid: pteamid, mode: 1, checkmode: 0, winObject: window.document.body, domId: 'WorkInfoId,WorkInfoName' });
+        }
+        else {
+            if (tasktype != "2") {
+                dialogMsg('请先选择旁站监督班组！', 0);
+            }
+            else {
+                dialogMsg('请先选择旁站监督单位！', 0);
+            }
+            return;
+        }
+    }
+
+    //选择旁站监督人员
+    function sideuser() {
+        if (!!$("#PTeamId").val()) {
+            selectUser({ deptId: $("#PTeamId").val(), checkMode: 1, mode: 1, winObject: window.document.body, domId: 'TaskUserName,,TaskUserId', eliminateUserIds: '', side: 1, userIds: $("#TaskUserId").val() });
+        }
+        else {
+            if (tasktype != "2") {
+                dialogMsg('请先选择旁站监督班组！', 0);
+            }
+            else {
+                dialogMsg('请先选择旁站监督单位！', 0);
+            }
+            return;
+        }
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle"><span id="sp1">旁站监督班组</span><font face="宋体">*</font></td>
+            <td class="formValue" colspan="5">
+                <input id="PTeamName" type="text" class="form-control" placeholder="请选择旁站监督班组" isvalid="yes" checkexpession="NotNull" readonly onclick="selectCompany()" />
+                <input type="hidden" id="PTeamId" />
+                <input type="hidden" id="PTeamCode" />
+            </td>
+        </tr>
+        <td class="formTitle">专业类别<font face="宋体">*</font></td>
+        <td class="formValue" colspan="2">
+            <div id="SpecialtyType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+        </td>
+        <tr>
+            <td class="formTitle">旁站监督人员<font id="fonttitle" face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="TaskUserName" type="text" class="form-control" errormsg="旁站监督员" placeholder="请选择旁站监督人员" isvalid="yes" checkexpession="NotNull" onclick="sideuser();" readonly />
+                <input id="TaskUserId" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">旁站计划开始时间<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="PStartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm', maxDate: '#F{$dp.$D(\'PEndTime\')}' })" isvalid="yes" checkexpession="NotNull">
+            </td>
+            <td class="formTitle">旁站计划结束时间<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="PEndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm', minDate: '#F{$dp.$D(\'PStartTime\')}' })" isvalid="yes" checkexpession="NotNull">
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业信息<font face="宋体">*</font></td>
+            <td class="formValue" colspan="5">
+                <input id="WorkInfoName" type="text" class="form-control" placeholder="请选择作业信息" isvalid="yes" checkexpession="NotNull" readonly onclick="selectWork()" isvalid="yes" checkexpession="NotNull" />
+                <input type="hidden" id="WorkInfoId" />
+            </td>
+        </tr>
+    </table>
+</div>

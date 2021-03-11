@@ -1,0 +1,606 @@
+﻿ @{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+<script>
+    var keyValue = request("keyValue"); //主键 违章信息主键
+    var actiontype = request("actiontype"); //操作动作
+    var redirectmodule = request("redirectmodule");//判断来源地址
+    var userId = "";
+    //初始方法
+    $(function () {
+
+        $.SetForm({
+            url: "../../QuestionManage/QuestionInfo/GetInitDataJson",
+            success: function (data) {
+
+                userId = data.User.UserId;
+               
+                //流程状态
+                $("#FLOWSTATE").ComboBox({
+                    id: "ItemValue",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.FlowState
+                });
+
+                //检查类型
+                var CheckTypeData = new Array();
+                for (var i = 0; i < data.CheckType.length; i++) {
+                    if (data.CheckType[i].ItemName.indexOf('其他安全检查') < 0) {
+                        CheckTypeData.push(data.CheckType[i]);
+                    }
+                }
+                //检查类型
+                $("#CHECKTYPE").ComboBox({
+                    id: "ItemValue",
+                    text: "ItemName",
+                    description: "==请选择==",
+                    allowSearch: false,
+                    data: CheckTypeData
+                });
+            }
+        });
+
+
+        if (actiontype == "view") {
+            $("#btn_Submit").attr("disabled", "disabled");//btn_Save
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+
+        //获取表单数据
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../QuestionManage/QuestionInfo/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    var curDate = "@DateTime.Now.ToString("yyyy-MM-dd")";
+                    //问题基本信息
+                    if (null != data.baseInfo) {
+                        $("#form1").formDeserialize(data.baseInfo);
+
+
+                        //关联应急id
+                        if (!!data.baseInfo.RELEVANCEID && !redirectmodule) {
+                            $.SetForm({
+                                url: "../../EmergencyPlatform/Drillplanrecord/GetFormJson",
+                                param: { keyValue: data.baseInfo.RELEVANCEID },
+                                success: function (data) {
+                                    if (!!data) {
+                                        if (!!data.data) {
+                                            $("#showdrill").css("display", "");
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    //问题整改
+                    if (null != data.reformInfo) {
+                        $("#REFORMID").val(data.reformInfo.ID);
+                        $("#form1").formDeserialize(data.reformInfo);
+
+                        if (!data.reformInfo.REFORMFINISHDATE) {
+
+                            $("#REFORMFINISHDATE").val(curDate); //当前时间
+                        }
+
+                        if (!!data.reformInfo.REFORMSIGN) {
+                            $("#REFORMSIGN").attr("src", data.reformInfo.REFORMSIGN);
+                        }
+                        //整改完成情况
+                        if (data.reformInfo.REFORMSTATUS == "1") {
+                            $("input[name='REFORMSTATUS']:eq(0)").prop("checked", "checked");  //完成
+                        }
+                        if (data.reformInfo.REFORMSTATUS == "0") {
+                            $("input[name='REFORMSTATUS']:eq(1)").prop("checked", "checked"); //未完成
+
+                        }
+                     
+                    }
+                    //问题验证
+                    if (null != data.verifyInfo) {
+                        $("#VERIFYID").val(data.verifyInfo.ID);
+                        $("#form1").formDeserialize(data.verifyInfo);
+                        //验证结果
+                        if (data.verifyInfo.VERIFYRESULT == "1") {
+                            $("input[name='VERIFYRESULT']:eq(0)").prop("checked", "checked");  //完成
+                            $(".form:eq(0) tr:eq(2) td:eq(0)").html("验证意见");
+                        }
+                        if (data.verifyInfo.VERIFYRESULT == "0") {
+                            $("input[name='VERIFYRESULT']:eq(1)").prop("checked", "checked"); //未完成
+                            $(".form:eq(0) tr:eq(2) td:eq(0)").html("不通过原因<span style='color:red;'>*</span>");
+                        }
+                        if (!!data.verifyInfo.VERIFYSIGN) {
+                            $("#VERIFYSIGN").attr("src", data.verifyInfo.VERIFYSIGN);
+                        }
+                    }
+
+                    //验证结果为空
+                    if (actiontype != "view") {
+                        $("input[name='VERIFYRESULT']:eq(0)").removeAttr("checked");  //完成
+                        $("input[name='VERIFYRESULT']:eq(1)").removeAttr("checked");  //完成
+                        $(".form:eq(0) tr:eq(2) td:eq(0)").html("验证意见");
+                        $("#VERIFYOPINION").val("");//意见
+                        $("#VERIFYSIGN").removeAttr("src"); //验证签名
+                        $("#VERIFYDATE").val(curDate); //当前时间
+
+                        $("#VERIFYPEOPLENAME").val(data.userInfo.RealName);
+                        $("#VERIFYPEOPLE").val(data.userInfo.Account);
+                        $("#VERIFYDEPTNAME").val(data.userInfo.DeptName);
+                        $("#VERIFYDEPTCODE").val(data.userInfo.DepartmentCode);
+                        $("#VERIFYDEPTID").val(data.userInfo.DepartmentId);
+                    }
+                }
+            });
+        }
+
+
+        if (redirectmodule == "drill") {//演技演练相关
+            $(".form:eq(1) tr:eq(3)").css("display", "none");
+            $(".form:eq(1) tr:eq(4)").css("display", "none");
+            $(".form:eq(1) tr:eq(5)").css("display", "none");
+            $(".form:eq(1) tr:eq(6)").css("display", "none");
+        }
+
+
+        uploadify("uploader"); //问题图片
+        uploadify("uploader_reformpic"); //整改图片
+
+   
+        //提交流程
+        $("#btn_Submit").click(function () {
+            SubmitAction();
+        });
+
+        //验证结果
+        $("input[name='VERIFYRESULT']").change(function () {
+            var isdone = $("input[name='VERIFYRESULT']:checked").val(); //验证结果
+            if (isdone == "0") {
+                $("input[name='VERIFYRESULT']:eq(1)").prop("checked", "checked"); //未完成
+               
+                $(".form:eq(0) tr:eq(2) td:eq(0)").html("不通过原因<span style='color:red;'>*</span>");
+                $("#VERIFYOPINION").attr("isvalid", "yes");
+            }
+            else {
+                $("input[name='VERIFYRESULT']:eq(0)").prop("checked", "checked");  //完成
+                $(".form:eq(0) tr:eq(2) td:eq(0)").html("验证意见");
+                $("#VERIFYOPINION").removeAttr("isvalid");
+            }
+        });
+    });
+
+
+    ///查看应急演练记录
+    function showdrill() {
+        var keyValue = $("#RELEVANCEID").val();
+
+        var dlg = dialogOpen({
+            id: "Form",
+            title: '查看信息',
+            url: '/EmergencyPlatform/Drillplanrecord/Form?type=show&keyValue=' + keyValue,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //上传文件
+    function uploadify(objId) {
+        var folderId = "";
+        var fileType = 'bmp,ico,gif,jpeg,jpg,png,psd';
+        var isImage = true;
+        var isdelete = actiontype == "view" ? false : true;
+        switch (objId) {
+            case "uploader": //问题图片
+                isdelete = false;
+                folderId = $("#QUESTIONPIC").val();
+                if (!folderId) {
+                    folderId = newGuid();
+                    $("#QUESTIONPIC").val(folderId);
+                }
+                break;
+            case "uploader_reformpic": //整改图片
+                isdelete = false;
+                folderId = $("#REFORMPIC").val();
+                if (!folderId) {
+                    folderId = newGuid();
+                    $("#REFORMPIC").val(folderId);
+                }
+                break;
+        }
+
+        $.ajax({
+            url: '../../PublicInfoManage/ResourceFile/GetFilesByRecId',
+            data: { recId: folderId },
+            type: "post",
+            success: function (data) {
+                var objdata = eval("(" + data + ")"); //转化为对象类型
+                file_upload.bind(objdata, isdelete, isImage, folderId, objId);
+            }
+        });
+    }
+
+    //获取签名
+    function GetSignImg() {
+        //获取签名图片
+        var signImg = getUserSignPic(userId, "QuestionVerifyForm");
+        if (!!signImg) {
+            $("#VERIFYSIGN").attr("src", "../.." + signImg);
+        }
+    }
+
+
+    function SetImageSrc(currUserId) {
+        var signImg = "";
+        $.ajax({
+            url: "../../BaseManage/User/GetEntity?keyValue=" + currUserId,
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                if (result != null) {
+                    signImg = result.SignImg;
+                    $("#VERIFYSIGN").attr("src", "../.." + signImg);
+                }
+            }
+        });
+    }
+
+
+    //获取历史整改信息
+    function GetHistoryReform() {
+        dialogOpen({
+            id: 'HistoryForm',
+            title: '问题整改信息',
+            url: '/QuestionManage/QuestionReform/DetailList?keyValue=' + keyValue,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: null
+        });
+    }
+    //获取历史验证信息
+    function GetHistoryVerify() {
+        dialogOpen({
+            id: 'HistoryForm',
+            title: '问题验证信息',
+            url: '/QuestionManage/QuestionVerify/DetailList?keyValue=' + keyValue,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: null
+        });
+    }
+
+
+    //提交流程
+    function SubmitAction() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        //验证结果
+        var verifyresult = $("input[name='VERIFYRESULT']:checked").val();
+        postData["VERIFYRESULT"] = verifyresult;
+        //签名
+        postData["VERIFYSIGN"] = !!$("#VERIFYSIGN").attr("src") ? encodeURIComponent($("#VERIFYSIGN").attr("src")) : "";
+
+        //完成状态下去，且不退回
+        if (!!verifyresult) {
+            if (!!postData["VERIFYSIGN"]) {
+                $("#btn_Submit").attr("disabled", "disabled");
+                $.SaveForm({
+                    url: "../../QuestionManage/QuestionVerify/SubmitForm?keyValue=" + keyValue,
+                    param: postData,
+                    loading: "正在保存数据...",
+                    success: function () {
+                        $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                    }
+                });
+                $("#btn_Submit").removeAttr("disabled");
+            }
+            else {
+                dialogMsg('请上传签名!', 0);
+            }
+        }
+        else {
+            dialogMsg('请选择验证结果!', 0);
+        }
+    }
+
+    //导出问题详情内容
+    var exportinfo = function () {
+        window.location.href = "../../QuestionManage/QuestionInfo/ExportDetailExcel?keyValue=" + keyValue;
+    }
+</script>
+
+
+<div class="center-Panel">
+    <div style="margin-top:42px;"></div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;问题验证信息&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#" onclick="GetHistoryVerify()">历史验证记录</a></strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">验证人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="VERIFYPEOPLENAME" class="form-control" disabled="disabled" />
+                            <input id="VERIFYPEOPLE" type="hidden" />
+                            <input id="VERIFYID" type="hidden" />
+                        </td>
+                        <td class="formTitle">验证部门</td>
+                        <td class="formValue">
+                            <input id="VERIFYDEPTNAME" type="text" class="form-control" disabled="disabled" />
+                            <input id="VERIFYDEPTCODE" type="hidden" />
+                            <input id="VERIFYDEPTID" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">验证结果</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="VERIFYRESULT" id="VERIFYRESULT1" value="1" onclick="GetSignImg()" />通过
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="VERIFYRESULT" id="VERIFYRESULT2" value="0" onclick="GetSignImg()" />不通过
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">验证时间<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="VERIFYDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ onpicked: selectCurDate(this) })" isvalid="yes" checkexpession="NotNull" errormsg="验证时间" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">验证意见</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="VERIFYOPINION" class="form-control" checkexpession="NotNull" errormsg="不通过原因"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">签名<span style="color:red;">*</span></td>
+                        <td class="formValue" colspan="3">
+                            <div style="float:left; width:20%">
+                                <img id="VERIFYSIGN" style="height: 50px; width:95%;" onclick="GetSignImg()" />
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;问题基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">问题编号</td>
+                        <td class="formValue">
+                            <input id="QUESTIONNUMBER" type="text" class="form-control" disabled="disabled" />
+                            <input id="QFLAG" type="hidden" />
+                            <input id="BELONGDEPTID" type="hidden" />
+                            <input id="BELONGDEPT" type="hidden" />
+                            <input id="RELEVANCEID" type="hidden" />
+                        </td>
+                        <td class="formTitle">问题地点</td>
+                        <td class="formValue">
+                            <input id="QUESTIONADDRESS" type="text" class="form-control" disabled="disabled" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">问题描述</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="QUESTIONDESCRIBE" class="form-control" disabled="disabled"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">问题照片</td>
+                        <td class="formValue" colspan="3">
+                            <input id="QUESTIONPIC" type="hidden" /><!--问题照片-->
+                            <div id="uploader" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 120px; margin-bottom: 10px;">
+                                <div class="queueList">
+                                    <div id="questionpic_place" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">检查人员</td>
+                        <td class="formValue">
+                            <input id="CHECKPERSONNAME" type="text" class="form-control" disabled="disabled" />
+                            <input id="CHECKPERSONID" type="hidden" />
+                        </td>
+                        <td class="formTitle">检查单位</td>
+                        <td class="formValue">
+                            <input id="CHECKDEPTNAME" type="text" class="form-control" disabled="disabled" />
+                            <input id="CHECKDEPTID" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">检查类型</td>
+                        <td class="formValue">
+                            <div id="CHECKTYPE" type="select" class="ui-select" disabled="disabled" />
+                        </td>
+                        <td class="formTitle">检查日期</td>
+                        <td class="formValue">
+                            <input id="CHECKDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" disabled="disabled" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">检查名称</td>
+                        <td class="formValue" colspan="3">
+                            <input id="CHECKNAME" type="text" class="form-control" disabled="disabled" />
+                            <input id="CHECKID" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">检查重点内容</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="CHECKCONTENT" class="form-control" disabled="disabled"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;问题整改信息&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#" onclick="GetHistoryReform()">历史整改记录</a>&nbsp;&nbsp;<a href="#" onclick="viewlllegalext(keyValue)">整改延期记录</a></strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">整改责任单位</td>
+                        <td class="formValue">
+                            <input id="REFORMDEPTNAME" type="text" class="form-control" disabled="disabled" />
+                            <input id="REFORMDEPTCODE" type="hidden" />
+                            <input id="REFORMDEPTID" type="hidden" />
+                            <input id="REFORMID" type="hidden" />
+                        </td>
+                        <td class="formTitle">联责单位</td>
+                        <td class="formValue">
+                            <input id="DUTYDEPTNAME" type="text" class="form-control" disabled="disabled" />
+                            <input id="DUTYDEPTCODE" type="hidden" />
+                            <input id="DUTYDEPTID" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改责任人</td>
+                        <td class="formValue">
+                            <input id="REFORMPEOPLENAME" class="form-control" disabled="disabled" />
+                            <input id="REFORMPEOPLE" type="hidden" />
+                        </td>
+                        <td class="formTitle">整改人电话</td>
+                        <td class="formValue">
+                            <input id="REFORMTEL" type="text" class="form-control" disabled="disabled" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">计划完成日期</td>
+                        <td class="formValue">
+                            <input id="REFORMPLANDATE" type="text" class="form-control input-wdatepicker" disabled="disabled" />
+                        </td>
+                        <td class="formTitle"></td>
+                        <td class="formValue"></td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改措施</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REFORMMEASURE" class="form-control" disabled="disabled"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改情况描述</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REFORMDESCRIBE" class="form-control" disabled="disabled"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改完成情况</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="REFORMSTATUS" id="REFORMSTATUS1" value="1" checked="checked" disabled="disabled" />完成
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="REFORMSTATUS" id="REFORMSTATUS2" value="0" disabled="disabled" />未完成
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr style="display:none;">
+                        <td class="formTitle">未完成原因说明</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REFORMREASON" class="form-control" disabled="disabled"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改责任人签名</td>
+                        <td class="formValue">
+                            <div style="float:left; width:30%">
+                                <img id="REFORMSIGN" style="height: 50px; width:95%;" />
+                            </div>
+                        </td>
+                        <td class="formTitle">整改完成时间</td>
+                        <td class="formValue">
+                            <input id="REFORMFINISHDATE" class="form-control input-wdatepicker" disabled="disabled" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改照片</td>
+                        <td class="formValue" colspan="3">
+                            <input id="REFORMPIC" type="hidden" /><!--整改相片-->
+                            <div id="uploader_reformpic" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 120px; margin-bottom: 10px;">
+                                <div class="queueList">
+                                    <div id="uploader_reformpic_place" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp;&nbsp;
+        <a class="btn btn-primary" onclick="exportinfo()"><i class="fa fa-file-excel-o"></i>&nbsp;&nbsp;导出</a>
+        &nbsp;&nbsp;
+        <a class="btn btn-primary" style="display:none;" id="showdrill" onclick="showdrill()"><i class="fa fa-file-excel-o"></i>&nbsp;&nbsp;查看应急演练记录</a>
+    </div>
+</div>

@@ -1,0 +1,269 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script src="~/Content/scripts/business/Grid.js"></script>
+<script>
+    var _parentId = "";
+    var _isOrg = "";
+    var _deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户部门ID
+    var _deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户部门编码
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户ID
+    var role = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//获取当前用户权限集合
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    $(function () {
+        InitialPage();
+        GetGrid();
+        //加载树
+        GetTree();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载组织机构树
+    function GetTree() {
+        var json;
+        if (roleName.indexOf("省级") >= 0) {
+            json = JSON.stringify(
+                {
+                    SelectMode: 0,
+                    Mode: 5
+                }
+            );
+        } else {
+            json = JSON.stringify(
+                {
+                    SelectMode: 0,
+                    Mode: 0
+                }
+            );
+        }
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _deptCode = item.Code;
+                _parentId = item.value;
+                _isOrg = item.Sort;
+                _deptId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../ComprehensiveManage/Honours/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify({ DeptCode: _deptCode }) },
+            colModel: [{ label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 120, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (rowObject.createuserid == UserId && rowObject.issend == '1') {
+                            html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '标题', name: 'title', index: 'title', width: 800, align: 'center', sortable: true },
+                { label: '发布人', name: 'publisher', index: 'publisher', width: 200, align: 'center', sortable: true },
+                {
+                    label: '发布时间', name: 'releasetime', index: 'releasetime', width: 100, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                sTime: $("#sTime").val(),
+                eTime: $("#eTime").val(),
+                txtSearch: $("#txt_Keyword").val(),
+                DeptCode: _deptCode
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加荣誉分享',
+            url: '/ComprehensiveManage/Honours/Form',
+            width: "800px",
+            height: ($(top.window).height() - 150) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            },
+            btn: null
+        });
+    }
+    //编辑
+    function btn_edit(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑荣誉分享',
+                url: '/ComprehensiveManage/Honours/Form?keyValue=' + keyValue,
+                width: "800px",
+                height: ($(top.window).height() - 150) + "px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                },
+                btn: null
+            })
+        }
+    }
+    //查看
+    function show(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看荣誉分享',
+                url: '/Content/SecurityDynamics/Show.html?keyValue=' + keyValue + "&state=4",
+                width: "900px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //删除
+    function btn_delete(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../ComprehensiveManage/Honours/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的荣誉分享！', 0);
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">综合信息—荣誉分享</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                时间：
+                            </td>
+                            <td>
+                                <input id="sTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'eTime\')}' })">
+                            </td>
+                            <td style="padding-left: 5px;">至</td>
+                            <td style="padding-left: 5px;">
+                                <input id="eTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'sTime\')}' })">
+                            </td>
+                            <td style="padding-left: 20px;">
+                                标题：
+                            </td>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

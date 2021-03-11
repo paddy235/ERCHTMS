@@ -1,0 +1,229 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+
+<script>
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var newrowid;
+    var isview = false;
+    $(function () {
+        isview = actiontype == "view" ? true : false;
+        if (isview) {
+            $("#add").css("display", "none");
+        }
+        initControl();
+        GetGrid();
+    });
+    //初始化控件
+    function initControl() {
+        $.SetForm({
+            url: "../../OutsourcingProject/Investigate/GetAllFactory",
+            success: function (data) {
+                //机构单位
+                $("#ORGINEZEID").ComboBox({
+                    id: "departmentid",
+                    text: "fullname",
+                    description: "==请选择==",
+                    allowSearch: false,
+                    data: data
+                });
+            }
+        });
+
+        //审查类型
+        $("#SETTINGTYPE").ComboBox({
+            id: "id",
+            text: "id",
+            description: "==请选择==",
+            allowSearch: false,
+            data: [{ "id": "入厂许可" }, { "id": "开工申请" }]
+        });
+
+        if (!!keyValue) {
+            //初始化组件
+            $.SetForm({
+                url: "../../OutsourcingProject/Investigate/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    if (!!data) {
+                        //绑定审查内容
+                        $("#form1").formDeserialize(data);
+                        $("#ORGINEZEID").ComboBoxSetValue(data.ORGINEZEID); //机构id
+                        $("#SETTINGTYPE").ComboBoxSetValue(data.SETTINGTYPE); //审查类型
+                        //是否启用
+                        if (data.ISUSE == "是") {
+                            $("input[name='ISUSE']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISUSE']:eq(1)").prop("checked", "checked");
+                        }
+                    }
+                }
+            });
+        }
+
+    }
+
+    //加载表格
+    function GetGrid() {
+        var isedit = actiontype = "view" ? false : true;
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() / 2,
+            url: "../../OutsourcingProject/Investigate/GetInvestigateContentListJson?keyValue=" + keyValue,
+            datatype: "json",
+            colNames: ["操作", "主键", "审查内容"],
+            colModel: [
+                {
+                    label: '操作', name: 'oper', index: 'oper', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (!isview) {
+                            var html = "&nbsp;&nbsp;&nbsp;<a href=javascript:removedata('" + options.rowId + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                            return html;
+                        }
+                        else {
+                            return "";
+                        }
+                    }
+                },
+                 { label: '主键', name: 'ID', index: 'ID', width: 100, align: 'center', hidden: true },
+                { label: '审查内容', name: 'INVESTIGATECONTENT', index: 'INVESTIGATECONTENT', width: 100, align: 'center', sortable: true, editable: true, edittype: "text", editrules: { required: true } }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            cellEdit: isedit,
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //移除行
+    function removedata(objId) {
+        $("#gridTable").jqGrid("delRowData", objId);
+    }
+    //新增
+    function btn_add() {
+        var ids = $("#gridTable").jqGrid("getDataIDs");
+        var selected = $("#gridTable").jqGrid("getGridParam", "selrow");
+        var rowid = 0; // Math.max(ids);
+        if (ids.length != 0) {
+            rowid = Math.max.apply(Math, ids);
+        }
+        newrowid = rowid + 1;
+        var datarow = { id: "col_" + newrowid, investigatecontent: "" };
+        $("#gridTable").jqGrid("addRowData", newrowid, datarow, "last");
+        $("#gridTable").jqGrid("editRow", newrowid, false);
+    }
+
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        //是否启用
+        var isUse = $("input[name='ISUSE']:checked").val();
+        postData["ISUSE"] = isUse;
+        //机构
+        var orgnizename = $("#ORGINEZEID").attr("data-text");
+        postData["ORGINEZENAME"] = orgnizename;
+
+        var arrData = new Array();
+        $("input[name='INVESTIGATECONTENT']").each(function (index, ele) {
+            var tempVal = $(this).val() + "," + this.parentElement.parentElement.id;
+            arrData.push(tempVal);
+        });
+       
+        //审查内容
+        var rowData = $("#gridTable").jqGrid("getRowData");
+        $(rowData).each(function (index, ele)
+        {
+
+            if (!!ele.ID)
+            {
+                var tempRow = ele.INVESTIGATECONTENT + "," + index;
+                arrData.push(tempRow);
+            }
+        });
+
+        //审查内容(编辑中的)
+        var jsonData = JSON.stringify(arrData);
+
+        postData["INVESTIGATECONTENT"] = jsonData;
+
+        $.SaveForm({
+            url: "../../OutsourcingProject/Investigate/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+</script>
+<div class="center-Panel">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;审查基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">所属机构<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="ORGINEZEID" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="所属机构"></div>
+                        </td>
+                        <td class="formTitle">审查类型<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="SETTINGTYPE" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="SETTINGTYPE"></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">是否启用</td>
+                        <td class="formValue" colspan="3">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISUSE" id="ISUSE1" value="是" checked="checked" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISUSE" id="ISUSE2" value="否" />否
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;审查内容信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div style="margin-top:10px;"></div>
+        <div class="toolbar" style="margin-left:20px;">
+            <div class="btn-group">
+                @*<a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>*@
+                <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+            </div>
+        </div>
+        <div class="panel-body">
+            <table id="gridTable"></table>
+        </div>
+    </div>
+</div>

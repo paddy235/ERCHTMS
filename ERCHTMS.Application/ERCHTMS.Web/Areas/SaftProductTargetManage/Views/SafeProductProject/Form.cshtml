@@ -1,0 +1,347 @@
+@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/Content/scripts/plugins/combo-select/combo.select.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<style type="text/css">
+    .combo-select select {
+        left: -1px;
+        top: -1px;
+        width: 0;
+        height: 0;
+        margin: 0;
+    }
+</style>
+<script>
+    var keyValue = request('keyValue');
+    var belongdept = request('belongdept');
+    var year = request('year');
+    var sortcode = request('sortcode');
+    var targetprojectvalue = request('TargetProjectValue');
+    var win = top.Target.window;
+    $(function () {
+        //$('select').comboSelect()
+
+        //目标项目
+        //$("#TargetProject").ComboBox({
+        //    url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+        //    param: { EnCode: "TargetProject" },
+        //    id: "ItemName",
+        //    text: "ItemName",
+        //    description: "",
+        //    height: "200px"
+        //});
+
+        //完成情况
+        $("#CompleteStatus").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "FinishCase" },
+            id: "ItemName",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        initControl();
+
+        //$("#TargetProject").attr("onkeyup", "changedata(1)");
+    });
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!keyValue && keyValue != "-1") {
+            $.SetForm({
+                url: "../../SaftProductTargetManage/SafeProductProject/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        } else {
+            $("#SortCode").val(sortcode);
+        }
+        if (win.tProject.length > 0) {
+            $("#TargetProject").val(win.tProject);
+            $("#CompleteStatus").ComboBoxSetValue(win.cStatus);
+            $("#GoalValue").val(win.gValue);
+            $("#RealValue").val(win.rValue);
+            $("#SortCode").val(win.sCode);
+            $("#TargetProjectValue").val(win.sTargetProjectValue);
+            //修改时,若目标项目是系统内置项目,则不准修改目标项目
+            changedata("2");
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        //if ($("select").eq(0).val().length == 0 && $("#TargetProject").val().length == 0) {
+        //    $("#TargetProject").attr("isvalid", "yes");
+        //    $("#TargetProject").attr("checkexpession", "NotNull");
+        //}
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        var jqGridTable = top.Target.window.$("#gridTable");
+        win.$("#gbox_gridTable").find(".unwritten").hide();
+        //修改
+        if (win.tProject.length > 0) {
+            rowId = win.selectedRowIndex;
+            jqGridTable.delRowData(rowId);
+            jqGridTable.addRowData(rowId, postData, 'last');
+        }
+            //新增
+        else {
+            rowId = jqGridTable.jqGrid('getRowData').length + 1;
+            //新添加的数据放到最上面
+            jqGridTable.addRowData(rowId, postData, 'last');
+        }
+        //console.log(postData);
+        dialogClose();
+    }
+
+    function changedata(type) {
+        $("#GoalValue").removeAttr('onkeyup');
+        $("#RealValue").removeAttr('onkeyup');
+        $.ajax({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            data: { EnCode: "TargetProject" },
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                var projectname = $("#TargetProject").val();
+                var targetprojectvalue = $("#TargetProjectValue").val();
+                //if (projectname == "误操作事故" || projectname == "环境污染事故" || projectname == "缺煤停机事故") {
+                if (targetprojectvalue == "4" || targetprojectvalue == "6" || targetprojectvalue == "8") {
+                    $("#RealValue").removeAttr("readonly");
+                    $("#CompleteStatus").removeAttr("disabled", "disabled");
+                    //$("#GoalValue,#RealValue").attr("onkeyup", "checkval(this)");
+                }
+                else {
+                    if (targetprojectvalue.indexOf("-") < 0) {
+                        var count = 0;
+                        for (var i = 0; i < result.length; i++) {
+                            //if ($("#TargetProject").val() == result[i].ItemName) {
+                            if ($("#TargetProjectValue").val() == result[i].ItemValue) {
+                                //$("select").eq(0).val(result[i].ItemValue);
+                                $("#GoalValue").attr('onkeyup', 'changeV(this)');
+                                $("#RealValue").attr('onkeyup', 'changeV(this)');
+                                count++;
+                            }
+                        }
+                        //新增时
+                        if (type == "1") {
+                            if (count > 0) {
+                                $("#RealValue").attr("readonly", "readonly");
+                                $("#CompleteStatus").attr("disabled", "disabled");
+                                $("#GoalValue,#RealValue").attr("onkeyup", "changeV(this)");
+                            }
+                            else {
+                                //不是系统内置的项目
+                                $("#RealValue").removeAttr("readonly");
+                                $("#CompleteStatus").removeAttr("disabled");
+                                $("#RealValue,#GoalValue").val(0);
+                                $("#CompleteStatus").ComboBoxSetValue("");
+                                //$("#CompleteStatus").attr("data-text", null);
+                                //$("#CompleteStatus").attr("data-value", null);
+                                //$("#CompleteStatus div:eq(0)").text("==请选择==");
+                                //$("#GoalValue,#RealValue").attr("onkeyup", "checkval(this)");
+                            }
+                        }
+                        //修改时
+                        else {
+                            if (count > 0) {
+                                $("#RealValue").attr("readonly", "readonly");
+                                $("#CompleteStatus").attr("disabled", "disabled");
+                                $("select").eq(0).attr("disabled", "disabled");
+                                $("#GoalValue,#RealValue").attr("onkeyup", "changeV(this)");
+                                $("#TargetProject").attr("disabled", "disabled");
+                            }
+                            else {
+                                $("select").eq(0).removeAttr("disabled");
+                            }
+                        }
+                    }
+                }
+
+            }
+        });
+    }
+
+    //验证并计算
+    function changeV(a) {
+        checkval(a);
+        calculate();
+    };
+
+    //验证输入框中的值是否符合
+    function checkval(a) {
+        var vnum = $(a).val();
+        if (vnum != "" && vnum != "0") {
+            var ex = /^\d+(\.\d{1,3})?$/;
+            if (vnum.indexOf(".") > 0) {
+                vnum = vnum + "0";
+            }
+            if (!ex.test(vnum)) {
+                dialogAlert("请输入数字！", 2);
+                $(a).val(0);
+            }
+        }
+    }
+
+
+    //切换目标项目
+    function changeproject() {
+        $("#GoalValue").val(0);
+        var ctype = $("#TargetProjectValue").val();//$("select").eq(0).val();
+        if (ctype != undefined && ctype != "") {
+            //4.8的实际值为手动输入
+            if (ctype.indexOf("-") < 0) {
+                if (ctype != "4" && ctype != "8") {
+                    $.ajax({
+                        url: '../../SaftProductTargetManage/SafeProduct/calculateGoal',
+                        data: { belongtype: ctype, belongdeptid: belongdept, year: year },
+                        dataType: "JSON",
+                        async: false,
+                        success: function (result) {
+                            $("#RealValue").val(result);
+                            compareUpper();
+                            $("#RealValue").attr("readonly", "readonly");
+                            $("#CompleteStatus").attr("disabled", "disabled");
+                        }
+                    });
+                }
+                else {
+                    $("#RealValue").removeAttr("readonly");
+                    $("#CompleteStatus").removeAttr("disabled");
+                }
+            }
+            else {
+                $("#RealValue").removeAttr("readonly");
+                $("#CompleteStatus").removeAttr("disabled");
+                $("#GoalValue").removeAttr('onkeyup');
+                $("#RealValue").removeAttr('onkeyup');
+            }
+        }
+    }
+
+    //计算
+    function calculate() {
+        var gvalue = $("#GoalValue").val();
+        var rvalue = $("#RealValue").val();
+        var ctype = $("#TargetProjectValue").val();//$("select").eq(0).val();
+        if (!!gvalue && !!rvalue) {
+            if (ctype != undefined && ctype != "") {
+                compareUpper();
+            }
+        }
+    }
+
+    function compareUpper() {
+        var gvalue = $("#GoalValue").val();
+        var rvalue = $("#RealValue").val();
+        var ctype = $("#TargetProjectValue").val();//$("select").eq(0).val();
+        //特种作业人员持证上岗率,特种设备检验合格率,隐患整改率
+        if (ctype == "1" || ctype == "13" || ctype == "14") {
+            //实际值大于等于目标值
+            if (parseFloat(rvalue) >= parseFloat(gvalue)) {
+                $("#CompleteStatus").ComboBoxSetValue("已完成")
+            }
+            else {
+                $("#CompleteStatus").ComboBoxSetValue("未完成")
+            }
+        }
+        else {
+            //实际值小于等于目标值
+            if (parseFloat(rvalue) <= parseFloat(gvalue)) {
+                $("#CompleteStatus").ComboBoxSetValue("已完成")
+            }
+            else {
+                $("#CompleteStatus").ComboBoxSetValue("未完成")
+            }
+        }
+    }
+    function OpenSelect() {
+        dialogOpen({
+            id: 'Sikp',
+            title: '选择安全生产目标',
+            url: '/SaftProductTargetManage/SafeProductProject/Project?',
+            width: ($(top.window).width() - 800) + "px",
+            height: ($(top.window).height() - 300) + "px",
+            //btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    function setStd() {
+        changeproject();
+        var projectname = $("#TargetProject").val();
+        var targetprojectvalue = $("#TargetProjectValue").val();
+        //if (projectname == "误操作事故" || projectname == "环境污染事故" || projectname == "缺煤停机事故") {
+        if (targetprojectvalue.indexOf("-") < 0) {
+            if (targetprojectvalue == "4" || targetprojectvalue == "6" || targetprojectvalue == "8") {
+                $("#RealValue").removeAttr("readonly");
+                $("#CompleteStatus").removeAttr("disabled", "disabled");
+                $("#GoalValue,#RealValue").removeAttr("onkeyup", "checkval(this)");
+            } else {
+                $("#GoalValue").attr('onkeyup', 'changeV(this)');
+                $("#RealValue").attr('onkeyup', 'changeV(this)');
+            }
+        }
+    }
+    //function changeproject2() {
+    //    var projectname = $("#TargetProject").val();
+    //    if (projectname == "误操作事故" || projectname == "环境污染事故" || projectname == "缺煤停机事故" ||
+    //        projectname == "特种作业人员持证上岗率(%)" || projectname == "重大及以上设备事故" || projectname == "人身重伤及以上事故" ||
+    //        projectname == "一般设备事故" || projectname == "人身轻伤及未遂事件" || projectname == "交通事故" ||
+    //        projectname == "火灾" || projectname == "一类障碍" || projectname == "二类障碍" ||
+    //        projectname == "特种设备检验合格率(%)" || projectname == "隐患整改率(%)" )
+    //    {
+    //    }
+    //    $("#GoalValue").attr('onkeyup', 'changeV(this)');
+    //    $("#RealValue").attr('onkeyup', 'changeV(this)');
+    //}
+</script>
+<div style="margin-top: 30px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">目标项目<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                @* <div id="TargetProject" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>*@
+                @*<select id="TargetProject" onchange="changeproject()" >
+            <option value="">请选择或手输目标项目</option>
+            @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("TargetProject"))
+        </select>*@
+                @*<input id="SaftTargetName" type="text" class="form-control" placeholder="请填写安全目标名称" isvalid="yes" checkexpession="NotNull" />*@
+                <div style="float:left;width:90%;">
+                    <input id="TargetProject" type="text" class="form-control" placeholder="请填写安全目标名称" isvalid="yes" checkexpession="LenStr" length="200"/>
+                </div>
+                <input type="hidden" id="TargetProjectValue" value="" />
+                <div style="float:left;width:8%;text-align:center;margin-top:0px;margin-left:5px;">
+                    <input type="button" value="选择" onclick="OpenSelect()" id="OpenStandardsystem" class="btn btn-primary" />
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">目标值<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="GoalValue" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" value="0" />
+            </td>
+            <td class="formTitle">实际值<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="RealValue" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" value="0" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">完成情况<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="CompleteStatus" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                @* <input id="CompleteStatus" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />*@
+            </td>
+            <td class="formTitle">排序号</td>
+            <td class="formValue">
+                <input id="SortCode" type="text" class="form-control" isvalid="yes" checkexpession="NumOrNull">
+            </td>
+        </tr>
+    </table>
+</div>

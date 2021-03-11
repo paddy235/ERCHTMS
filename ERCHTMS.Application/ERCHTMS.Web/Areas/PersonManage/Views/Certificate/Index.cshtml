@@ -1,0 +1,290 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script type="text/javascript">
+    var action = request('action');
+    var userId = request('userId');
+    var mode = request("mode");
+    var title = "特种作业操作证";
+    $(function () {
+        initControl();
+        getGrid();
+    });
+    //初始化控件
+    function initControl() {
+        if (action == "show") {
+            disabledControl();
+        }
+        if (mode == 2) {
+            title = "特种设备作业人员证";
+            $("#title").html(title);
+        }
+        //获取表单
+        if (!!userId) {
+            $.SetForm({
+                url: "../../PersonManage/Person/GetUserInfo",
+                param: { keyValue: userId },
+                success: function (json) {
+                    $("#form1").formDeserialize(json);
+
+                }
+            })
+        }
+    }
+    function viewImages(obj, id) {
+        var dlg = dialogOpen({
+            id: "CertPic",
+            title: '查看证书照片',
+            url: '/PersonManage/Certificate/ViewImage?keyValue=' + id,
+            width: "800px",
+            height: "600px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+    function getGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 300,
+            url: "../../PersonManage/Certificate/GetListJson" ,
+            postData: { userId: userId, certType: title },
+            datatype: "json",
+            colModel: [
+                { label: 'ID', name: 'Id', align: 'center',  hidden: true }, { label: 'Years', name: 'Years',hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 110, align: 'center',sortable: false,formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=\"javascript:show('" + rowObject.Id + "')\" title=\"查看\"><i class=\"fa fa-eye\"></i></a>";
+                        if (action=="edit") {
+                             html += "<a href=\"javascript:edit('" + rowObject.Id + "')\" title=\"修改\"><i class=\"fa fa-pencil-square-o\"></i></a>";
+                             html += "<a href=\"javascript:del('" + rowObject.Id + "')\" title=\"删除\"><i class=\"fa fa-trash-o\"></i></a>";
+                        }
+                         return html;
+                     }
+                 },
+                { label: '证书编号', name: 'CertNum', width: 100, align: 'center', sortable: true },
+                { label:mode==1?'作业类别':'种类', name: 'WorkType', width: 150, align: 'center', sortable: true },
+                { label: mode == 1 ? '操作项目' : '作业项目', name: 'WorkItem', width: 120, align: 'center', sortable: true },
+                { label: '项目代号', name: 'ItemNum', width: 100, align: 'center', sortable: true,hidden:true },
+                {
+                    label: '初领日期', name: 'SendDate', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, "yyyy-MM-dd");
+                    }
+                },
+                {
+                    label: "有效期开始日期", name: 'StartDate', width: 100, align: 'center', sortable: true, hidden: mode == 2,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, "yyyy-MM-dd");
+                    }
+                },
+                {
+                    label: mode==1?"有效期结束日期":'有效期限', name: 'EndDate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, "yyyy-MM-dd");
+                    }
+                },
+                {
+                    label: '应复审日期', name: 'ApplyDate', width: 150, align: 'center', sortable: true, hidden: mode == 2,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, "yyyy-MM-dd");
+                    }
+                },
+                { label: '发证机关', name: 'SendOrgan', width: 150, align: 'center', sortable: true },
+               {
+                   label: '证书照片', name: 'FilePath', align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == null) {
+                            return "";
+                        } else {
+                            return "<a onclick=viewImages(this,'" + rowObject.Id + "') style='cursor:pointer;text-decoration:underline;'>查看照片</a>";
+                        }
+                    }
+               }
+            ]
+        });
+    }
+    //保存表单;
+    function AcceptClick() {
+        if ($("#gridTable").find(".jqgrow ").length == 0) {
+            dialogAlert("请至少新增一条证件信息！", 0);
+            return;
+        }
+        //if (!$('#form1').Validform()) {
+        //    return false;
+        //}
+        //var postData = $("#form1").formSerialize(keyValue);
+        //$.SaveForm({
+        //    url: "../../PersonManage/Certificate/SaveForm?keyValue=" + keyValue,
+        //    param: postData,
+        //    loading: "正在保存数据...",
+        //    success: function () {
+        //        var certtype = $("#CertType").attr("data-value");
+        //        if (certtype == "特种作业操作证") {
+        //            top.frames["Form"].window.$(".tzzy").find("input:radio").eq(0).iCheck('check');
+        //        }
+        //        if (certtype == "特种设备作业人员证") {
+        //            top.frames["Form"].window.$(".tzsb").find("input:radio").eq(0).iCheck('check');
+        //        }
+        //        top.frames["Form"].window.$("#gridTableCert").trigger("reloadGrid");
+        //    }
+        //})
+        $.currentIframe().$("#gridTable").trigger("reloadGrid");
+        dialogClose();
+    }
+    function callBack(userNames, userAccounts, deptCodes, userIds, deptIds, deptNames, dutyname, sex, postNames, enterTime) {
+        userId = userIds;
+        $('#gridTable').jqGrid('setGridParam', {
+            postData: {
+                userId: userId
+            }
+        }).trigger('reloadGrid');
+    }
+    function selUser() {
+        selectUser({
+            deptId: "", checkMode: 0, mode:4, callBack: callBack, winObject: document.body, domId: 'RealName,,UserId,,,DeptName,,Gender,IdentifyID,,DutyName,PostName,EnterTime'
+        });
+    }
+    //新增
+    function add(id) {
+        var userId=$("#UserId").val();
+        if (userId.length==0) {
+            dialogAlert("请选择人员！", 0);
+            return false;
+        } else {
+            var dlg = dialogOpen({
+                id: "NewForm",
+                title: '新增证件信息',
+                url: '/PersonManage/Certificate/NewForm?action=add&mode=' + mode + '&userId=' + userId,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        }
+    }
+    //查看证件信息
+    function show(id) {
+            var userId = $("#UserId").val();
+            var dlg = dialogOpen({
+                id: "NewForm",
+                title: '查看证件信息',
+                url: '/PersonManage/Certificate/NewForm?action=show&mode=' + mode + '&userId=' + userId+"&keyValue="+id,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn:["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+    }
+    //删除证件信息
+    function del(id) {
+        $.RemoveForm({
+            url: '../../PersonManage/Certificate/RemoveForm',
+            param: { keyValue: id },
+            success: function (data) {
+                $("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //修改证件信息
+    function edit(id) {
+        var userId = $("#UserId").val();
+        var dlg = dialogOpen({
+            id: "NewForm",
+            title: '修改证件信息',
+            url: '/PersonManage/Certificate/NewForm?action=edit&mode=' + mode + '&userId=' + userId + "&keyValue=" + id,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //复审
+    var itemCode = "";
+    var sendOrg = "";
+
+    function audit(id) {
+        var id = $("#gridTable").jqGridRowValue("Id");
+        if (id.length==0) {
+            dialogAlert("请先选择一条证件信息！", 0);
+            return false;
+        } else {
+            itemCode = $("#gridTable").jqGridRowValue("ItemNum");
+            sendOrg = $("#gridTable").jqGridRowValue("SendOrgan");
+            var years = $("#gridTable").jqGridRowValue("Years");
+            var userId = $("#UserId").val();
+            var dlg = dialogOpen({
+                id: "AuditForm",
+                title: '新增复审信息',
+                url: '/PersonManage/Certificate/AuditForm?pFrom=2&action=add&certId=' + id + "&userId=" + userId + "&mode=" + mode + "&years=" + years,
+                width: "900px",
+                height: ($(top.window).height() - 250) + "px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        }
+       
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">选择人员<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div class="input-group" style="width:100%;">
+                    <input id="RealName" type="text" class="form-control" placeholder="请选择人员" isvalid="yes" checkexpession="LenStrOrNull" readonly />
+                    <input type="hidden" id="UserId" /><input id="IdentifyID" type="hidden" />
+                    <span  class="input-group-addon" onclick="selUser()" title="选择人员"><i class="fa fa-check"></i></span>
+                </div>
+            </td>
+            <td class="formTitle">单位/部门</td>
+            <td class="formValue">
+                <input type="text" class="form-control" id="DeptName" readonly />
+            </td>
+        </tr>
+        <tr style="display:none;">
+            <td class="formTitle">性别</td>
+            <td class="formValue" colspan="3">
+                <input type="text" class="form-control" id="Gender" readonly />
+            </td>
+        </tr>
+        <tr>
+           
+            <td class="formTitle">岗位</td>
+            <td class="formValue">
+                <input type="text" class="form-control" id="DutyName" readonly />
+            </td>
+            <td class="formTitle">职务</td>
+            <td class="formValue">
+                <input type="text" class="form-control" id="PostName" readonly />
+            </td>
+        </tr>
+        
+    </table>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong id="title">特种作业操作证</strong>
+            <span class="tools pull-right">
+                <a href="javascript:add(this)" class="btn btn-primary btn-xs">新 增</a>&nbsp;&nbsp;
+                <a href="javascript:audit(this)" class="btn btn-primary btn-xs">复 审</a>&nbsp;&nbsp;&nbsp;&nbsp; 
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        
+        <div class="panel-body">
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,262 @@
+@model ERCHTMS.Web.Areas.KbsDeviceManage.Models.TaskModel
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+
+<script>
+    var keyValue = request('keyValue');
+    var Areastate;
+    $(function () {
+        initControl();
+        //disabledControl();
+
+
+    });
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../KbsDeviceManage/Safeworkcontrol/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    switch (data.Areastate) {
+                        case 0:
+                            // $("#Areastate").val("正方形");
+                            break;
+                        case 1:
+                            // $("#Areastate").val("圆形");
+                            break;
+                        case 2:
+                            // $("#Areastate").val("手绘");
+                            break;
+                        default:
+                    }
+                }
+            })
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if ($("#StationCode").val() == "") {
+            dialogMsg('请先绘制电子围栏！', 0);
+            return false;
+        }
+        postData["Areacode"] = $("#StationCode").val();
+        postData["Areastate"] = Areastate;
+        postData["State"] = 1;
+        postData["Radius"] = parseInt(Number($("#Radius").val()));
+        $.SaveForm({
+            url: "../../KbsDeviceManage/Safeworkcontrol/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    //查看隔离区域
+    function ShowArea() {
+        var dlg = dialogOpen({
+            id: 'ShowArea',
+            title: '查看隔离区域',
+            url: '/KbsDeviceManage/Safeworkcontrol/ShowArea?keyValue=' + keyValue,
+            width: '1000px',
+            height: '800px',
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //新增
+    function GetPos(obj) {
+        Areastate = obj;
+        var paths = top.contentPath;
+        var dlg = dialogOpen({
+            id: 'GetPos1',
+            title: '绘制',
+            url: '../..' + paths + '/KbsDeviceManage/BaseStation/GetPos?type=dzwl&pNum=' + obj,
+            width: '1003px',
+            height: '800px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+
+
+</script>
+<div class="container-fluid">
+    <div class="panel-body form-horizontal">
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                工作票编号 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.Workno, new { @class = "form-control", maxlength = "100", isvalid = "yes", checkexpession = "NotNull" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                工作负责人 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.Taskmanagename, new { @class = "form-control", isvalid = "yes", checkexpession = "NotNull", placeholder = "请点击选择", onclick = "selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: document.body, domId: 'Taskmanagename,,Taskmanageid,Deptid,Deptcode,Deptname' });", onfocus = "blur();" })
+                @Html.HiddenFor(x => x.Taskmanageid)
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                部门/班组 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.Deptname, new { @class = "form-control", @readonly = "readonly", isvalid = "yes", checkexpession = "NotNull", onclick = "selectDept('', 0, 0, '选择部门', window.document.body, 'Deptname,DeptCode,DeptId','')" })
+                @Html.HiddenFor(x => x.Deptid)
+                @Html.HiddenFor(x => x.Deptcode)
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                工作成员 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.Taskmembername, new { @class = "form-control", isvalid = "yes", checkexpession = "NotNull", placeholder = "请点击选择", onclick = "selectUser({ deptId: '', checkMode: 1, mode: 0, winObject: document.body, domId: 'Taskmembername,,Taskmemberid' });", onfocus = "blur();" })
+                @Html.HiddenFor(x => x.Taskmemberid)
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                工作任务 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.Taskname, new { @class = "form-control", maxlength = "200", isvalid = "yes", checkexpession = "NotNull" })
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                工作类型 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.DropDownListFor(x => x.Tasktype, ViewData["Tasktype"] as IEnumerable<SelectListItem>, new { @class = "form-control" })
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                工作风险等级 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.DropDownListFor(x => x.DangerLevel, ViewData["DangerLevel"] as IEnumerable<SelectListItem>, new { @class = "form-control" })
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                工作区域 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.Taskregionname, new { @class = "form-control", isvalid = "yes", checkexpession = "NotNull", onclick = "selectArea(window.document.body, 'Taskregionname,Taskregioncode,,,,,,Taskregionid');", placeholder = "请点击选择", onfocus = "blur();" })
+                @Html.HiddenFor(x => x.Taskregionid)
+                @Html.HiddenFor(x => x.Taskregioncode)
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                许可开始时间 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.Actualstarttime, new { @class = "form-control input-wdatepicker", Value = Model.Actualstarttime == null ? string.Empty : Model.Actualstarttime.Value.ToString("yyyy-MM-dd HH:mm"), onfocus = "WdatePicker({dateFmt:'yyyy-MM-dd HH:mm:ss'});blur();" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                计划结束时间 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.Planendtime, new { @class = "form-control input-wdatepicker", isvalid = "yes", checkexpession = "NotNull", Value = Model.Planendtime == null ? string.Empty : Model.Planendtime.Value.ToString("yyyy-MM-dd HH:mm"), onfocus = "WdatePicker({dateFmt:'yyyy-MM-dd HH:mm:ss'});blur();" })
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                工作票签发人<span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.IssueName, new { @class = "form-control", isvalid = "yes", checkexpession = "NotNull", placeholder = "请点击选择", onclick = "selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: document.body, domId: 'IssueName,,IssueUserid' });", onfocus = "blur();" })
+                @Html.HiddenFor(x => x.IssueUserid)
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                工作许可人<span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.PermitName, new { @class = "form-control", isvalid = "yes", checkexpession = "NotNull", placeholder = "请点击选择", onclick = "selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: document.body, domId: 'PermitName,,PermitUserid' });", onfocus = "blur();" })
+                @Html.HiddenFor(x => x.PermitUserid)
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                监护人（工作单位）
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.Guardianname, new { @class = "form-control", placeholder = "请点击选择", onclick = "selectUser({ deptId: '', checkMode: 1, mode: 0, winObject: document.body, domId: 'Guardianname,,Guardianid' });", onfocus = "blur();" })
+                @Html.HiddenFor(x => x.Guardianid)
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                监护人（主管部门）
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.ExecutiveNames, new { @class = "form-control", placeholder = "请点击选择", onclick = "selectUser({ deptId: '', checkMode: 1, mode: 0, winObject: document.body, domId: 'ExecutiveNames,,ExecutiveIds' });", onfocus = "blur();" })
+                @Html.HiddenFor(x => x.ExecutiveIds)
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                监护人（安全监察部门）
+            </label>
+            <div class="col-xs-10">
+                @Html.TextBoxFor(x => x.SupervisionNames, new { @class = "form-control", placeholder = "请点击选择", onclick = "selectUser({ deptId: '', checkMode: 1, mode: 0, winObject: document.body, domId: 'SupervisionNames,,SupervisionIds' });", onfocus = "blur();" })
+                @Html.HiddenFor(x => x.SupervisionIds)
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-xs-2 control-label">
+                电子围栏 <span style="color:red;">*</span>
+            </label>
+            <div class="col-xs-10">
+                <input id="StationCode" type="text" class="form-control" isvalid="yes" readonly="readonly" style="display:none;" />
+                <label id="Radius"></label>
+                <a id="btn_Sea" style="float: left; width: 12%; " onclick="GetPos(0)" class="btn btn-primary">正方形</a>
+                <a id="btn_Sea" style="float: left; width: 12%;  margin-left: 15px;" onclick="GetPos(1)" class="btn btn-primary">圆形</a>
+                <a id="btn_Sea" style="float: left; width: 12%;  margin-left: 15px;" onclick="GetPos(2)" class="btn btn-primary">手绘</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<style>
+    .btn btn-primary {
+        color: #fff;
+        background-color: #337ab7;
+        border-color: #2e6da4;
+        width: 18%;
+    }
+</style>

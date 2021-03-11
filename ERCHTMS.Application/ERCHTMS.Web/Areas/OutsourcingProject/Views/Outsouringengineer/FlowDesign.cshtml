@@ -1,0 +1,252 @@
+﻿@{
+    ViewBag.Title = "流程设计器";
+    Layout = "~/Views/Shared/_FlowForm.cshtml";
+}
+<script type="text/javascript" src="~/Content/scripts/business/common.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var WFSchemeInfoId = request('WFSchemeInfoId')
+    var postData = {};//提交数据
+    var flowData = {};
+    var frmData = {};
+    var SchemeContentOld;
+    var frmapp;
+    var shcemeAuthorizeData = "";
+    var AllAuthorizeCheckData = {};
+    $(function () {
+        initialPage();
+    })
+    //初始化页面
+    function initialPage() {
+        
+        initFlowInfo();
+        $("#FlowPanel_btn_shuntnode").hide();
+        $("#FlowPanel_btn_confluencenode").hide();
+        $("#FlowPanel_btn_group").hide();
+        //if (!bindingFlow()) {
+        //    return false;
+        //}
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../OutsourcingProject/Outsouringengineer/GetFlowForm",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    if (!!data.dept) {
+                        $("#RecId").val(data.dept.DepartmentId);
+                        $("#DeptCode").val(data.dept.Encode);
+                        $("#DeptName").val(data.dept.FullName);
+                    }
+                    else
+                    { 
+                        WFSchemeInfoId = data.data.WFSchemeInfoId;
+                    }
+                    SchemeContentOld = JSON.parse(data.data.SchemeContent);
+                    setFlowInfo(SchemeContentOld.Flow);
+                }
+            });
+        }
+
+        if (!!WFSchemeInfoId) {
+            $("#tr_line").hide();
+            $("#DeptName").removeAttr("isvalid");
+            $.SetForm({
+                url: "../../OutsourcingProject/Outsouringengineer/GetFlowFormBySchemeInfoId",
+                param: { keyValue: WFSchemeInfoId },
+                success: function (data) {
+                    if (!!data.dept) {
+                        $("#RecId").val(data.dept.DepartmentId);
+                        $("#DeptCode").val(data.dept.Encode);
+                        $("#DeptName").val(data.dept.FullName);
+                    }
+                    else {
+                        keyValue = data.data.Id;
+                    }
+                    SchemeContentOld = JSON.parse(data.data.SchemeContent);
+                    setFlowInfo(SchemeContentOld.Flow);
+                }
+            });
+        }
+
+
+        ////保存为草稿
+        //$('#btn_caogao').click(function () {
+        //    if (!$('#step-1').Validform()) {
+        //        return false;
+        //    }
+        //    var _data = $("#step-1").formSerialize(keyValue);
+        //    var _frmcotentls = "";
+        //    if (postData.FrmType == 1) {
+        //        frmData = "";
+        //    }
+        //    else {
+        //        if (frmapp != undefined) {
+        //            _frmcotentls = frmapp.getData(true);
+        //        }
+        //        frmData.FrmContent = JSON.stringify(_frmcotentls);
+        //    }
+
+        //    flowData["SchemeContent"] = JSON.stringify({ "Frm": frmData, "Flow": FlowDesignPanel.exportData() });
+        //    bindingSchemeAuthorize(true);
+        //    postData = $.extend(postData, _data);
+        //    postData["EnabledMark"] = 3;
+        //    $.SaveForm({
+        //        url: "../../FlowManage/FlowDesign/SaveForm?keyValue=" + keyValue,
+        //        param: { "InfoEntity": JSON.stringify(postData), "ContentEntity": JSON.stringify(flowData), "shcemeAuthorizeData": shcemeAuthorizeData },
+        //        loading: "正在保存数据...",
+        //        success: function () {
+        //            $.currentIframe().$("#gridTable").trigger("reloadGrid");
+        //        }
+        //    })
+        //});
+    }
+
+    /*=========流程设计（begin）==================================================================*/
+    var FlowDesignPanel;
+    var FlowDesignObject;//
+    var LineId;
+    var nodePramData = [];
+    function initFlowInfo()
+    {
+        FlowDesignPanel = $('#FlowPanel').flowdesign({
+            height: $(window).height()-100,
+            widht: $(window).width()-100,
+            OpenNode: function (object) {
+                FlowDesignObject = object;
+                if (object.$nodeData[object.$focus].type == 'startround')
+                {
+                    return false;
+                }
+                dialogOpen({
+                    id: "FlowLineForm",
+                    title: '节点设置【' + object.$nodeData[object.$focus].name + '】',
+                    url: '/OutsourcingProject/Outsouringengineer/FlowNodeForm',
+                    width: "750px",
+                    height: "430px",
+                    callBack: function (iframeId) {
+                        top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                    }
+                });
+            },
+            //OpenLine: function (id, object) {
+            //    FlowDesignObject = object;
+            //    LineId = id;
+            //    var _line = object.$lineData[id];
+            //    var _fromNode = object.$nodeData[_line.from];
+            //    if (_fromNode.type == "shuntnode")
+            //    {
+            //        dialogTop("前一个节点是分流节点无法设置流转条件", "error");
+            //        return false;
+            //    }
+            //    dialogOpen({
+            //        id: "FlowNodeForm",
+            //        title: '流转条件设置',
+            //        url: '/FlowManage/FlowDesign/FlowLineForm',
+            //        width: "750px",
+            //        height: "430px",
+            //        callBack: function (iframeId) {
+            //            top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            //        }
+            //    });
+            //}
+        });
+    }
+    function setFlowInfo(data)
+    {
+        FlowDesignPanel.loadData(data);
+    }
+    function callBackNode(id, data, _nodePramData)
+    {
+        nodePramData = _nodePramData;
+        FlowDesignPanel.SetNodeEx(id, data);
+    }
+    function callBackLine(id, data)
+    {
+        FlowDesignPanel.SetLineEx(id, data);
+    }
+    function bindingFlow()
+    {
+        var _content = FlowDesignPanel.exportDataEx();
+        if (_content == -1)
+        {
+            return false;
+        }
+        flowData["SchemeContent"] = JSON.stringify({ "Frm": frmData, "Flow": _content });
+        return true;
+    }
+    /*=========流程设计（end）====================================================================*/
+
+    /*=========创建完成（begin）==================================================================*/
+    function finishbtn() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        flowData["SchemeContent"] = JSON.stringify({ "Flow": FlowDesignPanel.exportData() });
+        flowData["WFSchemeInfoId"] = !!WFSchemeInfoId ? WFSchemeInfoId : $("#RecId").val();
+        postData["EnabledMark"] = 1;
+        $.SaveForm({
+            url: "../../OutsourcingProject/Outsouringengineer/SaveFlowForm?keyValue=" + keyValue,
+            param: { "InfoEntity": JSON.stringify(postData), "ContentEntity":encodeURIComponent(JSON.stringify(flowData)) },
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    /*=========创建完成（end）====================================================================*/
+</script>
+
+<div class="widget-body">
+    @*<div id="wizard" class="wizard" data-target="#wizard-steps">
+        <ul class="steps">
+            <li data-target="#step-1" class="active"><span class="step">1</span>基本配置<span class="chevron"></span></li>
+            <li data-target="#step-2"><span class="step">2</span>权限设置<span class="chevron"></span></li>
+            <li data-target="#step-3"><span class="step">3</span>表单选择<span class="chevron"></span></li>
+            <li data-target="#step-4"><span class="step">4</span>流程设计<span class="chevron"></span></li>
+            <li data-target="#step-5"><span class="step">5</span>创建完成<span class="chevron"></span></li>
+        </ul>
+    </div>*@
+    <table class="form">
+        <tr id="tr_line">
+            <td class="formTitle" style="width:130px;">所属单位<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="RecId" type="hidden" class="form-control" />
+                <input id="DeptCode" type="hidden" class="form-control" />
+                <input id="DeptName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" onclick="selectDept('', 0, 13, '所属部门', document.body, 'DeptName,DeptCode,RecId')" />
+            </td>
+        </tr>
+
+    </table>
+
+    <div class="step-pane wizard-step-pane active" id="wizard-steps">
+        <div class="step-pane" id="step-4">
+            <div id="FlowPanel" style="margin: 0px;">
+            </div>
+        </div>
+    </div>
+    @*<div class="form-button" id="wizard-actions">
+        <a id="btn_finish" disabled class="btn btn-success" onclick="finishbtn();">保存</a>
+    </div>*@
+</div>
+<style>
+    .editviewtitle {
+        position: fixed !important;
+        top: 117px;
+        right: 11px;
+        width: 50px;
+        z-index: 1000;
+    }
+    .standtab-pane {
+        width:224px;
+        border-right:1px solid #ccc;
+        float:left;
+    }
+    .SchemeAuthorizePanel {
+        width:828px;
+        float: left;
+        display:none;
+    }
+    .card-box.active {
+        background: url(../../Content/Images/item_close.png) right top no-repeat !important;
+    }
+</style>

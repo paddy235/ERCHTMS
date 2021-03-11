@@ -1,0 +1,213 @@
+﻿@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var PlanId = request('PlanId');
+    var keyValue = request('keyValue');
+    var IsPublic = request('IsPublic');
+    var IsTb = 0;//是否直接同步
+
+    $(function () {
+        InitCombobox();
+        initControl();
+        //已经发布的任务分解：修改内容--走流程提交 修改计划月份 -- 直接同步到发布信息
+        if (IsPublic == "1") {
+            $("input").attr("disabled", "disabled");
+            $(".ui-select").attr("disabled", "disabled");
+            $("#EditPlanWork").show();
+            IsTb = 1;
+        } else {
+            $("#EditPlanWork").hide();
+        }
+    });
+    //初始化控件
+    function initControl() {
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../ObserveRecord/ObsTaskwork/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.ObsMonth != null && data.ObsMonth != undefined) {
+                        $("#ObsMonth").val(data.ObsMonth);
+                        $("#ObsMonth").find("option").each(function (i, dom) {
+                            data.ObsMonth = "," + data.ObsMonth + ",";
+                            if (data.ObsMonth.indexOf(","+dom.value+",") >= 0 && dom.value.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+                    }
+                }
+            })
+        } else {
+            keyValue = keyValue.length == 0 ? newGuid() : keyValue;
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["PlanId"] = PlanId;
+        postData["ObsPersonId"] = $("#ObsPersonId").val();
+        postData["ObsNum"] = $("#ObsNum").attr("data-value");
+        postData["ObsNumText"] = $("#ObsNum").attr("data-text");
+        var UrlCommit = "";
+        if (IsTb == 1) {
+            UrlCommit =  "../../ObserveRecord/ObsTaskwork/TbSaveForm?keyValue=" + keyValue;
+        } else {
+            UrlCommit = "../../ObserveRecord/ObsTaskwork/SaveForm?keyValue=" + keyValue;
+        }
+        $.SaveForm({
+            url: UrlCommit,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                //$.currentIframe().$("#gridTable").trigger("reloadGrid");
+                top.frames["AddPlanForm"].window.$("#gridTable").trigger("reloadGrid")
+            }
+        })
+    }
+    function InitCombobox() {
+        //风险等级
+        var data = [
+            { no: "I级", name: "I级" },
+            { no: "II级", name: "II级" },
+            { no: "III级", name: "III级" },
+            { no: "IV级", name: "IV级" },
+            { no: "V级", name: "V级" }
+        ];
+        $("#RiskLevel").ComboBox({
+            id: "no",
+            text: "name",
+            description: "==请选择==",
+            height: '400px',
+            allowSearch: false,
+            data: data
+        });
+        //观察频率
+        var data = [
+          { no: "I级", name: "选择性观察" },
+          { no: "II级", name: "1次/半年,以发生作业为准" },
+          { no: "III级", name: "1次/季度,以发生作业为准" },
+          { no: "IV级", name: "1次/月,以发生作业为准" },
+          { no: "V级", name: "每次观察,以发生作业为准" }
+        ];
+        $("#ObsNum").ComboBox({
+            id: "no",
+            text: "name",
+            description: "==请选择==",
+            height: '400px',
+            allowSearch: false,
+            data: data
+        });
+    }
+    function LevelChange(obj) {
+        if ($(obj).attr("data-value") == "") {
+            $("#ObsNum").attr("data-text", "==请选择==");
+            $("#ObsNum").attr("data-value", "");
+            $("#ObsNum div:eq(0)").text("==请选择==");
+        } else {
+            $("#ObsNum").ComboBoxSetValue($(obj).attr("data-value"));
+        }
+        switch ($(obj).attr("data-value")) {
+            case "I级":
+            case "II级":
+            case "III级":
+                top.frames["AddPlanForm"].window.$("#PlanLevel").ComboBoxSetValue("部门级")
+                break;
+            case "IV级":
+            case "V级":
+                top.frames["AddPlanForm"].window.$("#PlanLevel").ComboBoxSetValue("公司级")
+                break;
+            default:
+
+        }
+    }
+
+    function EditWork() {
+        IsTb = 0;
+        $("input").attr("disabled", false);
+        $(".ui-select").attr("disabled", false);
+    }
+    function checkLen() {
+        if ($("#ObsPerson").val().length >= 800) {
+            dialogMsg("人员选择过多,请重新选择！", 0);
+            $("#ObsPerson").val("");
+            $("#ObsPersonId").val("");
+            return;
+        }
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <div id="obsInfo" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;任务分解基本信息</strong>
+            <span class="tools pull-right">
+                <a style="display:none;" href="javascript:EditWork(this)" id="EditPlanWork" class="btn btn-primary btn-xs">修改任务分解</a>&nbsp;&nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle" style="width:120px;">任务分解名称</td>
+                    <td class="formValue" colspan="3">
+                        <input id="WorkName" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">观察人员<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <input id="ObsPerson" type="text" class="form-control" maxlength="800" style="width:90%;float:left;" isvalid="yes" checkexpession="NotNull" placeholder="多个人用(英文)逗号隔开" />
+                        <input type="button" class="btn btn-primary" onclick="selectUser({ deptId: '', userIds: 'ObsPersonId', checkMode: 1, mode: 0, winObject: window.document.body, domId: 'ObsPerson,,ObsPersonId',callBack:checkLen });" value="选 择" />
+                        <input type="hidden" id="ObsPersonId" />
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle">计划观察月份<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <select id="ObsMonth" class="form-control selectpicker show-menu-arrow" multiple isvalid="yes" checkexpession="NotNull">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="12">12</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">风险等级<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="RiskLevel" onchange="LevelChange(this)" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                    <td class="formTitle">观察频率<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="ObsNum" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">备注</td>
+                    <td class="formValue" colspan="3">
+                        <input id="Remark" type="text" class="form-control" />
+                    </td>
+                </tr>
+
+            </table>
+        </div>
+    </div>
+</div>

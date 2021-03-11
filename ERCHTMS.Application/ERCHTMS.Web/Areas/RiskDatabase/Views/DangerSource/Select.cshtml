@@ -1,0 +1,178 @@
+﻿@{
+    ViewBag.Title = "危险点管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script type="text/javascript">
+
+    var mode = request("mode");
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+               
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+  
+  
+    //查看风险评估
+    function show(id) {
+        id = id == undefined ? $("#gridTable").jqGridRowValue("id") : id;
+        var idx=dialogOpen({
+            id: "win0",
+            title: "查看风险辨识评估详情",
+            url: '/RiskDatabase/RiskAssess/Show?keyValue=' + id,
+            width: ($(top.window).width() - 80) + "px",
+            height: ($(top.window).height() - 20) + "px",
+            btns: 1,
+            btn:["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+
+    }
+   
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/RiskAssess/GetPageListJson",
+            postData: { queryJson: JSON.stringify({riskType:"作业" }) },
+            datatype: "json",
+            height: $(window).height() - 160,
+            autowidth: true,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true }, { label: '', name: 'areaid', hidden: true },
+               { label: '工作任务', name: 'worktask', width: 200, align: 'center' },
+               { label: '风险描述', name: 'riskdesc', width: 300, align: 'center' },
+               { label: '风险后果', name: 'result', width: 150, align: 'center' },
+               { label: '风险值', name: 'itemr', width: 80, align: 'center' },
+               { label: '风险等级', name: 'grade', width: 80, align: 'center' },
+               { label: "管控责任单位", name: "deptname", width: 100, align: "center" },
+               {
+                   label: "管控措施", name: "measure", width: 100, align: "left",headerAlign:'center'
+               }
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rownumWidth:50,
+            rowNum: 15,
+            rowList: [15,30, 50, 100],
+            rownumbers: true,
+            sortname: !!mode?'itemr desc,id':'createdate',
+            sortorder:  !!mode?'asc':'desc',
+            shrinkToFit: false,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                var objData= $gridTable.getRowData(rowid);
+                areaId = objData.AreaId;
+                areaName = objData.AreaName;
+            },
+            gridComplete: function () {
+                var rows = $gridTable.jqGrid("getRowData");//获取当前页记录行数据
+                $(rows).each(function (i, item) {
+                    $.get("../../RiskDatabase/Measures/GetMeasures", { riskId: item.id }, function (data) {
+                        $("td[aria-describedby='gridTable_measure']").eq(i).html(data);
+                    });
+                });
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val(), grade: $("#Grade").val(),riskType:"作业" }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txtKeyword").val(""); $("#Grade").val("");  $("button[data-id='Grade']").find(".filter-option").text('请选择');
+            $(".inner li").removeClass("selected");
+            $gridTable.jqGrid('setGridParam', {
+                postData:  { queryJson: JSON.stringify({  keyWord: $("#txtKeyword").val(), grade: $("#Grade").val(),riskType:"作业" }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    function AcceptClick() {
+        var jqGridTable = $('#gridTable');
+        var ds = jqGridTable.jqGridRowValue('riskdesc');
+        if (!!ds) {
+            if (mode == 0) {
+                //if (top.Form.window.mode != undefined) {
+                    top.Form.window.$('#gridTable').clearGridData(false);
+                //} 
+                top.Form.window.$("#TaskName").val(jqGridTable.jqGridRowValue('worktask'));
+                var rowId = jqGridTable.jqGrid('getRowData').length + 1;
+                top.Form.window.$('#gridTable').addRowData(rowId, { RiskContent: ds, Measure: jqGridTable.jqGridRowValue('measure') });
+             } else {
+                $(top.Form.window.node).parent().parent().children().eq(3).find("textarea").val(ds);
+                 $(top.Form.window.node).parent().parent().children().eq(4).find("textarea").val(jqGridTable.jqGridRowValue('measure'));
+            }
+           dialogClose();
+        }
+       
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+           
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                风险等级&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                    <select id="Grade" class="selectpicker show-menu-arrow form-control">
+                                        <option value="">请选择</option>
+                                        <option value="重大风险">重大风险</option>
+                                        <option value="较大风险">较大风险</option>
+                                        <option value="一般风险">一般风险</option>
+                                        <option value="低风险">低风险</option>
+                                    </select>
+                            </td>
+                            @*<td>
+                                &nbsp;事故类别&nbsp;
+                            </td>
+                            <td>
+                                <select id="AccidentType" class="selectpicker show-menu-arrow form-control" multiple>
+                                    <option value=""  >请选择</option>
+                                    @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("AccidentType"))
+                                </select>
+                            </td>*@
+                            <td width="10"></td>
+                            <td>
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入风险描述或风险后果进行搜索" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>  
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                   
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

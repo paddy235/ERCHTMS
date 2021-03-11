@@ -1,0 +1,749 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>        
+    var select = request("select");
+    var standardtype = request("standardtype");
+    var enCode = "";
+    var parentId = "";
+    var catoryname = "";
+    var ids = "";
+    var titlecontent = "";
+    var postname = request("postname");
+    var time = request("time");
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var actiontype = request("actiontype");
+    //1.技术标准体系
+    //2.管理标准体系
+    //3.岗位标准体系
+    //4.上级标准化文件
+    //5.指导标准
+    //6.法律法规
+    //7.标准体系策划与构建
+    //8.标准体系评估与改进
+    //9.标准化培训
+    $(function () {
+        InitialPage();
+        GetGrid();
+        GetTree();
+        InitialTitleContent();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //$('#layout').layout('panel', 'west').panel('resize', { width: 500 });
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                if (standardtype == 8 || standardtype == 9) {
+                    $(".ui-layout-west").hide();
+                    $(".ui-layout-center").css({ position: "relative", left: "5px", width: $(window).width() - 10 });
+                    
+                }
+                if (standardtype == 7 || standardtype == 8 || standardtype == 9) {
+                    $("#lblstation").hide();
+                    $("#txtstation").hide();
+                }
+
+                $("#gridTable").setGridHeight($(window).height() - 138);
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+        if (!!select) {//如果是选择管理标准，隐藏操作按钮。
+            $("#add,#enter,#export,#store,#mystore").css("display", "none");
+        }
+        if (!!actiontype) {//如果是选择，隐藏操作按钮。yxx20190307添加（合规性评价）
+            $("#add,#enter,#export,#store,#mystore").css("display", "none");
+        } else {
+            $("#selectBtuSpan").css("display", "none");
+        }
+        if (standardtype == 8 || standardtype == 9) {
+            $(".ui-layout-west").hide();
+            $(".ui-layout-center").css({ position: "relative", left: "5px", width: $(window).width() - 10 });
+            $("#gridTable").setGridWidth($(window).width() - 10, false);
+        }
+       
+        
+        if (standardtype == 7 || standardtype == 8 || standardtype == 9) {
+            $("#lblstation").hide();
+            $("#txtstation").hide();
+        }
+
+        //window.setTimeout($(window).resize(), 200);
+        //window.setTimeout($(window).resize(), 200);
+
+        if (postname) {
+            $("#txt_station").val("@ERCHTMS.Code.OperatorProvider.Provider.Current().PostName");
+        }
+        
+        
+    }
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            standardtype: standardtype,
+            enCode: enCode,
+            filename: $("#txt_filename").val(),
+            station: $("#txt_station").val(),
+            time: true
+        };
+        var IsSelect = false;
+        if (!!actiontype) {
+            if (standardtype == 1 || standardtype == 2 || standardtype == 3 || standardtype == 4 || standardtype == 5 || standardtype == 6) {
+                var colModel = [
+                    { label: '主键', name: 'id', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '', name: 'createuserid', hidden: true }, { label: '', name: 'createuserdeptcode', hidden: true }, { label: '', name: 'createuserorgcode', hidden: true },
+                    { label: '文件名称', name: 'filename', index: 'filename', width: 200, align: 'center', sortable: true },
+                    { label: '类别', name: 'categorycode', index: 'categorycode', width: 200, align: 'center', sortable: true },
+                    { label: '对应元素', name: 'relevantelementname', index: 'relevantelementname', width: 200, align: 'center', sortable: false },
+                    {
+                        label: '施行日期', name: 'carrydate', index: 'carrydate', width: 180, align: 'center', sortable: true,
+                        formatter: function (cellvalue, options, rowObject) {
+                            return formatDate(cellvalue, 'yyyy-MM-dd');
+                        }
+                    },
+                    {
+                        label: '发布日期', name: 'createdate', index: 'createdate', width: 180, align: 'center', sortable: true,
+                        formatter: function (cellvalue, options, rowObject) {
+                            return formatDate(cellvalue, 'yyyy-MM-dd');
+                        }
+                    },
+                    { label: '查阅频次', name: 'consultnum', index: 'consultnum', width: 100, align: 'center', sortable: true },
+                    { label: '颁布部门', name: 'publishdept', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '主分类', name: 'maincategory', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '类别ID', name: 'categorycodeid', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '主分类ID', name: 'maincategoryid', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '主分类上级', name: 'mainparentid', width: 10, align: 'left', sortable: true, hidden: true }
+                ]
+            }
+        } else {
+            IsSelect = true;
+            if (standardtype == 1 || standardtype == 2 || standardtype == 3 || standardtype == 4 || standardtype == 5 || standardtype == 6) {
+                var colModel = [
+                    { label: '主键', name: 'id', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '', name: 'createuserid', hidden: true }, { label: '', name: 'createuserdeptcode', hidden: true }, { label: '', name: 'createuserorgcode', hidden: true },
+                    {
+                        label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false
+                        //formatter: function (cellvalue, options, rowObject) {
+                        //    var html = "";
+                        //    html += "<a href=javascript:btn_show()  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                        //    if (rolename.indexOf("精益管理岗用户") > 0) {
+                        //        html += "<a href=javascript:btn_edit()  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        //        html += "<a href=javascript:btn_delete()  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        //    }
+                        //    return html;
+                        //}
+                    },
+                    { label: '文件名称', name: 'filename', index: 'filename', width: 200, align: 'center', sortable: true },
+                    { label: '类别', name: 'categorycode', index: 'categorycode', width: 200, align: 'center', sortable: true },
+                    { label: '对应元素', name: 'relevantelementname', index: 'relevantelementname', width: 200, align: 'center', sortable: false },
+                    {
+                        label: '施行日期', name: 'carrydate', index: 'carrydate', width: 180, align: 'center', sortable: true,
+                        formatter: function (cellvalue, options, rowObject) {
+                            return formatDate(cellvalue, 'yyyy-MM-dd');
+                        }
+                    },
+                    {
+                        label: '发布日期', name: 'createdate', index: 'createdate', width: 180, align: 'center', sortable: true,
+                        formatter: function (cellvalue, options, rowObject) {
+                            return formatDate(cellvalue, 'yyyy-MM-dd');
+                        }
+                    },
+                    { label: '查阅频次', name: 'consultnum', index: 'consultnum', width: 100, align: 'center', sortable: true },
+                    { label: '颁布部门', name: 'publishdept', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '主分类', name: 'maincategory', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '附件数量', name: 'filenum', index: 'FILENUM', hidden: true, width: 300, align: 'center', sortable: false },
+                    {
+                        label: '是否有附件', name: 'isannex', index: 'ISANNEX', width: 200, align: 'center', sortable: false,
+                        formatter: function (cellvalue, options, rowObject) {
+
+                            if (rowObject.filenum == 0) {
+                                html = "否";
+                                return html;
+
+                            } else if (rowObject.filenum > 0) {
+                                html = "<a href=javascript:btn_Annex('" + rowObject.id + "') style='color:blue; text-decoration:underline;padding-left:0px;' title='修改'>是</a>";
+                                return html;
+
+                            }
+
+
+                        }
+
+                    },
+                    { label: '类别ID', name: 'categorycodeid', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '主分类ID', name: 'maincategoryid', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '主分类上级', name: 'mainparentid', width: 10, align: 'left', sortable: true, hidden: true }
+                ]
+            }
+            else {
+                var colModel = [
+                    { label: '主键', name: 'id', width: 10, align: 'left', sortable: true, hidden: true },
+                    { label: '', name: 'createuserid', hidden: true }, { label: '', name: 'createuserdeptcode', hidden: true }, { label: '', name: 'createuserorgcode', hidden: true },
+                    {
+                        label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false
+                    },
+                    { label: '文件名称', name: 'filename', index: 'filename', width: 300, align: 'center', sortable: true },
+                    {
+                        label: '发布日期', name: 'createdate', index: 'createdate', width: 300, align: 'center', sortable: true,
+                        formatter: function (cellvalue, options, rowObject) {
+                            return formatDate(cellvalue, 'yyyy-MM-dd');
+                        }
+                    },
+                    {
+                        label: '发布单位/部门', name: 'createuserdeptname', index: 'createuserdeptname', width: 300, align: 'center', sortable: true
+                    },
+                    { label: '查阅频次', name: 'consultnum', index: 'consultnum', width: 100, align: 'center', sortable: true },
+                    { label: '附件数量', name: 'filenum', index: 'FILENUM', hidden: true, width: 300, align: 'center', sortable: false },
+                    {
+                        label: '是否有附件', name: 'isannex', index: 'ISANNEX', width: 200, align: 'center', sortable: false,
+                        formatter: function (cellvalue, options, rowObject) {
+
+                            if (rowObject.filenum == 0) {
+                                html = "否";
+                                return html;
+
+                            } else if (rowObject.filenum > 0) {
+                                html = "<a href=javascript:btn_Annex('" + rowObject.id + "') style='color:blue; text-decoration:underline;padding-left:0px;' title='修改'>是</a>";
+                                return html;
+
+                            }
+
+
+                        }
+
+                    }
+                ]
+            }
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            autowidth: true,
+            height: $(window).height() - 138,
+            url: "../../StandardSystem/Standardsystem/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: colModel,
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'isnew,a.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            multiselect: IsSelect,
+            multiboxonly: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+            //,
+            //gridComplete: function () {
+            //    if (!!actiontype) {
+            //        $gridTable.hideCol("Oper");
+            //        $gridTable.hideCol("cb");
+            //    }
+            //}
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                standardtype:standardtype,
+                enCode: enCode,
+                filename: $("#txt_filename").val(),
+                station: $("#txt_station").val()
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+        
+    }
+    //查询全部事件
+    function btn_Searchall() {
+        $("div[unselectable='on']").attr("class", "bbit-tree-node-el bbit-tree-node-expanded");
+        enCode = "";
+        parentId = "";
+        catoryname = "";
+        $("#txt_filename").val("");
+        $("#txt_station").val("");
+        var queryJson = {
+            standardtype: standardtype
+        }
+        $('#gridTable').jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        }).trigger('reloadGrid');
+    };
+    //加载树
+    function GetTree(id) {
+        var arr = [];
+        if (rolename.indexOf("精益管理岗用户") >= 0) {
+            arr = [
+                {
+                    title: "新增",
+                    text: '<i class="fa fa-file-text-o"  name="toolbtn"></i>', callback: "add"
+                },
+            {
+                title: "修改",
+                text: '<i class="fa fa-pencil-square-o toolbtn" name="toolbtn"></i>', callback: "edit"
+
+            },
+            {
+                title: "删除",
+                text: '<i class="fa fa-trash-o toolbtn" name="toolbtn"></i>', callback: "del"
+
+            }];
+        }
+        var url = "../../StandardSystem/StandardCatory/GetCatoryTreeJson?typecode=" + standardtype;
+        if (id != undefined) {
+            url += "&tid=" + id;
+        }
+        //加载组织机构树
+        var item = {
+            height: $(window).height() - 50,
+            url: url,
+            onnodeclick: function (item) {
+                enCode = item.Code.split('|')[0];
+                if (enCode == "00") enCode = "0";
+                parentId = item.id;
+                catoryname = item.text;
+                $("#btn_Search").click();
+                $("#add").css("display", "");
+                $("#export").css("display", "");
+            }
+            , isTool: true
+            //自定义工具栏
+            , nodeTools: arr
+        };
+        //初始化分类树
+        dtree = $("#itemTree").treeview(item);
+        $($("#itemTree").find("div[unselectable='on']").eq(0)).find("span[title='删除']").remove();
+        $($("#itemTree").find("div[unselectable='on']").eq(0)).find("span[title='修改']").remove();
+
+        if (id != undefined) {
+            var node = $("span[data-value='" + id + "']");
+            if (node != undefined && node != null) {
+                node.css({ "background-color": "#ccc" });
+                var h = node.position().top;
+                $("#itemTree").animate({ scrollTop: h });
+            }
+        }
+    }
+
+    //选择数据
+    function selData(obj, id) {
+        if (obj.checked) {
+            ids += id + ",";
+        } else {
+            ids = ids.replace(id + ",", "");
+        }
+    }
+    //新增
+    function btn_add() {
+        if (!!catoryname || standardtype == 8 || standardtype == 9) {
+            dialogOpen({
+                id: 'Form',
+                title: '添加' + titlecontent + '',
+                width: "800px",
+                height: ($(top.window).height() - 50) + "px",
+                url: '/StandardSystem/Standardsystem/Form?categoryname=' + encodeURIComponent(catoryname) + "&categorycode=" + parentId + "&standardtype=" + standardtype,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        }
+        else {
+            dialogMsg('请先选择' + titlecontent + '分类！', 0);
+            return false;
+        }
+
+    }
+    //查看
+    function btn_show() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            $.ajax({
+                url: '../../StandardSystem/Standardsystem/AddConsultNum?keyValue=' + keyValue,
+                type: "Post",
+                dataType: "json",
+                success: function (result) {
+                    var idx = dialogOpen({
+                        id: 'Form',
+                        title: '查看' + titlecontent + '',
+                        url: '/StandardSystem/Standardsystem/Form?actiontype=view&keyValue=' + keyValue + "&standardtype=" + standardtype,
+                        width: "800px",
+                        height: ($(top.window).height() - 50) + "px",
+                        btns: 1,
+                        btn: ["关闭"],
+                        callBack: function (iframeId) {
+                            top.layer.close(idx);
+                        }
+                    })
+                },
+                error: function (result) {
+                    dialogMsg("跳出失败.",0);
+                }
+            })
+        }
+    }
+    //编辑
+    function btn_edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            $.ajax({
+                url: '../../StandardSystem/Standardsystem/AddConsultNum?keyValue=' + keyValue,
+                type: "Post",
+                dataType: "json",
+                success: function (result) {
+                    dialogOpen({
+                        id: 'Form',
+                        title: '编辑' + titlecontent + '',
+                        url: '/StandardSystem/Standardsystem/Form?actiontype=edit&keyValue=' + keyValue + "&standardtype=" + standardtype,
+                        width: "800px",
+                        height: ($(top.window).height() - 50) + "px",
+                        callBack: function (iframeId) {
+                            top.frames[iframeId].AcceptClick();
+                        }
+                    })
+                },
+                error: function (result) {
+                    dialogMsg("跳出失败.", 0);
+                }
+            })
+        }
+    }
+    //删除
+    function btn_delete() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../StandardSystem/Standardsystem/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的' + titlecontent + '！', 0);
+        }
+    }
+
+    //批量删除
+    function deletelist() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue.length > 0) {
+            $.RemoveForm({
+                url: '../../StandardSystem/Standardsystem/RemoveListForm',
+                param: { idsData: keyValue },
+                success: function (data) {
+                    ids = "";
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的' + titlecontent + '！', 0);
+        }
+    }
+    //新增标准分类
+    function add(id, code, name) {
+        dialogOpen({
+            id: "win",
+            title: "新增" + titlecontent + "分类",
+            url: '/StandardSystem/StandardCatory/Form?keyValue=&parentId=' + id + "&code=" + code + "&parentName=" + encodeURIComponent(name) + "&standardtype=" + standardtype,
+            width: "600px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+
+    };
+    //编辑标准分类
+    function edit(id, code, name) {
+        var idx = dialogOpen({
+            id: "win0",
+            title: "修改" + titlecontent + "分类",
+            url: '/StandardSystem/StandardCatory/Form?keyValue=' + id + "&parentName=" + encodeURIComponent(name) + "&standardtype=" + standardtype,
+            width: "600px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                //$.currentIframe().window.$("#gridTable").trigger('reloadGrid');
+            }
+        });
+
+    }
+    //删除标准分类
+    function del(id, code) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: "../../StandardSystem/StandardCatory/RemoveForm",
+                param: { keyValue: keyValue, encode: code.split('|')[0] },
+                msg: "确定删除吗?相关联的数据将同步删除，无法恢复！",
+                success: function (data) {
+                    //GetTree();
+                    $('#gridTable').jqGrid('setGridParam', {
+                        postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val(), enCode: enCode }) }, page: 1
+                    }).trigger('reloadGrid');
+                    var node = $("span[data-value='" + id + "']");
+                    if (node != null && node != undefined) {
+                        node.parent().parent().remove();
+                    }
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的数据！', 0);
+        }
+    }
+    //收藏
+    function storeData() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue.length > 0) {
+            $.RemoveForm({
+                msg: "确定收藏？",
+                loading: "正在操作数据...",
+                url: '../../StandardSystem/Storestandard/StoreStandard',
+                param: { idsData: keyValue, standardType: 1 },
+                success: function (data) {
+                    ids = "";
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        }
+        else {
+            dialogMsg('请选择需要收藏的' + titlecontent + '！', 0);
+        }
+    }
+
+    //查看收藏
+    function mystoreData() {
+        var idx = dialogOpen({
+            id: "Form",
+            title: "查看我的收藏",
+            url: '/StandardSystem/Standardsystem/Mystore?standardtype=' + standardtype,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //导出
+    function exportResult()
+    {
+        var queryJson = {
+            standardtype: standardtype,
+            station: $("#txt_station").val(),
+            filename: $("#txt_filename").val(),
+            enCode: enCode
+        };
+        location.href = "../../StandardSystem/StandardSystem/ExportData?queryJson=" + JSON.stringify(queryJson);
+    }
+
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        if (!!catoryname || standardtype == 8 || standardtype == 9) {
+            idx = dialogOpen({
+                id: "Import",
+                title: '导入标准',
+                url: '/StandardSystem/Standardsystem/Import?standardtype=' + standardtype + "&categorycode=" + parentId,
+                width: "500px",
+                height: "450px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                },
+                cancel: function (index) {
+                    if (isImport) {
+                        isImport = false;
+                        $("#btn_Search").click();
+                    }
+
+                }
+            });
+        }
+        else {
+            dialogMsg('请先选择' + titlecontent + '分类！', 0);
+            return false;
+        }
+
+    }
+
+    function InitialTitleContent()
+    {
+        switch (standardtype) {
+            case "1":
+                titlecontent = "技术标准";
+                break;
+            case "2":
+                titlecontent = "管理标准";
+                break;
+            case "3":
+                titlecontent = "岗位标准";
+                break;
+            case "4":
+                titlecontent = "上级标准化文件";
+                break;
+            case "5":
+                titlecontent = "指导标准";
+                break;
+            case "6":
+                titlecontent = "法律法规";
+                break;
+            case "7":
+                titlecontent = "标准体系策划与构建";
+                break;
+            case "8":
+                titlecontent = "标准体系评估与改进";
+                break;
+            case "9":
+                titlecontent = "标准化培训";
+                break;
+            default:
+
+        }
+
+        $("#titlecontent").html(titlecontent + "分类");
+    }
+    //保存表单;
+    function AcceptClick() {
+        var jqGrid = $("#gridTable");
+        var stdId = jqGrid.jqGridRowValue("id");
+        var stdName = jqGrid.jqGridRowValue("filename");
+        if (!!stdId == false) {
+            dialogMsg('请选择标准！', 0);
+        } else {
+            top.PlanDetails.window.setStd(stdId, stdName);
+            dialogClose();
+        }
+    }
+    //确定选择
+    function selectOk() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            if ($('#gridTable').jqGridRowValue('mainparentid') != '0') {
+                top.Sikp.window.categoryLoad($('#gridTable').jqGridRowValue('maincategoryid'));
+                top.Sikp.$("#Category").ComboBoxSetValue($('#gridTable').jqGridRowValue('maincategoryid'));
+                top.Sikp.$("#CategoryName").val($('#gridTable').jqGridRowValue('maincategory'));
+                top.Sikp.$("#Rank").ComboBoxSetValue($('#gridTable').jqGridRowValue('categorycodeid'));
+                top.Sikp.$("#RankName").val($('#gridTable').jqGridRowValue('categorycode'));
+            } else {
+                top.Sikp.$("#Category").ComboBoxSetValue($('#gridTable').jqGridRowValue('categorycodeid'));
+                top.Sikp.$("#CategoryName").val($('#gridTable').jqGridRowValue('categorycode'));
+                top.Sikp.window.categoryLoad($('#gridTable').jqGridRowValue('categorycodeid'));
+                top.Sikp.$("#Rank").ComboBoxSetValue(null);
+                top.Sikp.$("#Rank").attr("data-value", null);
+                top.Sikp.$("#Rank").attr("data-text", null);
+                $("#Rank div:eq(0)").text("==请选择==");
+                top.Sikp.$("#RankName").val("");
+            }
+            top.Sikp.$("#FileName").val($('#gridTable').jqGridRowValue('filename'));
+            
+            top.Sikp.$("#DutyDept").val($('#gridTable').jqGridRowValue('publishdept'));
+            top.Sikp.$("#PutDate").val($('#gridTable').jqGridRowValue('carrydate'));
+            top.Sikp.$("#StandardId").val(keyValue);
+            top.Sikp.window.setStd(keyValue);
+            dialogClose();
+        } else {
+            dialogMsg('请选择一条法律法规！', 0);
+        }
+    }
+
+    //查看附件
+    function btn_Annex(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Annex',
+                title: '附件列表',
+                url: '/OccupationalHealthManage/Occupatioalstaff/FileList?keyValue=' + keyValue,
+                width: '600px',
+                height: '550px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west" >
+        <div class="west-Panel">
+
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    <label id="titlecontent"></label>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td id="lblstation" style="padding-left:10px">
+                                岗位:
+                            </td>
+                            <td id="txtstation" style="padding-left: 4px;">
+                                <input id="txt_station" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left:10px">
+                                文件名称:
+                            </td>
+                            <td style="padding-left: 4px;">
+                                <input id="txt_filename" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Searchall" class="btn btn-primary" onclick="btn_Searchall()"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <span id="selectBtuSpan">
+                        <input type="button" value="确定选择" onclick="selectOk()" id="selectBtu" class="btn btn-primary" />
+                    </span>
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                        <a id="enter" class="btn btn-default" onclick="importData()"><i class="fa fa-exclamation-circle"></i>导入</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download"></i>导出</a>
+                        <a id="store" class="btn btn-default" onclick="storeData()"><i class="fa fa-drupal"></i>收藏</a>
+                        <a id="mystore" class="btn btn-default" onclick="mystoreData()"><i class="fa fa-shopping-basket"></i>我的收藏</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,1110 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>应急管理报表</title>
+    <!--第三方统计图start-->
+    <script src="~/Content/Scripts/plugins/highcharts/highcharts.7.0.js"></script>
+    @*<script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>*@
+    <script src="~/Content/Scripts/plugins/highcharts/modules/drilldown.7.0.js"></script>
+    <script src="~/Content/Scripts/plugins/highcharts/modules/exporting.7.0.js"></script>
+    <link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+    <script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+    <script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+    <style type="text/css">
+        .dropdown-menu > li > a:active {
+            color: rgb(38, 38, 38);
+            background-color: transparent;
+            text-decoration: none;
+        }
+
+        .tab1 {
+            width: 100%;
+            text-align: center;
+        }
+
+            .tab1 td {
+                background-color: white;
+                height: 30px;
+                border: 1px solid #ccc;
+            }
+    </style>
+    <script>
+        var mode = 0;
+        var id = 0;
+        var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+        var orzid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+        $(function () {
+            Highcharts.setOptions({
+                exporting: {
+                    url: "../../HiddenTroubleManage/HTStatistics/Export",
+                    enabled: true,
+                    filename: 'MyChart',
+                    width: 1200
+                },
+                lang: {
+                    printChart: "打印图表",
+                    downloadJPEG: "下载JPEG图片",
+                    downloadPDF: "下载PDF文件",
+                    downloadPNG: "下载PNG图片",
+                    downloadSVG: "下载SVG文件"
+                }
+            });
+            InitialPage();
+            drawChart(0);
+            ExportData();
+        })
+        function ExportData() {
+            //导出内容
+            $("#btn_Export").click(function () {
+                queryJson = JSON.stringify({
+                    deptCode: $("#DeptCode").val(),
+                    startTime: $("#StartTime").val(),
+                    endTime: $("#EndTime").val()
+                });
+                window.location.href = "../../EmergencyPlatform/Drillplan/DrillplanStatExportExcel?queryJson=" + queryJson;
+            });
+        }
+        //初始化
+        function InitialPage() {
+            $('#desktop').height($(window).height() - 22);
+            $(window).resize(function (e) {
+                window.setTimeout(function () {
+                    $('#desktop').height($(window).height() - 22);
+                    $('#gridTable2').setGridWidth(($(window).width()-100));
+                }, 200);
+                e.stopPropagation();
+            });
+            //if (roleNames.indexOf("负责人") < 0) {
+            //    $("#btnWorks").remove();
+            //}
+            //var width = ($(window).width() / 3) - 30;
+            //$("#divFX").width(width); $("#divJC").width(width); $("#divSGYH").width(width);
+        }
+        var isWork = false;//双控工作ajax请求加载标识
+        var isRank = false;//隐患曝光与风险排名ajax请求加载标识
+        //导航切换
+        function changeTab(idx, obj) {
+            id = idx;
+            $(".con0").hide();
+            $(".con0").eq(idx).show();
+            $(".btn1").removeClass("btn-primary");
+            $(obj).addClass("btn-primary");
+            $(".btn1").addClass("btn-default");
+            drawChart(idx);
+        }
+        function Search() {
+            drawChart(id);
+        }
+    </script>
+    <script type="text/javascript">
+        var chatObj = {};
+        var uId = top.currUserId;
+        var apiUrl = "@BSFramework.Util.Config.GetValue("ApiServiceUrl")";
+        var signalRUrl = "@BSFramework.Util.Config.GetValue("SignalRUrl")";
+        function drawChart(type) {
+
+            $("#btn_Search").show();
+            //安全预警趋势图
+            var deptId = $("#DEPARTID").val();
+            var deptCode = $("#DeptCode").val();
+            var year = $("#Year").val() == "" ? "@DateTime.Now.Year.ToString()" : $("#Year").val();
+            var month = $("#Month").val() == "" ? "@DateTime.Now.Month.ToString()" : $("#Month").val();
+            var starttime = $("#StartTime").val();
+            var endtime = $("#EndTime").val();
+            var GetUrl = "../../EmergencyPlatform/Drillplan/DrillplanFinish?deptId=" + deptId + "&year=" + year + "&type=" + type + "&month=" + month + "&starttime=" + starttime + "&endtime=" + endtime;
+            if (type == 6) {
+                $("#divgridTable2").show();
+                $("#divgridTable1").hide();
+                queryJson = {
+                    deptCode: $("#DeptCode").val(),
+                    startTime: $("#StartTime").val(),
+                    endTime: $("#EndTime").val()
+                };
+                GetGridTable2(queryJson);
+                GetUrl = "../../EmergencyPlatform/Drillplan/DrillplanStat?deptCode=" + deptCode + "&starttime=" + starttime + "&endtime=" + endtime;
+            } else {
+                $("#divgridTable1").show();
+                $("#divgridTable2").hide();
+            }
+            $.post(GetUrl, function (riskVal) {
+
+                var json = eval("(" + riskVal + ")");
+                    var arr = new Array();
+                    var arrdatajh = new Array();
+                    var arrdatasj = new Array();
+                    var arrdatasjX = new Array();
+                    var arrdcnb = 0;
+                    var arrww = 0;
+                    var html = "";
+                    switch (type) {
+                        case 0: //应急演练预案类型统计
+                            html = '<table cellpadding="0" cellspacing="0" class="tab1" border="1" style="width:100%;">';
+                            html += '<tr style="font-weight: bold;">';
+                            html += '<td style="width:50%;">应急预案类型</td>';
+                            html += '<td style="width:50%;">演练次数</td>';
+                            html += "</tr>";
+                            break;
+                        case 1: //参加演练人次统计
+                            html = '<table cellpadding="0" cellspacing="0" class="tab1" border="1" style="width:100%;">';
+                            html += '<tr style="font-weight: bold;">';
+                            html += '<td align="center">演练方式</td>';
+                            html += '<td align="center">参加演练人次</td>';
+                            html += "</tr>";
+                            break;
+                        case 2: //应急演练完成率
+                            html = '<table cellpadding="0" cellspacing="0" class="tab1" border="1" style="width:100%;">';
+                            html += '<tr style="font-weight: bold;">';
+                            html += '<td align="center">季度</td>';
+                            html += '<td align="center">计划应急演练数量</td>';
+                            html += '<td align="center">实际应急演练数量</td>';
+                            html += '<td align="center">应急演练完成率</td>';
+                            html += "</tr>";
+                            break;
+                        case 3: //应急演练数量
+                            html = '<table cellpadding="0" cellspacing="0" class="tab1" border="1" style="width:100%;">';
+                            html += '<tr style="font-weight: bold;">';
+                            html += '<td align="center">季度</td>';
+                            html += '<td align="center">计划应急演练数量</td>';
+                            html += '<td align="center">实际应急演练数量</td>';
+                            html += "</tr>";
+                            break;
+                        case 4: //应急演练方式
+                            html = '<table cellpadding="0" cellspacing="0" class="tab1" border="1" style="width:100%;">';
+                            html += '<tr style="font-weight: bold;">';
+                            html += '<td align="center">演练方式</td>';
+                            html += '<td align="center">计划应急演练数量</td>';
+                            html += '<td align="center">实际应急演练数量</td>';
+                            html += "</tr>";
+                            break;
+                        case 5: //单位内部、各外包单位对比
+                            html = '<table cellpadding="0" cellspacing="0" class="tab1" border="1" style="width:100%;">';
+                            html += '<tr style="font-weight: bold;">';
+                            html += '<td align="center">单位性质</td>';
+                            html += '<td align="center">应急预案数量</td>';
+                            html += "</tr>";
+                            break;
+                        case 6:
+                            ////$("#gridTable1").css("display", "none");
+                            ////$("#gridTable2").css("display", false);
+                            //html = '<table cellpadding="0" cellspacing="0" class="tab1" border="1" style="width:100%;">';
+                            //html += '<tr style="font-weight: bold;">';
+                            //html += '<td align="center">部门名称</td>';
+                            //html += '<td align="center">组织部门</td>';
+                            //html += '<td align="center">参与部门</td>';
+                            //html += '<td align="center">合计(次数)</td>';
+                            //html += "</tr>";
+                            break;
+                    }
+
+                    for (var i = 0; i < json.length; i++) {
+                        if (type == 0) {
+                            var seriesdata = json[0].seriesdata;
+                            var drilldowndata = json[0].drilldowndata;
+                            $(seriesdata).each(function (index, ele) {
+                                html += '<tr>';
+                                if (ele.name == "现场处置方案") {
+                                    html += '<td onclick="showchild(this)" class="active">' + ele.name + ' ></td>';
+                                    html += '<td>' + ele.y + '</td>';
+                                    html += "</tr>";
+                                    $(drilldowndata).each(function (dindex, dele) {
+                                        $(dele.data).each(function (i, cele) {
+                                            html += '<tr class="xcczfa">';
+                                            html += '<td style="padding-left:20%;">' + cele.name + '</td>';
+                                            html += '<td align="center">' + cele.y + '</td>';
+                                            html += "</tr>";
+                                        });
+                                    });
+                                }
+                                else {
+                                    html += '<td>' + ele.name + '</td>';
+                                    html += '<td>' + ele.y + '</td>';
+                                    html += "</tr>";
+                                }
+                            });
+                        }
+                        if (type == 1) {
+                            html += '<tr>';
+                            html += '<td align="center">' + json[i].name + '</td>';
+                            html += '<td align="center">' + json[i].y + '</td>';
+                            html += "</tr>";
+                        }
+                        if (type == 2) {
+                            html += '<tr>';
+                            html += '<td align="center">' + json[i].text + '</td>';
+                            html += '<td align="center">' + json[i].jhNum + '</td>';
+                            html += '<td align="center">' + json[i].sjNum + '</td>';
+                            html += '<td align="center">' + json[i].value + '%</td>';
+                            html += "</tr>";
+                            arrdatasjX.push(json[i].text);
+                            arr.push(json[i].value);
+                        }
+                        if (type == 3) {
+                            html += '<tr>';
+                            html += '<td align="center">' + json[i].text + '</td>';
+                            html += '<td align="center">' + json[i].jhNum + '</td>';
+                            html += '<td align="center">' + json[i].sjNum + '</td>';
+                            html += "</tr>";
+                            arrdatasjX.push(json[i].text);
+                            arrdatajh.push(json[i].jhNum);
+                            arrdatasj.push(json[i].sjNum);
+                        }
+                        if (type == 4) {
+                            html += '<tr>';
+                            html += '<td align="center">' + json[i].text + '</td>';
+                            html += '<td align="center">' + json[i].jhNum + '</td>';
+                            html += '<td align="center">' + json[i].sjNum + '</td>';
+                            html += "</tr>";
+                            arrdatasjX.push(json[i].text);
+                            arrdatajh.push(json[i].jhNum);
+                            arrdatasj.push(json[i].sjNum);
+                        }
+                        if (type == 5) {
+                            html += '<tr>';
+                            html += '<td align="center">' + json[i].text + '</td>';
+                            html += '<td align="center">' + json[i].value + '</td>';
+                            html += "</tr>";
+                            if (json[i].text == "单位内部") {
+                                arrdcnb += parseInt(json[i].value);
+                            }
+                            else {
+                                arrww += parseInt(json[i].value);
+                            }
+                        }
+                        if (type == 6) {
+                          
+                            //html += '<tr>';
+                            //html += '<td align="center">' + json[i].text + '</td>';
+                            //html += '<td align="center">' + json[i].value + '</td>';
+                            //html += "</tr>";
+                            //if (json[i].text == "单位内部") {
+                            //    arrdcnb += parseInt(json[i].value);
+                            //}
+                            //else {
+                            //    arrww += parseInt(json[i].value);
+                            //}
+                        }
+                    }
+
+                    html += '</tr>';
+                    html += "</table>";
+                    $("#gridTable1").html(html);
+
+                    $("#searchTab tr td").css("display", "");
+                    switch (type) {
+                        case 0:
+                            $("#searchTab tr td:eq(4)").css("display", "none");
+                            $("#searchTab tr td:eq(5)").css("display", "none");
+                            $("#searchTab tr td:eq(6)").css("display", "none");
+                            $("#searchTab tr td:eq(7)").css("display", "none");
+                            $("#searchTab tr td:eq(8)").css("display", "none");
+                            $("#searchTab tr td:eq(9)").css("display", "none");
+                            $("#btn_Export").css("display", "none");
+                            var totalVal = 0;
+                            $(json[0].seriesdata).each(function (index, ele) {
+                                totalVal += ele.y;
+                            });
+                            $(json[0].seriesdata).each(function (index, ele) {
+                                ele.p = totalVal > 0 ? parseFloat(ele.y / totalVal * 100).toFixed(2) : 0;
+                            });
+
+                            var dtotalVal = 0;
+                            $(json[0].drilldowndata).each(function (index, ele) {
+                                $(ele.data).each(function (i, cele) {
+                                    dtotalVal += cele.y;
+                                });
+                            });
+                            $(json[0].drilldowndata).each(function (index, ele) {
+                                $(ele.data).each(function (i, cele) {
+                                    cele.p = dtotalVal > 0 ? parseFloat(cele.y / dtotalVal * 100).toFixed(2) : 0;
+                                });
+                            });
+                            LoadContainer0(json[0].seriesdata, json[0].drilldowndata);
+                            
+                            break;
+                        case 1:
+                            $("#searchTab tr td:eq(2)").css("display", "none");
+                            $("#searchTab tr td:eq(3)").css("display", "none");
+                            $("#searchTab tr td:eq(4)").css("display", "none");
+                            $("#searchTab tr td:eq(5)").css("display", "none");
+                            $("#btn_Export").css("display", "none");
+                            //演练方式统计分析
+                            var totalVal = 0;
+                            $(json).each(function (index, ele) {
+                                totalVal += ele.y;
+                            });
+                            $(json).each(function (index, ele) {
+                                ele.p = totalVal > 0 ? parseFloat(ele.y / totalVal * 100).toFixed(2) : 0;
+                            });
+                            LoadContainer1(json);
+                          
+                            break;
+                        case 2:  //应急演练完成率统计
+                            $("#searchTab tr td:eq(4)").css("display", "none");
+                            $("#searchTab tr td:eq(5)").css("display", "none");
+                            $("#searchTab tr td:eq(6)").css("display", "none");
+                            $("#searchTab tr td:eq(7)").css("display", "none");
+                            $("#searchTab tr td:eq(8)").css("display", "none");
+                            $("#searchTab tr td:eq(9)").css("display", "none");
+                            $("#btn_Export").css("display", "none");
+                            var resultdata = [{
+                                name: '百分比',
+                                colorByPoint: false,
+                                data: arr,
+                                stack: "1"
+                            }];
+                            LoadContainer2(resultdata, arrdatasjX);
+                         
+                            break;
+                        case 3:
+                            $("#searchTab tr td:eq(4)").css("display", "none");
+                            $("#searchTab tr td:eq(5)").css("display", "none");
+                            $("#searchTab tr td:eq(6)").css("display", "none");
+                            $("#searchTab tr td:eq(7)").css("display", "none");
+                            $("#searchTab tr td:eq(8)").css("display", "none");
+                            $("#searchTab tr td:eq(9)").css("display", "none");
+                            $("#btn_Export").css("display", "none");
+                            //应急演练数量统计
+                            var resultdata = [{
+                                name: '计划应急演练数量',
+                                colorByPoint: false,
+                                data: arrdatajh,
+                                stack: "0"
+
+                            }, {
+                                name: '实际应急演练数量',
+                                colorByPoint: false,
+                                data: arrdatasj,
+                                stack: "1",
+                            }];
+
+                            LoadContainer3(resultdata, arrdatasjX);
+                           
+                            break;
+                        case 4:
+                            $("#searchTab tr td:eq(6)").css("display", "none");
+                            $("#searchTab tr td:eq(7)").css("display", "none");
+                            $("#searchTab tr td:eq(8)").css("display", "none");
+                            $("#searchTab tr td:eq(9)").css("display", "none");
+                            $("#btn_Export").css("display", "none");
+                            //应急演练数量统计
+                            var resultdata = [{
+                                name: '计划应急演练数量',
+                                colorByPoint: false,
+                                data: arrdatajh,
+                                stack: "3",
+                            }, {
+                                name: '实际应急演练数量',
+                                colorByPoint: false,
+                                data: arrdatasj,
+                                stack: "1",
+                            }];
+
+                            //演练方式统计分析
+                            LoadContainer4(resultdata, arrdatasjX);
+                           
+                            break;
+
+                        case 5:
+                            $("#searchTab tr td").css("display", "none");
+                            $("#btn_Export").css("display", "none");
+                            //演练方式统计分析
+                            var resultdata = [{
+                                name: '单位内部',
+                                colorByPoint: false,
+                                data: [arrdcnb],
+                                stack: "0",
+                            }, {
+                                name: '外包单位',
+                                colorByPoint: false,
+                                data: [arrww],
+                                stack: "1",
+                            }];
+                            arrdatasjX.push(["应急预案数量"]);
+                            LoadContainer5(resultdata, arrdatasjX);
+                         
+                            break;
+                        case 6:
+                            $("#searchTab tr td:eq(0)").css("display", "none");
+                            $("#searchTab tr td:eq(1)").css("display", "none");
+                            $("#searchTab tr td:eq(2)").css("display", "none");
+                            $("#searchTab tr td:eq(3)").css("display", "none");
+                            $("#searchTab tr td:eq(4)").css("display", "none");
+                            $("#searchTab tr td:eq(5)").css("display", "none");
+                            queryJson = {
+                                deptCode: $("#DeptCode").val(),
+                                startTime: $("#StartTime").val(),
+                                endTime: $("#EndTime").val()
+                            };
+                           
+                            $("#btn_Export").css("display", "");
+                           
+                            $('#gridTable2').jqGrid('clearGridData');
+                            //$('#gridTable2').jqGrid('setGridParam', { dataType: 'local', data: nData.tdata }).trigger('reloadGrid');
+                            $('#gridTable2').jqGrid('setGridParam', { postData: { queryJson: JSON.stringify(queryJson) } }).trigger('reloadGrid');
+                            LoadContainer6(json.xdata, json.sdata);
+                            break;
+                        default:
+                            break;
+                    }
+                });
+        
+          
+        }
+
+
+        function showchild(obj) {
+            if ($(obj).attr("class").indexOf("active") >= 0) {
+                $(obj).removeClass("active");
+                $(".xcczfa").css("display", "none");
+            }
+            else {
+                $(obj).addClass("active");
+                $(".xcczfa").css("display", "");
+            }
+
+        }
+
+        //应急演练预案类型统计
+        function LoadContainer0(data, dataX) {
+
+            $("#c0").highcharts({
+                chart: {
+                    type: 'pie'
+                },
+                title: {
+                    text: '应急演练预案类型统计'
+                },
+                exporting: { enabled: false },
+                plotOptions: {
+                    series: {
+                        dataLabels: {
+                            enabled: true,
+                            format: '{point.name}: {point.p:.2f}%'
+                        }
+                    }
+                },
+                tooltip: {
+                    headerFormat: '<span style="font-size:11px">{series.name}</span><br>',
+                    pointFormat: '<span style="color:{point.color}">{point.name},数量:{point.y},占比:{point.p:.2f}%</span><br/>'
+                },
+                series: [{
+                    name: '应急演练预案类型',
+                    colorByPoint: true,
+                    data: data
+                }],
+                drilldown: {
+                    series: dataX
+                },
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        }
+
+        //参加演练人次统计
+        function LoadContainer1(data) {    //图形
+            $("#c1").highcharts({
+                chart: {
+                    type: 'pie'
+                },
+                title: {
+                    text: '参加演练人次统计'
+                },
+                exporting: { enabled: false },
+                plotOptions: {
+                    series: {
+                        dataLabels: {
+                            enabled: true,
+                            format: '{point.name}: {point.p:.2f}%'
+                        }
+                    }
+                },
+                tooltip: {
+                    headerFormat: '<span style="font-size:11px">{series.name}</span><br>',
+                    pointFormat: '<span style="color:{point.color}">{point.name},数量:{point.y},占比:{point.p:.2f}%</span><br/>'
+                },
+                series: [{
+                    name: '演练方式',
+                    colorByPoint: true,
+                    data: data 
+                }],
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        }
+
+        //应急演练完成率统计
+        function LoadContainer2(data, dataX) {
+            //图形
+            $("#c2").highcharts({
+                chart: {
+                    plotBackgroundColor: null,
+                    plotBorderWidth: null,
+                    plotShadow: false,
+                    type: 'spline'
+                },
+                tooltip: { pointFormat: '{series.name}: <b>{point.y}%</b>' },
+                exporting: { enabled: false },
+                title: { text: '应急演练完成率统计' },
+                plotOptions: {
+                    pie: {
+                        allowPointSelect: true,
+                        cursor: 'pointer',
+                        dataLabels: {
+                            enabled: true,
+                            format: '<b>{point.name}</b>: {point.y} %',
+                            style: {
+                                color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
+                            }
+                        },
+                        showInLegend: true
+                    }
+                },
+
+                xAxis: { categories: dataX },
+                yAxis: {
+                    min: 0,
+                    title: {
+                        text: '百分比'
+                    }
+                },
+                series: data,
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        }
+
+        //应急演练数量统计
+        function LoadContainer3(data, dataX) {
+            //图形
+            $("#c3").highcharts({
+
+                chart: {
+
+                    type: 'column',
+                    hight: 50,
+
+                },
+
+                xAxis: { categories: dataX },
+                yAxis: { title: { text: '数量统计' } },
+
+                tooltip: { pointFormat: '{series.name}: <b>{point.y}</b>' },
+                exporting: { enabled: false },
+                title: { text: '应急演练数量统计分析' },
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        allowPointSelect: true,
+                        cursor: 'pointer',
+                        dataLabels: {
+                            enabled: true,
+                            format: '<b>{point.name}</b>{point.y}',
+                            style: {
+                                color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
+                            }
+                        },
+                    }
+
+                },
+                series: data,
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        }
+
+        //应急演练方式统计
+        function LoadContainer4(data, dataX) {
+            //图形
+            $("#c4").highcharts({
+                chart: {
+
+                    type: 'column',
+                    hight: 50,
+
+                },
+
+                xAxis: { categories: dataX },
+                yAxis: { title: { text: '数量统计' } },
+
+                tooltip: { pointFormat: '{series.name}: <b>{point.y}</b>' },
+                exporting: { enabled: false },
+                title: { text: '应急演练方式统计分析' },
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        allowPointSelect: true,
+                        cursor: 'pointer',
+                        dataLabels: {
+                            enabled: true,
+                            format: '<b>{point.name}</b>{point.y}',
+                            style: {
+                                color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
+                            }
+                        },
+                    }
+
+                },
+                series: data,
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        }
+
+        //单位内部,各外包单位分析
+        function LoadContainer5(data, dataX) {
+            //图形
+            $("#c5").highcharts({
+                chart: {
+                    plotBackgroundColor: null,
+                    plotBorderWidth: null,
+                    plotShadow: false,
+                    type: 'column'
+                },
+                xAxis: { categories: dataX },
+                yAxis: { title: { text: '数量统计' } },
+                tooltip: { pointFormat: '{series.name}: <b>{point.y}</b>' },
+                exporting: { enabled: false },
+                title: { text: '单位内部,各外包单位分析对比' },
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        allowPointSelect: true,
+                        cursor: 'pointer',
+                        dataLabels: {
+                            enabled: true,
+                            format: '<b>{point.name}</b>{point.y}',
+                            style: {
+                                color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
+                            }
+                        },
+                    }
+                },
+                series: data,
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        }
+        function LoadContainer6(xdata, sdata) {
+            $('#c6').highcharts({
+                chart: {
+                    type: 'column'
+                },
+                title: {
+                    text: '应急演练次数统计'
+                },
+                xAxis: {
+                    type: 'category'
+                },
+                yAxis: {
+                    min: 0,
+                    title: {
+                        text: '数量'
+                    },
+                    stackLabels: {
+                        enabled: true,
+                        style: {
+                            fontWeight: 'bold',
+                            color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                        }
+                    }
+                },
+                legend: {
+                    align: 'right',
+                    x: -30,
+                    verticalAlign: 'top',
+                    y: 25,
+                    floating: true,
+                    backgroundColor: (Highcharts.theme && Highcharts.theme.background2) || 'white',
+                    borderColor: '#CCC',
+                    borderWidth: 1,
+                    shadow: false
+                },
+                tooltip: {
+                    pointFormat: '{series.name}: {point.y}<br/>合计: {point.stackTotal}'
+                },
+                plotOptions: {
+                    column: {
+                        stacking: 'normal',
+                        dataLabels: {
+                            enabled: true,
+                            color: (Highcharts.theme && Highcharts.theme.dataLabelsColor) || 'white'
+                        }
+                    }
+                },
+                series: xdata,
+                drilldown: { series: sdata },
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            })
+        }
+
+
+        function GetGridTable2(queryJson) {
+            var selectedRowIndex = 0;
+            var $gridTable = $('#gridTable2');
+
+            var col_Array = new Array();
+
+            col_Array.push({ label: '部门名称', name: 'fullname', index: 'fullname', width: 150, align: 'center', sortable: false },
+                   { label: '主键', name: 'departmentid', index: 'departmentid', width: 100, align: 'center', hidden: true },
+                   { label: '父节点', name: 'parent', index: 'parent', width: 100, align: 'center', hidden: true },
+                    { label: '主键', name: 'changedutydepartcode', index: 'changedutydepartcode', width: 100, align: 'center', hidden: true },
+                   { label: 'haschild', name: 'haschild', hidden: true });
+            //动态创建表格
+            $.ajax({
+                url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+                data: { enCode: "MAE_DirllMode" },
+                type: "get",
+                async: false,
+                success: function (data) {
+                    var DataItem = eval("(" + data + ")");
+                    if (DataItem.length > 0) {
+                        for (var i = 0; i < DataItem.length; i++) {
+                            col_Array.push({
+                                label: DataItem[i].ItemName, name: "recordnum" + (i + 1) + "", align: 'center',classes:"xxxxx",
+                                formatter: function (cellvalue, options, rowObject) {
+                                    if (cellvalue == null||cellvalue==0)
+                                        return 0;
+                                    else 
+                                        return "<a href=javascript:f_drillRecord('" + rowObject.changedutydepartcode + "','" + options.colModel.label + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                                }
+                            })
+                        }
+                    } else {
+                        col_Array.push({
+                            label: '桌面演练', name: 'recordnum1', width: 150, align: 'center',
+                            formatter: function (cellvalue, options, rowObject) {
+                                if (cellvalue == null || cellvalue == 0)
+                                    return 0;
+                                else
+                                    return "<a href=javascript:f_drillRecord('" + rowObject.changedutydepartcode + "','" + options.colModel.label + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                            }
+                        },
+                        {
+                            label: '实战演练', name: 'recordnum2', width: 150, align: 'center',
+                            formatter: function (cellvalue, options, rowObject) {
+                                if (cellvalue == null || cellvalue == 0)
+                                    return 0;
+                                else
+                                    return "<a href=javascript:f_drillRecord('" + rowObject.changedutydepartcode + "','" + options.colModel.label + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                            }
+                        });
+                    }
+                   
+                }
+            })
+            col_Array.push({
+                label: '合计', name: 'total', index: 'total', width: 150, align: 'center',
+                
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == null || cellvalue == 0)
+                            return 0;
+                        else
+                            return "<a href=javascript:f_drillRecord('" + rowObject.changedutydepartcode + "','')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+            });
+            //隐患基本信息
+            $gridTable.jqGrid({
+                url: "../../EmergencyPlatform/Drillplan/DrillplanStatList",
+                datatype: "json",
+                treeGrid: true,
+                treeGridModel: "nested",
+                ExpandColumn: "fullname",
+                postData: { queryJson: JSON.stringify(queryJson) },
+                height: parseFloat($(window).height() / 2 - 100),
+                autowidth: true,
+                colModel: col_Array,
+                treeReader: {
+                    level_field: "level",
+                    parent_id_field: "parent",
+                    leaf_field: "isLeaf",
+                    expanded_field: "expanded"
+                },
+                rowNum: "all",
+                rownumbers: true,
+                rownumWidth: 70,
+                onSelectRow: function (rowid) {
+                    selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                },
+                gridComplete: function () {
+                    $("#" + this.id).setSelection(selectedRowIndex, false);
+                    $("#gridTable2").setGridWidth(($(window).width()-100));
+                }
+            });
+        }
+        function f_drillRecord(deptcode,drillmode) {
+
+            top.tablist.newTab({
+                id: 'dc6d830a-6f26-4c89-b4f0-84f704898bdb',
+                url: top.contentPath + "/EmergencyPlatform/Drillplanrecord/Index?deptcode=" + deptcode + '&drillmode=' + drillmode,
+                title: "应急演练记录"
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="center-Panel">
+        <div class="panel-Title">应急演练统计</div>
+        <div class="titlePanel">
+            <div class="title-search" id="search">
+                <table class="queryform" id="searchTab">
+                    <tr>
+                        <td>
+                            演练部门：
+                        </td>
+                        <td>
+                            <input id="DEPARTID" type="hidden" class="form-control" />
+                            <input id="DeptCode" type="hidden" class="form-control" />
+                            <input id="DEPARTNAME" type="text" style="width: 120px" class="form-control" onclick="selectDept('', 0, 0, '演练部门', document.body, 'DEPARTNAME,DeptCode,DEPARTID')" />
+                        </td>
+                        <td style="padding-left:10px;">年度：</td>
+                        <td>
+                            <input id="Year" type="text" style="width: 100px; " value="@DateTime.Now.ToString("yyyy")" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy' })" />
+                        </td>
+                        <td style="display: none; padding-left: 10px;"> 月份：</td>
+                        <td style="display:none;">
+                            <input id="Month" type="text" style="width: 100px" value="@DateTime.Now.ToString("MM")" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'MM' })" />
+                        </td>
+                        <td style="display: none; padding-left: 10px;">统计时间：</td>
+                        <td>
+                            <input id="StartTime" type="text" style="width: 100px;" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                        </td>
+                        <td style="display: none; padding-left: 10px;">至</td>
+                        <td style="display: none; padding-left: 10px;">
+                            <input id="EndTime" type="text" style="width: 100px;" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                        </td>
+                        <td style="padding-left:10px;">
+                            <a id="btn_Search" class="btn btn-primary" onclick="Search();"><i class="fa fa-search"></i>查询</a>
+                            &nbsp;&nbsp;  <a id="btn_Export" style="display:none;" class="btn btn-primary"><i class="fa fa-file"></i>&nbsp;导出</a>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="toolbar">
+                <div class="btn-group">
+                    <button id="btnType" class="btn btn-primary btn1" type="button" onclick="changeTab(0,this)"><i class="fa fa-exclamation-triangle"></i>&nbsp;应急演练预案类型统计</button>
+                    <button id="btnJoin" class="btn btn-default btn1" type="button" onclick="changeTab(1,this)"><i class="fa fa-exclamation-triangle"></i>&nbsp;参加演练人次统计</button>
+                    <button id="btnWarn" class="btn btn-default btn1" type="button" onclick="changeTab(2,this)"><i class="fa fa-exclamation-triangle"></i>&nbsp;应急演练完成率统计</button>
+                    <button id="btnWork" class="btn btn-default btn1" type="button" onclick="changeTab(6,this)"><i class="fa fa-bell-o"></i>&nbsp;应急演练次数统计</button>
+                    @*<button id="btnWork" class="btn btn-default btn1" type="button" onclick="changeTab(3,this)"><i class="fa fa-bell-o"></i>&nbsp;应急演练数量统计分析</button>*@
+                    <button id="btnSpace" class="btn btn-default btn1" type="button" onclick="changeTab(4,this)"><i class="fa fa fa-area-chart"></i>&nbsp;应急演练方式统计分析</button>
+                    <button id="btnRank" class="btn btn-default btn1" type="button" onclick="changeTab(5,this)"><i class="fa fa-paw"></i>&nbsp;单位内部,各外包单位分析对比</button>
+                </div>
+            </div>
+        </div>
+        <div class="portal-panel" style="margin-left:0px;">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计图表</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <div id="dbcontainer">
+                        <!---应急演练预案类型统计--->
+                        <div id="con0" style="width: 100%; float: left;" class="row con0">
+                            <div class="portal-panel-title" style="font-weight: bold; color: #41b1c6;">
+                                <div id="c0" style="position: relative; left: -15px;">
+                                    <center style="margin-top:50px;"><img src="../../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+                                <div class="row" style="margin-right: 80px; margin-top: 10px; margin-bottom: 10px;">
+                                    <div id="divData0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!---参加演练人次统计--->
+                        <div id="con1" style="width: 100%; display: none; float: left;" class="row con0">
+                            <div class="portal-panel-title" style="font-weight: bold; color: #41b1c6;">
+                                <div id="c1" style="position: relative; left: -15px;">
+                                    <center style="margin-top:50px;"><img src="../../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+                                <div class="row" style="margin-right: 80px; margin-top: 10px; margin-bottom: 10px;">
+                                    <div id="divData1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!---应急演练完成率统计--->
+                        <div id="con2" style="width: 100%; display: none; float: left;" class="row con0">
+                            <div class="portal-panel-title" style="font-weight: bold; color: #41b1c6;">
+                                <div id="c2" style="position: relative; left: -15px;">
+                                    <center style="margin-top:50px;"><img src="../../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+                                <div class="row" style="margin-right: 80px; margin-top: 10px; margin-bottom: 10px;">
+                                    <div id="divData2">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!---应急演练数量统计分析--->
+                        <div id="con3" style="width: 100%; display:none; float: left;" class="row con0">
+                            <div class="portal-panel-title" style="font-weight: bold; color: #41b1c6;">
+                                <div id="c3" style="position: relative; left: -15px; width: 100%;">
+                                    <center style="margin-top:50px;"><img src="../../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+                                <div class="row" style="margin-right: 80px; margin-top: 10px; margin-bottom: 10px;">
+                                    <div id="divData3">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!---应急演练方式统计分析--->
+                        <div id="con4" style="width: 100%; display:none; float: left;" class="row con0">
+                            <div class="portal-panel-title" style="font-weight: bold; color: #41b1c6;">
+                                <div id="c4" style="position: relative; left: -15px; width: 100%;">
+                                    <center style="margin-top:50px;"><img src="../../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+                                <div class="row" style="margin-right: 80px; margin-top: 10px; margin-bottom: 10px;">
+                                    <div id="divData4">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!---单位内部,各外包单位分析对比--->
+                        <div id="con5" style="width: 100%; display:none; float: left;" class="row con0">
+                            <div class="portal-panel-title" style="font-weight: bold; color: #41b1c6;">
+                                <div id="c5" style="position: relative; left: -15px; width: 100%;">
+                                    <center style="margin-top:50px;"><img src="../../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+                                <div class="row" style="margin-right: 80px; margin-top: 10px; margin-bottom: 10px;">
+                                    <div id="divData5">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="con6" style="width: 100%; display:none; float: left;" class="row con0">
+                            <div class="portal-panel-title" style="font-weight: bold; color: #41b1c6;">
+                                <div id="c6" style="position: relative; left: -15px; width: 100%;">
+                                    <center style="margin-top:50px;"><img src="../../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+                                <div class="row" style="margin-right: 80px; margin-top: 10px; margin-bottom: 10px;">
+                                    <div id="divData6">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row" id="grid1">
+                <div class="panel panel-default" style="margin:10px;">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计数据</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div id="divgridTable1" class="panel-body">
+                        <table class="tab1" id="gridTable1"></table>
+
+                    </div>
+                    <div id="divgridTable2" class="panel-body" style="display:none">
+                        <table id="gridTable2"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

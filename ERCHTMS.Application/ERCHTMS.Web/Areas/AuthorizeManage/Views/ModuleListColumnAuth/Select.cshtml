@@ -1,0 +1,86 @@
+﻿@{
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script type="text/javascript">
+    var objectId = request('objectId');
+    var moduleId = "-1";
+    var moduleIds = "";
+    var checkMode = request('checkMode');
+    var mode = request('mode');
+    var type = request('type');
+    $(function () {
+        GetTree();
+    });
+    function GetTree() {
+        var item = {
+            height: 540,
+            showcheck: checkMode == 1,
+            url: "../../AuthorizeManage/PermissionJob/ModuleTreeJson?jobId=" + objectId,
+            onnodeclick: function (item) {
+                if (item.checkstate == 0) {
+                    $("#ModuleTree").setCheckedNodeOne(item.id);
+                }
+                moduleId = item.id;
+                var $gridTable = $('#gridTable');
+                var postData = $gridTable.jqGrid("getGridParam", "postData");
+                $gridTable.jqGrid('setGridParam', {
+                    postData: { moduleId: item.id, jobId: objectId },
+                }).trigger('reloadGrid');
+            }
+        };
+        $("#ModuleTree").treeview(item);
+
+    }
+
+    //返回选择后的结果并赋值到dom控件
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序依次为部门名称,部门Code，部门Id（多选用逗号分隔）
+    //callback:回调函数
+    function AcceptClick(winObject, domId, _win, callback) {
+        var selVal = new Array();
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var moduleTree = $("#ModuleTree");
+                if (checkMode == 1) {
+                    selVal = new Array(moduleTree.getCheckedTexts(), moduleTree.getCheckedValues(), moduleTree.getCheckedIds());
+                } else {
+                    var currentNode = moduleTree.getCurrentNode();
+                    var manager = "";
+                    var managerId = "";
+                    var isOrg = "0";
+                    if (currentNode.manager != undefined && currentNode.manager != null) {
+                        var arr = currentNode.manager.split(',');
+                        if (arr.length > 0) {
+                            manager = arr[0]; managerId = arr[1]; isOrg = arr[2];
+                        }
+                    }
+                    selVal = new Array(currentNode.text, currentNode.value, currentNode.id, manager, managerId, isOrg);
+                }
+                var ids = domId.split(',');
+                for (var j = 0; j < ids.length; j++) {
+                    if (ids[j].length > 0) {
+                        var dom = $(winObject).find("#" + ids[j]).eq(0);
+                        if (dom != undefined) {
+                            dom.val(selVal[j]);
+                        }
+                    }
+                }
+            }
+            if (_win != undefined) {
+                if (typeof (_win.callBackSelect) == "function") {
+                    _win.callBackSelect();
+                }
+
+            }
+            if (callback) {
+                callback();
+            }
+            dialogClose();
+        }
+    }
+</script>
+
+<div style="margin: 10px;">
+    <div id="ModuleTree"></div>
+</div>
+

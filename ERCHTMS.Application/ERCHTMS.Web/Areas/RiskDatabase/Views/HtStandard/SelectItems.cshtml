@@ -1,0 +1,348 @@
+﻿@{;
+ViewBag.Title = "隐患排查标准列表";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<style type="text/css">
+    .ui-jqgrid tr.jqgrow td {
+        white-space: normal !important;
+        height: auto;
+        vertical-align: text-top;
+    }
+</style>
+<script>
+    var dtree, gtree;
+    var enCode = "";
+    var parentId = "";
+    var pType = request("pType");
+    var action = request("action");
+    var ctype = request('ctype');//检查类型
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrpTree();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //layout布局
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                //$('#gridTable').setGridWidth(($('.gridPanel').width() - 100));
+                ////$("#gridTable").setGridHeight($(window).height() - 130);
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 206);
+                $("#deptTree").setTreeHeight($(window).height()-210);
+
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载树
+    function GetTree() {
+      
+        //加载组织机构树
+        var item = {
+            method: "post",
+            cascadecheck: true,
+            showcheck: true,
+            height: $(window).height() - 35,
+            url: "../../RiskDatabase/HtStandard/GetStandardTreeJson?isCheck=true" ,
+            param: { ids: JSON.stringify(top.Details.window.selIds), selIds: top.Details.window.selIds},
+            onnodeclick: function (item) {
+                enCode = item.Code.split('|')[0];
+                if (enCode == "00") enCode = "0";
+                parentId = item.id;
+                var $gridTable = $("#gridTable");
+                $gridTable.jqGrid('setGridParam', {
+                    mtype: "post",
+                    url: "../../RiskDatabase/HtStandard/GetPageListJson",
+                    postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+                }).trigger('reloadGrid');
+            },
+            oncheckboxclick: function (item, status) {
+                 
+            }
+        };
+        //初始化部门树
+        dtree = $("#deptTree").treeview(item);
+       
+    }
+    function GetGrpTree() {
+        var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+        if (!(roleName.indexOf("集团用户") >= 0 || roleName.indexOf("省级用户") >= 0)) {
+            //$("#liGrpTree,#grpTreePanel").css("display", "inline-block");
+            $("#liGrpTree,#grpTreePanel").removeAttr("style");
+            //加载组织机构树
+            var item = {
+                cascadecheck: true,
+                showcheck: true,
+                height: $(window).height() - 60,
+                url: "../../RiskDatabase/HtStandard/GetGrpStandardTreeJson?isCheck=true",
+                onnodeclick: function (item) {
+                    enCode = item.Code.split('|')[0];
+                    if (enCode == "00") enCode = "0";
+                    parentId = item.id;
+                    var $gridTable = $("#gridTable");
+                    $gridTable.jqGrid('setGridParam', {
+                        mtype: "post",
+                        url: "../../RiskDatabase/HtStandard/GetGrpPageListJson",
+                        postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+                    }).trigger('reloadGrid');
+                }
+            };
+            //初始化部门树
+            gtree = $("#grpTree").treeview(item);
+            $("#grpTreePanel").height($(window).height() - 55);
+        }
+    }
+    var selectedRowIndex = -1;
+    var ids = new Array();
+    function addRow(obj,arr) {
+        $(arr).each(function (j,item) {
+            if (item.rid) {
+
+            }
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var ismulti = true;
+        if (!!action)
+        {
+            ismulti = false;
+        }
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/HtStandard/GetPageListJson",
+            datatype: "json",
+            mtype:"post",
+            postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+            height: $(window).height() - 160,
+            autowidth: true,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true }, { label: '标准Id', name: 'stid', hidden: true },
+               { label: 'name', name: 'name', hidden: true },
+               { label: '发现问题', name: 'content', width: 500, align: 'left', headerAlign: 'center' },
+               { label: '整改要求', name: 'require', align: 'left', width: 200, headerAlign: 'center' },
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rowNum: 20,
+            multiselect: false,
+            rowList: [20, 50, 100],
+            rownumbers: true,
+            rownumWidth:40,
+            sortname: 'name,require',
+            sortorder: 'asc'
+            //,onSelectRow: function (rowid, status) {
+            //    var objData = $gridTable.getRowData(rowid);
+            //    if (status) {
+                    
+            //        if ($.inArray(objData.rid, ids) < 0) {
+            //            ids.push(objData.rid);
+            //        }
+            //    } else {
+            //        var idx = $.inArray(objData.rid, ids);
+            //        if (idx >= 0) {
+            //            ids.splice(idx, 1);
+            //        }
+            //    }
+            //    bindData();
+            //},
+            //onSelectAll: function (rowid, status) {
+              
+            //    var rows = $gridTable.getRowData();
+            //    for (var j = 0; j < rows.length; j++) {
+            //        var objData=rows[j];
+            //        if (status) {
+                       
+            //            if ($.inArray(objData.rid, ids) < 0) {
+            //                ids.push(objData.rid);
+            //            }
+                       
+            //        } else {
+            //            ids.splice(0,1);
+            //        }
+            //    }
+            //    bindData();
+            //},
+            //gridComplete: function () {
+            //    var size = $gridTable.jqGrid('getGridParam', 'rowNum');
+            //    var page = $gridTable.jqGrid('getGridParam', 'page');
+            //    var rIds = $gridTable.getDataIDs();
+            //    var rows = $gridTable.getRowData();
+            //    if (rIds.length > 0 && ids.length>0) {
+            //        for (var j = 0; j < rIds.length; j++) {
+            //            var idx = $.inArray(rows[j].rid, ids);
+            //            if (idx >= 0) {
+            //                $gridTable.setSelection(j + 1, true);
+            //            }
+            //        }
+            //    }
+            //}
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val(), enCode: enCode }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txtKeyword").val("");
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: "", enCode: enCode }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+   
+
+    //选择标准并返回
+    function AcceptClick(options) {
+        var cvs=$("#deptTree").getCheckedValues();
+        if ($("#deptTree").text().length > 0) {
+            if (cvs!=null) {
+                ids = cvs;
+            }
+          
+        }
+        if ($("#grpTree").text().length > 0) {
+            cvs = $("#grpTree").getCheckedValues();
+            if (cvs != null) {
+                ids = $.merge(ids, cvs);
+            }
+           
+        }
+        if (ids.length == 0) {
+                dialogMsg("请至少选择一条数据！", 0);
+                return;
+            } else {
+            var arr = new Array();
+            top.Loading(true);
+            var postData = {
+                queryJson: JSON.stringify({ stIds: ids, noIds: top.Details.window.selIds }),
+                page: 1,   
+                rows: 10000000,
+                sidx: "name,require",
+                sord: "asc"
+            }
+            //if (pType == "1") {
+                if (ctype != '1' && (top.Details.window.$("#CheckUsers").val() != "" || top.Details.window.$("#CheckUsers").val() != undefined)) {
+                    postData["users"] = top.Details.window.$("#CheckUsers").val();
+                    postData["userIds"] = top.Details.window.$("#CheckLevelID").val();
+                    postData["codes"] = top.Details.window.$("#CheckDeptCode").val();
+                }
+            //}
+                $.post("GetItemsJson", postData, function (data) {
+                    var json = eval("(" + data + ")");
+                 
+                    top.Details.fillItems(json.rows, ids);
+                    top.Loading(false);
+                    if (options != undefined) {
+                        if (options.callBack) {
+                            options.callBack();
+                        }
+
+                    }
+                    dialogClose();
+                });
+            } 
+       
+    }
+    function selectTree(id) {
+        var enCode = "XX";
+        if (id == "deptTree") {
+            var item = dtree.getCurrentNode();
+            if (!item) {
+                var data = dtree.getData();
+                item = !!data ? data[0] : null;
+            }
+            if (!!item && !!item.Code)
+                enCode = item.Code.split('|')[0];
+            if (enCode == "00") enCode = "0";
+            var $gridTable = $("#gridTable");
+            $gridTable.jqGrid('setGridParam', {
+                url: "../../RiskDatabase/HtStandard/GetPageListJson",
+                postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+            }).trigger('reloadGrid');
+        }
+        else {
+            var item = gtree.getCurrentNode();
+            if (!item) {
+                var data = gtree.getData();
+                item = !!data ? data[0] : null;
+            }
+            if (!!item && !!item.Code)
+                enCode = item.Code.split('|')[0];
+            if (enCode == "00") enCode = "0";
+            var $gridTable = $("#gridTable");
+            $gridTable.jqGrid('setGridParam', {
+                url: "../../RiskDatabase/HtStandard/GetGrpPageListJson",
+                postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+            }).trigger('reloadGrid');
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <ul class="nav nav-tabs" id="ulTabs">
+                <li class="active" onclick="selectTree('deptTree')">
+                    <a data-toggle="tab" href="#tab1">隐患排查标准分类</a>
+                </li>
+                <li id="liGrpTree" style="display:none;" onclick="selectTree('grpTree')"><a href="#grpTreePanel" data-toggle="tab">集团排查标准分类</a></li>
+            </ul>
+            <div class="tab-content">
+                <div id="tab1" class="tab-pane active">
+                    <div id="deptTree"></div>
+                </div>
+                <div id="grpTreePanel" class="tab-pane" style="display:none;">
+                    <div id="grpTree"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title" id="pelTitle">隐患排查检查项目</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td width="10"></td>
+                            <td>
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入事故隐患描述(简题)或整改措施进行搜索" style="width: 300px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                                
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+
+     
+</div>

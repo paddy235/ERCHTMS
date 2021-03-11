@@ -1,0 +1,457 @@
+﻿
+@{
+    ViewBag.Title = "人员进出门禁数据";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+
+
+<script>
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户id
+    var indexdeal = request('indexdeal');//首页待办跳转
+    var _belongcode = "";
+    var _isOrg = "";
+    var useraccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+    var IsHrdl = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("IsOpenPassword"))";
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var state = 0;  //判断是内部单位还是外包单
+    $(function () {
+        InitialPage();
+        GetTree();
+        DateTime();
+        GetGrid();
+    });
+
+
+    //日期默认
+    function DateTime()
+    {
+        var date = new Date();
+        var year = date.getFullYear();
+        var mon = date.getMonth() + 1;
+        var day = date.getDate();
+        var stime = "";
+        if (mon < 10)
+        {
+            mon = '0' + mon;
+        }
+        if ((day - 6) < 10) {
+            stime = year + '-' + mon + '-' + '0' + (day - 6);
+        }
+        else if ((day - 6) < 0) {
+            stime = year + '-' + mon + '-' + "1";
+        }
+        else {
+            stime = year + '-' + mon + '-' + (day - 6);
+        }
+        var etime = year + '-' + mon + '-' + day;
+
+        //$("#sTime").val('2020-12-03');
+        //$("#eTime").val('2020-12-07');
+        $("#sTime").val(stime);
+        $("#eTime").val(etime);
+    }
+
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#PageList').setGridWidth(($('.gridPanel').width()));
+                $('#PageList').setGridHeight($(window).height() - 210);
+                $("#itemTree").setTreeHeight($(window).height() - 55);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+              {
+                  SelectMode: 0,
+                  Mode: 957
+              }
+            );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _belongcode = item.value;
+                _isOrg = item.Sort;
+                var DeptType = item.DeptType;
+                if (_belongcode) {
+                    if (_belongcode.indexOf("cx100_") == 0 || _belongcode.indexOf("ls100_") == 0) {//外包
+                        $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $("#btn_out").addClass('btn-primary');
+                        state = 1;
+                    }
+                    else {
+                        if (DeptType == "长协" || DeptType == "临时") {//外包
+                            $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $("#btn_out").addClass('btn-primary');
+                            state = 1;
+                        }
+                        else {//内部
+                            $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $("#btn_in").addClass('btn-primary');
+                            state = 0;
+                        }
+                    }
+                } else {
+                    $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $("#btn_in").addClass('btn-primary');
+                    state = 0;
+                }
+
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#PageList').setGridWidth(($('.gridPanel').width()));
+            $("#PageList").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+    //加载表格
+    function GetGrid() {
+        $gridTable = $("#PageList");
+
+        $gridTable.jqGrid({
+            url: "../../Personnelaccess/GetTable",
+            datatype: "json",
+            height: $(window).height() - 230,
+            autowidth: true,
+            postData: { queryJson: getQueryJson() },
+            colModel: [
+                { label: '主键', name: 'userid', sortable: true, width: 10, align: 'center', hidden: true },
+                {
+                    label: '单位(部门)', name: 'bmname', index: 'bmname', width: 350, align: 'center', sortable: false,
+                    cellattr: function (rowId, tv, rawObject, cm, rdata) {
+                        //合并单元格
+                        return 'id=\'bmname' + rowId + "\'";
+                    },
+                    formatter: function (cellvalue, options, rowObject) {
+                        var depttype = rowObject.depttype == null ? "[内部]" : "[" + rowObject.depttype + "]";
+                        var clo = rowObject.depttype == null ? "#199ed8;" : "#FF9D6D;";
+                        var html = "<lable style='color: " + clo + "' >" + depttype + "</lable>" + cellvalue + "</br><span id = 'spanrow' style = 'color: #199ed8;'>进门总次数:" + rowObject.bminnum + "</span><span id='spanrow' style='color: #199ed8;'>出门总次数:" + rowObject.bmoutnum + "</span>";
+                        return html;
+                    }
+                },
+                //{ label: '类型', name: 'depttype', index: 'depttype', width: 150, align: 'center' },
+                { label: '姓名', name: 'realname', index: 'realname', width: 150, align: 'center', sortable: false },
+                { label: '岗位名称', name: 'dutyname', index: 'dutyname', width: 350, align: 'center', sortable: false },
+                { label: '进门次数(次)', name: 'intnum', index: 'intnum', width: 250, align: 'center', sortable: false },
+                { label: '出门次数(次)', name: 'outnum', index: 'outnum', width: 250, align: 'center', sortable: false },
+                {
+                    label: '操作', name: '', width: 80, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:sel('" + rowObject.userid + "') title='查看' style='color: #199ed8'>查看</a>";
+                        return html;
+                    }
+                },
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 40, 100],
+            pager: '#PagePaging',
+            sortname: 'DEPTSORTss,v_info.DEPTSORT asc,v_info.deptcode asc,v_info.userid',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+            },
+            loadError: function (xhr, status, error) {
+            },
+            loadComplete: function (data) {
+                var innum;
+                var outnum;
+                if (data.rows.length > 0) {
+                    innum = data.rows[0]["allintnum"];
+                    outnum = data.rows[0]["alloutnum"];
+                }
+                else {
+                    innum = 0;
+                    outnum = 0;
+                }
+                $("#allnum").html("进门总次数:<lable style='color: #199ed8' >" + innum + "</lable>次&nbsp;&nbsp;&nbsp;&nbsp;出门总次数：<lable style='color: #199ed8' >" + outnum + "</lable>次");
+            },
+            gridComplete: function () {
+                Merger("PageList", "bmname");
+            }
+        });
+
+
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() },
+                page: 1
+            }).trigger('reloadGrid');
+        })
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var st = $("#sTime").val();
+        var et = $("#eTime").val();
+        if (st > et && st != "" && et != "")
+        {
+            dialogMsg('开始时间不能大于结束时间！', 2);
+            return false;
+        }
+        if (rolename.indexOf("承包商级用户")>=0)
+        {
+            state = 1;
+        }
+        if ($("#deptType option:selected").val() != "") {
+            $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $("#btn_out").addClass('btn-primary');
+            state = 1;
+        }
+        var query = {
+            sTime: $("#sTime").val(),
+            eTime: $("#eTime").val(),
+            deptType: $("#deptType option:selected").val(),
+            dataType: $("#dataType option:selected").val(),
+            Name: $("#PersonName").val(),
+            state: state,
+            deptCode: _belongcode,
+            isOrg: _isOrg
+        }
+        return JSON.stringify(query);
+    }
+
+    //点击切换内部和外包
+    function qstate(obj)
+    {
+        console.log($(obj).attr("data-id"));
+        state = $(obj).attr("data-id");
+
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: getQueryJson() },
+            page: 1
+        }).trigger('reloadGrid');
+    }
+
+    //导出
+    function exportResult() {
+        var queryJson = getQueryJson();
+        location.href = "../../HJBPerson/Personnelaccess/ExportData?queryJson=" + queryJson;
+    }
+
+
+
+    //查看
+    function sel(obj) {
+        var keyValue = obj;
+        var sTime = $("#sTime").val();
+        var eTime = $("#eTime").val();
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '进出门禁数据详细',
+                url: '/HJBPerson/Personnelaccess/UserDetail?keyValue=' + keyValue + '&maxTime=' + eTime + '&minTime=' + sTime,
+                width: ($(top.window).width() - 700) + "px",
+                height: ($(top.window).height() - 400) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //设置
+    function set()
+    {
+        var dlg = dialogOpen({
+            id: "set",
+            title: '人员进出门禁设置',
+            url: '/HJBPerson/PersonList/Set?ModuleType=1',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+
+    //合并单元格
+    function Merger(gridName, CellName) {
+
+        //得到显示到界面的id集合
+
+        var showIds = $("#" + gridName + "").getDataIDs();
+
+        //当前显示多少条
+
+        var length = showIds.length;
+        for (var i = 0; i < length; i++) {
+
+            //从上到下获取一条信息
+
+            var before = $("#" + gridName + "").jqGrid('getRowData', showIds[i]);
+
+            //定义合并行数
+
+            var rowSpanTaxCount = 1;
+
+            for (j = i + 1; j <= length; j++) {
+
+                //和上边的信息对比 如果值一样就合并行数+1 然后设置rowspan 让当前单元格隐藏
+
+                var end = $("#" + gridName + "").jqGrid('getRowData', showIds[j]);
+
+                if (before[CellName] == end[CellName]) {
+
+                    rowSpanTaxCount++;
+
+                    $("#" + gridName + "").setCell(showIds[j], CellName, '', { display: 'none' });
+
+                } else {
+
+                    rowSpanTaxCount = 1;
+
+                    break;
+
+                }
+                $("#" + CellName + "" + showIds[i] + "").attr("rowspan", rowSpanTaxCount);
+                $("#" + CellName + "" + showIds[i] + "").children("span").html();
+            }
+
+        }
+    }
+
+    //侧边栏展开/收起功能实现
+    function setBar(obj) {
+        var left = $(".ui-layout-west").css("left");
+        if (left == "-185px") {
+            $(obj).attr("class", "fa fa-arrow-left");
+            $(".ui-layout-west").css({ left: "0px" });
+            $(".ui-layout-center").css({ left: $(".ui-layout-west").width(), width: $(window).width() - $(".ui-layout-west").width() - 10 });
+            if (document.getElementById("PageList") != undefined) {
+                $('#PageList').setGridWidth(($('.gridPanel').width()));
+            }
+
+        } else {
+            $(obj).attr("class", "fa fa-arrow-right");
+            $(".ui-layout-west").css({ left: "-185px" });
+            $(".ui-layout-center").css({ left: "35px", width: $(window).width() - 40 });
+            if (document.getElementById("PageList") != undefined) {
+                $('#PageList').setGridWidth(($('.gridPanel').width()));
+            }
+        }
+
+    };
+
+</script>
+
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer" title="展开/收起"></i>
+                </div>
+                <a onclick=""></a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title"><div><div style="float:left">人员进出门禁数据</div><div id="allnum" style="float:right;margin-right:20px">进门总次数:0人&nbsp;&nbsp;&nbsp;&nbsp;出门总次数:0人</div></div></div>
+          
+                <div class="title-search">
+                    <table style="width:100%;margin-top:10px">
+                        <tr>
+                            <td id="td3" style="padding-left: 15px;width:60px;">日期：</td>
+                            <td id="td4" style="padding-left: 5px;width:120px;">
+                                <input id="sTime" type="text" readonly="readonly" isvalid="yes" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                            </td>
+                            <td id="td5" style="padding-left: 5px;width:20px;"><span>至</span></td>
+                            <td id="td6" style="padding-left: 5px;width:120px;">
+                                <input id="eTime" type="text" readonly="readonly" isvalid="yes" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                            </td>
+                            <td id="td10" style="padding-left: 15px; width: 85px;"><span>单位类型</span> </td>
+                            <td id="td11" style="padding-left: 5px; width:150px;">
+                                <select class="form-control" id="deptType" style="width: 150px;">
+                                    <option value="" selected="selected">==请选择==</option>
+                                    @*<option value="内部单位">内部</option>
+                <option value="外包单位">外包单位</option>*@
+                                    <option value="长协">长协外包</option>
+                                    <option value="临时">临时外包</option>
+                                </select>
+                            </td>
+                            <td id="td10" style="padding-left: 15px;width: 85px;"><span>数据范围</span> </td>
+                            <td id="td11" style="padding-left: 5px; width:150px;">
+                                <select class="form-control" id="dataType" style="width: 150px;">
+                                    <option value="" selected="selected">==请选择==</option>
+                                    <option value="0">人员有门禁数据</option>
+                                    <option value="1">人员无门禁数据</option>
+                                </select>
+                            </td>
+                            <td id="td12" style="width: 180px;padding-left: 15px">
+                                <input id="PersonName" type="text" class="form-control input" placeholder="请输入要查询的姓名" style="width: 180px;" />
+                            </td>
+                            <td style="padding-left: 15px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>&nbsp;&nbsp;
+                                @*<a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>&nbsp;&nbsp;*@
+                            </td>
+                        </tr>
+                    </table>
+                    <div class="row" style="margin-top:10px;">
+                        <div style="margin-left: 10px;float: left;">
+                            <div class="btn-group">
+                                @if (ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName.Contains("承包商级用户"))
+                                {
+                                    <button id="btn_out" data-id="1" class="btn btn-primary btn10" type="button" onclick="qstate(this);$('.btn10').addClass('btn-primary');$('.btn10').removeClass('btn-default');$(this).addClass('btn-primary');"><i class="fa fa"></i>&nbsp;外包单位</button>
+                                }
+                                else
+                                {
+                                    <button id="btn_in" data-id="0" class="btn btn-primary btn10" type="button" onclick="qstate(this);$('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary');"><i class="fa fa"></i>&nbsp;电厂内部</button>
+                                    <button id="btn_out" data-id="1" class="btn btn-default btn10" type="button" onclick="qstate(this);$('.btn10').removeClass('btn-primary');$('.btn10').addClass('btn-default');$(this).addClass('btn-primary');"><i class="fa fa"></i>&nbsp;外包单位</button>
+                                }
+
+                            </div>
+                        </div>
+
+                        <div class="toolbar" style="float:right">
+                            <div class="btn-group" style="text-align:right;">
+                                <a id="set" class="btn btn-primary" onclick="set()">设置</a>&nbsp;&nbsp;&nbsp;
+                                <a id="export" class="btn btn-primary" onclick="exportResult()" style="margin-left:10px;margin-right:10px">导出</a>
+                            </div>
+                            <script>$('.toolbar').authorizeButton()</script>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="gridPanel" style="margin-top:10px">
+                    <table id="PageList"></table>
+                    <div id="PagePaging"></div>
+                </div>
+          
+        </div>
+    </div>
+</div>

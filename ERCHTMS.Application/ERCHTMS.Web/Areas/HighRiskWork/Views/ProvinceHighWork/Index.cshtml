@@ -1,0 +1,248 @@
+@{;
+  ViewBag.Title = "列表页面";
+  Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var starttime = request('starttime');
+    var endtime = request('endtime');
+    var deptcode = request('deptcode');
+    var worktype = request('worktype');
+    var departmentid = request('deptid');
+    var mode = request('mode');
+
+    var _belongcode = "";
+    $(function () {
+        InitialPage();
+        GetTree();
+        ShowData();
+        GetGrid();
+    });
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        $("#itemTree").height($(window).height() - 45);
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 45);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //通用作业类型
+        $("#WorkType").ComboBox({
+            param: { EnCode: "StatisticsType" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "======全部======",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+    }
+
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+              {
+                  SelectMode: 0,
+                  Mode: 9
+              }
+            );
+        var item = {
+            height: $(window).height() - 48,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _belongcode = item.value;
+                _isOrg = item.Sort;
+                deptId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../HighRiskWork/ProvinceHighWork/GetPageTableJson",
+            postData: { queryJson: getQueryJson() },
+            datatype: "json",
+            colModel: [
+                  { label: '主键', name: 'id', width: 10, align: 'left', sortable: true, hidden: true },
+                  {
+                      label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                      formatter: function (cellvalue, options, rowObject) {
+                          var html = "<a href=javascript:showDetail('" + rowObject.id + "','" + rowObject.worktype + "')   title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                          return html;
+                      }
+                  },
+                 { label: '作业类型', name: 'worktypename', width: 100, align: 'center', sortable: true },
+                 { label: '申请编号', name: 'applynumber', index: 'applynumber', width: 150, align: 'center', sortable: false },
+                 { label: '作业单位类别', name: 'workdepttypename', index: 'workdepttype', width: 120, align: 'center', sortable: false },
+                 { label: '工程名称', name: 'engineeringname', width: 200, align: 'center', sortable: false },
+                 { label: '作业地点', name: 'workplace', width: 180, align: 'center', sortable: false },
+                 {
+                     label: '作业时间', name: 'workstarttime', width: 300, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                         return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.workendtime, 'yyyy-MM-dd hh:mm');
+                     }
+                 },
+                 { label: '作业单位', name: 'workdeptname', index: 'workdeptname', width: 100, align: 'center', sortable: false },
+                 { label: '申请人', name: 'createusername', index: 'createusername', width: 100, align: 'center', sortable: false },
+                 { label: '申请时间', name: 'createdate', index: 'createdate', width: 100, align: 'center', sortable: true, formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } },
+                { label: '所属电厂', name: 'createuserorgname', index: 'createuserorgname', width: 120, align: 'center', sortable: false },
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 30, 40],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+        });
+
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var query = {
+            worktype: $("#WorkType").attr("data-value"),
+            st: $("#starttime").val(),
+            et: $("#endtime").val(),
+            workdeptcode: _belongcode
+        }
+        return JSON.stringify(query);
+    }
+
+    //查看
+    function showDetail(id, worktype) {
+        var keyValue = id;
+        var title = "查看高风险作业";
+        var url = "";
+        if (worktype == "-1") {
+            url = "/HighRiskWork/Scaffold/FormOne?mode=view&keyValue=" + keyValue + "&scaffoldtype=0";
+        }
+        else if (worktype == "-2") {
+            url = "/HighRiskWork/Scaffold/FormThree?mode=view&keyValue=" + keyValue + "&scaffoldtype=2";
+        }
+            //安全设施变动
+        else if (worktype == "-3") {
+            url = '/HighRiskWork/Safetychange/Form?keyValue=' + keyValue + '&actiontype=view&currstate=3';
+        }
+            //高风险通用界面
+        else {
+            url = "/HighRiskWork/HighRiskCommonApply/CheckForm?keyValue=" + keyValue + "&mode=view&state=3";
+        }
+
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "ViewForm",
+                title: title,
+                url: url,
+                width: ($(top.window).width() - 300) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //导出
+    function exportResult() {
+        var queryJson = getQueryJson();
+        location.href = "../../HighRiskWork/ProvinceHighWork/ExportData?queryJson=" + queryJson;
+    }
+
+    function ShowData() {
+        if (!!mode) {
+            $("#WorkType").ComboBoxSetValue(worktype);
+            $("#starttime").val(starttime);
+            $("#endtime").val(endtime);
+            _belongcode = deptcode;
+            var chooseObj = "#itemTree_" + departmentid.replace(/-/g, "_");
+            $(chooseObj).addClass("bbit-tree-selected");
+            $('#btn_Search').trigger("click");
+        }
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right: 8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor: pointer;" title="展开/收起"></i>
+                </div>
+                <a onclick=''></a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">高风险作业清单</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="display: flex;">作业时间:</td>
+                            <td>
+                                <input style="width: 120px;" id="starttime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'endtime\')}' })"></td>
+                            <td>&nbsp;&nbsp;-&nbsp;&nbsp;</td>
+                            <td>
+                                <input style="width: 120px;" id="endtime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'starttime\')}' })"></td>
+                            <td style="width: 20px;"></td>
+                            <td>作业类型:
+                            </td>
+                            <td>
+                                <div id="WorkType" type="select" class="ui-select" style="width: 200px;"></div>
+                            </td>
+                            <td style="width: 20px;"></td>
+                            <td><a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download"></i>导出</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

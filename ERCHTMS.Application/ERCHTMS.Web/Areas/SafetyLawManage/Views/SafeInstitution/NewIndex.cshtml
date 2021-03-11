@@ -1,0 +1,884 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Code
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";//系统管理员
+    var selectId = "-1", selectName = "";
+    selectdept = "", selectCode = "";//选择节点
+    var ParentOrgCode = "";
+    var tree = null;
+    //导入刷新用
+    var isImport = false;
+    //页面代理
+    var lagc = null;
+    var state = 0;//0本级,1上级
+    var flag = 0;//0不包含下级节点
+    $(function () {
+
+        //本级选项卡
+        $("#a1").click(function () {
+            state = 0;
+            $(".bbit-tree-selected").removeClass("bbit-tree-selected");
+            selectId = selectName = selectCode = "";
+            $('#btn_Search').trigger("click");
+        });
+        //上级选项卡
+        $("#a2").click(function () {
+            state = 1;
+            $(".bbit-tree-selected").removeClass("bbit-tree-selected");
+            selectId = selectName = selectCode = "";
+            $('#btn_Search').trigger("click");
+        });
+
+        $.ajax({
+            url: "../../SafetyLawManage/SafeInstitution/GetParentOrgCode",
+            type: "GET",
+            async: false,
+            dataType: "text",
+            success: function (data) {
+                ParentOrgCode = data;
+                //无省级隐藏上级规章制度
+                if (data == "0") {
+                    $("#area").hide();
+                }
+            }
+        });
+        GetTreeS();
+        if (isSystem == "True" || rolename.indexOf("省级") >= 0) {
+            $("#ulTabs,#div1").css("display", "none");
+            //
+            //加载树
+            //
+            GetTree(0, "");
+        } else {
+            $("#SItemTree").css("display", "none");
+            $("#td1").css("display", "none");
+            $("#td2").css("display", "none");
+            //
+            //加载树
+            //
+            GetTree(1, "");
+        }
+
+        var json = JSON.stringify(
+             {
+                 SelectMode: 0,
+                 Mode: 9
+             }
+           );
+        $("#Province").ComboBoxTree({
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            description: "",
+            height: "300px"
+        }).bind("change", function () {
+            var self = $(this);
+            orgCode = self.attr("data-code");
+            GetTree(0, orgCode);
+            lagc.addPageGotoUrl({
+                addArg: {
+                    title: '添加文件',
+                    width: "1300px",
+                    url: '/SafetyLawManage/SafeInstitution/Form?mode=add&treeId=' + selectId + "&treeName=" + encodeURIComponent(selectName) + "&treeCode=" + selectCode,
+                    btn: null
+                }
+            });
+            selectCode = "";
+            $('#btn_Search').trigger("click");
+        });
+
+        BindData();
+
+    });
+    //
+    //设置页面参数
+    //
+    function setPageData() {
+        if (isSystem == "True" || rolename.indexOf("省级") >= 0 || rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("厂级部门用户") >= 0 || (rolename.indexOf("部门级用户") >= 0 && rolename.indexOf("负责人") >= 0)) {
+            $("#add,#enter").css("display", "");
+            //$("#add,#enter,#divRoot").css("display", "");
+        } else {
+            $("#add,#enter").css("display", "none");
+            //$("#add,#enter,#divRoot").css("display", "none");
+        }
+        if (isSystem == "True" || rolename.indexOf("省级") >= 0 || rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("厂级部门用户") >= 0) {
+            $("#divRoot").css("display", "");
+            //$("#add,#enter,#divRoot").css("display", "");
+        } else {
+            $("#divRoot").css("display", "none");
+            //$("#add,#enter,#divRoot").css("display", "none");
+        }
+    }
+    //
+    //权限设置
+    //
+    function setPower() {
+        //标准制度节点权限控制
+        $(".bbit-tree-node-el").on("mouseover", function () {
+            var self = $(this);
+            var id = self.attr("id").replace("itemTree_", "");
+            if (isSystem == "True" || rolename.indexOf("省级") >= 0) {
+                id = self.attr("id").replace("SItemTree_", "");
+            }
+            if (self.attr("id").indexOf("deptTree") > -1 || self.attr("id").indexOf("bbtree") > -1) {
+
+            } else {
+                var list = tree.getData();
+                var node = findNode(list, id.replace(/_/g, "-"));
+                if (node.Code == "001") {
+                    self.find(".bbit-tree-node-tool span[data-index='2']").css("display", "none");
+                }
+                var hasPower1 = rolename.indexOf("省级") >= 0;
+                if (hasPower1) {
+                    if (orgCode == "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode") {
+                       
+                    } else {
+                        self.find(".bbit-tree-node-tool span").css("display", "none");
+                    }
+                } else {
+                    if (isSystem == "True" || rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("厂级部门用户") >= 0 || (rolename.indexOf("部门级用户") >= 0 && rolename.indexOf("负责人") >= 0)) {
+
+                    } else {
+                        self.find(".bbit-tree-node-tool span").css("display", "none");
+                    }
+                }
+
+            }
+
+
+
+        })
+    }
+    function setAddPower(node) {
+        if (isSystem == "True" || rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("省级") >= 0 || rolename.indexOf("厂级部门用户") >= 0 || (rolename.indexOf("部门级用户") >= 0 && rolename.indexOf("负责人") >= 0)) {
+            //所有操作权限
+            $("#add,#enter").css("display", "");
+            //$("#add,#divRoot,#enter").css("display", "");
+        } else {
+            $("#add,#enter").css("display", "none");
+            //$("#add,#divRoot,#enter").css("display", "none");
+        }
+        if (isSystem == "True" || rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("省级") >= 0 || rolename.indexOf("厂级部门用户") >= 0) {
+            //所有操作权限
+            $("#divRoot").css("display", "");
+            //$("#add,#divRoot,#enter").css("display", "");
+        } else {
+            $("#divRoot").css("display", "none");
+            //$("#add,#divRoot,#enter").css("display", "none");
+        }
+    }
+    //
+    //查找节点
+    //
+    function findNode(list, id) {
+        var node = list.find(function (x) { return x.id == id; });
+        if (!node) {
+            for (var n in list) {
+                var ele = list[n];
+                node = findNode(ele.ChildNodes, id);
+                if (!!node)
+                    break;
+            }
+        }
+        return node;
+    }
+    //
+    //重新定义查询条件
+    //
+    function buidQuery() {
+        var StartTime = $("#sTime").val();
+        var EndTime = $("#eTime").val();
+        if (EndTime.length > 0 && StartTime.length == 0) {
+            alert("请选择开始时间");
+            return;
+        }
+        if (new Date(StartTime.replace("-", "/").replace("-", "/")) > new Date(EndTime.replace("-", "/").replace("-", "/"))) {
+            alert("开始时间不可大于结束时间！");
+            return;
+        }
+        var filename = $("#FileName").val();
+        var rnd = Math.random();
+        var data = {
+            filename: filename, treeCode: selectCode, state: state, orgcode: orgCode, sTime: StartTime, eTime: EndTime, flag: flag
+        };
+        return JSON.stringify(data);
+    }
+    //
+    //重置条件
+    //
+    function reset() {
+        $("#FileName").val("");
+        $(".bbit-tree-selected").removeClass("bbit-tree-selected");
+        selectId = selectName = selectCode = "";
+        lagc.addPageGotoUrl({
+            addArg: {
+                title: '添加文件',
+                width: "1300px",
+                url: '/SafetyLawManage/SafeInstitution/Form?mode=add&treeId=' + selectId + "&treeName=" + encodeURIComponent(selectName) + "&treeCode=" + selectCode,
+                btn: null
+            }
+        });
+    }
+    //
+    //查看全部数据
+    //
+    function viewAll() {
+        $(".bbit-tree-selected").removeClass("bbit-tree-selected");
+        selectId = selectName = selectCode = "";
+        lagc.queryData();
+        lagc.addPageGotoUrl({
+            addArg: {
+                title: '添加文件',
+                width: "1300px",
+                url: '/SafetyLawManage/SafeInstitution/Form?mode=add&treeId=' + selectId + "&treeName=" + encodeURIComponent(selectName) + "&treeCode=" + selectCode,
+                btn: null
+            }
+        });
+    }
+    //
+    //窗口大小改变
+    //
+    function resize() {
+        var gh = $(window).height() - 143;
+        var gw = $(".gridPanel").width();
+        var th = $(window).height() - 55;
+        $("#itemTree").setTreeHeight(th);
+        $("#gridTable").setGridHeight(gh);
+        $("#gridTable").setGridWidth(gw);
+    }
+    //
+    //构造操作栏
+    //
+    function buildOper(rowObject) {
+        var html = "<a href=javascript:detail('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+        var hasPower = rolename.indexOf("省级") >= 0;
+        if (hasPower) {
+            if (orgCode == "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode") {
+                html += "&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                html += "&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+            }
+        } else {
+            //hasPower = rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("厂级部门用户") >= 0 || (rolename.indexOf("部门级用户") >= 0 && rolename.indexOf("负责人") >= 0);
+            hasPower = rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("厂级部门用户") >= 0;
+            if (hasPower) {
+                if (state == 0) {
+                    html += "&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                    html += "&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                }
+            } else {
+                if (rowObject.createuserid == userId) {
+                    html += "&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                    html += "&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                }
+            }
+        }
+        return html;
+    }
+    //
+    //收藏
+    //
+    function setStore() {
+        var ids = [];
+        var chkList = $("input:checked").not("#cb_gridTable").not("#ckSelect");
+        if (chkList.length == 0) {
+            dialogMsg('请选择要收藏的记录！', 0);
+        }
+        else {
+            $.each(chkList, function (i, n) {
+                var self = $(this);
+                var id = self.attr("id").replace("jqg_gridTable_", "");
+                ids.push(id);
+            });
+
+            $.RemoveForm({
+                msg: "确定收藏？",
+                loading: "正在操作数据...",
+                url: '../../SafetyLawManage/StoreLaw/storeSafetyLaw',
+                param: { idsData: ids.join(",")+",", ctype: 2 },
+                success: function (data) {
+                    ids = "";
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        }
+    }
+    //
+    //打开我的收藏
+    //
+    function openMyStore() {
+        var idx = dialogOpen({
+            id: "Form",
+            title: "查看我的收藏",
+            url: '/SafetyLawManage/SafeInstitution/myStoreIndex',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //
+    //类型操作
+    //
+    {
+        //
+        //加载元素树
+        //
+        function GetTree(type, code) {
+            var arr = [];
+            var hasPower = rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("省级") >= 0 || rolename.indexOf("厂级部门用户") >= 0 || (rolename.indexOf("部门级用户") >= 0 && rolename.indexOf("负责人") >= 0);
+            if (hasPower == true) {
+                arr = [
+                    {
+                        title: "新增",
+                        text: '<i class="fa fa-plus"  name="toolbtn"></i>', callback: "addNode"
+                    },
+                    {
+                        title: "修改",
+                        text: '<i class="fa fa-pencil-square-o toolbtn" name="toolbtn"></i>', callback: "editNode"
+                    },
+                    {
+                        title: "删除",
+                        text: '<i class="fa fa-trash-o toolbtn" name="toolbtn"></i>', callback: "delNode"
+                    }
+                ];
+            }
+            var itreHeight = $(window).height() - 55;
+            var url = "../../SafetyLawManage/SafeInstitution/GetTypeTreeJson?datatype=0&orgcode=" + code;
+            var item = {
+                height: itreHeight,
+                url: url,
+                onnodeclick: function (item) {
+                    selectdept = orgCode;
+                    selectId = item.id;
+                    selectName = item.text;
+                    selectCode = item.value;
+                    setAddPower(item);
+                    lagc.addPageGotoUrl({
+                        addArg: {
+                            title: '添加文件',
+                            width: "1300px",
+                            url: '/SafetyLawManage/SafeInstitution/Form?mode=add&treeId=' + selectId + "&treeName=" + encodeURIComponent(selectName) + "&treeCode=" + selectCode,
+                            btn: null
+                        }
+                    });
+                    $('#btn_Search').trigger("click");
+                },
+                isTool: true,
+                //自定义工具栏
+                nodeTools: arr
+            };
+            //初始化
+            var itree = $("#itemTree");
+            if (type == 0) {
+                itree = $("#SItemTree");
+            }
+            tree = itree.treeview(item);
+            if (itree.html().length == 0) {
+                itree.setTreeHeight(itreHeight);
+            }
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize();
+                }
+            });
+            if (hasPower == true) {
+                $(".bbit-tree-node-el").on("mouseover",
+                    function () {
+                        var self = $(this);
+                        var inceeded = self.attr("inceeded");
+                        if (!inceeded) {
+                            self.width(self.width());
+                            self.attr("inceeded", "true");
+                        }
+                    });
+            }
+        }
+        //
+        //增加根节点
+        //
+        function addRoot() {
+            addNode("-1");
+        }
+        //
+        //增加节点
+        //
+        function addNode(pId, pCode, pName) {
+            var dlgArg = {
+                id: 'FormTraType',
+                title: '新增文件类型',
+                url: '/SafetyLawManage/SafeInstitution/TreeForm?parentid=' + pId,
+                width: ($(top.window).width() - 600) + "px",
+                height: ($(top.window).height() - 250) + "px",
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+        //
+        //修改节点
+        //
+        function editNode(id, code, name) {
+            var dlgArg = {
+                id: 'FormTraType',
+                title: '修改文件类型',
+                url: '/SafetyLawManage/SafeInstitution/TreeForm?keyValue=' + id,
+                width: ($(top.window).width() - 600) + "px",
+                height: ($(top.window).height() - 250) + "px",
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+        //
+        //删除节点
+        //
+        function delNode(id) {
+            var keyValue = id;
+            if (keyValue) {
+                $.RemoveForm({
+                    url: "../../SafetyLawManage/SafeInstitution/RemoveTreeForm",
+                    param: { keyValue: keyValue },
+                    msg: "<div style='color:#ff0000;'><strong>下级类型及相关的文件将同步删除，无法恢复！确定删除吗？</strong></div>",
+                    success: function (data) {
+                        if (isSystem == "True" || rolename.indexOf("省级") >= 0) {
+                            //
+                            //加载树
+                            //
+                            GetTree(0, "");
+                        } else {
+                            //
+                            //加载树
+                            //
+                            GetTree(1, "");
+                        }
+                        selectId = selectName = "";
+                        lagc.queryData();
+                    }
+                });
+            } else {
+                dialogMsg('请选择需要删除的数据！', 0);
+            }
+        }
+    }
+
+
+    function GetTreeS() {
+        var arr = [];
+        var hasPower = rolename.indexOf("省级") >= 0;
+
+        var itreHeight = $(window).height() - 55;
+        var url = "../../SafetyLawManage/SafeInstitution/GetTypeTreeJson?datatype=0&orgcode=" + ParentOrgCode;
+        var item = {
+            height: itreHeight,
+            url: url,
+            onnodeclick: function (item) {
+                selectdept = orgCode;
+                selectId = item.id;
+                selectName = item.text;
+                selectCode = item.value;
+                setAddPower(item);
+                lagc.addPageGotoUrl({
+                    addArg: {
+                        title: '添加文件',
+                        width: "1300px",
+                        url: '/SafetyLawManage/SafeInstitution/Form?mode=add&treeId=' + selectId + "&treeName=" + encodeURIComponent(selectName) + "&treeCode=" + selectCode,
+                        btn: null
+                    }
+                });
+                $('#btn_Search').trigger("click");
+            },
+            isTool: true,
+            //自定义工具栏
+            nodeTools: arr
+        };
+        //初始化
+        var itree = $("#deptTree");
+        tree = itree.treeview(item);
+        if (itree.html().length == 0) {
+            itree.setTreeHeight(itreHeight);
+        }
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        if (hasPower == true) {
+            $(".bbit-tree-node-el").on("mouseover",
+                function () {
+                    var self = $(this);
+                    var inceeded = self.attr("inceeded");
+                    if (!inceeded) {
+                        self.width(self.width());
+                        self.attr("inceeded", "true");
+                    }
+                });
+        }
+    }
+
+    function BindData() {
+        //
+        //创建页面代理
+        //
+        lagc = new listAgency({
+            hasPowerOper: true,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            },
+            gridId: "gridTable",
+            gridJustHeight: 143,
+            gridOptions: {
+                height: $(window).height() - 143,
+                url: "../../SafetyLawManage/SafeInstitution/GetPageListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'releasedate desc,filename',
+                sortorder: 'desc',
+                multiselect: true
+            },
+            gridColumns: [
+                 { label: '主键', name: 'id', width: 10, align: 'left', sortable: true, hidden: true },
+               {
+                   label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                   formatter: function (cellvalue, options, rowObject) {
+                       return buildOper(rowObject);
+                   }
+               },
+                { label: '文件名称', name: 'filename', width: 200, align: 'center', sortable: true },
+                { label: '文件编号', name: 'filecode', width: 200, align: 'center', sortable: true },
+                { label: '发布单位(部门)', name: 'issuedept', width: 150, align: 'center', sortable: true },
+                {
+                    label: '发布日期', name: 'releasedate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '修订日期', name: 'revisedate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '实施日期', name: 'carrydate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '类型', name: 'lawtypename', width: 150, align: 'center', sortable: true },
+                { label: '文件主键1', name: 'filesid', width: 10, align: 'left', hidden: true }
+            ]
+        });
+        //
+        //绑定页面控件
+        //
+        lagc.bindPageControls({
+            searchId: "btn_Search",
+            resetId: "btn_Reset",
+            refreshId: "refresh",
+            addId: "add",
+            expId: "exp",
+            btns: [
+                { id: "store", onClick: setStore },
+                { id: "mystore", onClick: openMyStore },
+                { id: "lnkViewRoot", onClick: viewAll },
+                { id: "lnkAddRoot", onClick: addRoot },
+                { id: "exp", onClick: expData }
+            ]
+        });
+        //
+        //绑定页面事件
+        //
+        lagc.addPageEvents({ onBuildQuery: buidQuery, onReset: reset, onSetPowerOper: setPower, onResize: resize });
+        //
+        //初始化
+        //
+        lagc.initialPage([{ callBack: setPageData }]);
+        //
+        //页面跳转
+        //
+        lagc.addPageGotoUrl({
+            addArg: {
+                title: '添加安全规章制度',
+                width: "1300px",
+                url: '/SafetyLawManage/SafeInstitution/Form?mode=add&treeId=' + selectId + "&treeName=" + encodeURIComponent(selectName) + "&treeCode=" + selectCode,
+                btn: null
+            },
+            delArg: { url: '../../SafetyLawManage/SafeInstitution/RemoveForm' }
+        })
+        //
+        //页面跳转
+        //
+        edit = function (id) {
+            var dlgArg = {
+                id: 'Form',
+                title: '编辑安全规章制度',
+                url: '/SafetyLawManage/SafeInstitution/Form?mode=edit&keyValue=' + id,
+                width: "1300px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    if (top.frames[iframeId].AcceptClick)
+                        top.frames[iframeId].AcceptClick();
+                },
+                btn: null
+            };
+            dialogOpen(dlgArg);
+
+        };
+        del = function (id) {
+            var delOpt = {
+                url: '../../SafetyLawManage/SafeInstitution/RemoveForm',
+                param: { keyValue: id },
+                success: function (data) {
+                    $("#gridTable").trigger('reloadGrid');
+                }
+            };
+            $.RemoveForm(delOpt);
+        };
+        detail = function (id) {
+            var dlgArg = {
+                id: "Form",
+                title: '查看文件',
+                url: '/SafetyLawManage/SafeInstitution/Form?mode=view&keyValue=' + id,
+                width: "1300px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+    }
+
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        if (!!selectId && !!selectName) {
+            var hasPower = rolename.indexOf("省级") >= 0;
+            if (hasPower) {
+                if (orgCode == "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode") {
+                    
+                } else {
+                    dialogMsg('请选择本单位文件类型节点！', 0);
+                    return false;
+                }
+            } else {
+                hasPower = rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("厂级部门用户") >= 0 || (rolename.indexOf("部门级用户") >= 0 && rolename.indexOf("负责人") >= 0);
+                if (hasPower) {
+                    if (state == 0) {
+
+                    } else {
+                        dialogMsg('请选择本单位文件类型节点！', 0);
+                        return false;
+                    }
+                }
+            }
+
+            idx = dialogOpen({
+                id: "Import",
+                title: '导入文件',
+                url: '/SafetyLawManage/SafeInstitution/Import?treeId=' + selectId + "&treeName=" + encodeURIComponent(selectName) + "&treeCode=" + selectCode,
+                width: "500px",
+                height: "450px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                },
+                cancel: function (index) {
+                    if (isImport) {
+                        isImport = false;
+                        $("#btn_Search").click();
+                    }
+
+                }
+            });
+        }
+        else {
+            dialogMsg('请先选择文件类型节点！', 0);
+            return false;
+        }
+
+    }
+    //
+    //导出
+    //
+    function expData() {
+        var StartTime = $("#sTime").val();
+        var EndTime = $("#eTime").val();
+        if (EndTime.length > 0 && StartTime.length == 0) {
+            alert("请选择开始时间");
+            return;
+        }
+        if (new Date(StartTime.replace("-", "/").replace("-", "/")) > new Date(EndTime.replace("-", "/").replace("-", "/"))) {
+            alert("开始时间不可大于结束时间！");
+            return;
+        }
+        var data = {};
+        var filename = $("#FileName").val();
+        var ids = [];
+        var chkList = $("input:checked").not("#cb_gridTable").not("#ckSelect");
+        if (chkList.length == 0) {
+            data = {
+                filename: filename, treeCode: selectCode, state: state, orgcode: orgCode, sTime: StartTime, eTime: EndTime, flag: flag
+            };
+        }
+        else {
+            $.each(chkList, function (i, n) {
+                var self = $(this);
+                var id = self.attr("id").replace("jqg_gridTable_", "");
+                ids.push(id);
+            });
+            data = {
+                filename: filename, treeCode: selectCode, state: state, orgcode: orgCode, sTime: StartTime, eTime: EndTime, idsData: ids.join(",") + ",", flag: flag
+            };
+        }
+        location.href = "../../SafetyLawManage/SafeInstitution/ExportData?queryJson=" + JSON.stringify(data);
+    }
+    function ckSelect(obj) {
+        //0表示不包含，1表示包含
+        if ($(obj)[0].checked) {
+            flag = 1;
+        }
+        else {
+            flag = 0;
+        }
+        $("#btn_Search").click();
+    }
+</script>
+<style type="text/css">
+    .titlePanel, .gridPanel {
+        min-width: 680px;
+    }
+
+    #gridTable tr td a:hover {
+        text-decoration: underline;
+    }
+
+    .panel-Title a {
+        cursor: pointer;
+    }
+
+    .bbit-tree-node-el {
+        display: inline-block;
+    }
+
+    .bbit-tree-node .bbit-tree-node-tool {
+        display: inline-block;
+        float: none;
+        margin-left: 10px;
+    }
+    .CheckPanel ul {
+        width: 100%;
+        height: 100%;
+    }
+
+        .CheckPanel ul li {
+            width: 200px;
+            float: left;
+            margin-top: 10px;
+            height: 32px;
+        }
+
+    .CheckInput {
+        width: 14px;
+        float: left;
+    }
+
+    .CheckLabel {
+        line-height: 32px;
+    }
+</style>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a id="lnkViewRoot" title="查看全部">查看全部</a>
+                <div id="divRoot" style="float: right; margin-right: 10px; display: none;" title="新增"><a id="lnkAddRoot"><i class="fa fa-plus"></i>新增</a> </div>
+            </div>
+            <ul class="nav nav-tabs" id="ulTabs">
+                <li class="active">
+                    <a data-toggle="tab" href="#tab1" id="a1">规章制度</a>
+                </li>
+                <li id="area">
+                    <a data-toggle="tab" href="#tab2" id="a2">上级规章制度</a>
+                </li>
+            </ul>
+            <div style=" padding: 0px 0px 0px 15px; border-bottom: 1px solid #ccc; ">
+                <div class="CheckInput"><input type="checkbox" id="ckSelect" class="form-control" onclick="ckSelect(this)" name="ckSelect" /></div><div class="CheckLabel">包含下级节点数据</div>
+            </div>
+            <div class="tab-content" id="div1">
+                <div id="tab1" class="tab-pane active">
+                    <div id="itemTree" style="overflow: auto; height: 600px;"></div>
+
+                </div>
+                <div id="tab2" class="tab-pane">
+                    <div id="deptTree" style="overflow: auto; height: 600px;">
+                    </div>
+                </div>
+
+            </div>
+            <div id="SItemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title" style="height:0px;"></div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table class="queryform" id="queryArea">
+                        <tr>
+                            <td id="td1" data-value="from">所属单位:</td>
+                            <td id="td2" data-value="from" style="padding-left: 4px;">
+                                <div id="Province" type="selectTree" class="ui-select" style="width:180px"></div>
+                            </td>
+                            <td style="padding-left: 4px;">
+                                发布时间：
+                            </td>
+                            <td>
+                                <input id="sTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" style="width:100px;" />
+                            </td>
+                            <td style="padding-left:5px;">至</td>
+                            <td style="padding-left:5px;">
+                                <input id="eTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" style="width:100px;" />
+                            </td>
+                            <td class="formTitle">&nbsp;文件名称：</td>
+                            <td class="formValue">
+                                <input id="FileName" type="text" class="form-control" querypro="filename" style="width: 120px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                <a id="btn_Reset" class="btn btn-primary" style="display:none;"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="refresh" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" style="display:none"><i class="fa fa-plus"></i>新增</a>
+                        <a id="enter" class="btn btn-default" style="display:none" onclick="importData()"><i class="fa fa-exclamation-circle"></i>导入</a>
+                        <a id="exp" class="btn btn-default"><i class="fa fa-file-excel-o"></i>导出</a>
+                        <a id="store" class="btn btn-default"><i class="fa fa-drupal"></i>收藏</a>
+                        <a id="mystore" class="btn btn-default"><i class="fa fa-shopping-basket"></i>我的收藏</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

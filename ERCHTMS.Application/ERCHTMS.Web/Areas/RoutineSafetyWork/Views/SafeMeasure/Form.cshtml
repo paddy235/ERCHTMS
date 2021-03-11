@@ -1,0 +1,516 @@
+﻿@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<script type="text/javascript">
+    var keyValue = request('keyValue');//安措计划主键
+    var rqaction = request('action');
+    var state = request('state'); //0: 无调整 1: 调整申请 2: 调整审批 3: 结束
+    var adjustId = request('adjustId');//调整申请表主键
+    $(function () {
+        initControl();
+        GetGrid();
+        //是否延期
+        $("input[name='IsDelay']").on('click', function (event) {
+            var checkValue = $(this).val();
+            if (checkValue == "1") {
+                $(".delay").show();
+                $("#DelayDays").attr("isvalid", "yes");
+            }
+            else {
+                $(".delay").hide();
+                $("#DelayDays").removeAttr("isvalid");
+            }
+        });
+        //是否调整费用
+        $("input[name='IsAdjustFee']").on('click', function (event) {
+            var checkValue = $(this).val();
+            if (checkValue == "1") {
+                $(".fee").show();
+                $("#AdjustFee").attr("isvalid", "yes");
+            }
+            else {
+                $(".fee").hide();
+                $("#AdjustFee").removeAttr("isvalid");
+            }
+        });
+    })
+
+    //初始化控件
+    function initControl() {
+        controlState();
+        //责任部门下拉树列表
+        //$("#DepartmentId").ComboBoxTree({
+        //    url: "../../BaseManage/Department/GetOrganizeTreeJson?mode=1",
+        //    description: "==请选择==",
+        //    height: "250px",
+        //    allowSearch: true,
+        //    click: function (item) {
+
+        //    }
+        //})
+
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../RoutineSafetyWork/SafeMeasure/GetFormJson",
+                param: { keyValue: keyValue, mode: rqaction ,adjustId: adjustId },
+                success: function (data) {
+                    $("#tab1").formDeserialize(data.plan);
+                    //流程审批或结束，可查看调整申请信息
+                    if ((rqaction == "show" && state=="1") || state == "2" || state=="3") {
+                        if (data.apply != null) {
+                            //安措计划申请
+                            $("#tab2").formDeserialize(data.apply);
+                            $("#AdjustmentId").val(data.apply.ID);
+                            if (data.apply.IsDelay == 1) {
+                                $("input[name='IsDelay']:eq(0)").prop("checked", "checked");
+                                $(".delay").show();
+                                $("#DelayDays").attr("isvalid", "yes");
+                            } else {
+                                $(".delay").hide();
+                                $("input[name='IsDelay']:eq(1)").prop("checked", "checked");
+                                $("#DelayDays").removeAttr("isvalid");
+                            }
+                            if (data.apply.IsAdjustFee == 1) {
+                                $("input[name='IsAdjustFee']:eq(0)").prop("checked", "checked");
+                                $(".fee").show();
+                                $("#AdjustFee").attr("isvalid", "yes");
+                            } else {
+                                $(".fee").hide();
+                                $("input[name='IsAdjustFee']:eq(1)").prop("checked", "checked");
+                                $("#AdjustFee").removeAttr("isvalid");
+                            }
+                        }
+
+                    }
+                }
+            });
+        }
+    }
+
+
+
+    function controlState() {
+        switch (rqaction) {
+            case "show":
+                $(":input").attr("disabled", "dsiabled");
+                $("#ProjectName").attr("disabled", "dsiabled");
+                $("#DepartmentId").attr('disabled', "dsiabled");
+                $("#panel3").hide();
+                if (state == "0") {
+                    //无调整
+                    $("#panel2").hide();
+                    $("#panel4").hide();
+                }
+                else if (state == "1") {
+                    //调整申请
+                    $("#panel2").show();
+                    $("#panel4").hide();
+                } else {
+                    //调整审批、结束
+                    $("#panel2").show();
+                   
+                    $("#panel4").show();
+                }
+                break;
+            case "apply":
+                $("#panel2").show()
+                $("#tab1 :input").attr("disabled", "dsiabled");
+                $("#DepartmentId").attr('disabled', "dsiabled");
+
+                var isDelay= $("input[name='IsDelay']:checked").val();
+                if (isDelay == "1") {
+                    $(".delay").show();
+                    $("#DelayDays").attr("isvalid", "yes");
+                }
+                else {
+                    $(".delay").hide();
+                    $("#DelayDays").removeAttr("isvalid");
+                }
+                var isAdjustFee = $("input[name='IsAdjustFee']:checked").val();
+                if (isAdjustFee == "1") {
+                    $(".fee").show();
+                    $("#AdjustFee").attr("isvalid", "yes");
+                }
+                else {
+                    $(".fee").hide();
+                    $("#AdjustFee").removeAttr("isvalid");
+                }
+                $("#panel3").hide();
+                $("#panel4").hide();
+                break;
+            case "approve":
+                //调整审批
+                $("#panel3").show();
+                $("#panel4").show();
+                $("#tab1 :input").attr("disabled", "dsiabled");
+                $("#DepartmentId").attr('disabled', "dsiabled");
+                $("#tab2 :input").attr("disabled", "dsiabled");
+                if (isDelay == "1") {
+                    $(".delay").show();
+                    $("#DelayDays").attr("isvalid", "yes");
+                }
+                else {
+                    $(".delay").hide();
+                    $("#DelayDays").removeAttr("isvalid");
+                }
+                var isAdjustFee = $("input[name='IsAdjustFee']:checked").val();
+                if (isAdjustFee == "1") {
+                    $(".fee").show();
+                    $("#AdjustFee").attr("isvalid", "yes");
+                }
+                else {
+                    $(".fee").hide();
+                    $("#AdjustFee").removeAttr("isvalid");
+                }
+                break;
+            default:
+                $("#panel2").hide();
+                $("#panel3").hide();
+                $("#panel4").hide();
+                break;
+        }
+    }
+
+    function GetGrid() {
+        var queryJson = {
+            keyValue: keyValue,
+            adjustId: $("#AdjustmentId").val()
+        };
+        var $gridTable = $("#gridTable1");
+        $gridTable.jqGrid({
+            url: "../../RoutineSafetyWork/SafeMeasure/GetApproveList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            height:  200,
+            emptyrecords: true,
+            autowidth: true,
+            rowNum: 100000000,
+            //pager: "#gridPager1",
+            emptyrecords: "没有检索到数据",
+            colModel: [
+                {
+                    label: '审批结论', name: 'AUDITRESULT', index: 'AUDITRESULT', width: 100, align: 'center', sortable: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        return cellvalue == "0" ? "<span class='ispass'>通过</span>" : "<span class='ispass'>不通过</span>";
+                    }
+                },
+                {
+                    label: '审批人', name: 'AUDITPEOPLE', index: 'AUDITPEOPLE', width: 180, align: 'center', sortable: true
+                },
+                {
+                    label: '审批部门', name: 'AUDITDEPT', index: 'AUDITDEPT', width: 180, align: 'center', sortable: true
+                },
+                {
+                    label: '审批时间', name: 'AUDITTIME', index: 'AUDITTIME', width: 120, align: 'center', sortable: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                {
+                    label: '审批意见', name: 'AUDITOPINION', index: 'AUDITOPINION', width: 150, align: 'center', sortable: true
+                }
+            ],
+            viewrecords: true,
+            onSelectRow: function () {
+            },
+            gridComplete: function () {
+                setInfo();
+            }
+        });
+    }
+    //设置列表当前总记录数
+    function setInfo() {
+        var $gridTable = $("#gridTable1");
+        $("#gridPager1").html("<b>当前共有&nbsp;" + $gridTable.find(".ispass").length + "&nbsp;条记录</b>");
+    }
+
+    //保存表单
+    function AcceptClick() {
+        if (rqaction == "edit") {
+            //安措计划修改
+            if (!$('#tab1').Validform()) {
+                return false;
+            }
+            var postData = $("#form1").formSerialize(keyValue);
+           
+            $.SaveForm({
+                url: top.contentPath + "/RoutineSafetyWork/SafeMeasure/SaveForm",
+                param: { "keyValue": keyValue, "safeData": JSON.stringify(postData) },
+                loading: "正在保存数据...",
+                success: function (data) {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            });
+        } else if (rqaction == "apply") {
+            //安措计划调整申请
+            if (!$('#tab2').Validform()) {
+                return false;
+            }
+            if ($("input[name='IsAdjustFee']:checked").val() == "0") {
+                $("#AdjustFee").val("");
+            }
+            if ($("input[name='IsDelay']:checked").val() == "0") {
+                $("#DelayDays").val("");
+            }
+            var postData = $("#tab2").formSerialize(keyValue);
+            postData["IsDelay"] = $("input[name='IsDelay']:checked").val();
+            postData["IsAdjustFee"] = $("input[name='IsAdjustFee']:checked").val();
+            //申请人id
+            postData["CreateUserId"] = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+            //申请部门
+            postData["ApplyDeptId"] = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+            postData["CreateUserDeptCode"] = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+            postData["CreateUserOrgCode"] = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+            //安措计划调整申请表主键
+            postData["SafeMeasureId"] = keyValue;
+            $.SaveForm({
+                url: top.contentPath + "/RoutineSafetyWork/SafeMeasure/SubmitForm",
+                param: { "safeData": JSON.stringify(postData) },
+                loading: "正在保存数据...",
+                success: function (data) {
+
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            });
+        } else if (rqaction == "approve") {
+            //安措计划调整审批
+            if (!$('#tab3').Validform()) {
+                return false;
+            }
+            var postData = $("#tab3").formSerialize(keyValue);
+            //审批结论(0:通过 1:不通过)
+            postData["AUDITRESULT"] = $("input[name='AUDITRESULT']:checked").val();
+            $.SaveForm({
+                url: top.contentPath + "/RoutineSafetyWork/SafeMeasure/ApproveForm?keyValue=" + keyValue + "&applyId=" + $("#AdjustmentId").val(),
+                param: postData,
+                loading: "正在保存数据...",
+                success: function (data) {
+
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            });
+        }
+    }
+
+    function record() {
+        var dlg = dialogOpen({
+            id: "List",
+            title: '调整申请记录',
+            url: '/RoutineSafetyWork/SafeMeasure/ApproveRecord?keyValue=' + keyValue,
+            width: "800px",
+            height: "520px",
+            btn: [],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+    //选择单位
+    function selectCompany() {
+        /**
+            责任部门位不包含班组，专业以及承包商
+         **/
+        selectDept('', 0, 16, '选择责任部门', document.body, 'DepartmentName,DeptCode,DepartmentId', "1", function () {
+            
+        });
+    }
+</script>
+
+<div style="margin:10px;" id="container">
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form" id="tab1">
+                <tr>
+                    <td class="formTitle">类别<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <div class="input-group" style="width:100%;">
+                            <input id="PlanType" type="text" class="form-control" placeholder="请输入类别" isvalid="yes" checkexpession="NotNull" maxlength="100" />
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">项目<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <div class="input-group" style="width:100%;">
+                            <textarea id="ProjectName" class="form-control" rows="5" isvalid="yes" checkexpession="NotNull" maxlength="500"></textarea>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">计划费用(万)<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="Cost" type="text" class="form-control" placeholder="请输入计划费用" isvalid="yes" checkexpession="PositiveSpotSixNumNotNul" />
+                        </div>
+                    </td>
+                    <td class="formTitle">计划完成时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="PlanFinishDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" checkexpession="NotNull" />
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">责任部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DepartmentName" type="text" class="form-control" placeholder="请选择责任部门" isvalid="yes" checkexpession="NotNull" readonly onclick="selectCompany()" />
+                        <input type="hidden" id="DepartmentId" />
+                        <input type="hidden" id="DeptCode" />
+                        @*<div id="DepartmentId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>*@
+
+                    </td>
+                    <td class="formTitle">部门验收人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="CheckUserName" type="text" class="form-control" placeholder="请输入部门验收人" isvalid="yes" checkexpession="NotNull" />
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel panel-default" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;调整信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form" id="tab2">
+                <tr>
+                    <td class="formTitle">调整原因<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <div class="input-group" style="width:100%;">
+                            <textarea id="ApplyReason" class="form-control" placeholder="请输入调整原因" rows="4" isvalid="yes" checkexpession="NotNull" maxlength="500"></textarea>
+                            <input id="AdjustmentId" type="hidden" />
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">是否延期<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="1" id="IsDelay1" name="IsDelay" checked="checked" />&nbsp;<label for="IsDelay1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="0" id="IsDelay2" name="IsDelay" />&nbsp;<label for="IsDelay2">否</label>
+                    </td>
+                    <td class="formTitle delay">延期天数<font face="宋体">*</font></td>
+                    <td class="formValue delay">
+                        <div class="input-group" style="width:100%;">
+                            <input id="DelayDays" type="text" class="form-control" placeholder="请输入延期天数" isvalid="yes" checkexpession="PositiveNumNotNull" maxlength="2" />
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">是否调整费用<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="1" id="IsAdjustFee1" name="IsAdjustFee" checked="checked" />&nbsp;<label for="IsAdjustFee1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="0" id="IsAdjustFee2" name="IsAdjustFee" />&nbsp;<label for="IsAdjustFee2">否</label>
+                    </td>
+                    <td class="formTitle fee">调整后费用（万）<font face="宋体">*</font></td>
+                    <td class="formValue fee">
+                        <div class="input-group" style="width:100%;">
+                            <input id="AdjustFee" type="text" class="form-control" placeholder="请输入调整后费用" isvalid="yes" checkexpession="PositiveSpotSixNumNotNul" />
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">申请人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="CreateUserName" type="text" class="form-control" value="@Html.Raw(new ERCHTMS.Code.OperatorProvider().Current().UserName)" disabled="disabled" />
+                        </div>
+                    </td>
+                    <td class="formTitle">申请部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="ApplyDeptName" type="text" class="form-control" value="@Html.Raw(new ERCHTMS.Code.OperatorProvider().Current().DeptName)" disabled="disabled" />
+
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel panel-default" id="panel3">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;审批信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form" id="tab3">
+                <tr>
+                    <td class="formTitle">审批结论<font face="宋体">*</font></td>
+                    <td class="formValue icheck" colspan="3">
+                        <input type="radio" value="0" id="AUDITRESULT1" name="AUDITRESULT" checked="checked" />&nbsp;<label for="IsDelay1">通过</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="1" id="AUDITRESULT2" name="AUDITRESULT" />&nbsp;<label for="IsDelay2">不通过</label>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审批意见</td>
+                    <td class="formValue" colspan="3">
+                        <div class="input-group" style="width:100%;">
+                            <textarea id="AUDITOPINION" class="form-control" placeholder="请输入审批意见" rows="4" maxlength="500"></textarea>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审批人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="AUDITPEOPLE" type="text" class="form-control" value="@Html.Raw(new ERCHTMS.Code.OperatorProvider().Current().UserName)" disabled="disabled" />
+                        </div>
+                    </td>
+                    <td class="formTitle">审批部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="AUDITDEPT" type="text" class="form-control" value="@Html.Raw(new ERCHTMS.Code.OperatorProvider().Current().DeptName)" disabled="disabled" />
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审批时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="input-group" style="width:100%;">
+                            <input id="AUDITTIME" type="text" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")" disabled="disabled" />
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default" id="panel4">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;审批记录</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table id="gridTable1"></table>
+            <div id="gridPager1"></div>
+        </div>
+    </div>
+    
+
+    </div>

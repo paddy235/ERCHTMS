@@ -1,0 +1,240 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    ;
+    $(function () {
+        InitWorkType();
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 145);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            autowidth: true,
+            isAuth: true,
+            height: $(window).height() - 145,
+            url: "../../RiskDatabase/Risktrainlib/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                {
+                    label: '操作', name: 'Oper', index: 'Oper', width: 180, align: 'center'
+
+                },
+                { label: '主键', name: 'id', index: 'id', width: 100, align: 'center', sortable: false, hidden: true },
+                { label: ' ', name: 'createuserdeptcode', hidden: true }, { label: ' ', name: 'createuserorgcode', hidden: true }, { label: ' ', name: 'createuserid', hidden: true },
+                { label: '创建时间', name: 'createdate', index: 'createdate', width: 100, align: 'center', sortable: false, hidden: true },
+                { label: '创建人ID', name: 'createuserid', index: 'createuserid', width: 100, align: 'center', sortable: false, hidden: true },
+                { label: '创建人姓名', name: 'createusername', index: 'createusername', width: 100, align: 'center', sortable: false, hidden: true },
+                { label: '工作任务', name: 'worktask', index: 'worktask', width: 400, align: 'center', sortable: true },
+                { label: '作业类型', name: 'worktype', index: 'worktype', width: 300, align: 'center', sortable: true },
+                //{ label: '作业岗位', name: 'workpost', index: 'workpost', width: 200, align: 'center', sortable: true },
+                { label: '使用次数', name: 'usernum', index: 'usernum', width: 100, align: 'center', sortable: true },
+                { label: '修改次数', name: 'modifynum', index: 'modifynum', width: 100, align: 'center', sortable: true }],
+            pager: "#gridPager",
+            viewrecords: true,
+            gridview: true,
+            shrinkToFit: true,
+            sortname: 'createdate desc,id',
+            sortorder: 'desc',
+            rowNum: 20,
+            rowList: [20, 50, 100],
+            rownumbers: true,
+            //multiselect: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: {
+                    queryJson: JSON.stringify({
+                        keyWord: $("#txt_Keyword").val(),
+                        WorkType: $("#WorkType").attr("data-value")
+                    })
+                }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_All").click(function () {
+            $("#txt_Keyword").val("");
+            $("#WorkType").attr("data-text", "==请选择==");
+            $("#WorkType").attr("data-value", "");
+            $("#WorkType div:eq(0)").text("==请选择==");
+            $gridTable.jqGrid('setGridParam', {
+                postData: {
+                    queryJson: JSON.stringify({
+                        keyWord: $("#txt_Keyword").val(),
+                        WorkType: $("#WorkType").attr("data-value")
+                    })
+                }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'AddForm',
+            title: '添加风险预知训练',
+            url: '/RiskDatabase/Risktrainlib/Form?mode=add',
+            width: ($(top.window).width() - 400) + 'px',
+            height: ($(top.window).height() - 100) + 'px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'EditForm',
+                title: '编辑风险预知训练',
+                url: '/RiskDatabase/Risktrainlib/Form?keyValue=' + keyValue + "&mode=edit",
+                width: ($(top.window).width() - 400) + 'px',
+                height: ($(top.window).height() - 100) + 'px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+
+    function show() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'ShowForm',
+                title: '查看风险预知训练',
+                url: '/RiskDatabase/Risktrainlib/Form?keyValue=' + keyValue + "&mode=show",
+                width: ($(top.window).width() - 400) + 'px',
+                height: ($(top.window).height() - 100) + 'px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../RiskDatabase/Risktrainlib/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的数据！', 0);
+        }
+    }
+    function Import() {
+        var idx = dialogOpen({
+            id: "Import",
+            title: '导入风险训练',
+            url: '/RiskDatabase/Risktrainlib/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                $("#gridTable").trigger('reloadGrid');
+            }
+        });
+    }
+    function ExportData() {
+        //window.location.href = "../../OutsourcingProject/Aptitudeinvestigateinfo/ExportPeopleRegister?keyValue=" + keyValue;
+        Loading(true, "数据正在处理中……");
+        var queryJson = JSON.stringify({ keyWord: $("#txt_Keyword").val(), WorkType: $("#WorkType").attr("data-value") });
+        $.ajax({
+            url: '../../RiskDatabase/Risktrainlib/ExportData?queryJson=' + queryJson + '&fileName=风险清单',
+            dataType: "JSON",
+            success: function (result) {
+                window.location.href = "../../Utility/DownloadFile?filePath=~/Resource/Temp/" + result.resultdata;
+                Loading(false);
+            }
+        });
+    }
+    function DelRiskData() {
+        $.RemoveForm({
+            url: '../../RiskDatabase/Risktrainlib/DelRiskData',
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        })
+    }
+    function InitWorkType() {
+        $("#WorkType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "StatisticsType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left:10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td class="formTitle">作业类型&nbsp;&nbsp;</td>
+                            <td class="formValue">
+                                <div id="WorkType" type="select" class="ui-select" style="width: 150px;" />
+
+                                @* <input id="WorkType" type="text" class="form-control" />*@
+                            </td>
+                            <td style="padding-left:5px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                <a id="btn_All" class="btn btn-primary"><i class="fa fa-search"></i>全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>新增</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

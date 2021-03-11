@@ -1,0 +1,516 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+@*<script src="~/Content/scripts/plugins/jquery.md5.js"></script>*@
+@*<script src="~/Content/scripts/plugins/uploadify/ajaxfileupload.js"></script>*@
+@*<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+    <script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>*@
+<script type="text/javascript">
+    var keyValue = request('keyValue');
+    var userId = request('userId');
+    var mode = request("mode");//1：特种作业，2：特种设备
+    var action = request("action");
+    var workType = "ryzylb";//作业类别或工种
+    var type = "ryzyxm";//准操项目或作业项目
+    var arrJson = new Array();
+    $(function () {
+        $.ajaxSetup({ async: false });
+        initControl();
+        getGrid();
+    });
+    //初始化控件
+    function initControl() {
+        if(action=="show"){
+            disabledControl();
+        }
+        if(action=="add"){
+            $("#con").remove();
+            if (mode == 1) {
+                $("#row3").find("#Years").val("6");
+                $("#CertNum").val("T"+top.Form.window.$("#IdentifyID").val());
+            }
+            if (mode == 2) {
+                $("#CertNum").val(top.Form.window.$("#IdentifyID").val());
+                $("#row5").find("#Years").val("4");
+            }
+        }
+        //特种作业
+        if (mode == 1) {
+            $("#row4,#row5").remove();
+            $("#row3,#row6,#row10").show();
+            $("#row3,#row6").find("input").attr("isvalid", "yes");
+        }
+        //特种设备
+        if(mode==2){
+            workType = "tzzlb"; //工种
+            type = "tzsbxm";//作业项目
+            $("#WorkType").parent().prev().html('种类<font face="宋体">*</font>');
+            $("#WorkItem").parent().prev().html('作业项目<font face="宋体">*</font>');
+            $("#row4,#row5").show();
+            $("#row4,#row5").find("input").attr("isvalid", "yes");
+            $("#row3,.date1").remove();
+        }
+        //证件类型
+        $("#CertType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListSortJson",
+            param: { EnCode: "CertType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        if(mode==1){
+            $("#CertType").ComboBoxSetValue("特种作业操作证");
+            $("#CertName").attr("disabled", "disabled").attr("placeholder", "按“证书类型-作业类别-操作项目”自动生成");
+        }
+        if (mode == 2) {
+            $("#CertType").ComboBoxSetValue("特种设备作业人员证");
+            $("#CertName").attr("disabled", "disabled").attr("placeholder", "按“证书类型-种类-作业项目”自动生成");
+        }
+        //绑定作业类别或工种
+        $("#WorkType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListSortJson",
+            param: { EnCode: workType },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        }).bind("change", function () {
+            var value = $(this).attr("data-value");
+            $("#WorkItem").removeAttr("data-value"); $("#WorkItem").removeAttr("data-text");
+            $("#WorkItem").find(".ui-select-text").html("==请选择==");
+            //$("#ItemNum").val("");
+            $.get("GetItemListJson", { type: type, code: value }, function (data) {
+                var json = JSON.parse(data);
+                if (json.length>0) {
+                    $("#WorkItem").ComboBox({
+                        data: json,
+                        id: "itemvalue",
+                        text: "itemname",
+                        description: "==请选择==",
+                        height: "200px",
+                        allowSearch: true
+                    }).bind("change", function () {
+                        if ($("#CertType").ComboBoxGetValue() == "特种设备作业人员证") {
+                            var name = $(this).attr("data-value");
+                            $(arrJson).each(function (j, item) {
+                                if (name == item.name) {
+                                    $("#ItemNum").val(item.code);
+                                    return false;
+
+                                }
+                            });
+                        }
+                    });
+                    if ($("#CertType").ComboBoxGetValue() == "特种设备作业人员证") {
+                        $(json).each(function (i, item) {
+                            arrJson.push({
+                                name: item.itemvalue,
+                                code: item.description
+                            });
+                        });
+                    }
+                }
+
+            });
+        });
+        //准操项目或作业项目
+        $("#WorkItem").ComboBox({
+            //url: "../../SystemManage/DataItemDetail/GetDataItemListSortJson",
+            //param: { EnCode: "ryzyxm" },
+            //id: "ItemValue",
+            //text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        keyValue = keyValue.length == 0 ? newGuid() : keyValue;
+        bindForm();//绑定表单
+    }
+    function bindForm() {
+        file_upload.init({
+            keyValue: keyValue, fileNumLimit: 4, multiple: true, extensions: 'jpg,gif,bmp,png', isImage: true, el: '#uploader'
+        });
+        var isEdit = action == "show" ? false : true;
+        file_upload.bindFiles(isEdit, true, keyValue, "uploader", isEdit);
+        if (!!userId) {
+            $("#UserId").val(userId);
+        }
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../PersonManage/Certificate/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    if (data==null) {
+                        return;
+                    }
+                    $("#form1").formDeserialize(data);
+                    $("#WorkType").trigger("change");
+                    $("#WorkItem").ComboBoxSetValue(data.WorkItem);
+
+                    if (data.CertType == "特种作业操作证") {
+                        $("#row3").find("#Years").val(data.Years);
+                        $("#row3").find("#SendDate").val(formatDate(data.SendDate, "yyyy-MM-dd"));
+                        $("#row10").find("#EndDate").val(formatDate(data.EndDate, "yyyy-MM-dd"));
+                        $("#row7").find("#SendOrgan").val(data.SendOrgan);
+                    }
+                    else if (data.CertType == "特种设备作业人员证") {
+                        $("#row5").find("#Years").val(data.Years);
+                        $("#row4").find("#SendDate").val(formatDate(data.SendDate, "yyyy-MM-dd"));
+                        $("#row5").find("#EndDate").val(formatDate(data.EndDate, "yyyy-MM-dd"));
+                    }
+
+                }
+            })
+        }
+    }
+    //绑定复审记录
+    function getGrid() {
+            var selectedRowIndex = 0;
+            var $gridTable = $('#gridTable');
+            $gridTable.jqGrid({
+                autowidth: true,
+                height: 300,
+                url: "../../PersonManage/Certificate/GetAuditListJson",
+                postData:{certId:keyValue},
+                datatype: "json",
+                colModel: [
+                    { label: 'ID', name: 'id', width: 100, align: 'center', hidden:true },
+                    {
+                        label: '操作', name: 'Oper', width: 130, align: 'center', hidden:action=="show", formatter: function (cellvalue, options, rowObject) {
+                            var html = "<a href=\"javascript:show('"+rowObject.id+"')\" title=\"查看\"><i class=\"fa fa-eye\"></i></a>";
+                            html += "<a href=\"javascript:edit('"+rowObject.id+"')\" title=\"修改\"><i class=\"fa fa-pencil-square-o\"></i></a>";
+                            html += "<a href=\"javascript:del('"+rowObject.id+"')\" title=\"删除\"><i class=\"fa fa-trash-o\"></i></a>";
+                            return html;
+                        }
+                    },
+                    { label: '复审项目代号', name: 'itemcode', width: 100, align: 'center', sortable: true },
+                    { label: '复审类别', name: 'audittype',  width: 100, align: 'center', sortable: true },
+                    {
+                        label: '复审/换证日期(有效期开始日期)', name: 'auditdate', width: 250, align: 'center', sortable: true,
+                        formatter: function (cellvalue, options, rowObject) {
+                            return formatDate(cellvalue, "yyyy-MM-dd");
+                        }
+                    },
+                    { label: '复审结果', name: 'result',  width: 120, align: 'center', sortable: true },
+                    {
+                        label: '有效期结束日期', name: 'enddate', width: 150, align: 'center', sortable: true,
+                        formatter: function (cellvalue, options, rowObject) {
+                            
+                            return rowObject.audittype=="复审"?"":formatDate(cellvalue, "yyyy-MM-dd");
+                        }
+                    },
+                    {
+                        label: '下次复审日期', name: 'nextdate', width: 150, align: 'center', sortable: true,
+                        formatter: function (cellvalue, options, rowObject) {
+                            return formatDate(cellvalue, "yyyy-MM-dd");
+                        }
+                    },
+                    { label: '发证机关', name: 'sendorgan', width: 150, align: 'center', sortable: true }
+                ],
+                gridComplete: function () {
+                    if(mode==1){
+                        $gridTable.hideCol(["itemcode"]);
+                    }
+                    if (mode == 2) {
+                        $gridTable.hideCol(["audittype", "result", "nextdate"]);
+                    }
+                    $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                }
+            });
+        }
+    //保存表单;
+    function AcceptClick() {
+        var certtype = $("#CertType").attr("data-value");
+        var certName = certtype + "-" + $("#WorkType").attr("data-value") + "-" + $("#WorkItem").attr("data-value");
+        $("#CertName").val(certName);
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if (mode==1) {
+            postData["SendDate"] = $("#row3").find("#SendDate").val();
+            postData["EndDate"] = $("#row10").find("#EndDate").val();
+            postData["Years"] = $("#row3").find("#Years").val();
+            postData["StartDate"] = $("#row10").find("#StartDate").val();
+            postData["CertName"] = $("#row6").find("#CertName").val();
+        }
+        if (mode==2) {
+            postData["CertName"] = $("#row6").find("#CertName").val();
+            postData["SendDate"] = $("#row4").find("#SendDate").val();
+            postData["EndDate"] = $("#row5").find("#EndDate").val();
+            postData["Years"] = $("#row5").find("#Years").val();
+        }
+        $.SaveForm({
+            url: "../../PersonManage/Certificate/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                //var certtype = $("#CertType").attr("data-value");
+                //if (certtype == "特种作业操作证") {
+                //    top.frames["Form"].window.$(".tzzy").find("input:radio").eq(0).iCheck('check');
+                //}
+                //if (certtype == "特种设备作业人员证") {
+                //    top.frames["Form"].window.$(".tzsb").find("input:radio").eq(0).iCheck('check');
+                //}
+                top.frames["Form"].window.$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //验证数字 num
+    function isInteger(obj) {
+        reg = /^[-+]?\d+$/;
+        if (!reg.test(obj)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+    function setValues(obj) {
+       
+        if (mode==1 && $("#row3").find("#Years").val().length > 0) {
+            var startDate = $("#row10").find("#StartDate").val();
+            if (startDate.length > 0) {
+                var date = new Date(startDate);
+                var years = parseInt($("#row3").find("#Years").val());
+                date.setDate(date.getDate() - 1);
+                date.setFullYear(date.getFullYear() + years);
+                $("#row10").find("#EndDate").val(formatDate(date, "yyyy-MM-dd"));
+                    date = new Date($("#row10").find("#StartDate").val());
+                    date.setFullYear(date.getFullYear() + 3);
+                    date.setDate(date.getDate() - 1);
+                    $("#row6").find("#ApplyDate").val(formatDate(date, "yyyy-MM-dd"));
+            }
+        }
+         
+    }
+    function setDate(obj) {
+        if (obj.value.length > 0 && action == "add") {
+            var sendDate = "";
+            var date = new Date();
+            var year = "";
+            if (mode == 1 && $("#audittype").val()!="复审") {
+                sendDate = $("#row3").find("#SendDate").val();
+                year = $("#row3").find("#Years").val();
+                if (sendDate.length > 0 && year.length > 0) {
+                    date = new Date(sendDate);
+                    $("#row10").find("#StartDate").val(formatDate(date, "yyyy-MM-dd"));
+                    year = parseInt(year);
+                    date.setDate(date.getDate() - 1);
+                    date.setFullYear(date.getFullYear() + year);
+                    $("#row10").find("#EndDate").val(formatDate(date, "yyyy-MM-dd"));
+                        sendDate = $("#row10").find("#StartDate").val();
+                        date = new Date(sendDate);
+                        date.setDate(date.getDate() - 1);
+                        date.setFullYear(date.getFullYear() + 3)
+                        $("#row6").find("#ApplyDate").val(formatDate(date, "yyyy-MM-dd"));
+                }
+            }
+            else if (mode==2) {
+                year = $("#row5").find("#Years").val();
+                sendDate = $("#row4").find("#SendDate").val();
+                if (year.length > 0 && sendDate.length > 0) {
+                    date = new Date(sendDate);
+                    date.setDate(date.getDate() - 1);
+                    date.setFullYear(date.getFullYear() + parseInt(year))
+                    $("#row5").find("#EndDate").val(formatDate(date, "yyyy-MM-dd"));
+                }
+            }  
+        }
+    }
+    //新增复审记录
+    function add(id) {
+        var dlg = dialogOpen({
+            id: "AuditForm",
+            title: '新增复审信息',
+            url: '/PersonManage/Certificate/AuditForm?pFrom=2&action=add&mode=' + mode + '&userId=' + $("#UserId").val() + "&certId=" + keyValue+"&years="+$("#Years").val(),
+            width: ($(top.window).width() - 250)+"px",
+            height: ($(top.window).height() - 250) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //删除复审信息
+    function del(id) {
+        $.RemoveForm({
+            url: '../../PersonManage/Certificate/RemoveAuditForm',
+            param: { keyValue: id },
+            success: function (data) {
+                $("#gridTable").trigger("reloadGrid");
+            }
+        })
+
+    }
+    //查看复审信息
+    function show(id) {
+        var userId = "";
+        var dlg = dialogOpen({
+            id: "AuditForm",
+            title: '查看复审信息',
+            url: '/PersonManage/Certificate/AuditForm?action=show&mode=' + mode + '&userId=' + userId + "&keyValue=" + id,
+            width: ($(top.window).width() - 250) + "px",
+            height: ($(top.window).height() - 250) + "px",
+            btn:["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //修改复审信息
+    function edit(id) {
+        var userId = "";
+        var dlg = dialogOpen({
+            id: "AuditForm",
+            title: '修改证件信息',
+            url: '/PersonManage/Certificate/AuditForm?action=edit&mode=' + mode + '&userId=' + userId + "&keyValue=" + id,
+            width: ($(top.window).width() - 250) + "px",
+            height: ($(top.window).height() - 250) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    function fillItems(items) {
+        var $gridTable = $("#gridTable");
+        var len = $gridTable.find(".jqgrow").length;
+        var idx = len == 0 ? 0 : len;
+        $(items).each(function (j, item) {
+            $gridTable.addRowData(parseInt(idx) + j + 1, item);
+        });
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">证书编号<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="CertNum" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+            </td>
+
+            <td class="formTitle">发证机关<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="SendOrgan" type="text" class="form-control" isvalid="yes" checkexpession="LenStr" length="32" />
+                <div id="CertType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" readonly style="display:none;"></div>
+            </td>
+        </tr>
+        <tr id="row1">
+            <td class="formTitle">作业类别<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="WorkType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+            <td class="formTitle">操作项目<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="WorkItem" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+        </tr>
+        <tr id="row4" style="display:none;">
+            <td class="formTitle">项目代码</td>
+            <td class="formValue">
+                <input id="ItemNum" type="text" class="form-control" isvalid="no" checkexpession="NotNull"   placeholder="根据作业项目自动获取" / >
+            </td>
+            <td class="formTitle">初领日期<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="SendDate" type="text" class="form-control input-wdatepicker t3" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" onblur="setDate(this)" />
+            </td>
+        </tr>
+        <tr id="row3">
+            <td class="formTitle">初领日期<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="SendDate" type="text" class="form-control input-wdatepicker t3" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" onblur="setDate(this)" />
+            </td>
+            <td class="formTitle">有效期(年)<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="Years" type="text" class="form-control  t1" isvalid="yes" checkexpession="PositiveNumNotNull" onblur="setValues(this)" />
+            </td>
+        </tr>
+
+        <tr id="row10" style="display:none;">
+            <td class="formTitle">有效期开始日期<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="StartDate" type="text" class="form-control input-wdatepicker" checkexpession="NotNull" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" onblur="setValues(this)" />
+            </td>
+            <td class="formTitle">有效期结束日期<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="EndDate" type="text" class="form-control input-wdatepicker" checkexpession="NotNull" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+            </td>
+        </tr>
+
+        <tr id="row5" style="display:none;">
+            <td class="formTitle">有效期限<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="EndDate" type="text" class="form-control input-wdatepicker" isvalid="yes" checkexpession="NotNull" onfocus="WdatePicker()" />
+            </td>
+            <td class="formTitle">复审周期(年)<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="Years" type="text" class="form-control" isvalid="yes" checkexpession="PositiveNumNotNull" onblur="setDate(this)" />
+            </td>
+        </tr>
+
+        <tr id="row6">
+            <td class="formTitle">证书名称<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="CertName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" disabled />
+            </td>
+            <td class="formTitle date1">应复审日期<font face="宋体">*</font></td>
+            <td class="formValue date1">
+                <input id="ApplyDate" type="text" class="form-control input-wdatepicker t4" isvalid="yes" onfocus="WdatePicker()" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">证件照片</td>
+            <td class="formValue" colspan="3" align="center">
+                <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                    <div class="queueList">
+                        <div id="dndArea" class="placeholder">
+                            <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display:none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+
+                @*<div style="margin-top: 10px; text-align: center; display:none;">
+                        <div class="file" title="点击上传照片">
+                            <img id="uploadPreview" style="height: 150px;" src="~/Content/images/App.png" />
+                            <input type="file" name="uploadFile" id="uploadFile">
+                        </div>
+                        <div style="line-height: 14px; color: #75777A; text-align: center;">
+                            点击图片可上传证件照片(<a href="javascript:void(0)" target="_blank" id="bigImg" style="text-decoration:underline;color:blue;">查看大图</a>)
+                        </div>
+                    </div>*@
+                <input type="hidden" id="FilePath" name="FilePath" />
+                <input type="hidden" id="UserId" name="UserId" />
+            </td>
+        </tr>
+    </table>
+
+    <div class="panel panel-default" id="con">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;复审记录</strong>
+            <span class="tools pull-right">
+                <a href="javascript:add(this)" class="btn btn-primary btn-xs">新 增</a>&nbsp;&nbsp;
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+            </div>
+        </div>
+    </div>
+</div>

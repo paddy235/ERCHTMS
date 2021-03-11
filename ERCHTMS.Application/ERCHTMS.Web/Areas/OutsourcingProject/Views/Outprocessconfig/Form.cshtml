@@ -1,0 +1,121 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        $("#ModuleName").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "OutProcessManagement" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        }).bind("change", function () {
+            var modulevalue = $(this).attr("data-value");
+            $.ajax({
+                url: "../../SystemManage/DataItemDetail/GetDataItemRemark",
+                data: { EnCode: "OutProcessManagement", ItemValue: modulevalue },
+                success: function (data) {
+                    
+                    if (data) {
+                        var result = eval("(" + data + ")");
+                        $("#Address").val(result.Description);
+                    }
+                }
+            });
+        })
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../OutsourcingProject/Outprocessconfig/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#ModuleName").ComboBoxSetValue(data.ModuleCode);
+                    if (data.FrontModuleCode != null && data.FrontModuleCode != undefined) {
+                        $("#FrontModuleName").val(data.AccidentType);
+                        $("#FrontModuleName").find("option").each(function (i, dom) {
+                            if (data.FrontModuleCode.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+                    }
+                }
+            })
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+
+        postData["FrontModuleName"] = $("button[data-id='FrontModuleName']").attr("title").replace(/\s+/, "").indexOf("请选择") >= 0 ? "" : $("button[data-id='FrontModuleName']").attr("title").replace(/\s+/, "");
+        var FrontModuleCode = "";
+        $(".dropdown-menu .inner").find(".selected").each(function (i, item) {
+            var value = $("#FrontModuleName").find("option").eq($(item).attr("data-original-index")).val();
+            if (value != "" || value != undefined) {
+                FrontModuleCode += value + ",";
+            }
+            postData["FrontModuleCode"] = FrontModuleCode;
+            //postData["FrontModuleCode"] += $("#FrontModuleName").find("option").eq($(item).attr("data-original-index")).val() + ",";
+        })
+        postData["ModuleName"] = $("#ModuleName").attr("data-text");
+        postData["ModuleCode"] = $("#ModuleName").attr("data-value");
+        $.SaveForm({
+            url: "../../OutsourcingProject/Outprocessconfig/SaveForm?keyValue=" + keyValue + "&mode=Edit",
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle" style="width:130px;">所属单位<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DeptId" type="hidden" class="form-control" />
+                <input id="DeptCode" type="hidden" class="form-control" />
+                <input id="DeptName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" onclick="selectDept('', 0, 13, '所属部门', document.body, 'DeptName,DeptCode,DeptId')" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">关联模块名称<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="ModuleName" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                @*<input id="ModuleName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />*@
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">前置模块名称</td>
+            <td class="formValue">
+                <select id="FrontModuleName" class="selectpicker show-menu-arrow form-control" multiple placeholder="请选择事故类型">
+
+                    @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("OutProcessManagement"))
+                </select>
+                @*<input id="FrontModuleName" type="text" class="form-control" />*@
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">跳转url地址</td>
+            <td class="formValue">
+                <input type="text" class="form-control" id="Address" />
+            </td>
+        </tr>
+       
+    </table>
+</div>

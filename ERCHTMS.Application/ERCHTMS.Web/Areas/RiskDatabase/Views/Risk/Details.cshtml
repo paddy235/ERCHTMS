@@ -1,0 +1,1169 @@
+﻿@{
+    ViewBag.Title = "区域管理";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var parentId = request('parentId');
+    var mode = request('mode');
+    var areaId = request('areaId');
+    var areaName = request('areaName');
+    var tCode = ""; var tName = ""; var tContent = "";
+    $(function () {
+        InitGkcj();
+        initControl();
+        GetGrid();
+    })
+    //初始化控件
+    function initControl() {
+        //绑定内置岗位
+        $.ajax({
+            url: "../../RiskDatabase/DangerSource/GetPostTreeJson",
+            async: false,
+            type: "post",
+            success: function (data) {
+                $("#PostName").html('<option value="">请选择</option>');
+                $("#PostName").append(data);
+            }
+        });
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../RiskDatabase/Risk/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#container").formDeserialize(data);
+                    //if (data.AccidentType != null && data.AccidentType != undefined) {
+                    //    $("#AccidentType").val(data.AccidentType);
+                    //    $("#AccidentType").find("option").each(function (i, dom) {
+                    //        if (data.AccidentType.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                    //            $(dom).attr("selected", "selected");
+                    //        }
+                    //    });
+                    //}
+                    if (data.RiskType != null && data.RiskType != undefined) {
+                        $("#RiskType").val(data.RiskType);
+                        $("#RiskType").find("option").each(function (i, dom) {
+                            if (data.RiskType.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+                    }
+                    if (data.HarmType != null && data.HarmType != undefined) {
+                        $("#HarmType").val(data.HarmType);
+                        $("#HarmType").find("option").each(function (i, dom) {
+                            if (data.HarmType.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+                    }
+                    selRiskType(document.getElementById("RiskType"));
+                    selWay(document.getElementById("Way"), 0);
+                }
+            });
+            
+        } else {
+            $("#table10").find(".form-control").attr("isvalid", "yes");
+            $("#table10").find(".form-control").attr("checkexpession", "NotNull");
+                //$("#tab10").find(".form-control").parent().prev().append('<font face="宋体">*</font>');
+        }
+    }
+    //保存表单
+    function AcceptClick() {
+        if (!$('#container').Validform()) {
+            return false;
+        }
+        var json = "";
+        var postData = $("#container").formSerialize(keyValue);
+        var arr0 = new Array("", "1", "2", "3", "4");
+        var arr = [];
+        $(arr0).each(function (j, idx) {
+            var measures = $("#gridTable" + idx).jqGrid('getRowData');
+            if (measures.length > 0) {
+                $(measures).each(function (i, dom) {
+                    arr.push({ Content: $("#gridTable" + idx).find("textarea[name='Content']").eq(i).val(), AreaId: $("#AreaId").val(), RiskId: $("#Id").val(), AreaCode: $("#AreaCode").val(), TypeName: $("#gridTable" + idx).attr("typename") });
+                });
+                json = JSON.stringify(arr);
+            }
+        });
+
+        //postData["AccidentName"] = $("button[data-id='AccidentType']").attr("title").replace(/\s+/, "");
+        postData["AreaName"] = $("#AreaId").find("option:selected").text();
+        postData["AreaCode"] = $("#AreaId").find("option:selected").attr("code");
+        postData["measuresJson"] = json;
+        $.SaveForm({
+            url: "../../RiskDatabase/Risk/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                if (top.win != undefined) {
+                    top.win.initControl();
+                    top.win.$("#gridTable").jqGrid('setGridParam', {
+                        postData: { areaId: areaId }
+                    }).trigger('reloadGrid');
+
+                } else {
+                    if (typeof ($.currentIframe().window.initControl) != "undefined") {
+                        $.currentIframe().window.initControl();
+                    }
+                }
+                $.currentIframe().window.$("#gridTable").trigger('reloadGrid');
+            }
+        })
+    }
+    var selectedRowIndex = 0;
+    //加载表格
+    function GetGrid() {
+        var arr = new Array("", "1", "2", "3", "4");
+        var types = new Array("工程技术", "管理", "个体防护", "培训教育", "应急处置");
+        $(arr).each(function (i, idx) {
+            var $gridTable = $("#gridTable" + idx);
+            $gridTable.jqGrid({
+                url: "../../RiskDatabase/Measures/GetListJson",
+                postData: { riskId: !!keyValue ? keyValue : "-1", typeName: types[i] },
+                datatype: "json",
+                height: 200,
+                width: $(window).width() - 100,
+                cellEdit: true,
+                sortable: false,
+                colModel: [
+                    { label: '主键', name: 'id', hidden: true },
+                    { label: 'Code', name: 'typename', hidden: true },
+                    {
+                        label: '操作', name: 'Oper', index: 'Oper', width: 60, align: 'center', sortable: false,
+                        formatter: function (cellvalue, options, rowObject) {
+                            var html = "";
+                            // html += "<a href=javascript:edit('" + rowObject.TypeCode + "','" + encodeURIComponent(rowObject.TypeName) + "','" + encodeURIComponent(rowObject.Content) + "','"+rowObject.Id+"')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a onclick=del('" + rowObject.id + "',this," + rowObject.status + ")  title='删除'><i class='fa fa-trash-o'></i></a>";
+                            return html;
+                        }
+                    },
+                    //{ label: '措施类型', name: 'TypeName', width: 300, align: 'center' },
+                    {
+                        label: '具体措施', name: 'content', width: 300, align: 'left', headerAlign: "center", sortable: false
+                        , formatter: function (cellvalue, options, rowObject) {
+                            var html = '<textarea type="text"  name="Content" role="textbox" style="width: 100%;height:50px;" class="form-control" >' + cellvalue + '</textarea>';
+                            return html;
+                        }
+                    }
+                ],
+                // pager: "#gridPager",
+                viewrecords: true,
+                rowNum: 20,
+                rowList: [20, 50, 100],
+                rownumbers: true
+
+            });
+            //查询事件
+            $("#btn_Search").click(function () {
+                $gridTable.jqGrid('setGridParam', {
+                    postData: { value: nodeId, keyword: $("#txt_Keyword").val() },
+                }).trigger('reloadGrid');
+            });
+        });
+
+
+    }
+    //编辑
+    function edit(typeCode, typeName, content, id) {
+        tCode = typeCode; tName = typeName; tContent = content;
+        var title = "采取的风险控制措施";
+        idx1 = dialogOpen({
+            id: "Measure",
+            title: "采取的风险控制措施",
+            url: '/RiskDatabase/Measures/Form?keyValue=' + id,
+            width: "500px",
+            height: "400px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    //删除管控措施
+    function del(id, obj, status) {
+        var jqTable = $(obj).parent().parent().parent().parent();
+        if (status == 1) {
+            $.RemoveForm({
+                url: "../../RiskDatabase/Measures/RemoveForm",
+                param: { keyValue: id },
+                success: function (data) {
+                    jqTable.delRowData(jqTable.getGridParam('selrow'));
+                }
+            })
+        } else {
+            var idx = dialogConfirm("确认删除吗？", function (isSure) {
+                if (isSure) {
+                    jqTable.delRowData(jqTable.getGridParam('selrow'));
+                    top.layer.close(idx);
+                } else {
+                    top.layer.close(idx);
+                }
+            });
+        }
+    }
+    //管控措施
+    var idx1 = null;
+    function addMeasure(obj) {
+        var $li = $(".nav-tabs").find("li[class='active']");
+        var index = $li.data("index");
+        var name = $li.text();
+        tCode = ""; tName = ""; tContent = "";
+        areaId = $("#Area").attr("data-value");
+        var areaCode = $("#Area").attr("data-code");
+        var rowId = $("#gridTable" + index).jqGrid('getRowData').length;
+        $("#gridTable" + index).addRowData(rowId, { id: rowId + 1, content: "", areaId: areaId, riskId: $("#Id").val(), areaCode: areaCode, typename: name, status: 0 });
+        $("#gview_gridTable" + index).find(".unwritten").hide();
+    }
+    var node = null; var score = 0; var idx = null;
+    function setScore(obj, title) {
+        node = obj;
+        var clsName = $("#Way").val() + obj.id;
+        var selId = $(node).parent().parent().parent().children().eq(0).find("select").attr("id");
+        clsName = selId == "Way" ? clsName : clsName.substring(0, clsName.length - 1);
+        var width = $("#Way").val() == "LEC" ? "600px" : $("#Way").val() == "TRA" ? "900px" : "700px";
+        var height = $("#Way").val() == "TRA" ? "600px" : "400px";
+        idx = dialogContent({
+            id: "win1",
+            title: $(obj).parent().prev().text(),
+            btns: 1,
+            btn: ["关闭"],
+            content: $("." + clsName).html(),
+            width: width,
+            height: height,
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    var mark = false;
+    function getScore(score) {
+        $(node).val(score);
+        var selId = $(node).parent().parent().parent().children().eq(0).find("select").attr("id");
+        var v1 = $.trim($("#ItemA").val());
+        var v2 = $.trim($("#ItemB").val());
+        var v3 = $.trim($("#ItemC").val());
+        var r = $("#ItemR");
+        var g = $("#Grade");
+        if ($("#Way").val() == "TRA") {
+            if (v1.length > 0 && v2.length > 0) {
+                var result = 0;
+                result = v1 * v2;
+                result = result.toFixed(2);
+                r.val(result);
+                if (result >= 20) {
+                    g.val("重大风险"); g.next().val("1");
+                }
+                else if (result >= 10 && result < 20) {
+                    g.val("较大风险"); g.next().val("2");
+                }
+                else if (result >= 5 && result < 10) {
+                    g.val("一般风险"); g.next().val("3");
+                } else {
+                    g.val("低风险"); g.next().val("4");
+                }
+            }
+        } else {
+            if (v1.length > 0 && v2.length > 0 && v3.length > 0) {
+                var result = 0;
+                result = v1 * v2 * v3;
+                result = result.toFixed(2);
+                r.val(result);
+                if (result >= 400) {
+                    g.val("重大风险"); g.next().val("1");
+                }
+                else if (result >= 200 && result < 400) {
+                    g.val("较大风险"); g.next().val("2");
+                }
+                else if (result >= 70 && result < 200) {
+                    g.val("一般风险"); g.next().val("3");
+                } else {
+                    g.val("低风险"); g.next().val("4");
+                }
+            }
+        }
+        top.layer.close(top.win.idx);
+    }
+    function selWay(obj, type) {
+        var val = $(obj).val();
+        var arr = null;
+        if (obj.id == "Way1") {
+            mark = true;
+        }
+        if (val == "LEC") {
+            arr = new Array("事故发生的可能性L<font face='宋体'>*</font>", "暴露于危险环境的频繁程度E<font face='宋体'>*</font>", "发生事故产生的后果C<font face='宋体'>*</font>");
+        } else if (val == "PSE") {
+            arr = new Array("可能性 P<font face='宋体'>*</font>", "后果 S<font face='宋体'>*</font>", "暴露 E<font face='宋体'>*</font>");
+        } else {
+            arr = new Array("事故发生的可能性L<font face='宋体'>*</font>", "事故后果严重程度S<font face='宋体'>*</font>");
+        }
+        for (var j = 1; j < 4; j++) {
+            $("." + obj.id + j).html(arr[j - 1]);
+            //if (val == "TRA" && j == 3) {
+            //    $("." + obj.id + j).hide();
+            //    $("." + obj.id + j).next().hide();
+            //} else {
+            //    $("." + obj.id + j).show();
+            //    $("." + obj.id + j).next().show();
+            //}
+        }
+        if (type == 1) {
+            $("#tab10").find("input[class='form-control']").val('');
+        }
+
+        for (var j = 1; j < 4; j++) {
+            if (val == "TRA" && j == 3) {
+                $("." + obj.id + j).next().find("input").removeAttr("checkexpession");
+                $("." + obj.id + j).next().find("input").removeAttr("isvalid", "yes");
+                $("." + obj.id + j).hide();
+                $("." + obj.id + j).next().hide();
+            } else {
+                $("." + obj.id + j).next().find("input").attr("checkexpession", "NotNull");
+                $("." + obj.id + j).next().find("input").attr("isvalid", "yes");
+                $("." + obj.id + j).show();
+                $("." + obj.id + j).next().show();
+            }
+        }
+
+    }
+    //选择区域时获取危险点信息
+    function selArea(obj, select, val) {
+        $.ajax({
+            url: "../../RiskDatabase/Risk/GetRisks",
+            data: { parentId: $(obj).val() },
+            type: "post",
+            dataType: "html",
+            async: false,
+            success: function (data) {
+                select.html('<option value="">请选择</option>');
+                select.append(data);
+                if (!!val) {
+                    select.val(val);
+                }
+            },
+            error: function (XMLHttpRequest, textStatus, errorThrown) {
+
+            }
+        });
+    }
+    function setPost() {
+        //var deptName = $("#DeptName").val();
+        //if (deptName.length == 0) {
+        //    dialogMsg("请先选择管控责任单位！", 2);
+        //    return false;
+        //} else {
+            $.post("../../RiskDatabase/DangerSource/GetPostTreeJson", { deptName: "" }, function (data) {
+                $("#PostName").html('<option value="">请选择</option>');
+                $("#PostName").append(data);
+            });
+        //}
+
+    }
+    //根据风险类别设置显示信息
+    function selRiskType(obj) {
+        var val = $(obj).val();
+        switch (val) {
+            case "设备":
+                $("#tabContent").find("tr").show();
+                $("#tr80").show(); $("#tr5").hide();
+                $("#tr1").show(); $("#tr2").show(); $("#tr3").hide(); $("#tr4").hide(); $("#tr0").show();
+                $("#tr10").hide(); $("#tr20").hide(); $("#tr30").hide(); $("#tr40").hide();
+                $("#FaultType").attr("checkexpession", "NotNull");
+                $("#FaultType").attr("isvalid", "yes");
+                $("#WorkTask").removeAttr("isvalid"); $("#WorkTask").attr("checkexpession");
+                
+                $("#MajorName").removeAttr("isvalid", "yes");
+                $("#Description").removeAttr("isvalid", "yes");
+                $("#HarmType").removeAttr("isvalid", "yes");
+                $("#HarmProperty").removeAttr("isvalid", "yes");
+                $("#DangerSource").removeAttr("checkexpession");
+                $("#DangerSource").removeAttr("isvalid", "yes");
+                break;
+            case "管理":
+                $("#tabContent").find("tr").show();
+                $("#tr80").hide(); $("#tr5").show();
+                $("#tr0").show(); $("#tr1").hide(); $("#tr2").hide(); $("#tr3").hide(); $("#tr4").hide();
+                $("#tr10").hide(); $("#tr20").hide(); $("#tr30").hide(); $("#tr40").hide();
+                $("#EquipmentName").removeAttr("isvalid"); $("#EquipmentName").attr("checkexpession");
+                //$("#Parts").removeAttr("isvalid"); $("#Parts").attr("checkexpession");
+                $("#WorkTask").removeAttr("isvalid"); $("#WorkTask").attr("checkexpession");
+               
+                $("#MajorName").removeAttr("isvalid", "yes");
+                $("#Description").removeAttr("isvalid", "yes");
+                $("#HarmType").removeAttr("isvalid", "yes");
+                $("#HarmProperty").removeAttr("isvalid", "yes");
+                $("#FaultType").removeAttr("checkexpession");
+                $("#FaultType").removeAttr("isvalid", "yes");
+                $("#DangerSource").attr("checkexpession", "NotNull");
+                $("#DangerSource").attr("isvalid", "yes");
+                break;
+            case "环境":
+                $("#tabContent").find("tr").show();
+                $("#tr80").hide(); $("#tr5").show();
+                $("#tr1").hide(); $("#tr2").hide(); $("#tr3").hide(); $("#tr4").hide(); $("#tr0").show();
+                $("#tr10").hide(); $("#tr20").hide(); $("#tr30").hide(); $("#tr40").hide();
+                $("#WorkTask").removeAttr("isvalid"); $("#WorkTask").attr("checkexpession");
+                
+                $("#EquipmentName").removeAttr("isvalid"); $("#EquipmentName").attr("checkexpession");
+                //$("#Parts").removeAttr("isvalid"); $("#Parts").attr("checkexpession");
+                $("#MajorName").removeAttr("isvalid", "yes");
+                $("#Description").removeAttr("isvalid", "yes");
+                $("#HarmType").removeAttr("isvalid", "yes");
+                $("#HarmProperty").removeAttr("isvalid", "yes");
+                $("#FaultType").removeAttr("checkexpession");
+                $("#FaultType").removeAttr("isvalid", "yes");
+                $("#DangerSource").attr("checkexpession", "NotNull");
+                $("#DangerSource").attr("isvalid", "yes");
+                break;
+            case "作业":
+                $("#tabContent").find("tr").show();
+                $("#tr80").hide(); $("#tr5").show();
+                $("#tr1").hide(); $("#tr2").hide(); $("#tr3").show(); $("#tr4").show(); $("#tr0").show();
+                $("#tr10").hide(); $("#tr20").hide(); $("#tr30").hide(); $("#tr40").hide();
+                $("#WorkTask").attr("isvalid", "yes"); $("#WorkTask").attr("checkexpession", "NotNull");
+              
+                $("#EquipmentName").removeAttr("isvalid"); $("#EquipmentName").attr("checkexpession");
+                //$("#Parts").removeAttr("isvalid"); $("#Parts").attr("checkexpession");
+                $("#MajorName").removeAttr("isvalid", "yes");
+                $("#Description").removeAttr("isvalid", "yes");
+                $("#HarmType").removeAttr("isvalid", "yes");
+                $("#HarmProperty").removeAttr("isvalid", "yes");
+                $("#FaultType").removeAttr("checkexpession");
+                $("#FaultType").removeAttr("isvalid", "yes");
+                $("#DangerSource").attr("checkexpession", "NotNull");
+                $("#DangerSource").attr("isvalid", "yes");
+                break;
+            case "职业病危害":
+                $("#tabContent").find("tr").hide(); $("#tr80").hide(); $("#tr5").hide();
+                $("#tr").show(); $("#tr10").show(); $("#tr20").show(); $("#tr30").show(); $("#tr40").show(); $("#tr0").show();
+                $("#tr50").show(); $("#tr60").show(); $("#tr70").show();
+                $("#EquipmentName").removeAttr("isvalid");
+                //$("#Parts").removeAttr("isvalid");
+               
+                $("#WorkTask").removeAttr("isvalid");
+                $("#DangerSource").removeAttr("isvalid");
+                $("#RiskDesc").removeAttr("isvalid");
+                $("#FaultType").removeAttr("checkexpession");
+                $("#FaultType").removeAttr("isvalid", "yes");
+                $("#DangerSource").removeAttr("checkexpession");
+                $("#DangerSource").removeAttr("isvalid", "yes");
+                //$("#AccidentType").removeAttr("isvalid");
+                //$("#ResultType").removeAttr("isvalid");
+                $("#Result").removeAttr("isvalid");
+
+                $("#MajorName").attr("isvalid", "yes"); $("#MajorName").attr("checkexpession", "NotNull");
+                $("#Description").attr("isvalid", "yes"); $("#Description").attr("checkexpession", "NotNull");
+                $("#HarmType").attr("isvalid", "yes"); $("#HarmType").attr("checkexpession", "NotNull");
+                $("#HarmProperty").attr("isvalid", "yes"); $("#HarmProperty").attr("checkexpession", "NotNull");
+                break;
+
+        }
+    }
+    function InitGkcj() {
+        //管控层级
+        var data = [
+            { no: "公司级", name: "公司级" },
+            { no: "部门级", name: "部门级" },
+              { no: "专业级", name: "专业级" },
+                { no: "班组级", name: "班组级" },
+        { no: "岗位级", name: "岗位级" }
+        ];
+        $("#LevelName").ComboBox({
+            id: "no",
+            text: "name",
+            description: "==请选择==",
+            height: '400px',
+            allowSearch: false,
+            data: data
+        });
+    }
+</script>
+<div style="margin:10px;" id="container">
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;风险辨识</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form" id="tabContent">
+                <tr id="tr">
+                    <td class="formTitle" style="width:150px;">风险类别<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <select id="RiskType" class="form-control" isvalid="yes" checkexpession="NotNull" onchange="selRiskType(this)">
+                            @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("RiskType"))
+                        </select>
+                    </td>
+                </tr>
+                <tr id="tr0">
+                    <td class="formTitle" style="width:150px;">所属区域<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input type="hidden" id="Id" value="@Guid.NewGuid().ToString()" />
+                        <select id="AreaId" isvalid="yes" checkexpession="NotNull" class="form-control">
+                            <option value="">请选择</option>
+                            @Html.Raw(new ERCHTMS.Busines.RiskDatabase.DangerSourceBLL().GetOptionsStringForArea("0"))
+                        </select>
+                    </td>
+                </tr>
+                <tr id="tr10" style="display:none;">
+                    <td class="formTitle">风险点<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="MajorName" type="text" class="form-control" placeholder="请填写风险点" />
+                    </td>
+                </tr>
+                <tr id="tr20" style="display:none;">
+                    <td class="formTitle">职业病危害因素<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="Description" type="text" class="form-control" placeholder="请填写职业病危害因素" />
+                    </td>
+                </tr>
+                <tr id="tr30" style="display:none;">
+                    <td class="formTitle">作业分级<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <select id="HarmType" class="form-control selectpicker show-menu-arrow">
+                            @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("WorkLevel"))
+                        </select>
+                    </td>
+                </tr>
+                <tr id="tr40" style="display:none;">
+                    <td class="formTitle">导致的职业病或健康损伤<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="HarmProperty" type="text" class="form-control" placeholder="请填写职业病危害因素" />
+                    </td>
+                </tr>
+
+
+                <tr id="tr1" style="display:none;">
+                    <td class="formTitle">设备名称<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="EquipmentName" type="text" class="form-control" placeholder="请输入设备名称" />
+                    </td>
+                </tr>
+                <tr id="tr2" style="display:none;">
+                    <td class="formTitle">部件</td>
+                    <td class="formValue">
+                        <input id="Parts" type="text" class="form-control" placeholder="请输入部件" />
+                    </td>
+                </tr>
+                <tr id="tr80" style="display:none;">
+                    <td class="formTitle">故障类型<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="FaultType" type="text" class="form-control" placeholder="请输入故障类型" />
+                    </td>
+                </tr>
+                <tr id="tr3">
+                    <td class="formTitle">工作任务<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="WorkTask" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" placeholder="请输入工作任务" />
+                    </td>
+                </tr>
+                <tr id="tr4">
+                    <td class="formTitle">工序</td>
+                    <td class="formValue">
+                        <input id="Process" type="text" class="form-control" placeholder="请输入工序" />
+                    </td>
+                </tr>
+
+                <tr id="tr5">
+                    <td class="formTitle">危险源<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DangerSource" type="text" class="form-control" placeholder="请输入风险描述" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                </tr>
+
+                <tr id="tr6">
+                    <td class="formTitle">危害因素</td>
+                    <td class="formValue">
+                        <input id="RiskDesc" type="text" class="form-control" placeholder="请输入风险描述"  />
+                    </td>
+                </tr>
+
+                @*<tr id="tr7">
+                        <td class="formTitle">风险后果分类<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <select id="ResultType" class="form-control selectpicker show-menu-arrow" isvalid="yes" checkexpession="NotNull">
+                                @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("ResultType"))
+                            </select>
+                        </td>
+                    </tr>*@
+
+                <tr id="tr8">
+                    <td class="formTitle">危害后果<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <textarea id="Result" class="form-control" placeholder="请输入风险后果" isvalid="yes" checkexpession="NotNull" rows="3"></textarea>
+                    </td>
+                </tr>
+                @*<tr id="tr9">
+                        <td class="formTitle">可能导致的事故类型</td>
+                        <td class="formValue">
+                            <select id="AccidentType" class="selectpicker show-menu-arrow form-control" multiple placeholder="请选择事故类型">
+
+                                @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("AccidentType"))
+                            </select>
+                        </td>
+                    </tr>*@
+                <tr id="tr70">
+                    <td class="formTitle">管控层级<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="LevelName" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr id="tr50">
+                    <td class="formTitle">管控责任单位<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <select id="DeptName" class="form-control" isvalid="yes" checkexpession="NotNull" onchange="setPost()">
+                            <option value="">请选择</option>
+                            @Html.Raw(new ERCHTMS.Busines.RiskDatabase.DangerSourceBLL().GetOptionsStringForInitDept())
+                        </select>
+
+                        @*<input id="DeptName" type="text" class="form-control" placeholder="请选择管控责任单位" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDept('', 1, 2, '选择管控责任单位', this.parentNode, 'DeptName,DeptCode');" />
+                            <input type="hidden" id="DeptCode" />*@
+                    </td>
+                </tr>
+                <tr id="tr60">
+                    <td class="formTitle">管控责任岗位</td>
+                    <td class="formValue">
+                        <select id="PostName" class="form-control"></select>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;采取的风险控制措施</strong>
+            <span class="tools pull-right">
+                <a href="javascript:addMeasure(this)" class="btn btn-primary btn-xs">新 增</a>&nbsp;&nbsp;&nbsp;&nbsp; <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <ul class="nav nav-tabs">
+                <li class="active" data-index=""><a href="#con" data-toggle="tab">工程技术</a></li>
+                <li data-index="1"><a href="#con1" data-toggle="tab">管理</a></li>
+                <li data-index="2"><a href="#con2" data-toggle="tab">个体防护</a></li>
+                <li data-index="3"><a href="#con3" data-toggle="tab">培训教育</a></li>
+                <li data-index="4"><a href="#con4" data-toggle="tab">应急处置</a></li>
+
+            </ul>
+            <div class="tab-content" style="padding-top: 15px;">
+                <div id="con" class="tab-pane active" style="padding-right: 30px;">
+                    <table id="gridTable" typename="工程技术"></table>
+                    <div id="gridPager"></div>
+                </div>
+                <div id="con1" class="tab-pane" style="padding-right: 30px;">
+                    <table id="gridTable1" typename="管理"></table>
+                    <div id="gridPager1"></div>
+                </div>
+                <div id="con2" class="tab-pane" style="padding-right: 30px;">
+                    <table id="gridTable2" typename="个体防护"></table>
+                    <div id="gridPager2"></div>
+                </div>
+                <div id="con3" class="tab-pane" style="padding-right: 30px;">
+                    <table id="gridTable3" typename="培训教育"></table>
+                    <div id="gridPager3"></div>
+                </div>
+                <div id="con4" class="tab-pane" style="padding-right: 30px;">
+                    <table id="gridTable4" typename="应急处置"></table>
+                    <div id="gridPager4"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;风险控制效果评估</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form" id="table10">
+                <tr>
+                    <td class="formTitle" style="width:150px;">风险评估方法<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <select id="Way" onchange="selWay(this,1)" class="form-control" isvalid="yes" checkexpession="NotNull">
+                            <option value="LEC">LEC</option>
+                            <option value="PSE">PSE</option>
+                            <option value="TRA">TRA</option>
+                        </select>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle Way1">事故发生的可能性L<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ItemA" type="text" class="form-control" placeholder="请选择" readonly onclick="setScore(this)" />
+
+                    </td>
+                    <td class="formTitle Way2">露于危险环境的频繁程度E<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ItemB" type="text" class="form-control" placeholder="请选择" readonly onclick="setScore(this)" />
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle Way3">发生事故产生的后果C<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ItemC" type="text" class="form-control" placeholder="请选择" readonly onclick="setScore(this)" />
+
+                    </td>
+                    <td class="formTitle">风险值R<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ItemR" type="text" class="form-control" placeholder="结果自动计算" readonly />
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width:150px;">风险等级<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <input id="Grade" type="text" class="form-control" placeholder="自动获取" readonly />
+                        <input id="GradeVal" type="hidden" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="divL" style="margin:0px; display:none;" class="table1 LECItemA">
+    <div style="margin:10px;">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width:100px;">选择</th>
+                    <th style="width:100px;">分值</th>
+                    <th>事故发生的可能性</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(10)">选择</a></td>
+                    <td style="text-align:center;">10</td>
+                    <td>完全可以预料</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(6)">选择</a></td>
+                    <td style="text-align:center;">6</td>
+                    <td>相当可能</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(3)">选择</a></td>
+                    <td style="text-align:center;">3</td>
+                    <td>可能，但不经常</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(1)">选择</a></td>
+                    <td style="text-align:center;">1</td>
+                    <td>可能性小，完全意外</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(0.5);">选择</a></td>
+                    <td style="text-align:center;">0.5</td>
+                    <td>很不可能，可以设想</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(0.2);">选择</a></td>
+                    <td style="text-align:center;">0.2</td>
+                    <td>极不可能</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(0.1);">选择</a></td>
+                    <td style="text-align:center;">0.1</td>
+                    <td>实际不可能</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<div id="divE" style="margin:0px; display:none;" class="table1 LECItemB">
+    <div style="margin:10px;">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width:100px;">选择</th>
+                    <th style="width:100px;">分值</th>
+                    <th>暴露于危险环境的频繁程度</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(10)">选择</a></td>
+                    <td style="text-align:center;">10</td>
+                    <td>连续暴露</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(6);">选择</a></td>
+                    <td style="text-align:center;">6</td>
+                    <td>每天工作时间内暴露</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(3)">选择</a></td>
+                    <td style="text-align:center;">3</td>
+                    <td>每周一次或偶然暴露</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(2);">选择</a></td>
+                    <td style="text-align:center;">2</td>
+                    <td>每月一次暴露</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(1)">选择</a></td>
+                    <td style="text-align:center;">1</td>
+                    <td>每年几次暴露</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(0.5);">选择</a></td>
+                    <td style="text-align:center;">0.5</td>
+                    <td>非常罕见暴露</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="divC" style="margin:0px; display:none;" class="table1 LECItemC">
+    <div style="margin:10px;">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width:100px;">选择</th>
+                    <th style="width:100px;">分值</th>
+                    <th>发生事故产生的后果</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(100);">选择</a></td>
+                    <td style="text-align:center;">100</td>
+                    <td>10人以上死亡</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(40);">选择</a></td>
+                    <td style="text-align:center;">40</td>
+                    <td>3~9人死亡</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(15);">选择</a></td>
+                    <td style="text-align:center;">15</td>
+                    <td>1~2人死亡</td>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(7);">选择</a></td>
+                    <td style="text-align:center;">7</td>
+                    <td>严重</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(3);">选择</a></td>
+                    <td style="text-align:center;">3</td>
+                    <td>重大，伤残</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(1);">选择</a></td>
+                    <td style="text-align:center;">1</td>
+                    <td>引人注意</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="divP" style="margin:0px; display:none;" class="table1 PSEItemA">
+    <div style="margin:10px;">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width:100px;">选择</th>
+                    <th style="width:100px;">分值</th>
+                    <th>安全、环境（S、E）</th>
+                    <th>职业健康（H）</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(10)">选择</a></td>
+                    <td style="text-align:center;">10</td>
+                    <td>如果危害事故发生，即产生最可能和预期的结果（100%）</td>
+                    <td>频繁：平均每6个月发生一次</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(6)">选择</a></td>
+                    <td style="text-align:center;">6</td>
+                    <td>并不是罕见，大约是1/2的机会（50%）</td>
+                    <td>持续：平均每1年发生一次</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(3)">选择</a></td>
+                    <td style="text-align:center;">3</td>
+                    <td>可能（25%）</td>
+                    <td>经常：平均每2年发生一次</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(1)">选择</a></td>
+                    <td style="text-align:center;">1</td>
+                    <td>很少的可能性，据说曾经发生过</td>
+                    <td>偶然：3-9年发生一次</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(0.5);">选择</a></td>
+                    <td style="text-align:center;">0.5</td>
+                    <td>相当少但确有可能，多年没有发生过</td>
+                    <td>难：10-20年发生一次</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(0.1);">选择</a></td>
+                    <td style="text-align:center;">0.1</td>
+                    <td>百万分之一的可能性，尽管暴露了许多年，但从来没有发生过</td>
+                    <td>罕见：几乎从未发生过</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<div id="divS" style="margin:0px; display:none;" class="table1 PSEItemB">
+    <div style="margin:10px;">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width:100px;">选择</th>
+                    <th style="width:100px;">分值</th>
+                    <th>设备事故/障碍与损失(S)</th>
+                    <th>人身伤害（S）</th>
+                    <th>职业相关病疾（H）</th>
+                    <th>环境影响（E）</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(100)">选择</a></td>
+                    <td style="text-align:center;">100</td>
+                    <td>设备或财产可能损失≥1000万,可能造成电网或设备较大及以上事故</td>
+                    <td>造成死亡≥3人；或重伤≥10人</td>
+                    <td>造成3-9例无法复原的严重职业病;造成9例以上很难治愈的职业病</td>
+                    <td>造成大范围环境破坏；可能造成人员死亡、环境恢复困难；极端违反国家环境保护法律法规；政府责令关闭</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(50)">选择</a></td>
+                    <td style="text-align:center;">50</td>
+                    <td>设备或财产可能损失在100万元到1000万元之间；可能造成电网或设备A类一般事故</td>
+                    <td>造成1-2人死亡；或重伤3-9人</td>
+                    <td>造成1-2例无法复原的严重职业病；可能造成3-9例以上很难治愈的职业病</td>
+                    <td>造成较大范围的环境破坏；影响后果可导致急性疾病或重大伤残；居民需要撤离；严重违法，政府责令关闭整顿</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(25)">选择</a></td>
+                    <td style="text-align:center;">25</td>
+                    <td>设备或财产可能损失在10万元到100万元之间；可能造成电网或设备B类一般事故</td>
+                    <td>造成重伤1-2人</td>
+                    <td>造成1-2例难治愈的职业病；可能造成3-9例可治愈的职业病；可能造成9例以上与职业有关的疾病</td>
+                    <td>中度影响到周边居民及生态环境，引起居民抗争</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(15)">选择</a></td>
+                    <td style="text-align:center;">15</td>
+                    <td>设备或财产可能损失在1万元到10万元之间；可能造成电网或设备一类障碍</td>
+                    <td>造成轻伤3人以上</td>
+                    <td>造成1-2例可治愈的职业病； 可能造成3-9例与职业有关的疾病</td>
+                    <td>对周边居民及环境有些影响，引起居民抱怨、投诉</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(5);">选择</a></td>
+                    <td style="text-align:center;">5</td>
+                    <td>设备或财产可能损失在1000元到1万元之间；可能造成电网或设备二类障碍</td>
+                    <td>造成轻伤1-2人</td>
+                    <td>造成1-2例与职业有关的疾病;可能造成部分人员（3人以上）轻微影响健康</td>
+                    <td>轻微影响到周边居民及小范围（现场）生态环境</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(1);">选择</a></td>
+                    <td style="text-align:center;">1</td>
+                    <td>设备或财产可能损失在1000元以下；可能造成电网或设备异常</td>
+                    <td>造成人员轻微的伤害（小的割伤、擦伤、撞伤）</td>
+                    <td>个别轻微影响健康事件</td>
+                    <td>仅对景观有轻度影响</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<div id="divE" style="margin:0px; display:none;" class="table1 PSEItemC">
+    <div style="margin:10px;">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width:100px;">选择</th>
+                    <th style="width:100px;">分值</th>
+                    <th>安全、环境（S、E）</th>
+                    <th>职业健康（H）</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(10)">选择</a></td>
+                    <td style="text-align:center;">10</td>
+                    <td>持续（每天许多次）</td>
+                    <td>暴露期大于2倍的法定极限值</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(6)">选择</a></td>
+                    <td style="text-align:center;">6</td>
+                    <td>经常（大概每天一次）</td>
+                    <td>暴露期介于1-2倍法定极限值之间</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(3)">选择</a></td>
+                    <td style="text-align:center;">3</td>
+                    <td>有时（从每周一次到每月一次）</td>
+                    <td>暴露期在法定极限值内</td>
+                </tr>
+
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(3)">选择</a></td>
+                    <td style="text-align:center;">2</td>
+                    <td>偶尔（从每月一次到每年一次）</td>
+                    <td>暴露期在正常允许水平和法定极限值之间</td>
+                </tr>
+
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(1);">选择</a></td>
+                    <td style="text-align:center;">1</td>
+                    <td>很少（据说曾经发生过)</td>
+                    <td>暴露期在允许水平内</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(0.5);">选择</a></td>
+                    <td style="text-align:center;">0.5</td>
+                    <td>特别的少，几乎不可能</td>
+                    <td>暴露期远小于允许水平</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+<div id="divTA" style="margin:0px; display:none;" class="table1 TRAItemA">
+    <div style="margin:10px;">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width:100px;">选择</th>
+                    <th style="width:100px;">分值</th>
+                    <th>参考频率</th>
+                    <th>人员情况</th>
+                    <th>设备设施、工器具材料</th>
+                    <th>环境状况</th>
+                    <th>规则和针对性管理方案</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(5)">选择</a></td>
+                    <td style="text-align:center;">5</td>
+                    <td>本企业一年内发生过</td>
+                    <td>无培训,无经验</td>
+                    <td>超期运行或超检验期</td>
+                    <td>危险化学品生产贮存区域;存在或可能产生危害气体</td>
+                    <td>没有</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(4)">选择</a></td>
+                    <td style="text-align:center;">4</td>
+                    <td>本集团一年内发生过</td>
+                    <td>有培训但培训时间不够或未达成效果</td>
+                    <td>保护自动装置功能不完善,存在质量缺陷</td>
+                    <td>作业空间受限;作业立体交叉;恶劣气象条件;高空或在运行设备设施上作业</td>
+                    <td>有,但不完善,且只偶尔执行</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(3)">选择</a></td>
+                    <td style="text-align:center;">3</td>
+                    <td>本行业一年内发生过</td>
+                    <td>经验不足,多次出现差错</td>
+                    <td>基本完好,但安全装置不完善</td>
+                    <td>通风、光照或温度需要采取措施才能作业;周围有运行设备;立面有同时作业</td>
+                    <td>有,较完善,但只执行部分</td>
+                </tr>
+
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(2)">选择</a></td>
+                    <td style="text-align:center;">2</td>
+                    <td>全国范围一年内发生过</td>
+                    <td>偶尔出现差错</td>
+                    <td>总体完好,但有缺陷</td>
+                    <td>通风、光照或温度不影像作业;系统停运;同一作业面有其它作业</td>
+                    <td>有,完善,但偶尔不执行</td>
+                </tr>
+
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(1);">选择</a></td>
+                    <td style="text-align:center;">1</td>
+                    <td>从未发生过</td>
+                    <td>培训充分,经验丰富,安全意识强</td>
+                    <td>完好,无缺陷</td>
+                    <td>通风、光照良好,温度适宜;系统停运且周围无运行设备</td>
+                    <td>有,完善,严格执行</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+<div id="divTB" style="margin:0px; display:none;" class="table1 TRAItemB">
+    <div style="margin:10px;">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width:100px;">选择</th>
+                    <th style="width:100px;">分值</th>
+                    <th>可能造成的人员伤害</th>
+                    <th>可能造成的财产损失、设备设施损坏</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(5)">选择</a></td>
+                    <td style="text-align:center;">5</td>
+                    <td>3人及以上死亡或7人及以上重伤</td>
+                    <td>直接经济损失在1000万元及以上</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(4)">选择</a></td>
+                    <td style="text-align:center;">4</td>
+                    <td>1-2人死亡或3-6人重伤</td>
+                    <td>直接经济损失在100万元及以上,1000万元以下</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(3)">选择</a></td>
+                    <td style="text-align:center;">3</td>
+                    <td>造成1至2人重伤或3至6人轻伤</td>
+                    <td>直接经济损失在10万元及以上,100万元以下</td>
+                </tr>
+
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(2)">选择</a></td>
+                    <td style="text-align:center;">2</td>
+                    <td>1至2人轻伤</td>
+                    <td>直接经济损失在1万元及以上,10万元以下</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;"><a style="cursor:pointer;" onclick="javascript:top.win.getScore(1);">选择</a></td>
+                    <td style="text-align:center;">1</td>
+                    <td>1至2人轻微伤</td>
+                    <td>直接经济损失在1万元以下</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>

@@ -1,0 +1,132 @@
+﻿@{
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var dataType = request('dataType');
+    var win = $.currentIframe().window;
+    $(function () {
+        if (dataType == 1) {
+            $("#man").html('评估人<font face="宋体">*</font>');
+        }
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        if ($.currentIframe().window.dCode==undefined) {
+            win = top.Plan.window;
+        }   
+        //获取表单
+        if (!!keyValue && keyValue!="-1") {
+                $.SetForm({
+                    url: "../../RiskDatabase/RiskPlan/GetPlanDataFormJson",
+                    param: { keyValue: keyValue },
+                    success: function (data) {
+                        $("#form1").formDeserialize(data);
+                        dataType = $("#DataType").val();
+                    }
+                });
+        }
+        else {
+            $("#DataType").val(dataType);
+        }
+        if (win.dCode.length>0) {
+            $("#DeptCode").val(win.dCode); $("#DeptName").val(decodeURIComponent(win.dName)); $("#DeptId").val(win.dId);
+            $("#UserId").val(win.uId); $("#UserName").val(decodeURIComponent(win.uName));
+            $("#AreaName").val(decodeURIComponent(win.aName)); $("#AreaId").val(win.aId);
+        }
+
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var rowId = 0;
+        var postData = $("#form1").formSerialize(keyValue);
+        var jqGridTable = null;
+        if ($.currentIframe().window.dCode!=undefined) {
+            jqGridTable = dataType == 0 ? $.currentIframe().window.$("#gridTable") : $.currentIframe().window.$("#gridTable1");
+          
+        } else {
+            jqGridTable = dataType == 0 ? top.Plan.window.$("#gridTable") : top.Plan.window.$("#gridTable1");
+           
+        }
+        //var deptCode = top.Plan.window.$("#DeptCode").val();
+        //if ((","+deptCode+",").indexOf("," + $("#DeptCode").val() + ",") < 0) {
+        //    deptCode += ","+$("#DeptCode").val();
+        //}
+        //top.Plan.window.$("#DeptCode").val(deptCode);
+        if (dataType == 0) {
+            top.Plan.window.$("#gbox_gridTable").find(".unwritten").hide();
+        } else {
+            top.Plan.window.$("#gbox_gridTable1").find(".unwritten").hide();
+        }
+       
+        if (win.dCode.length > 0) {
+            rowId = win.selectedRowIndex;
+            if (keyValue != "") {
+                jqGridTable.delRowData(rowId);
+            }
+           
+            jqGridTable.addRowData(rowId, postData);
+        } else {
+            rowId = jqGridTable.jqGrid('getRowData').length + 1;
+            jqGridTable.addRowData(rowId, postData);
+        }
+        var idx = dialogConfirm("操作成功，是否继续新增？", function (isSure) {
+            if (isSure) {
+                keyValue = "";
+                $("#DeptName").val(''); $("#DeptCode").val(''); $("#DeptId").val('');
+                $("#UserName").val(''); $("#UserId").val('');
+                $("#AreaName").val(""); $("#AreaId").val(""); $("#AreaCode").val("");
+                top.layer.close(idx);
+            } else {
+                dialogClose();
+            }
+            
+        });
+    }
+
+    function selectuser() {
+        var deptid = $('#DeptId').val();
+        if (!!deptid) {
+            selectUser({ deptId: $('#DeptId').val(), deptCode: $('#DeptCode').val(), checkMode: 0, mode: 1, winObject: document.body, domId: 'UserName,UserId' });
+        }
+        else {
+            dialogMsg('请先选择部门！', 0);
+            return;
+        }
+
+    }
+</script>
+<div style="margin:0px; background-color:white;">
+    <table class="form" id="form1">
+        <tr>
+            <td class="formTitle">部门<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DeptName" type="text" class="form-control"  isvalid="yes" checkexpession="NotNull" readonly onclick="selectDept('', 0, 0, '选择部门', document.body, 'DeptName,DeptCode,DeptId,UserName,UserId');" />
+                <input id="DeptCode" type="hidden" /><input id="DeptId" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" style="width:150px;" id="man">辨识人<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="UserName" type="text" placeholder="自动关联部门负责人,也可以选择其他人员" class="form-control" readonly onclick="selectuser()" isvalid="yes" checkexpession="NotNull" errormsg="负责人" />
+               <input id="UserId" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">辨识范围<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="AreaName" type="text" class="form-control" readonly onclick="selectArea(window.document.body, 'AreaName,AreaCode,AreaId', 1)" isvalid="yes" checkexpession="NotNull" errormsg="负责人" />
+                <input id="AreaId" type="hidden" /><input id="DataType" type="hidden" />
+                <input id="AreaCode" type="hidden" />
+            </td>
+        </tr>
+    </table>
+    
+</div>

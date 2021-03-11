@@ -1,0 +1,359 @@
+@{;
+  ViewBag.Title = "列表页面";
+  Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>;
+
+    var belongtypecode = "@ViewBag.SpecialDept";
+    var belongid = "@ViewBag.SpecialDeptId"
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var flag = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+    var curdeptcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var curdeptid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var curparentid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().ParentId";
+
+    var ids = "";
+    var selectedRowIndex = 0;
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+       
+
+        
+        //系统管理员能导入
+        if (flag == "True") {
+            $("#enter").removeAttr("style");
+            $("#add").removeAttr("style");
+        }
+
+        if ((curparentid == belongid || curdeptid == belongid) && (roleName.indexOf("专工") >= 0 || roleName.indexOf("负责人") >= 0))
+        {
+            $("#add").removeAttr("style");
+        }
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+                   {
+                       SelectMode: 0,
+                       Mode: 15
+                   }
+                 );
+        var item = {
+            height: $(window).height() - 52,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                belongtypecode = item.Code;//用户所属部门编码
+                $('#btn_Search').trigger("click");
+
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        if (flag == "True") {
+            $(".bbit-tree-node").children().eq(0).addClass("bbit-tree-selected");
+        }
+    }
+
+    //加载表格
+    function GetGrid() {
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../StandardSystem/WrittenWork/GetPageListJson",
+            datatype: "json",
+            colModel: [{ label: '主键', name: 'swpid', width: 10, align: 'left', sortable: true, hidden: true },
+                  {
+                      label: '', name: '', width: 40, align: 'center',
+                      formatter: function (cellvalue, options, rowObject) {
+                          html = "<input type='checkbox' onclick=selData(this,'" + rowObject.swpid + "') />";
+                          return html;
+                      }
+                  },
+                 {
+                     label: '操作', name: 'Oper', index: 'Oper', width: 100, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "";
+                         html += "<a href=javascript:show()  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                         var flag = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+                         if (flag != "True") {
+                             if ((curparentid == belongid || curdeptid == belongid) && (roleName.indexOf("专工") >= 0 || roleName.indexOf("负责人") >= 0) && curdeptcode == rowObject.belongtypecode) {
+                                 html += "<a href=javascript:edit()  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                                 html += "<a href=javascript:del()  title='删除'><i class='fa fa-trash-o'></i></a>";
+                             }
+                         }
+                         else {
+                             html += "<a href=javascript:edit()  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                             html += "<a href=javascript:del()  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         }
+                         return html;
+                     }
+                 },
+                 { label: '文件和资料名称', name: 'filename', width: 300, align: 'center', sortable: true },
+                  { label: '颁发部门', name: 'issuedept', width: 200, align: 'center', sortable: false },
+                  { label: '文件编号', name: 'filecode', width: 200, align: 'center', sortable: true },
+                   {
+                       label: '发布日期', name: 'publishdate', width: 120, align: 'center', sortable: false,
+                       formatter: function (cellvalue, options, rowObject) {
+                           return formatDate(cellvalue, 'yyyy-MM-dd');
+                       }
+                   },
+                   {
+                       label: '实施日期', name: 'carrydate', width: 100, align: 'center', sortable: true,
+                       formatter: function (cellvalue, options, rowObject) {
+                           return formatDate(cellvalue, 'yyyy-MM-dd');
+                       }
+                   },
+                   { label: '文件主键1', name: 'filesid', width: 10, align: 'left', hidden: true }],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 30, 40],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var query = {
+            keyword: $("#txt_Keyword").val(),
+            code: belongtypecode,
+        }
+        return JSON.stringify(query);
+    }
+
+    //查看详情
+    function show() {
+        var keyValue = $('#gridTable').jqGridRowValue('swpid');
+        var FilesId = $('#gridTable').jqGridRowValue('filesid');
+        var idx = dialogOpen({
+            id: "Form",
+            title: "查看书面工作程序SWP",
+            url: '/StandardSystem/WrittenWork/Form?keyValue=' + keyValue + "&FilesId=" + FilesId + "&mode=view",
+            width: '700px',
+            height: '600px',
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+
+
+    //新增
+    function add() {
+        if (flag != "True") {
+            belongtypecode = curdeptcode;
+        }
+        dialogOpen({
+            id: 'Form',
+            title: '添加书面工作程序SWP',
+            url: '/StandardSystem/WrittenWork/Form?belongtypecode=' + belongtypecode,
+            width: '700px',
+            height: '600px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('swpid');
+        var FilesId = $('#gridTable').jqGridRowValue('filesid');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑书面工作程序SWP',
+                url: '/StandardSystem/WrittenWork/Form?keyValue=' + keyValue + "&FilesId=" + FilesId,
+                width: '700px',
+                height: '600px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('swpid');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../StandardSystem/WrittenWork/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的书面工作程序SWP！', 0);
+        }
+    }
+
+    var idx;
+    var isImport = false;
+
+    function importData() {
+        if (flag != "True") {
+            belongtypecode = curdeptcode;
+        }
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入',
+            url: '/StandardSystem/WrittenWork/Import?belongtypecode=' + belongtypecode,
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    $("#gridTable").jqGrid('setGridParam', {
+                        postData: { keyWord: "" }
+                    }).trigger('reloadGrid');
+                }
+
+            }
+        });
+    }
+
+    //选择数据
+    function selData(obj, id) {
+        if (obj.checked) {
+            ids += id + ",";
+        } else {
+            ids = ids.replace(id + ",", "");
+        }
+    }
+
+
+    //导出
+    function exportResult() {
+        location.href = "../../StandardSystem/WrittenWork/ExportData?queryJson=" + getQueryJson();
+    }
+
+
+    //收藏
+    function storeData() {
+        if (ids.length > 0) {
+            $.RemoveForm({
+                msg: "确定收藏？",
+                loading: "正在操作数据...",
+                url: '../../SafetyLawManage/StoreLaw/storeSafetyLaw',
+                param: { idsData: ids, ctype: 5 },
+                success: function (data) {
+                    ids = "";
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        }
+        else {
+            dialogMsg('请选择需要收藏的书面工作程序SWP！', 0);
+        }
+    }
+
+    function mystoreData() {
+        var idx = dialogOpen({
+            id: "Form",
+            title: "查看我的收藏",
+            url: '/StandardSystem/WrittenWork/myStoreIndex',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right: 8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor: pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">书面工作程序SWP</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()" style="display: none"><i class="fa fa-plus"></i>新增</a>
+                        <a id="enter" class="btn btn-default" onclick="importData()" style="display: none"><i class="fa fa-superscript"></i>导入</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download"></i>导出</a>
+                        <a id="store" class="btn btn-default" onclick="storeData()"><i class="fa fa-drupal"></i>收藏</a>
+                        <a id="mystore" class="btn btn-default" onclick="mystoreData()"><i class="fa fa-shopping-basket"></i>我的收藏</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

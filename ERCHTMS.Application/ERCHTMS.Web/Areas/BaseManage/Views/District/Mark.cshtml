@@ -1,0 +1,511 @@
+﻿@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <title>标注区域 </title>
+    <link href="~/Content/styles/font-awesome.min.css" rel="stylesheet" />
+    <link href="~/Content/scripts/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <script type="text/javascript" src="~/content/scripts/jquery/jquery-2.0.3.min.js"></script>
+    <script src="~/Content/scripts/bootstrap/bootstrap.min.js"></script>
+    <script type="text/javascript" src="~/content/scripts/utils/framework-ui.js"></script>
+    <script type="text/javascript" src="~/content/scripts/utils/framework-form.js"></script>
+    <style type="text/css">
+        .itemul {
+            background-color: pink;
+            z-index: 9999;
+            padding: 0px;
+            width: 130px;
+            min-height: 100px;
+            border-radius: 10%;
+        }
+
+            .itemul ul {
+                margin: 0px;
+                padding: 10px;
+            }
+
+                .itemul ul li {
+                    min-width: 100px;
+                    height: 16px;
+                    text-align: left;
+                    display: inline-block;
+                    font-size: 12px;
+                }
+
+            .itemul a {
+                text-decoration: underline;
+                cursor: pointer;
+            }
+    </style>
+    <script type="text/javascript">
+        var imgUrl = "@ViewBag.MapImage";
+        var keyValue = request("keyValue");
+        var action = request("action");
+        var points = new Array();//存放初始点坐标
+        var arrPoints = new Array();//存放当前已画坐标
+        var ctx = null;
+        var tctx = null;
+        var tc = null;
+        var canvas = null;
+        var step = 0;
+        var arrImg = new Array();
+        var tempImg = new Image();
+        var img = null;
+        $.ajaxSetup({
+            async: false
+        });
+        $(function () {
+            initControl();
+            $(document.body).keypress(function (e) {
+                //捕捉ctrl+Z鼠标动作
+                if (e.keyCode == 26) {
+                    //撤销本次画图
+                    cancel();
+                }
+            });
+        });
+        //撤销本次画图
+        function cancel() {
+            if (step > 0) {
+                step--;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                img = new Image();
+                img.src = arrImg[step];
+                var len = arrPoints.length;
+                if (len>=1) {
+                    arrPoints.splice(len - 1);
+                }
+                img.onload = function () {
+                    ctx.drawImage(img, 0, 0);
+                }
+
+            }
+        }
+        function drawMap(id) {
+            var dlg = top.layer.msg("请稍候，正在加载分布图……", { icon: 0, time: 300000, shift: 5 });
+            //获取所有区域坐标并绘制图形
+            $.get("GetAreaMapListJson",{id:id}, function (data) {
+                var json = $.parseJSON(data);
+                $(json).each(function (j, item) {
+                    drawArea(item);
+                    points.push(item);
+                    if (action == "View") {
+                        if (item.htnum.length > 0) {
+                            var arr = $.parseJSON(item.LatLng);
+                            if (arr.length > 0) {
+                                var arr1 = item.htnum.split(',');//获取隐患数量信息
+                                //以下根据隐患级别进行图标提示
+                                var div = document.createElement("div");
+                                var img = document.createElement("img");
+                                div.style.position = "absolute";
+                                div.style.left = arr[0].x + 2 + "px";
+                                div.className = "markicon"
+                                div.style.top = arr[0].y + 10 + "px";
+                                if (arr1.length > 0) {
+                                    if (arr1[0] != 0) {
+                                        //img.src = "../../content/areamaps/xiangyu/img/icon1.png";
+                                        //div.appendChild(img);
+                                        //document.body.appendChild(div);
+                                        ctx.beginPath();
+                                        ctx.arc(arr[0].x + 2, arr[0].y + 10, 6, 0, Math.PI * 2);
+                                        ctx.fillStyle = "orange";
+                                        ctx.fill();
+                                        ctx.strokeStyle = "white";
+                                        ctx.stroke();
+                                       
+                                    }
+                                    if (arr1[1] != 0) {
+                                        //img.src = "../../content/areamaps/xiangyu/img/icon2.png";
+                                        //div.appendChild(img);
+                                        //document.body.appendChild(div);
+                                        ctx.beginPath();
+                                        ctx.arc(arr[0].x + 2, arr[0].y + 10, 6, 0, Math.PI * 2);
+                                        ctx.fillStyle = "red";
+                                        ctx.fill();
+                                        ctx.strokeStyle = "white";
+                                        ctx.stroke();
+                                      
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                });
+                if (action == "View") {
+                    $("#tools>a").remove();
+                    //鼠标移动到区域位置进行提示
+                    canvas.addEventListener("mousemove", function (e) {
+                        onClick(e);
+                    }, false);
+                }
+                top.layer.close(dlg);
+                if (json.length>0) {
+                    img = new Image();
+                    img.src = canvas.toDataURL();
+                    tempImg.src = canvas.toDataURL();
+                }
+            });
+        }
+        //初始化控件
+        function initControl() {
+          
+            if (imgUrl.length>0) {
+                var width="@ViewBag.ImgWidth";
+                var height="@ViewBag.ImgHeight";
+                $("#con").css({ "background-image": "url(" + imgUrl + ")","width":width+"px","height":height+"px" });
+                $("#canvasId").attr("width","@ViewBag.ImgWidth");
+                $("#canvasId").attr("height", "@ViewBag.ImgHeight");
+                canvas = document.getElementById("canvasId");
+                tc = document.createElement("canvas");
+                tc.width = canvas.width;
+                tc.height = canvas.height;
+                ctx = canvas.getContext("2d");
+                tctx = tc.getContext("2d");
+                initMap();
+            }
+            drawMap("");
+            //获取某个区域点坐标
+            //if (!!keyValue) {
+            //    $.SetForm({
+            //        url: "../../BaseManage/District/GetFormJson",
+            //        param: { keyValue: keyValue },
+            //        success: function (data) {
+            //            if (data.LatLng != null) {
+            //                var arr = $.parseJSON(data.LatLng);
+            //                //根据点坐标绘制区域图形
+            //                if (arr.length > 1) {
+            //                    ctx.strokeStyle = "grey";
+            //                    ctx.lineWidth = 2;
+            //                    ctx.beginPath();
+            //                    ctx.moveTo(arr[0].x, arr[0].y);
+            //                    points.push(arr[0]);
+            //                    for (var j = 1; j < arr.length; j++) {
+            //                        points.push(arr[j]);
+            //                        ctx.lineTo(arr[j].x, arr[j].y);
+            //                    }
+            //                    ctx.closePath();
+            //                    ctx.stroke();
+            //                    ctx.fillStyle = "grey";
+            //                    ctx.fill();
+            //                }
+
+            //            }
+            //            top.layer.close(dlg);
+            //        }
+            //    });
+            //} else {
+
+            }
+        //}
+        //根据风险等级设置区域颜色
+        function getColor(item) {
+            var status = item.Status;
+            if (status == 0) {
+                color = "grey";
+            }
+            if (status == 1) {
+                color = "red";
+            }
+            if (status == 2) {
+                color = "orange";
+            }
+            if (status == 3) {
+                color = "yellow";
+            }
+            if (status == 4) {
+                color = "blue";
+            }
+            return color;
+        }
+        //绘制区域图形并填充
+        function drawArea(item,event) {
+            if (item.LatLng.length>0) {
+                //获取区域坐标集合
+                var arr = $.parseJSON(item.LatLng);
+                if (arr.length > 0) {
+                    //根据风险级别设置图形边框颜色
+                    ctx.strokeStyle = getColor(item);
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(arr[0].x, arr[0].y);
+                    for (var j = 1; j < arr.length; j++) {
+                        ctx.lineTo(arr[j].x, arr[j].y);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                    //根据风险级别填充图形颜色
+                    ctx.fillStyle = getColor(item);
+                    ctx.fill();
+                    //绘制区域名称
+                    ctx.fillStyle = "black";
+                    ctx.font = "11px";
+                    ctx.fillText(item.DistrictName, arr[0].x, arr[0].y + 35);
+
+                    var e = event || window.event;
+                    var x = e.clientX - canvas.getBoundingClientRect().left;
+                    var y = e.clientY - canvas.getBoundingClientRect().top;
+                    if (ctx.isPointInPath(x, y)) {
+                      
+                        changeStatus(item);
+                    }
+                    if (item.htnum.length>0) {
+                        var arr1 = item.htnum.split(',');//获取隐患数量信息
+                        //以下根据隐患级别进行图标提示
+                        if (arr1.length > 0) {
+                            if (arr1[0] != 0) {
+                                //img.src = "../../content/areamaps/xiangyu/img/icon1.png";
+                                //div.appendChild(img);
+                                //document.body.appendChild(div);
+                                ctx.beginPath();
+                                ctx.arc(arr[0].x + 2, arr[0].y + 10, 6, 0, Math.PI * 2);
+                                ctx.fillStyle = "orange";
+                                ctx.fill();
+                                ctx.strokeStyle = "white";
+                                ctx.stroke();
+
+                            }
+                            if (arr1[1] != 0) {
+                                //img.src = "../../content/areamaps/xiangyu/img/icon2.png";
+                                //div.appendChild(img);
+                                //document.body.appendChild(div);
+                                ctx.beginPath();
+                                ctx.arc(arr[0].x + 2, arr[0].y + 10, 6, 0, Math.PI * 2);
+                                ctx.fillStyle = "red";
+                                ctx.fill();
+                                ctx.strokeStyle = "white";
+                                ctx.stroke();
+
+                            }
+                        }
+                    }
+                }
+            }
+            
+        }
+        // 重新绘制（鼠标移动到区域位置时重新绘制并出现提示层）
+        function reDraw(x, y, event) {
+           // ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < points.length; i++) {
+                drawArea(points[i],event);
+              
+            }
+        }
+        // 如果在事件触发的范围内，可以做一些事情来改变状态
+        function changeStatus(item) {
+            showInfo(item);
+        }
+        // 点击事件处理函数
+        function onClick(event) {
+            $(".itemul").remove();
+            var e = event || window.event;
+            var x = e.clientX - canvas.getBoundingClientRect().left;
+            var y = e.clientY - canvas.getBoundingClientRect().top;
+            reDraw(x, y, event);
+        }
+        //区域统计信息
+        function getHtml(item) {
+            var html = "";
+            var areaCode=item.Code;
+            if (item.wxnum != "0") {
+                html = "<li>重大危险源：<a onclick=\"top.tablist.newTab({title:'重大危险源',url: '../HazardsourceManage/Hisrelationhd_qd/DangerList?pMode=0&code=" + areaCode + "'})\" title='点击查看详情'>" + item.wxnum + "</a></li>";
+            }
+            if (item.htnum.length > 0) {
+                arr = item.htnum.split(',');
+                if (arr[0] != 0) {
+                    html += "<li>一般隐患：<a onclick=\"top.tablist.newTab({id:'67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0',title:'一般隐患',url: '../HiddenTroubleManage/HTBaseInfo/Index?ChangeStatus=" + encodeURIComponent("未整改结束") + "&mode=ybqbyh&code=" + areaCode + "'})\" title='点击查看详情'>" + arr[0] + "</a></li>";
+                }
+                if (arr[1] != 0) {
+                    html += "<li>重大隐患：<a onclick=\"top.tablist.newTab({id:'67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0',title:'重大隐患',url: '../HiddenTroubleManage/HTBaseInfo/Index?ChangeStatus=" + encodeURIComponent("未整改结束") + "&mode=bigHt&code=" + areaCode + "'})\" title='点击查看详情'>" + arr[1] + "</a></li>";
+                }
+            }
+            if (item.fxnum.length > 0) {
+                arr = item.fxnum.split(',');
+                $(arr).each(function (k, num) {
+                    var grade = ""
+                    if (k == 0) {
+                        grade = "重大";
+                    }
+                    if (k == 1) {
+                        grade = "较大";
+                    }
+                    if (k == 2) {
+                        grade = "一般";
+                    }
+                    if (k == 3) {
+                        grade = "低";
+                    }
+                    if (num > 0) {
+                        html += "<li>" + grade + "级风险：<a onclick=\"top.tablist.newTab({id:'d472030f-3094-4ad8-89cd-90c949fd4d91',title:'" + grade + "风险清单',url: '../RiskDatabase/DangerSource/List?mode=1&year=&level=" + (k + 1) + "&code=" + areaCode + "'})\" title='点击查看详情'>" + num + "</a></li>";
+                    }
+
+                });
+            }
+            return html;
+        }
+        //区域提示统计信息
+        function showInfo(item) {
+            var arr = $.parseJSON(item.LatLng);
+            if($("#"+item.DistrictName)!=undefined){
+                $("#" + item.DistrictName).remove();
+            }
+            var html = getHtml(item);
+            if (html.length>0 && arr.length>0) {
+                var div = document.createElement("div");
+                div.id = item.DistrictName;
+                div.style.left = arr[0].x + "px";
+                div.style.top = arr[0].y + "px";
+                div.style.position = "absolute";
+                div.className = "itemul";
+                div.innerHTML = "<ul>" + getHtml(item) + "</ul>";
+                div.style.zIndex = 10000;
+                document.body.appendChild(div);
+                div.onmouseleave = function () {
+                    $(div).hide();
+                }
+            }
+
+        }
+        //保存区域点坐标
+        function AcceptClick() {
+            
+            if (arrPoints.length > 0) {
+                if (arrPoints.length<3) {
+                    dialogAlert("绘图不正确，请重新绘制！");
+                } else {
+                    var lats = JSON.stringify(arrPoints);
+                    $.SaveForm({
+                        url: "../../BaseManage/District/SaveMark?keyValue=" + keyValue,
+                        param: { points: lats },
+                        loading: "正在保存数据...",
+                        success: function (data) {
+                            top.frames["Form"].window.$("#LatLng").val(lats);
+
+                        }
+                    });
+                }
+            } else {
+                //$.post("ClearMark", { keyValue: keyValue }, function (data) {
+                //    if (top.frames["Form"]!=undefined) {
+                //        top.frames["Form"].window.$("#LatLng").val("");
+                //    }
+                //    dialogClose();
+                //});
+                dialogAlert("您没有做任何标记！");
+            }
+
+        }
+        //清除坐标
+        function clearMark() {
+            var idx=dialogConfirm("确定重新绘制本区域吗？", function (isSure) {
+                if (isSure) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                   // ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
+                    //ctx.drawImage(img, 0, 0);
+                    //points = new Array();
+                    arrPoints = new Array();
+                    top.layer.close(idx);
+                    drawMap(keyValue);
+                    //$.post("ClearMark", { keyValue: keyValue }, function (data) {
+                    //    top.layer.close(idx);
+                    //    if (top.frames["Form"]!=undefined) {
+                    //        top.frames["Form"].window.$("#LatLng").val("");
+                    //    }
+                    //    window.location.reload();
+                    //});
+                }
+            });
+        }
+        function initMap() {
+            try {
+                var canvas = document.getElementById("canvasId");
+                var flag = false;
+                //var tc = document.createElement("canvas");
+                //tc.width = canvas.width;
+                //tc.height = canvas.height;
+                //var ctx = canvas.getContext("2d");
+                var x = 0;
+                var y = 0;
+                //绘制图形
+
+                if (action != "View") {
+                    //鼠标按下时记录坐标
+                    canvas.onmousedown = function (e) {
+                        e = e || window.event;
+                        x = e.clientX - canvas.offsetLeft + (document.body.scrollLeft || document.documentElement.scrollLeft);
+                        y = e.clientY - canvas.offsetTop + (document.body.scrollTop || document.documentElement.scrollTop);
+                        flag = true;
+                        img = new Image();
+                        img.src = canvas.toDataURL();
+                        arrImg.push(canvas.toDataURL());
+                       // tctx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+                        points.push({
+                            x: x, y: y
+                        });
+                        arrPoints.push({
+                            x: x, y: y
+                        });
+                        step++;
+                        //alert(step + "==" + arrImg.length);
+                    }
+                    //鼠标移动时记录位置并绘图
+                    canvas.onmousemove = function (e) {
+                        if (!flag) return;
+                        e = e || window.event;
+                        var gx = e.clientX - canvas.offsetLeft + (document.body.scrollLeft || document.documentElement.scrollLeft);
+                        var gy = e.clientY - canvas.offsetTop + (document.body.scrollTop || document.documentElement.scrollTop);
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        ctx.beginPath();
+                        ctx.strokeStyle = "red";//绘制线条的颜色
+                        ctx.lineWidth = 2;
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(gx, gy);
+                        ctx.stroke();
+                    }
+                    //鼠标释放时停止绘图
+                    canvas.onmouseup = function (e) {
+                        e = e || window.event;
+                        x = e.clientX - canvas.offsetLeft + (document.body.scrollLeft || document.documentElement.scrollLeft);
+                        y = e.clientY - canvas.offsetTop + (document.body.scrollTop || document.documentElement.scrollTop);
+                        flag = false;
+                    }
+                }
+            }//当浏览器不支持canvas绘图时进行提示
+            catch (ex) {
+                $("#tools>a").remove();
+                top.layer.open({
+                    id: "WinMark",
+                    type: 1,
+                    title: "系统提示",
+                    fix: false,
+                    area: ['500px', '200px'],
+                    content: "<div style='margin:20px;color:red;font-size:18px;'>对不起,此功能不支持IE9以下浏览器,推荐使用谷歌或360浏览器操作</div>",
+                    btn: null,
+                    cancel: function () {
+                        top.layer.close(top.window.dlgIndex);
+                    }
+                });
+            }
+        }
+    </script>
+</head>
+<body style="background-color:#ccc;  background-repeat:no-repeat; background-size:cover; ">
+    <div class="col-12 text-right" style="position:fixed; right:5px;top:5px;width:25px;height:300px;" id="tools">
+        <a onclick="cancel()" title="撤销" style="cursor:pointer; "><i class="fa fa-undo fa-2x"></i></a>&nbsp;
+        <a onclick="clearMark()" title="清除,重新绘制" style="cursor:pointer; "><i class="fa fa-trash fa-2x"></i></a>
+    </div>
+    <div class="container1">
+        <div id="con" class="content">
+            <canvas id="canvasId" width="1500" height="900" style="background-color:transparent;"></canvas>
+        </div>
+    </div>
+    
+   
+    @*<script type="text/javascript" src="../../content/scripts/utils/zoom.js"></script>*@
+</body>
+</html>

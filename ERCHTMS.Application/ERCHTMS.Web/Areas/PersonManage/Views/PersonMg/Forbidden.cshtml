@@ -1,0 +1,169 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+
+
+<script>
+
+    var userId = request('userId');
+    var type = request('type');
+    var checkarr = [];
+    var ptime = "@DateTime.Now";
+    var time;//计时器
+    var listobj;//设备集
+
+    $(function () {
+        GetGrid();
+    });
+
+    //定时执行任务
+    function refreshData() {
+        var taskIds = "";
+        for (var i = 0; i < listobj.length; i++) {
+            if (i == 0) {
+                taskIds += listobj[i].taskId
+            }
+            else {
+                taskIds += ',' + listobj[i].taskId
+            }
+        }
+        $.ajax({//先查询添加或删除任务进度是否完成
+            url: '../../PersonManage/PersonMg/QuerySpeedofprogress?taskIds=' + taskIds,
+            type: "POST",
+            async: true,
+            dataType: "Json",
+            success: function (result) {
+                if (result == "1") {
+                    window.clearInterval(time);
+                    $.SaveForm({//将人脸信息下载到指定设备中
+                        url: "../../PersonManage/PersonMg/DownloadToEquipment",
+                        param: { list: listobj },
+                        close: true,
+                        success: function (data) {
+                            $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                        }
+                    });
+                }
+            }
+        })
+    };
+
+    //加载表格
+    function GetGrid() {
+        var url = "../../PersonManage/PersonMg/GetCheckUserList?userids=" + userId + "&type=" + type;
+        var res = "";
+        $.post(url, {}, function (data) {
+            var list = eval("(" + data + ")")
+            for (var i = 0; i < list.length; i++) {
+                var entity = list[i];
+                var realname = entity.realname == null ? "" : entity.realname;
+                var userid = entity.userid == null ? "" : entity.userid;
+                var gender = entity.gender == null ? "" : entity.gender;
+                var mobile = entity.mobile == null ? "" : entity.mobile;
+                var organizename = entity.organizename == null ? "" : entity.organizename;
+                var deptname = entity.deptname == null ? "" : entity.deptname;
+                var dutyname = entity.dutyname == null ? "" : entity.dutyname;
+                var createdate = entity.createdate == null ? "" : entity.createdate;
+
+                res += "<tr> <td><input checked=\"checked\" type=\"checkbox\" id=" + userid + " /></td><td>" + realname + "</td><td>" + gender + "</td><td>" + mobile + "</td>  <td>" + organizename + "</td><td>" + deptname + "</td><td>" + dutyname + "</td>";
+                res += "<td>" + createdate + "</td><td>" + "" + "</td>";
+                res += "</tr>";
+            }
+            $(".bodyClass").append(res);
+        });
+    }
+
+
+    //保存表单;
+    function AcceptClick() {
+        $(".bodyClass").find("input").each(function () {
+            var tdArr = $(this).children();
+            var Id = tdArr.context.id;
+            if (document.getElementById(Id).checked) {
+                checkarr.push({ USERID: Id, Remark: $("#Remark").val(), EndTime: ptime });
+            }
+        });
+
+        var url = '../../PersonManage/PersonMg/SaveForbidden';
+        $.post(url, { list: checkarr }, function (data) {
+            var list = eval('(' + data + ')')
+            Loading(true, "请稍候,正在下发数据……");
+            listobj = list;
+            time = window.setInterval("refreshData()", 4000);
+           
+
+        });
+
+
+        //$.SaveForm({
+        //    url: "../../PersonManage/PersonMg/SaveForbidden",
+        //    param: { list: checkarr },
+        //    loading: "正在保存数据...",
+        //    close: true,
+        //    success: function () {
+        //        $.currentIframe().$("#gridTable").trigger("reloadGrid");
+        //    }
+        //});
+
+    }
+
+
+</script>
+
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div style="text-align-last:center;" class="ui-layout-center">
+        <h3>加入禁入名单</h3>
+        <div class="center-Panel" style="margin-left: 10px;">
+            <table class="ContenSumTitle" id="gridTable">
+                <thead>
+                    <tr style="height: 35px; font-weight: bold; background-color: #f5f5f6; ">
+                        <td>操作</td>
+                        <td>姓名</td>
+                        <td>性别</td>
+                        <td>手机号</td>
+                        <td>单位</td>
+                        <td>部门</td>
+                        <td>岗位</td>
+                        <td>开始考勤时间</td>
+                        <td>终止考勤时间</td>
+                    </tr>
+                </thead>
+                <tbody class="bodyClass"></tbody>
+            </table>
+
+        </div>
+        <div class="center-Panel444" style="margin-left: 10px;margin-top: 40px;">
+            <table>
+                <tr>
+                    <td>禁入原因：</td>
+                    <td class="formValue">
+                        <textarea id="Remark" type="text" maxlength="1000" style="height:144px;width: 1405px" isvalid="yes" checkexpession="NotNull" class="form-control"></textarea>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .ContenSumTitle {
+        height: 74px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        margin-left: 10px;
+        text-align: center;
+    }
+
+        .ContenSumTitle td {
+            border: 1px solid #ccc;
+            width: 185px;
+        }
+
+    .bodyClass tr {
+        height: 40px;
+    }
+</style>
+

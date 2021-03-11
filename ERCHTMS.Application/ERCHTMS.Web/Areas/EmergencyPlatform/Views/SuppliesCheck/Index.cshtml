@@ -1,0 +1,347 @@
+@{;
+    ViewBag.Title = "应急物资领用申请";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script>
+    var _parentId = "";
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var DeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolenames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//角色
+    var suppliesid = request("suppliesid");
+    $(function () {
+        InitialPage();
+        GetGrid();
+        GetTree();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+
+    //加载树
+    var deptCode = "";//部门编码
+    function GetTree() {
+        var json = JSON.stringify(
+                       {
+                           SelectMode: 0,
+                           Mode: 0
+                       }
+              );
+        url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+        //加载组织机构树
+        var item = {
+            height: $(window).height() - 65,
+            url: url,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化部门树
+        $("#itemTree").treeview(item);
+
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            checkstartdate: $("#CheckStartDate").val(),
+            checkenddate: $("#CheckEndDate").val(),
+            checkperson: $("#CheckPerson").val(),
+            code: _parentId,
+            suppliesid: suppliesid
+        }
+        $gridTable.jqGrid({
+            autowidth: true,
+            postData: { queryJson: JSON.stringify(queryJson) },
+            height: $(window).height() - 170,
+            url: "../../EmergencyPlatform/SuppliesCheck/GetPageList",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'id', align: 'left', sortable: true, hidden: true },
+                 { label: '创建人', name: 'createuserid', index: 'createuserid', align: 'center', sortable: true, hidden: true },
+                  { label: '创建人部门code', name: 'createuserdeptcode', index: 'createuserdeptcode', align: 'center', sortable: true, hidden: true },
+                  { label: '创建人组织code', name: 'createuserorgcode', index: 'createuserorgcode', align: 'center', sortable: true, hidden: true },
+                  {
+                      label: '操作', name: 'Oper', align: 'center', width: 200,
+                      formatter: function (cellvalue, options, rowObject) {
+                          var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                          if (UserId == rowObject.createuserid) {
+                              html += "<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>&nbsp;";
+                              html += "<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>&nbsp;";
+                          }
+                          return html;
+                      }
+                  },
+                { label: '检查日期', name: 'checkdate', index: 'checkdate', align: 'center', sortable: true, width: 200 },
+                { label: '检查人员', name: 'checkusername', index: 'checkusername', align: 'center', sortable: true, width: 200 },
+                { label: '检查单位', name: 'checkuserdept', index: 'checkuserdept', align: 'center', sortable: true, width: 200 },
+                {
+                    label: '应急物资检查情况', name: 'checknum', index: 'checknum', align: 'center', sortable: true, width: 300, formatter:
+                    function (cellvalue, options, rowObject) {
+                        return "检查项：" + rowObject.checknum + "项    不合格项：" + rowObject.badnum + "项"
+                    }
+                },
+                { label: '创建人', name: 'createusername', index: 'createusername', align: 'center', sortable: true, width: 200 },
+                { label: '创建时间', name: 'createdate', index: 'createdate', align: 'center', sortable: true, width: 200 }],
+            viewrecords: true,
+            rowNum: 30,
+            // rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'a.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            multiselect: false,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            loadError: function (xhr, status, error) {
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                ////隐藏搜索框
+                var title = $(".ui-filter-text");
+
+                title.trigger("click");
+            }
+            var queryJson = {
+                checkstartdate: $("#CheckStartDate").val(),
+                checkenddate: $("#CheckEndDate").val(),
+                checkperson: $("#CheckPerson").val(),
+                code: _parentId,
+                suppliesid: suppliesid
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //重置
+        $("#btn_Reset").click(function () {
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                ////隐藏搜索框
+                var title = $(".ui-filter-text");
+
+                title.trigger("click");
+            }
+            $("#CheckStartDate").val("");
+            $("#CheckEndDate").val("");
+            $("#CheckPerson").val("");
+            var queryJson = {
+                checkstartdate: $("#CheckStartDate").val(),
+                checkenddate: $("#CheckEndDate").val(),
+                checkperson: $("#CheckPerson").val(),
+                code: _parentId,
+                suppliesid: suppliesid
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+
+        })
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加应急物资检查',
+            url: '/EmergencyPlatform/SuppliesCheck/Form?action=add',
+            width: ($(top.window).width() - 150) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: ["确认", "关闭"],
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑应急物资检查',
+                url: '/EmergencyPlatform/SuppliesCheck/Form?action=edit&keyValue=' + keyValue,
+                width: ($(top.window).width() - 150) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["确认","关闭"],
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../EmergencyPlatform/SuppliesCheck/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的应急物资检查！', 0);
+        }
+    }
+
+    //查看
+    function show() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看应急物资检查',
+                url: '/EmergencyPlatform/SuppliesCheck/Form?action=show&keyValue=' + keyValue,
+                width: ($(top.window).width() - 150) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    function ExportData() {
+        var queryJson = {
+            checkstartdate: $("#CheckStartDate").val(),
+            checkenddate: $("#CheckEndDate").val(),
+            checkperson: $("#CheckPerson").val(),
+            code: _parentId,
+            suppliesid: suppliesid
+        }
+        location.href = "../../EmergencyPlatform/SuppliesCheck/ExportData?queryJson=" + JSON.stringify(queryJson);
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">应急物资检查</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle">检查日期：</td>
+                                                <td class="formValue">
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="CheckStartDate" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'CheckEndDate\')}' })">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="CheckEndDate" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'CheckStartDate\')}' })">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">检查人员：</td>
+                                                <td class="formValue">
+                                                    <input id="CheckPerson" type="text" class="form-control" placeholder="请输入检查人" style="width: 200px;" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-primary">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

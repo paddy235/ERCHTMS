@@ -1,0 +1,178 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户ID
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $("#WorkType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetAllDataItemListJson",
+            param: { EnCode: "DangerousJobConfig" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../DangerousJobConfig/SafetyMeasureConfig/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                {
+                    label: '操作', name: 'oper', index: 'oper', width: 200, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (rowObject.createuserid == UserId) {
+                            html += "<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '作业类型', name: 'worktypename', index: 'worktypename', width: 300, align: 'center', sortable: true },
+                { label: '配置类型', name: 'configtypename', index: 'configtypename', width: 300, align: 'center', sortable: true },
+                { label: '创建时间', name: 'createdate', index: 'createdate', width: 100, align: 'center', sortable: true }],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 30, 40],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: {
+                    queryJson: JSON.stringify({
+                        WorkType: $("#WorkType").attr("data-value")
+                    })
+                }, page: 1
+            }).trigger('reloadGrid');
+        })
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'AddForm',
+            title: '新增安全配置',
+            url: '/DangerousJobConfig/SafetyMeasureConfig/Form',
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit(keyValue) {
+
+        if (!!keyValue) {
+            dialogOpen({
+                id: 'EditForm',
+                title: '编辑安全配置',
+                url: '/DangerousJobConfig/SafetyMeasureConfig/Form?actiontype=edit&keyValue=' + keyValue,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+
+    //删除
+    function del(keyValue) {
+        if (!!keyValue) {
+            $.RemoveForm({
+                url: '../../DangerousJobConfig/SafetyMeasureConfig/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的安全配置！', 0);
+        }
+    }
+    //查看
+    function show(keyValue) {
+        if (!!keyValue) {
+            dialogOpen({
+                id: 'ShowForm',
+                title: '查看安全配置',
+                url: '/DangerousJobConfig/SafetyMeasureConfig/Form?actiontype=view&keyValue=' + keyValue,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: []
+            })
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title">安全措施配置</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                        <table>
+                            <tr>
+                                <td class="formTitle">作业类型</td>
+                                <td class="formValue">
+                                    <div id="WorkType" type="select" class="ui-select" style="width: 200px;"></div>
+                                </td>
+                                <td style="padding-left: 5px;">
+                                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>新增</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+

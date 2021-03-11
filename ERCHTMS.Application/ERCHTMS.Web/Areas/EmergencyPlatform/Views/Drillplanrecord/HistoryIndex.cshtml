@@ -1,0 +1,198 @@
+﻿@{;
+ViewBag.Title = "应急演练";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script>
+
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var DeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Cod
+    var drillplanId = request('drillplanId');
+    var IsGdxy = false;//版本标示 true 标示国电荥阳版本 false 通用版本
+
+    $(function () {
+        IsGdxy = GetVersion();
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            drillplanId: drillplanId
+        }
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../EmergencyPlatform/Drillplanrecord/GetHistoryPageListJson",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'id', align: 'center', sortable: true, hidden: true },
+                { label: '创建人', name: 'createuserid', index: 'createuserid', align: 'center', sortable: true, hidden: true },
+                { label: '创建人部门code', name: 'createuserdeptcode', index: 'createuserdeptcode', align: 'center', sortable: true, hidden: true },
+                { label: '创建人组织code', name: 'createuserorgcode', index: 'createuserorgcode', align: 'center', sortable: true, hidden: true },
+                {
+                    label: '操作', name: 'Oper', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        return html;
+                    }
+                },
+                { label: '', name: 'evaluatedeptid ', hidden: true },
+                { label: '', name: 'evaluateroleid ', hidden: true }, { label: '', name: 'evaluaterole ', hidden: true },
+                 { label: '', name: 'iscommit', hidden: true }, { label: '', name: 'isstartconfig', hidden: true }, { label: '', name: 'isoverevaluate', hidden: true },
+                { label: '组织部门', name: 'orgdept', index: 'orgdept', align: 'center', sortable: true },
+                { label: '演练部门', name: 'departname', index: 'departname', align: 'center', hidden: true, sortable: true },
+                { label: '演练名称', name: 'name', index: 'name', align: 'center', sortable: true },
+                { label: '演练预案名称', name: 'drillplanname', index: 'drillplanname', align: 'center', sortable: true },
+                { label: '演练预案类型', name: 'drilltypename', index: 'drilltypename', align: 'center', sortable: true },
+                { label: '演练方式', name: 'drillmodename', index: 'drillmodename', align: 'center', sortable: true },
+                {
+                    label: '演练时间', name: 'drilltime', index: 'drilltime', align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return rowObject.drilltime.substring(0, 10);
+                    }
+                },
+                { label: '演练地点', name: 'drillplace', index: 'drillplace', align: 'center', sortable: true },
+                { label: '参与人数', name: 'drillpeoplenumber', index: 'drillpeoplenumber', align: 'center', sortable: true },
+                {
+                    label: '查看演练方案附件', name: 'name', align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var key = rowObject.id;
+                        return loadFile(key);
+                    }
+                },
+                 {
+                     label: '评价状态', name: 'isoverevaluatestate', align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         if (rowObject.iscommit == 0) {
+                             return '<a style="text-decoration:underline;color:blue" >待提交</a>';
+                         }
+                         else {
+                             if (rowObject.isstartconfig == 1) {
+                                 if (cellvalue == 0) {
+                                     return '<a style="text-decoration:underline;color:blue"  href="javascript:btn_viewflow(\'' + rowObject.id + '\')">评价中</a>';
+                                 } else {
+                                     return '<a style="text-decoration:underline;color:blue"  href="javascript:btn_viewflow(\'' + rowObject.id + '\')">评价完成</a>';
+                                 }
+                             } else {
+                                 if (cellvalue == 0) {
+                                     return '<a style="text-decoration:underline;color:blue" >评价中</a>';
+                                 } else {
+                                     return '<a style="text-decoration:underline;color:blue" >已评价</a>';
+                                 }
+                             }
+                         }
+                     }
+                 },
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            multiselect: false,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                //查询用户对该模块的数据操作权限
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                if (IsGdxy) {
+                    $gridTable.hideCol(["isoverevaluatestate"]);
+                    $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                }
+
+            }
+        });
+    }
+    //加载附件
+    function loadFile(cellvalue) {
+        $.ajax({
+            url: '../../SaftProductTargetManage/SafeProductDutyBook/GetFiles',
+            data: { fileId: cellvalue },
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                if (result == "" || result == undefined || result == null) {
+                    cellvalue = "&nbsp;&nbsp;无";
+                }
+                else {
+                    cellvalue = "<a href=javascript:funcAction('" + cellvalue + "') style='color:blue; text-decoration:underline'  title='查看文件'>查看</a>";
+                }
+            }
+        });
+        return cellvalue;
+    }
+    //查看
+    function show(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "HistoryForm",
+                title: '查看信息',
+                url: '/EmergencyPlatform/Drillplanrecord/Form?type=history&keyValue=' + keyValue,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //文件显示
+    function funcAction(a) {
+        var idx = dialogOpen({
+            id: "Form",
+            title: "查看文件",
+            url: '/EmergencyPlatform/Drillplanrecord/Files?filesid=' + a,
+            width: "500px",
+            height: ($(top.window).height() - 550) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+
+</div>

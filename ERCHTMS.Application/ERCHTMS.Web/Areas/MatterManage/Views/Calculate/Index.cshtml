@@ -1,0 +1,931 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+<!--即时通信start-->
+<script src="~/Content/scripts/plugins/signalr/jquery.signalR-2.2.0.min.js"></script>
+<script src="@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("SignalRUrl", "MQConfig"))/hubs"></script>
+
+<style>
+    .mztitle {
+        display: flex;
+    }
+
+    .layui-layer-btn .layui-layer-btn0 {
+        background: #5cb85c;
+        border: 1px solid #4cae4c;
+        color: #fff;
+    }
+
+    .layui-layer-btn a {
+        height: 28px;
+        line-height: 46px;
+        margin: 5px 5px 0;
+        padding: 0 15px;
+        border: 1px solid #dedede;
+        background-color: #fff;
+        color: #333;
+        border-radius: 2px;
+        font-weight: 400;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .tabel-container1 {
+        height: 285px;
+        padding: 10px;
+        border: 1px solid #ccc;
+    }
+
+    .list-leftcontainer {
+        height: 285px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        margin-right: 10px;
+    }
+
+    .list-container1 {
+        height: 285px;
+        padding: 10px 5px;
+        border: 1px solid #ccc;
+        overflow-y: auto;
+    }
+
+        .list-container1 span {
+            padding: 0 10px;
+        }
+
+        .list-container1 p:hover {
+            cursor: pointer;
+            color: #2e99d4;
+        }
+
+    .btn-group1 {
+        float: right;
+        width: 200px;
+    }
+
+        .btn-group1 a {
+            display: inline-block;
+            width: 60px;
+            margin-right: 10px;
+            height: 24px;
+            line-height: 24px;
+            background: #5cb85c;
+            color: #fff;
+            text-align: center;
+            border-radius: 2px;
+            margin-top: 10px;
+            float: right;
+            text-decoration: none;
+        }
+
+    .table-title1 li {
+        width: 70%;
+        float: left;
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+
+    .workRecord_l {
+        float: left;
+        margin-right: 7px;
+        padding-top: 14px;
+    }
+
+    .workRecord_r {
+        float: left;
+        line-height: 20px;
+        padding-left: 10px;
+    }
+
+    .clear:after {
+        display: block;
+        content: '';
+        clear: both;
+        overflow: hidden;
+        height: 0;
+    }
+
+    .clear {
+        zoom: 1;
+    }
+
+    #Weight, #Count, #zNetwneight, #zrough, #ztare {
+        display: inline-block;
+        line-height: 35px;
+        height: 35px;
+    }
+
+    #WorkRecord li {
+        margin-bottom: 10px;
+    }
+
+    .list-leftcontainerBox {
+        width: 26%;
+        float: left;
+    }
+
+    .list-leftcontainerBox2 {
+        width: 45%;
+        float: left;
+    }
+
+    .list-leftcontainerBox3 {
+        width: 28%;
+        float: right;
+    }
+
+        .list-leftcontainerBox h4, .list-leftcontainerBox2 h4, .list-leftcontainerBox3 h4 {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-left: 12px;
+        }
+
+    .btn-group1 a:hover {
+        cursor: pointer;
+        color: #2e99d4;
+    }
+
+    #btn_Save {
+        display: block;
+    }
+
+    .ClassLeft {
+        float: left;
+        padding-left: 8px;
+        text-align: center;
+    }
+
+        .ClassLeft input {
+            padding: 0;
+            padding-left: 5px;
+            height: auto;
+        }
+
+    .titlePan {
+        height: 74px;
+        background: #fff;
+        border: 1px solid #ccc;
+        margin: 0px;
+        border-bottom: none;
+        position: relative;
+    }
+
+        .titlePan .toolbar {
+            float: right;
+            margin-right: 15px;
+        }
+
+    .btn-group {
+        margin-top: 15px;
+        margin-left: 10px;
+    }
+</style>
+
+<script>
+    var keyValue = request('keyValue');
+    var currUserAccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    var clientIp = "@ViewBag.IPAddress";
+    var poundAIp= "@ViewBag.PoundAIP";
+    var poundBIp = "@ViewBag.PoundBIP";
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+        BindWeighbridge();
+        GetWorkRecord();
+
+          //查询事件
+        $("#btn_Search").click(function () {
+            $('#gridTable').jqGrid('setGridParam', { postData: { queryJson: JSON.stringify(CreateParams()) }, page: 1}).trigger('reloadGrid');
+        });
+
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val('');
+            $("#txt_UserName").val('');
+            $("#Goodsname1").val('');
+            $("#Takegoodsname1").val('');
+            $('#gridTable').jqGrid('setGridParam', { postData: { queryJson: JSON.stringify(CreateParams()) }, page: 1 }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+              if (event.keyCode == "13") {
+                  $('#btn_Search').trigger("click");
+              }
+          });
+    });
+
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 500);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //初始化控件
+    function initControl(id, num) {
+        keyValue = id;
+        //获取表单
+        if (!!id) {
+            $.SetForm({
+                url: "../../MatterManage/Calculate/GetOnlyFormJson",
+                param: { keyValue: id },
+                success: function (data) {
+                    if (data != null) {
+                        $("#form1").formDeserialize(data);
+                        $("#Weight").val(data.Rough);
+                        $("#Taretime").val(formatDate(data.Taretime, "yyyy-MM-dd hh:mm"));
+                        $("#Roughtime").val(formatDate(data.Roughtime, "yyyy-MM-dd hh:mm"));
+                        $("#Roughusername").val(data.Roughusername == null ? data.Tareusername : data.Roughusername);
+                        jQuery("#bit_OverLoad").hide();
+                        jQuery("#btn_Save").hide();
+                    }
+                }
+            })
+        }
+    }
+
+    //工作记录
+    function GetWorkRecord() {
+        var url = "../../MatterManage/Operticketmanager/GetdailyrRecord";
+        $.post(url, { type: 3 }, function (data) {
+            if (data) {
+                var list = eval("(" + data + ")");
+                var html = "";
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i].theme == "登录") {
+                        var title = formatDate(list[i].createdate, "yyyy-MM-dd hh:mm") + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;用户" + list[i].username + "登录系统";
+                        html += "<li class='clear'><p >" + title + "</p></li>";
+                    }
+                    else {
+                        var arr = list[i].content.split(',');
+                        if (arr.length > 2) {
+                            html += " <li class='clear'><div class='workRecord_l'>" + formatDate(list[i].createdate, "yyyy-MM-dd hh:mm") + "  </div> <div class='workRecord_r'>";
+                            html += "<p>" + list[i].theme + "：车牌号【" + arr[0] + "】" + "</p> <p style='max-width:210px'>毛重【" + arr[1] + "】,皮重【" + arr[2] + "】,净重【" + arr[3] + "】</p></div></li>"
+                        }
+                        else {//自动提货
+                            var title = formatDate(list[i].createdate, "yyyy-MM-dd hh:mm") + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+                            title += "" + list[i].theme + "：车牌号【" + arr[0] + "】" + "皮重【" + arr[1] + "】"
+                            html += "<li class='clear'><p >" + title + "</p></li>";
+                        }
+                    }
+                }
+                $("#WorkRecord").html(html);
+            }
+        });
+    }
+
+    //加载地磅室信息
+    function BindWeighbridge() {
+        if (clientIp == poundAIp) {
+            $("#Poundcode").val("2#");
+            $("#Poundname").val("2#地磅");
+            $("#Roughusername").val(currUserAccount);
+        } else if (clientIp ==poundBIp) {
+            $("#Poundcode").val("1#");
+            $("#Poundname").val("1#地磅");
+            $("#Roughusername").val(currUserAccount);
+        } else {
+              jQuery("#btn_Save").hide();
+        }
+    }
+
+    function CreateParams() {
+        var queryJson = {
+            keyword: $("#txt_Keyword").val(),
+            StartTime: $("#StartTime").val(),
+            EndTime: $("#EndTime").val(),
+            Takegoodsname: $("#Takegoodsname1").val(),
+            Goodsname: $("#Goodsname1").val(),
+            UserName: $("#txt_UserName").val()
+        }
+
+        return queryJson;
+    }
+
+    //加载表格
+    function GetGrid() {
+         var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(top.window).height() - 500,
+            url: "../../MatterManage/Calculate/GetNewPageList",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(CreateParams()) },
+            colModel: [
+                { label: 'Id', name: 'id', hidden: true },
+                { label: 'isout', name: 'isout', hidden: true },
+                { label: '操作', name: 'Oper', index: 'Oper', width: 150, align: 'center', sortable: false },
+                { label: '提货/转运单号', name: 'numbers', index: 'Numbers', width: 300, align: 'center' , sortable: false},
+                { label: '运货单位', name: 'takegoodsname', index: 'TakeGoodsName', width: 300, align: 'center', sortable: false },
+                { label: '车牌号', name: 'platenumber', index: 'PlateNumber', width: 150, align: 'center', sortable: false },
+                { label: '开票ID', name: 'baseid', hidden: true },
+                { label: '货名', name: 'goodsname', index: 'goodsName', width: 150, align: 'center', sortable: false },
+                { label: '毛重', name: 'rough', index: 'rough', width: 200, align: 'center', sortable: false },
+                { label: '皮重', name: 'tare', index: 'tare', width: 200, align: 'center', sortable: false },
+                { label: '净重', name: 'netwneight', index: 'netwneight', width: 200, align: 'center', sortable: false },
+                {
+                  label: '毛重时间', name: 'roughtime', index: 'roughTime', width: 200, align: 'center', sortable: false,  formatter: function (cellvalue, options, rowObject) {
+                         return formatDate(cellvalue, 'yyyy-MM-dd hh:mm')
+                     }
+                 },
+
+                { label: '毛重司磅员', name: 'roughusername', index: 'roughUserName', width: 150, align: 'center', sortable: false },
+                {
+                    label: '皮重时间', name: 'taretime', index: 'tareTime', width: 200, align: 'center', sortable: false,  formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm')
+                    }
+                },
+                { label: '皮重司磅员', name: 'tareusername', index: 'tareUserName', width: 150, align: 'center', sortable: false },
+                {
+                    label: '称重单打印时间', name: 'stamptime', index: 'stampTime', width: 300, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (Number(rowObject.zcount) > 1) {
+                            if (rowObject.zstamptime != null) {
+                                return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + "（第一车）";
+                            }
+                            else {
+                                return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                            }
+                        }
+                        else {
+                            return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                        }
+                    }
+                },
+                { label: '备注', name: 'remark', index: 'Remark', width: 300, align: 'center', sortable: true },
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                gridqxcz($gridTable);
+                var rowDatas = $("#gridTable").jqGrid("getRowData");
+                var zrough = 0; var ztare = 0; var znetweight = 0;
+                for (var i = 0; i < rowDatas.length; i++) {
+                    zrough = Number(zrough) + Number(rowDatas[i].rough);
+                    ztare = Number(ztare) + Number(rowDatas[i].tare);
+                    znetweight = Number(znetweight) + Number(rowDatas[i].netwneight);
+                }
+                $("#Count").val(rowDatas.length);
+                $("#zrough").val(zrough);
+                $("#ztare").val(ztare);
+                $("#zNetwneight").val(znetweight);
+            },
+            rowNum: 10000,
+            sortname: 'roughtime',
+            sortorder: 'desc',
+            rownumbers: true,
+        });
+    }
+
+    //添加数据
+    function add() {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '添加地磅称重单',
+            url: '/MatterManage/Calculate/addForm?keyValue=',
+            width: 450 + "px",
+            height: 300 + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //查看
+    function show() {
+       var key = $('#gridTable').jqGridRowValue('id');
+        f_stamp(key);
+        //initControl(id, 1);
+    }
+
+    //编辑
+    function edit() {
+        var id = $('#gridTable').jqGridRowValue('baseid');
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '编辑记录',
+                url: '/MatterManage/Calculate/ShowForm?keyValue=' + id,
+                width: 1650 + "px",
+                height: 600 + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                    $("#gridTable").trigger("reloadGrid");
+                }
+            });
+        }
+    }
+
+    //删除
+    function del() {
+        var key = $('#gridTable').jqGridRowValue('id');
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '删除记录',
+            url: '/MatterManage/Calculate/Form?keyValue=' + key,
+            width: 500 + "px",
+            height: 300 + "px",
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+                $("#gridTable").trigger("reloadGrid");
+            }
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var Weight = $("#Weight").val();
+        var MaxWeight = $("#txtMaxWeight").val();
+        if (Weight != "" && parseInt(Weight) > parseInt(MaxWeight)) {
+            speakText("当前装载超重");
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["IsDelete"] = 1;
+        postData["InsertType"] = 1;
+        $.SaveForm({
+            url: "../../MatterManage/Calculate/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function (data) {               
+                var speakMsg = " 重量" + Weight + "，称重完成，";
+                if (parseInt(postData["Rough"]) > 0 && data.resultdata) {
+                    speakMsg += "净重" + $("#Netwneight").val();
+                    f_stamp(data.resultdata);
+                }
+                GetWorkRecord();                
+                speakText(speakMsg);
+                resetform();
+                $('#gridTable').jqGrid('setGridParam', { postData: { queryJson: JSON.stringify(CreateParams()) }, page: 1 }).trigger('reloadGrid');
+            }
+        });
+    }
+
+    //超载
+    function OverLoadClick() {
+        resetform();
+        jQuery.getJSON("../../MatterManage/Calculate/OverLoad",{},
+            function (data) {
+
+            }
+        );
+    }
+
+    //选择称重车辆
+    function ChooseTickite() {
+        var plateNo = prompt("请输入车牌号！");
+        if (plateNo) {
+            jQuery.getJSON("../../MatterManage/Calculate/GetTicketEntity", {plateNo:plateNo},
+                function (tickite) {
+                    if (tickite) {
+                        jQuery("#Platenumber").val(tickite.Platenumber);
+                        jQuery("#BaseId").val(tickite.BaseId);
+                        jQuery("#Numbers").val(tickite.Numbers);
+                        jQuery("#Takegoodsname").val(tickite.Takegoodsname);
+                        jQuery("#Goodsname").val(tickite.Goodsname);
+                        jQuery("#DataType").val(tickite.DataType);
+                        if (tickite.DataType == "0")
+                            jQuery("#IsOut").removeAttr("disabled");
+                        else if(tickite.DataType == "4")
+                            jQuery("#IsOut").attr("disabled","disabled");
+                        if (tickite.Tare) {
+                            jQuery("#Tare").val(tickite.Tare);
+                            jQuery("#Taretime").val(tickite.Taretime);
+                            tareWeight = tickite.Tare;
+                            keyValue = tickite.ID;
+                        }
+                    } else {
+                        resetform();
+                         dialogMsg("<span style='color:red;font-size:24px'>未查询到车辆【"+plateNo+"】的开票信息！请联系相关人员开票</span>", 0);
+                    }
+
+                }
+            );
+        }
+    }
+    //打印
+    function f_stamp(printKey) {
+        var rowDatas = $("#gridTable").jqGrid("getRowData");
+        if (rowDatas.length > 0) {
+           var dlg = dialogOpen({
+                id: 'Form',
+                title: '称重单打印',
+                url: '/MatterManage/Calculate/Stamp?keyValue=' + printKey,
+                width: 950 + "px",
+                height: 450 + "px",
+                btn: null,
+               callBack: function (iframeId) {
+                    $("#gridTable").trigger("reloadGrid");
+                    GetWorkRecord();
+                   top.layer.close(dlg);
+                }
+            });
+        }
+        else {
+            dialogMsg('没有可以打印的数据！', 0);
+        }
+    }
+    // 文字语音播放
+    function speakText(context) {
+        var mess = context;
+
+        var msg = new SpeechSynthesisUtterance(mess)
+
+        msg.volume = 100  // 声音的音量
+
+        msg.rate = 1 // 语速，数值，默认值是1，范围是0.1到10
+
+        msg.pitch = 1.5 // 表示说话的音高，数值，范围从0（最小）到2（最大）。默认值为1
+
+        speechSynthesis.speak(msg)
+    }
+
+</script>
+
+<div style="margin: 20px 10px 0 10px;overflow:hidden;">
+
+    <div class="list-leftcontainerBox">
+        <h4>磅秤信息</h4>
+        <div class="list-leftcontainer">
+            <table class="form">
+                <tr>
+                    <th class="formTitle">磅编号：</th>
+                    <td class="formValue">
+                        <input id="Poundcode" type="text" readonly="readonly" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <th class="formTitle">磅名称：</th>
+                    <td class="formValue">
+                        <input id="Poundname" type="text" value="" readonly="readonly" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <th class="formTitle" style=" font-size:16px;font-weight:bold;">重量：</th>
+                    <td class="formValue">
+                        <input style="font-size: 65px; height: 120px; width: 335px;color: red;" id="Weight" type="text" name="name" readonly="readonly" class="form-control" value="0" />
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <table style="width:100%;">
+                            <tr>
+                                <th class="formTitle">
+                                    最大称重：
+                                </th>
+                                <td>
+                                    <input type="text" id="txtMaxWeight" class="form-control" value="85000" checkexpession="PositiveNumNotNull" />
+                                </td>
+                                <td>
+                                    <div class="btn-group1" style="text-align:right;">
+                                        <a onclick="OverLoadClick()" id="bit_OverLoad" style="background-color:red;" class="layui-layer-btn0">放行</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="list-leftcontainerBox2">
+        <h4>称重计量</h4>
+        <div class="tabel-container1">
+            <table id="CzjlTable" class="form">
+                <tr>
+                    <th class="formTitle">提货单号：</th>
+                    <td class="formValue">
+                        <input id="Numbers" readonly="readonly" type="text" isvalid="yes" checkexpession="NotNull" class="form-control" />
+                    </td>
+                    <th class="formTitle">运货单位：</th>
+                    <td class="formValue">
+                        @*<select id="Takegoodsid" disabled="disabled" class="form-control"></select>*@
+                        <input id="Takegoodsname" type="text" readonly="readonly" isvalid="yes" checkexpession="NotNull" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <th class="formTitle">货名：</th>
+                    <td class="formValue">
+                        <input id="Goodsname" readonly="readonly" type="text" isvalid="yes" checkexpession="NotNull" class="form-control" />
+                    </td>
+                    <th class="formTitle">车牌号：</th>
+                    <td class="formValue">
+                        @*<select id="Platenumber" isvalid="yes" checkexpession="isNotNullAndPlate" onchange="f_checktext()" class="form-control" ></select>*@
+                        <input id="Platenumber" readonly="readonly" type="text" isvalid="yes" checkexpession="NotNull" class="form-control" style="width:70%;float:left;" />
+                        <div class="ui-filter-list-bottom" style="float:left;height:26px; line-height:26px;">
+                            &nbsp;&nbsp;<a onclick="ChooseTickite()" id="btn_Select" class="btn btn-primary">输入车牌</a>
+                        </div>
+                        <input id="BaseId" type="hidden" value="" />
+                    </td>
+                </tr>
+                <tr>
+                    <th class="formTitle">毛重：</th>
+                    <td class="formValue mztitle">
+                        <div id="widthclass" style="float: left; width: 100%;">
+                            <input id="Rough" type="text" readonly="readonly" maxlength="12" isvalid="yes" class="form-control" />
+                        </div>
+                    </td>
+                    <td class="formTitle">毛重时间：</td>
+                    <td class="formValue">
+                        <input id="Roughtime" type="text" disabled="disabled" class="form-control input-wdatepicker">
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">皮重：</td>
+                    <td class="formValue mztitle">
+                        <div id="widthclass1" style="float: left; width: 100%; ">
+                            <input id="Tare" type="text" checkexpession="PositiveSpotNumNotNul" readonly="readonly" maxlength="12" isvalid="yes" class="form-control" />
+                        </div>
+                    </td>
+                    <th class="formTitle">皮重时间：</th>
+                    <td class="formValue">
+                        <input id="Taretime" type="text" disabled="disabled" checkexpession="NotNull" class="form-control input-wdatepicker" />
+                    </td>
+                </tr>
+                <tr>
+                    <th class="formTitle">净重：</th>
+                    <td class="formValue">
+                        <input id="Netwneight" type="text" readonly="readonly" class="form-control" />
+                    </td>
+                    <th class="formTitle">司磅员：</th>
+                    <td class="formValue">
+                        <input id="Roughusername" readonly="readonly" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <th class="formTitle">是否出厂：</th>
+                    <td class="formValue" colspan="3">
+                        <input id="IsOut" name="" type="checkbox" disabled="disabled" />
+                        <input type="hidden" id="DataType" value="" />
+                    </td>
+
+                    @*<td class="formTitle">异常提醒：</td>
+                        <td class="formValue">
+                            <input id="Unusualremind" readonly="readonly" type="text" class="form-control" />
+                        </td>*@
+                </tr>
+            </table>
+            <div class="btn-group1">
+                <a onclick="AcceptClick()" id="btn_Save" class="layui-layer-btn0" style="height:40px;width:80px;line-height:40px;font-size:16px;font-weight:bold;">保存</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="list-leftcontainerBox3">
+        <h4>工作记录</h4>
+        <ul id="WorkRecord" class="list-container1"></ul>
+    </div>
+</div>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px;">
+            <div class="titlePan">
+                <div class="title-search" style="float: left;padding-left: 15px;padding-top: 22px;">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px;float:left;">
+                                        <table class="form" id="filter-form" style="margin-left:-20%">
+                                            <tr>
+                                                <td style="float: right; ">毛重时间起：</td>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; ">
+                                                        <input id="StartTime" type="text" style="width:180px;" class="form-control input-wdatepicker" value="@DateTime.Now.Date.ToString("yyyy-MM-dd HH:mm:ss")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" />
+                                                    </div>
+
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float:right; ">毛重时间止：</td>
+                                                <td class="formValue">
+                                                    <div style="float: left;">
+                                                        <input id="EndTime" style="width:180px;" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.Date.ToString("yyyy-MM-dd 23:59:59")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float: right; ">
+                                                    运货单位：
+                                                </td>
+                                                <td class="formValue">
+                                                    <input id="Takegoodsname1" type="text" class="form-control" placeholder="请输入运货单位" style="width: 180px;" />
+                                                </td>
+                                            </tr>
+                                            @*<tr>
+                                                    <td style="float: right; ">
+                                                        运输类型：
+                                                    </td>
+                                                    <td class="formValue">
+                                                        <select id="Transporttype1" style="width:180px;">
+                                                            <option>全部</option>
+                                                            <option>提货</option>
+                                                            <option>转运</option>
+                                                        </select>
+                                                    </td>
+                                                </tr>*@
+                                            <tr>
+                                                <td style="float: right; ">
+                                                    货名：
+                                                </td>
+                                                <td class="formValue">
+                                                    <input id="Goodsname1" type="text" class="form-control" placeholder="请输入货名" style="width: 180px;" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float: right; ">车牌号：</td>
+                                                <td class="formValue">
+                                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 180px;" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float: right; ">司磅员：</td>
+                                                <td class="formValue">
+                                                    <input id="txt_UserName" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 180px;" />
+                                                </td>
+                                            </tr>
+
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                            <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div style="float:left;margin: 11px 0 0 50px;">
+                    <table>
+                        <tr>
+                            <td style="border: 1px solid #ccc; width: 120px; text-align: center;">
+                                <label style="font-size: 15px; font-weight: bold;">合计</label>
+                            </td>
+                            <td style="border: 1px solid #ccc; width:600px;height:50px;">
+                                <div style="font-size: 15px; font-weight: bold; padding-top: 7px;" class="ClassLeft">记录</div><div class="ClassLeft"><input id="Count" type="text" style="width:80px;" name="name" readonly="readonly" class="form-control" value="0" /></div>
+                                <div style=" padding-left: 30px; font-size: 15px; font-weight: bold; padding-top: 7px;" class="ClassLeft">毛重</div><div class="ClassLeft"><input id="zrough" type="text" style="width:80px;" name="name" readonly="readonly" class="form-control" value="0" /></div>
+                                <div style=" padding-left: 30px; font-size: 15px; font-weight: bold; padding-top: 7px;" class="ClassLeft">皮重</div><div class="ClassLeft"><input id="ztare" type="text" style="width:80px;" name="name" readonly="readonly" class="form-control" value="0" /></div>
+                                <div style=" padding-left: 30px; font-size: 15px; font-weight: bold; padding-top: 7px;" class="ClassLeft">净重</div><div class="ClassLeft"><input id="zNetwneight" type="text" style="width:80px;" name="name" readonly="readonly" class="form-control" value="0" /></div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    var dlg = null;
+    var signalRUrl = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("SignalRUrl", "MQConfig"))";
+    var userid = "192.168.9.234";
+    var tareWeight = -1;
+    if (signalRUrl.length > 0 && clientIp == poundAIp) {
+        var status = false;
+        var st = null;
+        var defaults = {
+            url: signalRUrl //服务地址
+        };
+        var options = {};
+        var options = $.extend(defaults, options);
+        //Set the hubs URL for the connection
+        $.connection.hub.url = options.url;
+        $.connection.hub.qs = { "userId": userid };//传递参数(做为客户端接收标识)
+        // Declare a proxy to reference the hub.
+        var chat = $.connection.ChatsHub;
+        //定义客户端方法供服务端调用。服务端向客户端推送消息
+        try {
+            chat.client.revMessage = function (str, msg, EqId) {
+                if (msg) {
+                    var result = JSON.parse(msg);
+                    //加载开票数据
+                    if (result.DataType == 0) {
+                        if (jQuery("#Platenumber").val() == "" && jQuery("#Numbers").val() == "") {
+                            resetform();
+                            if (result.Data) {
+                                var row = result.Data;
+                                jQuery("#Platenumber").val(row.Platenumber);
+                                jQuery("#BaseId").val(row.BaseId);
+                                jQuery("#Numbers").val(row.Numbers);
+                                jQuery("#Takegoodsname").val(row.Takegoodsname);
+                                jQuery("#Goodsname").val(row.Goodsname);
+                                jQuery("#DataType").val(row.DataType);
+                                if (row.DataType == "0")
+                                    jQuery("#IsOut").removeAttr("disabled");
+                                else if(row.DataType == "4")
+                                    jQuery("#IsOut").attr("disabled","disabled");
+                                if (row.Tare) {
+                                    jQuery("#Tare").val(row.Tare);
+                                    jQuery("#Taretime").val(row.Taretime);
+                                    tareWeight = row.Tare;
+                                    keyValue = row.ID;
+                                 }
+                            }
+                        }
+                    }
+                    else if (result.DataType == 1) { //获取称重信息
+                        var currentWeight = parseInt(result.Data);
+                        jQuery("#Weight").val(currentWeight);
+                        //第一次称重
+                        if (tareWeight == -1) {
+                            jQuery("#Tare").val(currentWeight);
+                            jQuery("#btn_Save").show();
+                        }
+                        else {//第二次称重
+                            var netWeight = Math.abs(eval(currentWeight - tareWeight));
+                            //第一次称重大于第二次称重
+                            if (tareWeight > currentWeight) {
+                                jQuery("#Tare").val(currentWeight);
+                                jQuery("#Rough").val(tareWeight);
+                                jQuery("#Roughtime").val(jQuery("#Taretime").val());
+                                jQuery("#Taretime").val("");
+                                jQuery("#btn_Save").show();
+                            } else {
+                                jQuery("#Rough").val(currentWeight);
+                                jQuery("#btn_Save").show();
+                            }
+                            jQuery("#Netwneight").val(netWeight);
+                        }
+                    }
+                    else if (result.DataType == -1)
+                        dialogMsg("<span style='color:red;font-size:24px'>未查询到车辆【"+result.Data+"】的开票信息！请联系相关人员开票</span>", 0);
+                }
+            };
+        } catch (ex) {
+
+        }
+
+        // 连接成功后注册服务器方法
+        $.connection.hub.start().done(function () {
+            chat.server.createGroup(userid);
+            chat.server.sendMsgKm(userid, "");
+            chat.server.printMsg(userid + "(" + userid + ")称重系统成功连接到SignalR服务器");
+        });
+
+        //断开连接后
+        $.connection.hub.disconnected(function (s) {
+           // console.error("SignalR服务器断开"+s);
+        });
+        //重连服务器
+        $.connection.hub.reconnecting(function () {
+
+           // console.info("SignalR服务器重新连接");
+        });
+        //连接错误
+        $.connection.hub.error(function () {
+           // console.error("SignalR服务器连接错误");
+        });
+    }
+
+    function resetform() {
+        tareWeight = -1;
+        jQuery("#Weight").val("0");
+        jQuery("#Numbers").val("");
+        jQuery("#BaseId").val("");
+        jQuery("#Takegoodsname").val("");
+        jQuery("#Goodsname").val("");
+        jQuery("#Platenumber").val("");
+        jQuery("#Rough").val("");
+        jQuery("#Roughtime").val("");
+        jQuery("#Tare").val("");
+        jQuery("#Taretime").val("");
+        jQuery("#Netwneight").val("");
+        jQuery("#Unusualremind").val("");
+        jQuery("#btn_Save").hide();
+    }
+</script>

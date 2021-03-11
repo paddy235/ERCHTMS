@@ -1,0 +1,261 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script>
+    var planid = request('planid');
+    var chaperid = "";
+    var state = 0;
+    $(function () {
+        initControl("");
+        GetGrid();//所有项
+        GetGrid1();//扣分项
+    });
+    //初始化控件,(chapid)存储选中项的大章节节点id
+    function initControl(chapid) {
+        //获取表单
+        if (!!planid) {
+            $.ajax({
+                url: '../../AssessmentManage/KScoreDetail/GetDetailInfo',
+                data: { planid: planid },
+                dataType: "JSON",
+                async: false,
+                success: function (data) {
+                    var count = 0;
+                    if (data.length > 0) {
+                        var html = "<table><tr>";
+                        $(data).each(function (i, data) {
+                            if (count == 0 && data.isclick == 1)//当前登录人可点击此项
+                            {
+                                chaperid = data.chaptersid;
+                                count++;
+                            }
+                            if (chapid != "") {
+                                chaperid = chapid;
+                            }
+                            if (data.isclick == 2) {
+                                //此项该登陆人不能操作此项
+                                html += "<td style='width:300px;'><a  style='width:100%;font-size:12px;background-color:gray' class='btn btn-default btn10'  href='#'>" + data.chaptersname + "(" + data.kscorenum + ")（" + data.issum + "）</a></td>";
+                            }
+                            else {
+                                //默认将此登录人能操作的所有项中的第一项选中
+                                if (chaperid == data.chaptersid) {
+                                    html += "<td style='width:300px;'> <div id='" + data.chaptersid + "' onclick=\"linkButton('" + data.chaptersid + "')\"  class='btn btn-default btn10 btn-primary' style='width:100%'><a   style='width:80%;font-size:12px;'>" + data.chaptersname + "(" + data.kscorenum + ")</a>";
+                                }
+                                else {
+                                    html += "<td style='width:300px;'><div id='" + data.chaptersid + "' onclick=\"linkButton('" + data.chaptersid + "')\" class='btn btn-default btn10' style='width:100%'><a  style='width:80%;font-size:12px;'>" + data.chaptersname + "(" + data.kscorenum + ")</a>";
+                                }
+                                if (data.gradestatus == "已评分") {
+                                    if (data.issum == "未总结") {
+                                        html += "<a  style='width:20%;font-size:12px;color:red'  href=javascript:linkSum('" + data.chaptersid + "')>" + "(" + data.issum + ")" + "</a></div></td>";
+                                    }
+                                    else {
+                                        html += "<a  style='width:20%;font-size:12px;color:green' href=javascript:linkSum('" + data.chaptersid + "')>" + "(" + data.issum + ")" + "</a></div></td>";
+                                    }
+                                }
+                                else {
+                                    html += "<a  style='width:20%;font-size:12px;color:red'  href=javascript:linkSum(-1)>" + "(" + data.issum + ")" + "</a></div></td>";
+                                }
+                            }
+                            if ((i + 1) % 5 == 0) {
+                                html += "</tr>";
+                                html += "<tr>";
+                            }
+                        });
+                        html += "</tr></table>";
+                        $("#div1").html(html);
+                    }
+                }
+            });
+        }
+
+        //所有项选项卡
+        $("#tab1").click(function () {
+            $("#div2").attr("style", "display:block");
+            $("#div3").attr("style", "display:none");
+
+            $('#gridTable').jqGrid('setGridParam', {
+                postData: { chaperOrfrist: chaperid, planid: planid }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //不适宜项选项卡
+        $("#tab2").click(function () {
+            $("#div3").attr("style", "display:block");
+            $("#div2").attr("style", "display:none");
+
+            $('#gridTable1').jqGrid('setGridParam', {
+                postData: { chaperOrfrist: chaperid, planid: planid }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+
+    }
+
+    //选择是
+    function radyesclick(smallchaperid) {
+        dialogOpen({
+            id: 'kScore',
+            title: '扣分项',
+            url: '/AssessmentManage/KScoreDetail/KScoreResult?planid=' + planid + "&smallchaperid=" + smallchaperid + "&chaperid=" + chaperid,
+            width: "600px",
+            height: "700px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+
+    //选择否
+    function radnoclick(smallchaperid) {
+        $.RemoveForm({
+            msg: "确定取消扣分项？",
+            url: '../../AssessmentManage/KScoreDetail/RemoveForm',
+            param: { planid: planid, smallchaperid: smallchaperid },
+            success: function (data) {
+                initControl(chaperid);
+                linkButton(chaperid);
+            }
+        })
+    }
+
+    //加载所有项表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 350,
+            url: "../../AssessmentManage/KScoreDetail/GetAllDetailPage",
+            postData: { chaperOrfrist: chaperid, planid: planid },
+            datatype: "json",
+            colModel: [{ label: '主键', name: 'sid', hidden: true },
+                { label: '要素号', name: 'majornumber', width: 100, align: 'center', sortable: true },
+                { label: '考评项目', name: 'chaptersname', width: 200, align: 'center', sortable: true },
+                { label: '考评内容', name: 'content', width: 500, align: 'center', sortable: true },
+                { label: '标准分值', name: 'score', width: 100, align: 'center', sortable: true },
+                {
+                    label: '是否为扣分项', name: 'kscore', width: 100, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == undefined || cellvalue == null || cellvalue == "") {
+                            html = "<input type='radio' name='UnitType_" + options.rowId + "' id='UnitType_" + options.rowId + "' value='1' onclick=\"radyesclick('" + rowObject.sid + "')\" />是&nbsp;&nbsp;&nbsp;<input type='radio' name='UnitType_" + options.rowId + "' id='UnitType2_" + options.rowId + "' value='2' checked='checked' onclick=\"radnoclick('" + rowObject.sid + "')\" />否";
+
+                        }
+                        else {
+                            html = "<input type='radio' name='UnitType_" + options.rowId + "' id='UnitType_" + options.rowId + "' value='1' onclick=\"radyesclick('" + rowObject.sid + "')\"  checked='checked'/>是&nbsp;&nbsp;&nbsp;<input type='radio' name='UnitType_" + options.rowId + "' id='UnitType2_" + options.rowId + "' value='2' onclick=\"radnoclick('" + rowObject.sid + "')\" />否";
+                        }
+                        return html;
+                    }
+                }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [5, 10, 15],
+            pager: "#gridPager",
+            sortname: "cast(replace(majornumber,'.','') as number)",
+            sortorder: 'asc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+        });
+    }
+
+    //加载扣分项表格
+    function GetGrid1() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable1');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 350,
+            url: "../../AssessmentManage/KScoreDetail/GetKScoreDetailPage",
+            postData: { chaperOrfrist: chaperid, planid: planid },
+            datatype: "json",
+            colModel: [{ label: '主键', name: 'id', hidden: true },
+                { label: '要素号', name: 'majornumber', width: 100, align: 'center', sortable: true },
+                { label: '考评项目', name: 'chaptersname', width: 200, align: 'center', sortable: true },
+                { label: '考评内容', name: 'content', width: 600, align: 'center', sortable: true },
+                { label: '标准分值', name: 'score', width: 100, align: 'center', sortable: true },
+                { label: '扣分分值', name: 'kscore', width: 300, align: 'center', sortable: false },
+                { label: '操作人', name: 'createusername', width: 130, align: 'center', sortable: false },
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [5, 10, 15],
+            pager: "#gridPager1",
+            sortname: "cast(replace(majornumber,'.','') as number)",
+            sortorder: 'asc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+        });
+    }
+
+    function linkButton(cid) {
+        chaperid = cid;
+        $('.btn10').removeClass('btn-primary');
+        $('.btn10').addClass('btn-default');
+        $("#" + cid).addClass('btn-primary');
+        $('#gridTable,#gridTable1').jqGrid('setGridParam', {
+            postData: { chaperOrfrist: chaperid, planid: planid }, page: 1
+        }).trigger('reloadGrid');
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        $.SaveForm({
+            close: false,
+            url: "../../AssessmentManage/AssessmentSum/SaveSumKSocreInfo?planid=" + planid + "&chaperid=" + chaperid,
+            param: { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val() },
+            loading: "正在处理...",
+            success: function () {
+                initControl(chaperid);
+            }
+        })
+    }
+
+    function linkSum(cid) {
+        if (cid == "-1")
+        {
+            dialogMsg('请先完成此项评分！', 0);
+            return false;
+        }
+        dialogOpen({
+            id: 'PlanSum',
+            title: '总结',
+            url: '/AssessmentManage/KScoreDetail/GradeSum?planid=' + planid + "&chaperid=" + chaperid,
+            width: "600px",
+            height: "350px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 20px; margin-left: 20px;">
+    <div id="div1" style="min-height:200px;">
+    </div>
+    <div class="titlePanel">
+        <ul class="nav nav-tabs">
+            <li class="active"><a id="tab1" data-toggle="tab">所有项</a></li>
+            <li><a id="tab2" data-toggle="tab">扣分项</a></li>
+        </ul>
+    </div>
+    <div class="gridPanel" style="display:block" id="div2">
+        <table id="gridTable"></table>
+        <div id="gridPager"></div>
+    </div>
+    <div class="gridPanel" style="display:none" id="div3">
+        <table id="gridTable1"></table>
+        <div id="gridPager1"></div>
+    </div>
+</div>

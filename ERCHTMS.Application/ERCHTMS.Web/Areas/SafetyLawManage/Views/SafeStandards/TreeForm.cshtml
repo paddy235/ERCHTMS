@@ -1,0 +1,171 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script src="~/Content/scripts/business/detailAgency.js"></script>
+<script>
+    //=================
+    //用户信息
+    //=================
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户ID
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";//当前用户所属部门名称
+    var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";//系统管理员
+    //页面请求参数
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var parentid = request('parentid');
+    var pcode = request('pcode');
+    $(function () {
+        keyValue = !!keyValue ? keyValue : newGuid();
+        //
+        //加载类别
+        //
+        GetTypeTree();
+        //
+        //创建代理
+        //
+        var detailAgc = new detailAgency({
+            keyValue: keyValue,
+            actiontype: actiontype,
+            saveParam: {
+                url: '../../SafetyLawManage/SafeInstitution/SaveTreeForm',
+                successCallback: function (data) {
+                    if (isSystem == "True" || rolename.indexOf("省级") >= 0) {
+                        //
+                        //加载树
+                        //
+                        $.currentIframe().GetTree(0, "");
+                    } else {
+                        //
+                        //加载树
+                        //
+                        $.currentIframe().GetTree(1, "");
+                    }
+                }
+            }
+        });
+        //
+        //绑定页面控件
+        //
+        detailAgc.bindPageControls({
+            saveId: "btn_Save"
+        });
+        //
+        //初始化数据
+        //
+        detailAgc.initialPage([
+            {
+                url: '../../SafetyLawManage/SafeStandards/GetTreeFormJson',
+                param: { keyValue: keyValue },
+                callBack:setPageData,
+                forms: [{ Id: 'form1', dataProName: 'data.data', extData: { ParentId: parentid, Code: pcode } }]
+            }
+        ]);
+    })
+    //
+    //加载分类树
+    //
+    function GetTypeTree() {
+        $("#ParentId").ComboBoxTree({
+            url: "../../SafetyLawManage/SafeInstitution/GetTypeTreeJson?datatype=1",
+            height: "300px",
+            description: "==请选择==",
+            allowSearch: false
+        }).bind("change", function () {
+            var self = $(this);
+            var id = self.attr("data-value");
+            var text = self.attr('data-text');
+            var dept = self.attr('data-dept');
+            var bCanSelect = true;
+            if (rolename.indexOf("公司管理员") >= 0 || rolename.indexOf("省级") >= 0 || rolename.indexOf("厂级部门用户") >= 0) {//所有操作权限
+                bCanSelect = true;
+            }
+            else if (rolename.indexOf("部门级用户") >= 0 && rolename.indexOf("负责人") >= 0) {
+                if (!dept || (dept!="05" && new RegExp("^" + deptCode).test(dept) == false)) {
+                    bCanSelect = false;
+                }
+            }
+            else {
+                bCanSelect = false;
+            }
+            if (bCanSelect == false) {
+                dialogMsg("选择无效，只能选择本单位的下级节点，请重新选择。", 0);
+                $("#ParentId").ComboBoxTreeSetValue(parentid);
+                var treeId = $(".bbit-tree").attr("id");
+                $("#" + treeId + "_" + id.replace(/-/g, "_")).removeClass("bbit-tree-selected");
+                return false;
+            }
+        });
+    }
+    //
+    //设置页面数据
+    //
+    function setPageData(data) {
+        if (!!data.data) {
+            parentid = data.data.ParentId;
+        }
+    }
+</script>
+<style type="text/css">
+    .form .formTitle {
+        width: 120px;
+    }
+
+    .ui-select .ui-select-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding-right: 25px;
+    }
+</style>
+<div class="center-Panel" style="margin-top:42px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">名称<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="TreeName" type="text" class="form-control" errormsg="名称不能为空，" isvalid="yes" checkexpession="LenStr" length="64" />
+                            <input id="DataType" type="hidden" value="1" />
+                        </td>
+                        <td class="formTitle">上级类别</td>
+                        <td class="formValue">
+                            <div id="ParentId" type="selectTree" class="ui-select" errormsg="上级类别" checkexpession="NotNull"></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">备注</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="Remark" type="text" class="form-control" errormsg="备注" checkexpession="NotNull" style="height:80px;"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style="top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+    </div>
+    <div id="HidMessage" style="width:360px; margin-left:20px; float:left;"></div>
+</div>

@@ -1,0 +1,196 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script type="text/javascript">
+    var keyValue = request('keyValue');
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth($(".gridPanel").width());
+                $('#gridTable').setGridHeight($(window).height() - 170);
+
+            }, 200);
+            e.stopPropagation();
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+
+        var StartTime = $("#sTime").val();
+        var EndTime = $("#eTime").val();
+        if (new Date(StartTime.replace("-", "/").replace("-", "/")) > new Date(EndTime.replace("-", "/").replace("-", "/"))) {
+            alert("开始时间不可大于结束时间！");
+            return;
+        }
+        var queryJson = {
+            sTime: StartTime,
+            eTime: EndTime,
+            condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+            txtSearch: $("#txt_Keyword").val(),
+            keyValue: keyValue
+        }
+
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../OutsourcingProject/Intromission/GetHistoryIntromissionList",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "','" + rowObject.outengineerid + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                        return html;
+                    }
+                },
+                { label: '外包工程', name: 'engineername', index: 'engineername', width: 300, align: 'center', sortable: true },
+                { label: '外包单位', name: 'fullname', index: 'fullname', width: 300, align: 'center', sortable: true },
+                { label: '申请人', name: 'applypeople', index: 'applypeople', width: 300, align: 'center', sortable: true },
+                { label: '申请时间', name: 'applytime', index: 'applytime', width: 300, align: 'center', sortable: true },
+                { label: '审核部门', name: 'flowdeptname', index: 'flowdeptname', width: 150, align: 'center', sortable: true },
+                { label: '审核状态', name: 'flowname', index: 'flowname', width: 150, align: 'center', sortable: true },
+                {
+                    label: '流程状态', name: 'investigatestate', index: 'investigatestate', width: 100, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var content = "";
+                        var investigatestate = rowObject.investigatestate;
+                        if (investigatestate == "0") {
+                            content = "申请状态";
+                        }
+                        else if (investigatestate == "1") {
+                            content = "审查状态";
+                        }
+                        else if (investigatestate == "2") {
+                            content = "审核状态";
+                        }
+                        else {
+                            content = "已完成";
+                        }
+                        return content;
+                    }
+                }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 'a.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var StartTime = $("#sTime").val();
+            var EndTime = $("#eTime").val();
+            if (new Date(StartTime.replace("-", "/").replace("-", "/")) > new Date(EndTime.replace("-", "/").replace("-", "/"))) {
+                alert("开始时间不可大于结束时间！");
+                return;
+            }
+            var queryJson = {
+                sTime: StartTime,
+                eTime: EndTime,
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                txtSearch: $("#txt_Keyword").val(),
+                keyValue:keyValue
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //查看
+    function show(id, engineerid) {
+        var keyValue = id;
+        var title = "查看入厂许可申请";
+        var url = "/OutsourcingProject/Intromission/HistoryForm?keyValue=" + keyValue + "&engineerid=" + engineerid;
+
+
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "HistoryForm",
+                title: title,
+                url: url,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+</script>
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            <tr>
+                <td>
+                    提交时间：
+                </td>
+                <td>
+                    <input id="sTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                </td>
+                <td style="padding-left:5px;">至</td>
+                <td style="padding-left:5px;">
+                    <input id="eTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                </td>
+                <td style="padding-left:20px;">
+                    <div id="queryCondition" class="btn-group">
+                        <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                        <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a data-value="b.engineername">外包工程名称</a></li>
+                            <li><a data-value="c.fullname">外包单位名称</a></li>
+                        </ul>
+                    </div>
+                </td>
+                <td>
+                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询的外包工程" style="width: 200px;" />
+                </td>
+                <td style="padding-left: 5px;">
+                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="toolbar">
+        <div class="btn-group">
+            <a  class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+        </div>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

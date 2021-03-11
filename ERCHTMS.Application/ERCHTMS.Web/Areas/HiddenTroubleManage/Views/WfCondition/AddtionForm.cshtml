@@ -1,0 +1,250 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+    var keyValue = request("keyValue"); //主键
+    var settingid = request("settingid"); //流程配置条件id
+    var actiontype = request("actiontype"); //操作动作
+    var conditionid = request("conditionid"); //操作动作
+    var orgId = request("orgid"); //机构id
+    var orgName = request("orgname"); //机构名称
+    $(function () {
+        if (!!conditionid) {
+            $("#WFCONDITIONID").val(conditionid); //条件id
+        }
+        //查看下
+        if (actiontype == "view") {
+            $("#btn_Save").attr("disabled", "disabled");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("readonly", "readonly");
+            });
+        }
+
+        if (!!orgId) {
+            $("#ORGANIZEID").val(orgId);
+        }
+        if (!!orgName) {
+            $("#ORGANIZENAME").val(orgName);
+        }
+
+        //获取表单数据
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../HiddenTroubleManage/WfCondition/GetAddtionFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    //详情
+                    if (null != data) {
+                        $("#form1").formDeserialize(data);
+                        //是否指定角色
+                        if (data.ISHROLE == "是") {
+                            $("input[name='ISHROLE']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISHROLE']:eq(1)").prop("checked", "checked");
+                        }
+                        //是否指定人员
+                        if (data.ISHUSER == "是") {
+                            $("input[name='ISHUSER']:eq(0)").prop("checked", "checked");
+                        }
+                        else {
+                            $("input[name='ISHUSER']:eq(1)").prop("checked", "checked");
+                        }
+                    }
+                }
+            });
+        }
+    });
+
+
+    //加载指定条件
+    function LoadGrid() {
+        var selectedRowIndex = 0;
+        var gridTable = $('#gridTable');
+
+        gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() / 2,
+            url: "../../HiddenTroubleManage/WfCondition/GetAddtionRoleListJson",
+            postData: { addtionId: keyValue },
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'ID', index: 'ID', width: 100, align: 'center', hidden: true },
+                 {
+                     label: '操作', name: 'oper', index: 'ID', width: 160, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:view('" + rowObject.ID + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                         html += "&nbsp;&nbsp;&nbsp;<a href=javascript:remove('" + rowObject.ID + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         return html;
+                     }
+                 },
+                { label: '角色', name: 'ROLENAME', index: 'ROLENAME', width: 250, align: 'center', sortable: true },
+                { label: '是否包含', name: 'ISCONTAIN', index: 'ISCONTAIN', width: 150, align: 'center', sortable: true }
+            ],
+            viewrecords: true,
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //添加指定部门对象
+    function add() {
+        var rqUrl = '/HiddenTroubleManage/WfCondition/AddtiionRoleForm?addtionId=' + keyValue + '&deptid=' + $("#DEPTID").val() + '&deptname=' + $("#DEPTNAME").val();
+        var title = "新增指定角色";
+        dialogOpen({
+            id: 'AddRoleForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //删除
+    function remove(obj) {
+        $.RemoveForm({
+            url: '../../HiddenTroubleManage/WfCondition/RemoveAddtionRoleForm',
+            param: { keyValue: obj },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        //是否指定角色
+        var ishrole = $("input[name='ISHROLE']:checked").val();
+        postData["ISHROLE"] = ishrole;
+        //是否指定用户
+        var ishuser = $("input[name='ISHUSER']:checked").val();
+        postData["ISHUSER"] = ishuser;
+
+        $.SaveForm({
+            url: "../../HiddenTroubleManage/WfCondition/SaveAddtionForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+            }
+        });
+    }
+
+</script>
+
+<div class="center-Panel">
+    <div style="margin-top: 5px;"></div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;流程导向配置条件管理&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">所属机构单位</td>
+                        <td class="formValue" colspan="3">
+                            <input id="ORGANIZENAME" type="text" class="form-control" placeholder="请选择所属单位" onclick="selectDept('', 0, 9, '所属单位', window.document.body, 'ORGANIZENAME,,ORGANIZEID,,', '')" />
+                            <input id="ORGANIZEID" type="hidden" />
+                            <input id="WFCONDITIONID" type="hidden" />
+                            <input id="ID" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">指定部门</td>
+                        <td class="formValue" colspan="3">
+                            <input id="DEPTNAME" type="text" class="form-control" placeholder="请选择指定部门" readonly onclick="selectDept($('#ORGANIZEID').val(), 0, 1, '指定部门' , window.document.body, 'DEPTNAME,DEPTCODE,DEPTID,,' , '' )" />
+                            <input id="DEPTID" type="hidden" />
+                            <input id="DEPTCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">是否指定角色</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISHROLE" id="ISHROLE1" value="是" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISHROLE" id="ISHROLE2" value="否" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">指定角色</td>
+                        <td class="formValue">
+                            <input id="ROLENAME" type="text" class="form-control" placeholder="请选择指定角色" readonly onclick="selectRole($('#ORGANIZEID').val(), '', 1, 2, window.document.body, 'ROLENAME,ROLECODE');" />
+                            <input id="ROLECODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">是否指定人员</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISHUSER" id="ISHUSER1" value="是" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISHUSER" id="ISHUSER2" value="否" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">指定人员</td>
+                        <td class="formValue">
+                            <input id="USERNAME" type="text" class="form-control" placeholder="请选择指定人员" readonly onclick="selectUser({ deptId: $('#DEPTID').val(), checkMode: 1, mode: 11, winObject: window.document.body, domId: 'USERNAME,USERACCOUNT,,,,' });" />
+                            <input id="USERACCOUNT" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">备注</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REMARKS" class="form-control" isvalid="yes" rows="6" checkexpession="LenStrOrNull" length="2000"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    @*<div class="panel panel-default" id="panel1">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;指定角色条件信息</strong>
+                <span class="tools pull-right">
+                    <a class="btn btn-primary btn-xs" onclick='javascript: $("#gridTable").trigger("reloadGrid")'>&nbsp;刷新</a>&nbsp;&nbsp;
+                    <a id="btn_addend" href="javascript:add()" class="btn btn-primary btn-xs">新 增</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div style="margin-left:10px;">
+                    <table id="gridTable"></table>
+                    <div id="gridPager"></div>
+                </div>
+            </div>
+        </div>*@
+</div>

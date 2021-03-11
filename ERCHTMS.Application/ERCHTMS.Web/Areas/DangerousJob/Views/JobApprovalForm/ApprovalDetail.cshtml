@@ -1,0 +1,902 @@
+﻿@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+<style type="text/css">
+    .tab1 {
+        width: 100%;
+        border: 1px solid #ccc;
+        text-align: center;
+    }
+
+        .tab1 td {
+            background-color: white;
+            height: 30px;
+            border: 1px solid #ccc;
+        }
+
+    .tdcss {
+        font-weight: bold;
+        font-size: 11pt;
+    }
+</style>
+<script>
+    var keyValue = request('keyValue');
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var flag = 0;//标识第一次请求安全措施，后面不请求
+    var action = request('action');
+    var modulename = "";
+    $(function () {
+        initControl();
+        //getFlow();
+    });
+
+    //初始化控件
+    function initControl() {
+        //默认值(申请人、单位)
+        $("#ApplyDeptName").val(deptName);
+        $("#ApplyDeptId").val(deptId);
+        $("#ApplyDeptCode").val(deptCode);
+        $("#ApplyUserName").val(userName);
+        $("#ApplyUserId").val(userId);
+        //加载危险作业类型
+       // LoadJobType();
+        //加载危险作业级别
+        LoadJobLevel();
+        //获取分级标准和危害辨识
+        GetStandard();
+        //区域的处理
+        $("#JobArea").attr("onclick", "selectArea(window.document.body, 'JobArea,JobAreaId');").attr("placeholder", "请选择作业区域");
+        $("#btnQr").click(function () {
+            $("#QrCodeModal").hide();
+        });
+        $("#btnMeasures").click(function () {
+            //循环安全措施获取选中的文本框
+            var p = $("#gridTable1");
+            var cs = $("input[name='Measures']:checked", p);
+            var str = "";
+            cs.each(function () {
+                str += $(this).attr("ch") + "/";
+            });
+            if (str.length > 0) {
+                str = str.substring(0, str.length - 1);
+            }
+            $("#SafetyMeasures").val(str);
+            $("#SafetyMeasuresModal").hide();
+        });
+        $("#btnMeasuresQX").click(function () {
+            $("#SafetyMeasuresModal").hide();
+        });
+
+        if (action == "check") {
+            //如果是审批，隐藏保存提交按钮，禁用作业信息控件
+            $("#btn_Save").hide();
+            $("#btn_Submit").hide();
+            $("#btn_Export").hide();
+            //默认值(审批人、单位)
+            $("#ApproveDeptName").val(deptName);
+            $("#ApproveDeptId").val(deptId);
+            $("#ApprovePerson").val(userName);
+            $("#ApprovePersonId").val(userId);
+            //获取签名
+            getUserSignPicFeedback("1");
+            $("#div3").find("input,textarea,.ui-select,.ui-select-text,.ui-select-option-content,.show-menu-arrow").each(function (ele, index) {
+                var it = $(this);
+                it.attr("disabled", "disabled");
+                it.attr("readonly", "readonly");
+            });
+            $("#btnaqz").hide();
+        } else {
+            //隐藏审批信息
+            $("#div2").hide();
+            $("#btn_Check").hide();
+            $("#btn_Export").hide();
+            if (action == "add" || action == "edit") {
+                getUserSignPicFeedback("0");
+            } else if (action == "view") {//查看
+                //$(".form-button").css("display", "none");
+                $("#form1").find("input,textarea,.ui-select,.ui-select-text,.ui-select-option-content,.show-menu-arrow").each(function (ele, index) {
+                    var it = $(this);
+                    it.attr("disabled", "disabled");
+                    it.attr("readonly", "readonly");
+                });
+                $("#btn_Save").hide();
+                $("#btn_Submit").hide();
+                $("#btn_Check").hide();
+                $("#btn_Export").show();
+            }
+        }
+        if (action != "edit" && action != "add" ) {
+            $("#div1").hide();//隐藏流程信息
+        }
+        if (!!keyValue) {
+            //获取表单
+            $.SetForm({
+                url: "../../DangerousJob/JobApprovalForm/GetEntity",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#div3").formDeserialize(data);
+                    if (data.DangerousDecipher != null) {
+                        //循环绑定危害辨识值
+                        $("input[name='DangerousDecipher']").each(function (i, dom) {
+                            if (("," + data.DangerousDecipher + ",").indexOf("," + $(dom).val() + ",") >= 0) {
+                                dom.checked = true;
+                            }
+                        });
+                    }
+
+                    var level= $("#JobLevel").attr("data-value");
+                    getFlow(level);
+                    $("#SignUrl").attr("src", "../.." + data.SignUrl);
+                    //$("#signPreview").attr("src", "../.." + data.SignUrl);
+                    $("#btn_c").hide();
+                    //风险类型
+                    if (data.JobType != null && data.JobType != undefined) {
+                        $("#JobType").val(data.JobType);
+                        $("#JobType").find("option").each(function (i, dom) {
+                            if (data.JobType.indexOf(dom.value) >= 0 && dom.text.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+                    }
+                    
+                    if (data.JobSafetyCardId != null && data.JobSafetyCard != null) {
+                        var cardId = data.JobSafetyCardId.split(',');
+                        var cardName = data.JobSafetyCard.split(',');
+                        var html = "";
+                        for (var i = 0; i < cardId.length; i++) {
+                            html += "<a href='#'  onclick='openRecord(\"" + cardId[i] + "\")' style='color:blue; text-decoration:underline;padding-right:20px'  title='" + cardName[i] + "'>" + cardName[i] + "</a>"
+                        }
+                        $("#JobSafety").html(html);
+                    }
+                }
+            })
+        }
+
+
+        keyValue = keyValue.length == 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+        //附件
+        file_upload.init({
+            keyValue: keyValue, extensions: 'doc,docx,xls,xlsx,zip,jpg,png,ppt,pdf', isImage: false, el: '#uploader'
+        });
+        var isDel = action == "view" ? false : true;
+        file_upload.bindFiles(isDel, false, keyValue, "uploader", isDel);
+
+        //保存
+        $("#btn_Save").click(function () {
+            AcceptClick("0");
+        });
+        //发送
+        $("#btn_Submit").click(function () {
+            AcceptClick("1");
+            top.refreshWork();
+        });
+        //审批
+        $("#btn_Check").click(function () {
+            CheckClick();
+            top.refreshWork();
+        });
+        $("#btn_Export").click(function () {
+            goReport();
+        });
+    }
+
+    //危险作业类别
+    function LoadJobType() {
+        $("#JobType").ComboBox({
+            param: { EnCode: "DangerousJobType" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "======请选择======",
+            id: "ItemValue",
+            multiple: true,
+            text: "ItemName",
+            height: "230px"
+        });
+    }
+    //危险作业级别
+    function LoadJobLevel() {
+        $("#JobLevel").ComboBox({
+            param: { EnCode: "DangerousJobCheck" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "======请选择======",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        }).bind("change", function () {
+            changeJobLevel()
+        });
+
+    }
+    //获取分级标准和危害辨识
+    function GetStandard() {
+
+        $.ajax({
+            url: '../../DangerousJobConfig/ClassStandardConfig/GetFormJsonByWorkType?WorkType=DangerousJobCheck',
+            dataType: 'Json',
+            async: false,
+            success: function (data) {
+                if (!!data.resultdata) {
+
+                    $("#modalBody tbody").html("");
+                    var html = "";
+                    Standard = eval("(" + data.resultdata.Standard + ")")
+                    for (var i = 0; i < Standard.length; i++) {
+                        html += "<tr><td >" + Standard[i].levelName + "</td><td style='text-align:left;white-space: pre-line; padding-left:5px'>" + Standard[i].levelStandard + "</td></tr>";
+                    }
+                    $("#modalBody tbody").html(html);
+                    if (!!data.resultdata.Whbs) {
+                        var whbs = data.resultdata.Whbs.split("$");
+                        for (var i = 0; i < whbs.length; i++) {
+                            if (i % 6 == 0) {
+                                $("#DangerousDecipher").append("<tr></tr>")
+                            }
+                            $("#DangerousDecipher").find("tr").eq(parseInt(i / 6)).append("<td><input type=\"checkbox\" name=\"DangerousDecipher\" value=\"" + whbs[i] + "\" />" + whbs[i] + "</td>");
+                        }
+                    }
+                }
+
+            }
+        })
+    }
+    //保存表单;
+    function AcceptClick(type) {
+        if (!$('#div3').Validform()) {
+            return false;
+        }
+        if (!$('#div1').Validform()) {
+            return false;
+        }
+
+        //var dd = $("#JobSafetyCardId").val();
+        //if (dd == "") {
+        //    dialogMsg('请选择对应作业安全证！', 0);
+        //    return false;
+        //}
+        //循环获取危害辨识
+        var DangerousDecipher = "";
+        var d = $("input[name='DangerousDecipher']:checked");
+        d.each(function () {
+            DangerousDecipher += $(this).val() + ",";
+        });
+        if (DangerousDecipher.length > 0) {
+            DangerousDecipher = DangerousDecipher.substring(0, DangerousDecipher.length - 1);
+        } else {
+            dialogMsg('主要危险危害因素！', 0);
+            return false;
+        }
+
+        var auditresult = $("#SignUrl").attr("src");
+        if (auditresult == "" || auditresult == undefined) {
+            dialogAlert("未上传签名，无法进行提交！！！", function () {
+                return false;
+            })
+            return false;
+        }
+        var postData = $("#div3").formSerialize(keyValue);
+        postData["DangerousDecipher"] = DangerousDecipher;
+        postData["ModuleName"] = moduleno;
+        postData["IsSubmit"] = type;
+        postData["JobState"] = type;
+        postData["JobTypeName"] = $(".filter-option").text().replace("请选择", "");
+        postData["SignUrl"] = $("#SignUrl").attr("src");
+        var arr = [];
+        $(".trSpecial").each(function ()
+        {
+            arr.push({
+                id: $(this).find("input[name='cid']").attr("id"),
+                userid: $(this).find("input[name='cid']").val(),
+                username: $(this).find("input[name='cname']").val(),
+                account: $(this).find("input[name='aid']").val()
+            });
+        });
+
+        postData["arr"] = JSON.stringify(arr);
+        $.SaveForm({
+            url: "../../DangerousJob/JobApprovalForm/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    //审批提交
+    function CheckClick() {
+        if (!$('#div2').Validform()) {
+            return false;
+        }
+        var checkresult = $("#SignUrl1").attr("src");
+        if (checkresult == "" || checkresult == undefined) {
+            dialogAlert("未上传签名，无法进行提交！！！", function () {
+                return false;
+            })
+            return false;
+        }
+        var postData = $("#div2").formSerialize(keyValue);
+        if (document.getElementById("CheckResult1").checked) {//审批结果
+            postData["CheckResult"] = "0";
+        } else {
+            postData["CheckResult"] = "1";
+        }
+
+        postData["SignUrl"] = $("#SignUrl1").attr("src");
+        $.SaveForm({
+            url: "../../DangerousJob/DangerousJobFlowDetail/ApprovalFormCheckSaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //导出
+    function goReport() {
+        location.href = "../../DangerousJob/JobApprovalForm/ExportDetails?keyValue=" + keyValue;
+    }
+   // 获取反馈人签名
+    function getUserSignPicFeedback(type) {
+        var signImg = getUserSignPic(userId);
+        if (!!signImg) {
+            if (type == 0) {
+                $("#SignUrl").attr("src", "../.." + signImg);
+            }
+            else if (type == 1) {
+                $("#SignUrl1").attr("src", "../.." + signImg);
+            }
+        }
+    }
+    function seletJobDept() {
+        selectDept('', 1, 0, '作业单位', document.body, 'JobDeptName,JobDeptCode,JobDeptId',$("#JobDeptId").val(), '', '');
+    }
+    //分级标准
+    function fjbzShow() {
+        $("#QrCodeModal").show();
+    }
+    //安全措施
+    function SafetyMeasuresShow() {
+        if (flag == 0) {
+            $.SetForm({
+                param: { EnCode: "SafetyMeasures", Remark: "gfx" },
+                url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+                success: function (data) {
+                    var html;
+                    var MeasuresStr = $("#SafetyMeasures").val();
+                    for (var i = 0; i < data.length; i++) {
+                        if (!!MeasuresStr && ("/" + MeasuresStr + "/").indexOf("/" + data[i].SortCode + "/") >= 0) {
+                            html += "<tr><td style='width:30px;'>" + data[i].SortCode + "</td><td style='text-align:left;'>&nbsp;" + data[i].ItemValue + "</td><td style='width:30px;'><input type='checkbox' checked='checked' name='Measures' ch='" + data[i].SortCode + "' /></td></tr>";
+                        } else {
+                            html += "<tr><td style='width:30px;'>" + data[i].SortCode + "</td><td style='text-align:left;'>&nbsp;" + data[i].ItemValue + "</td><td style='width:30px;'><input type='checkbox' name='Measures' ch='" + data[i].SortCode + "' /></td></tr>";
+                        }
+                    }
+                    $("#gridTable1").append(html);
+                }
+            });
+            flag = 1;
+        }
+
+        $("#SafetyMeasuresModal").show();
+    }
+    //选中作业人员(0)和监护人(1)
+    function selectDutyUser(type) {
+
+        if (type == "0") {
+            if ($('#JobDeptId').val().length > 0) {
+                var options = { deptId: $('#JobDeptId').val(), checkMode: 1, mode: 19, istree: 1, winObject: window.document.body, domId: 'JobPerson,,JobPersonId' };
+                var url = '/BaseManage/User/Select?deptId=' + $('#JobDeptId').val() + "&checkMode=" + 1 + "&mode=" + 19 + "&istree=" + 0 + "&pfrom=" + 1 + "&userIds=JobPersonId";
+                dialogOpen({
+                    id: "User",
+                    title: "选择用户",
+                    url: url,
+                    width: ($(top.window).width() - 10) + "px",
+                    height: ($(top.window).height()) + "px",
+                    callBack: function (iframeId) {
+
+                        top.document.getElementById(iframeId).contentWindow.AcceptClick(options);
+                        $("#JobNum").val($('#JobPersonId').val().split(',').length);
+                    }
+                });
+                //selectUser({ deptId: $('#DutyDeptId').val(), checkMode: 0, mode: 19, istree:1, winObject: window.document.body, domId: 'DutyPerson,,DutyPersonId' });
+            } else {
+                dialogMsg('请先选择作业单位！', 0);
+            }
+        } else {
+            selectUser({ deptId: '', checkMode: 1, mode: 0, winObject: window.document.body, domId: 'Custodian,,CustodianId', userIds: "CustodianId" });
+        }
+
+    }
+    function selectSafetyCard() {
+        var jobtype = $("#JobType").val();
+        if (jobtype == "" || jobtype == null) {
+            dialogMsg('请先选择危险作业类型！', 0);
+        }
+        else {
+            //<a href="~/Areas/DangerousJob/Views/JobApprovalForm/Select.cshtml">~/Areas/DangerousJob/Views/JobApprovalForm/Select.cshtml</a>
+            var options = { deptId: $('#JobDeptId').val(), checkMode: 1, mode: 19, istree: 1, winObject: window.document.body, domId: 'JobSafetyCard,JobSafetyCardId' };
+            var url = '/DangerousJob/JobApprovalForm/Select?deptId=' + $('#JobDeptId').val() + "&checkMode=" + 1 + "&mode=" + 19 + "&istree=" + 0 + "&pfrom=" + 1 + "&jobtype=" + jobtype + "&keyValue=" + keyValue+ "&userIds=JobSafetyCardId";
+            dialogOpen({
+                id: "User",
+                title: "选择作业安全证申请",
+                url: url,
+                width: ($(top.window).width() - 10) + "px",
+                height: ($(top.window).height()) + "px",
+                callBack: function (iframeId) {
+
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick(options);
+                    var cardId = $("#JobSafetyCardId").val().split(',');
+                    var cardName = $("#JobSafetyCard").val().split(',');
+                    var html = "";
+                    for (var i = 0; i < cardId.length; i++) {
+                        html += "<a href='#' onclick='openRecord(\"" + cardId[i] + "\")' style='color:blue; text-decoration:underline;padding-right:20px'  title='" + cardName[i] + "'>" + cardName[i]+"</a>"
+
+                    }
+
+                    $("#JobSafety").html(html);  //$("#JobNum").val($('#JobPersonId').val().split(',').length);
+                }
+            });
+        }
+    }
+    //查看关联作业安全证
+    function openRecord(keyValue) {
+
+        var dlg = dialogOpen({
+            id: 'User',
+            title: '关联的作业安全证',
+            url: '/DangerousJob/JobApprovalForm/CordForm?key=' + keyValue,
+            width: ($(top.window).width() - 10) + "px",
+            height: ($(top.window).height()) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+    //切换作业级别
+    function changeJobLevel() {
+        var level = $("#JobLevel").attr("data-value");
+        getFlow(level);
+    }
+    //获取流程展示，切换作业级别时调用
+    function getFlow(level) {
+       
+        $("#tab").html("");
+        flowname(level);
+        $.ajax({
+            url: "../../DangerousJob/JobApprovalForm/ConfigurationByWorkList?keyValue=" + keyValue + "&moduleno=" + moduleno,
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                if (!!result && result.length > 0) {
+                    var html = "";
+                    for (var i = 0; i < result.length; i++) {
+                        var FLOWNAME = result[i].flowname;
+                        var flowusername = result[i].username;
+                        var flowuseraccount = result[i].account;
+                        var flowtitle = result[i].choosepersontitle;
+                        var flowwarn = result[i].choosepersonwarn;
+                        var flowuserid = result[i].userid;
+                        if (!flowusername) {
+                            flowusername = "";
+                            flowuseraccount = "";
+                            flowuserid = "";
+                        }
+                        html += "<tr class='trSpecial'>";
+                        html += "<td class='formTitle' style='width:260px;'>" + flowtitle + "<font face='宋体'>*</font></td>";
+                        html += "<td class='formValue'>";
+                        html += "<input id='value" + result[i].id + "' ch='" + result[i].id + "' value='" + flowusername + "' type='text' name='cname' class='form-control' onclick=selectCheckUser('value" + result[i].id + "','" + result[i].id + "','account" + result[i].id + "') placeholder='" + flowwarn + "' readonly isvalid='yes' checkexpession='NotNull' />";
+                        html += "<input id='" + result[i].id + "' value='" + flowuserid + "' name='cid' type='hidden' />";
+                        html += "<input id='account" + result[i].id + "' name='aid' type='hidden' value='" + flowuseraccount + "' />";
+                        html += "</tr>";
+                    }
+                    $("#tab").append(html);
+
+                }
+            }
+        });
+    }
+    function flowname(level) {
+        switch (level) {
+            case "0"://一级
+                moduleno = "YJFXZYSP";
+                break;
+            case "1"://二级
+                moduleno = "EJFXZYSP";
+                break;
+            case "2"://三级
+                moduleno = "SJFXZYSP";
+                break;
+            default:
+        }
+    }
+    //选择审批人
+    function selectCheckUser(name, value,account) {
+        var str = name + "," + account + "," + value;
+        selectUser({ deptId: '', checkMode: 1, mode: 0, winObject: window.document.body, domId: '' + str + '' });
+    }
+    function yzCount() {
+        var num = $("#JobNum").val();
+
+        if (!(/^[+]?\d+$/.test(num))) {
+            dialogMsg('作业人数请输入整数！', 0);
+            $("#JobNum").val("");
+        }
+    }
+    function jobtype() {
+       
+        $("#JobSafetyCard").val("");
+        $("#JobSafetyCardId").val("");
+        $("#JobSafety").html("");
+    }
+</script>
+<div style="margin-left: 10px; margin-right: 10px;">
+
+    <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px;padding-top:40px;">
+        <div id="div2" class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;审批信息</strong>
+                <span class="tools pull-right">
+                    &nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body" style="height:280px;">
+                <table class="form" id="tab1">
+                    <tr>
+                        <td class="formTitle">审批结果<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="CheckResult" id="CheckResult1" value="0" checked="checked" />通过
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="CheckResult" id="CheckResult2" value="1" />不通过
+                                </label>
+                            </div>
+                            <input type="hidden" id="SuperviseResult" />
+                        </td>
+                        <td class="formTitle">审批时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApproveTime" type="text" isvalid="yes" checkexpession="NotNull" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")" disabled="disabled" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">审批部门<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApproveDeptName" type="text" class="form-control" disabled="disabled" isvalid="yes" checkexpession="NotNull" />
+                            <input id="ApproveDeptId" type="hidden" />
+                        </td>
+                        <td class="formTitle">审批人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApprovePerson" type="text" class="form-control" disabled="disabled" isvalid="yes" checkexpession="NotNull" />
+                            <input id="ApprovePersonId" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">审批意见</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="ApproveOpinion" class="form-control" style="height: 120px;" checkexpession="NotNull"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">签名<font face="宋体">*</font></td>
+                        <td>
+                            @*<input id="SignUrl1" type="hidden" />
+                                <img id="signPreview1" style="width: 100px; height: 40px; " src="" />
+                                <a id="btn_a" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="getUserSignPicFeedback()">获取签名</a>*@
+                            <img id="SignUrl1" style="width: 100px; height: 40px; " src="" />
+                            <a id="btn_a" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="getUserSignPicFeedback(1)">获取签名</a>
+
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <div id="div3" class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;作业信息</strong><strong style="padding-left:30px;color:#2e99d4;">温馨提示：若所做的作业需要申请作业安全证，请先申请作业安全证后再进行危险作业审批单的申请。只要申请即可，无需审批通过。</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body" style="height:1050px;">
+                <table class="form">
+                    <tr id="HandleTr">
+                        <td class="formTitle">申请单位<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApplyDeptName" type="text" class="form-control" disabled="disabled" isvalid="yes" checkexpession="NotNull" />
+                            <input id="ApplyDeptId" type="hidden" />
+                            <input id="ApplyDeptCode" type="hidden" />
+                        </td>
+                        <td class="formTitle">申请人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApplyUserName" type="text" class="form-control" disabled="disabled" isvalid="yes" checkexpession="NotNull" />
+                            <input id="ApplyUserId" type="hidden" />
+                            <input id="ApplyNumber" type="hidden" value="1" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">申请时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApplyTime" type="text" isvalid="yes" checkexpession="NotNull" disabled="disabled" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                        </td>
+                        <td class="formTitle">编号<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApplyNo" type="text" class="form-control" readonly placeholder="编号由系统自动生成" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">危险作业类型<font face="宋体">*</font></td>
+                        <td class="=formValue icheck">
+                            @*<div id="JobType" type="select"  class="ui-select" isvalid="yes" checkexpession="NotNull"  multiple="multiple" ></div>*@
+                            <select id="JobType" class="selectpicker show-menu-arrow form-control" multiple placeholder="危险作业类型"   onchange="jobtype()">
+                                @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("DangerousJobType"))
+                            </select>
+                        </td>
+                        <td class="formTitle">危险作业级别<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="JobLevel" type="select" style="width:70%;float:left;" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                            &nbsp;&nbsp;&nbsp;<a class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="fjbzShow()">分级标准</a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">对应作业安全证</td>
+                        <td class="formValue" colspan="2">
+                            <div style="border:1px solid #ccc; height:70px; padding-left:10px;overflow-y:auto" id="JobSafety">
+                            </div>
+                            <input id="JobSafetyCard" type="hidden" />
+
+                            <input id="JobSafetyCardId" type="hidden" />
+
+                        </td>
+                        <td> <a class="btn btn-primary" id="btnaqz" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="selectSafetyCard()">选择对应作业安全证</a></td>
+
+
+
+                    </tr>
+                    <tr>
+                        <td class="formTitle">作业单位<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="JobDeptName" type="text" class="form-control" readonly onclick="seletJobDept()" isvalid="yes" checkexpession="NotNull" />
+                            <input id="JobDeptId" type="hidden" />
+                            <input id="JobDeptCode" type="hidden" />
+                        </td>
+                        <td class="formTitle">工作票编号</td>
+                        <td class="formValue">
+                            <input id="JobTicketNo" type="text" class="form-control" />
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td class="formTitle">计划作业开始时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="JobStartTime" type="text" isvalid="yes" checkexpession="NotNull" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" />
+                        </td>
+                        <td class="formTitle">计划作业结束时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="JobEndTime" type="text" isvalid="yes" checkexpession="NotNull" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">作业区域<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="JobArea" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" />
+                            <input id="JobAreaId" type="hidden" />
+                        </td>
+                        <td class="formTitle">作业地点<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="JobPlace" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">作业内容<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="JobContent" class="form-control" style="height: 120px;" isvalid="yes" checkexpession="NotNull"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">作业人员</td>
+                        <td class="formValue" colspan="3">
+                            <input id="JobPerson" type="text" class="form-control" onclick="selectDutyUser(0)" readonly />
+                            <input id="JobPersonId" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">作业人数<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="JobNum" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" onchange="yzCount()" />
+                        </td>
+                        <td class="formTitle">监护人</td>
+                        <td class="formValue">
+                            <input id="Custodian" type="text" class="form-control" onclick="selectDutyUser(1)" readonly />
+                            <input id="CustodianId" type="hidden" />
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">主要危险危害因素<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <div style="border:1px solid #ccc;">
+                                <table style="width:100%;margin-left:5px;line-height:28px;" id="DangerousDecipher">
+                                    @*<tr>
+                                            <td><input type="checkbox" name="Decipher" value="高处坠落" />高处坠落</td>
+                                            <td><input type="checkbox" name="Decipher" value="物体打击" />物体打击</td>
+                                            <td><input type="checkbox" name="Decipher" value="触电" />触电</td>
+                                            <td><input type="checkbox" name="Decipher" value="坍塌" />坍塌</td>
+                                            <td><input type="checkbox" name="Decipher" value="火灾" />火灾</td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" name="Decipher" value="灼烫" />灼烫</td>
+                                            <td><input type="checkbox" name="Decipher" value="车辆伤害" />车辆伤害</td>
+                                            <td><input type="checkbox" name="Decipher" value="机械伤害" />机械伤害</td>
+                                            <td><input type="checkbox" name="Decipher" value="淹溺" />淹溺</td>
+                                            <td><input type="checkbox" name="Decipher" value="起重伤害" />起重伤害</td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" name="Decipher" value="冒顶片帮" />冒顶片帮</td>
+                                            <td><input type="checkbox" name="Decipher" value="透水" />透水</td>
+                                            <td><input type="checkbox" name="Decipher" value="放炮" />放炮</td>
+                                            <td><input type="checkbox" name="Decipher" value="瓦斯爆炸" />瓦斯爆炸</td>
+                                            <td><input type="checkbox" name="Decipher" value="火药爆炸" />火药爆炸</td>
+                                        </tr>
+                                        <tr>
+                                            <td><input type="checkbox" name="Decipher" value="锅炉爆炸" />锅炉爆炸</td>
+                                            <td><input type="checkbox" name="Decipher" value="容器爆炸" />容器爆炸</td>
+                                            <td><input type="checkbox" name="Decipher" value="其他爆炸" />其他爆炸</td>
+                                            <td><input type="checkbox" name="Decipher" value="中毒和窒息" />中毒和窒息</td>
+                                            <td><input type="checkbox" name="Decipher" value="其他伤害" />其他伤害</td>
+                                        </tr>*@
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">安全措施<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <div style="border:1px solid #ccc;height:156px;width:100%;float:left;">
+                                <div style="padding:5px; padding-left:20px">
+
+                                </div>
+                                <div>
+                                    <textarea id="SafetyMeasures" class="form-control" style="height: 80px;width:95%;margin-left:20px;" isvalid="yes" checkexpession="NotNull"></textarea>
+                                </div>
+                                <div>
+                                    <span style="float:right;padding-right:30px">
+                                        编制人：
+                                        <img id="SignUrl" style="width: 100px; height: 40px; " src="" />
+                                        <a id="btn_c" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="getUserSignPicFeedback(0)">获取签名</a>
+
+                                    </span>
+                                </div>
+                            </div>
+                            @*<span>
+                                    <a class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; margin-top:60px;margin-left:10px;" onclick="SafetyMeasuresShow()">安全措施项</a>
+                                </span>*@
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">附件</td>
+                        <td class="formValue" colspan="3">
+                            <div class="panel-body" style="padding:0px;">
+                                <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                                    <div class="queueList">
+                                        <div id="uploaderFile" class="placeholder">
+                                            <div class="filePicker" style="margin-top:10px;margin-left:10px;"></div>
+                                        </div>
+                                    </div>
+                                    <div class="statusBar" style="display:none;">
+                                        <div class="progress">
+                                            <span class="text">0%</span>
+                                            <span class="percentage"></span>
+                                        </div>
+                                        <div class="info"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <div class="panel panel-default" id="div1">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;流程处理人员</strong><strong style="padding-left:30px;color:#2e99d4;">温馨提示：请选择以下审批人员，您选择的人员将会对您申请的危险作业审批单进行审批处理。</strong>
+                <span class="tools pull-right">
+                    &nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body" style="height:440px;">
+                <table class="form" id="tab"></table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+
+        <a id="btn_Export" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-download"></i>&nbsp;导&nbsp;&nbsp;出</a>
+        &nbsp; &nbsp;
+        <a id="btn_Save" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+        <a id="btn_Check" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-mail-forward"></i>&nbsp;审&nbsp;&nbsp;批</a>
+        &nbsp; &nbsp;
+    </div>
+</div>
+<div class="modal" id="QrCodeModal">
+    <div class="modal-dialog" style="width:677px;height:600px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header" style="text-align:left;background-color:#2e99d4;color:#fff;padding:9px;">
+                <h5>危险作业分级标准</h5>
+            </div>
+            <div class="modal-body" id="modalBody" style="height:auto;">
+                <table cellpadding="0" cellspacing="0" class="tab1" border="1">
+                    <thead>
+                        <tr>
+                            <td style="background-color:#ddd; width:100px">危险作业级别</td>
+                            <td style="background-color:#ddd;">分级标准</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @*<tr>
+                                <td>一级高处作业</td>
+                                <td>2m≤h＜5m</td>
+                            </tr>
+                            <tr>
+                                <td>二级高处作业</td>
+                                <td>5m≤h＜15m</td>
+                            </tr>
+                            <tr>
+                                <td>三级高处作业</td>
+                                <td>15m≤h＜30m</td>
+                            </tr>*@
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer" style="padding:5px;">
+                <button id="btnQr" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal" id="SafetyMeasuresModal">
+    <div class="modal-dialog" style="width:877px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header" style="text-align:left;background-color:#2e99d4;color:#fff;padding:9px;">
+                <h5>安全措施</h5>
+            </div>
+            <div class="modal-body" id="modalBody" style="height:390px;overflow-x:hidden;overflow-y:scroll;">
+                <table id="gridTable1" cellpadding="0" cellspacing="0" class="tab1" border="1">
+                    <thead>
+                        <tr>
+                            <td style="background-color:#ddd;">序号</td>
+                            <td style="background-color:#ddd;">高处作业安全措施</td>
+                            <td style="background-color:#ddd;">打√</td>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+            <div class="modal-footer" style="padding:5px;">
+                <button id="btnMeasures" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal">确认</button>
+                <button id="btnMeasuresQX" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal">取消</button>
+            </div>
+        </div>
+    </div>
+</div>

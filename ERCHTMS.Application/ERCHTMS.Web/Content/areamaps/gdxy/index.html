@@ -1,0 +1,674 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="./css/reset.css">
+    <link rel="stylesheet" href="./css/main.css">
+    <script src="../../scripts/jquery/jquery-1.8.2.min.js"></script>
+    <script src="../../../Content/scripts/utils/framework-ui.js"></script>
+    <style type="text/css">
+        .itemul {
+            background-color: #fc0606;
+            z-index: 9999;
+            padding: 10px;
+            display: none;
+            border-radius: 10%;
+        }
+
+        .tab1 {
+            width: 100%;
+            border: 1px solid #ccc;
+        }
+
+            .tab1 td {
+                background-color: white;
+                height: 30px;
+                text-align: center;
+                border: 1px solid #ccc;
+            }
+    </style>
+    <script type="text/javascript">
+        var apiUrl = "";
+        var mode = request("mode");
+        //加载提示框
+        function Loading(bool, text) {
+            if ($("#loading_manage") != undefined) {
+                $("#loading_manage").css("left", ($(window.document.body).width() - $("#loading_manage").width()) / 2 - 54);
+                $("#loading_manage").css("top", ($(window.document.body).height() - $("#loading_manage").height()) / 2);
+                var ajaxbg = $("#loading_background,#loading_manage");
+                if (bool) {
+                    ajaxbg.show();
+                } else {
+                    if ($("#loading_manage").attr('isTableLoading') == undefined) {
+                        ajaxbg.hide();
+                        $(".ajax-loader").hide();
+                    }
+                }
+                if (!!text) {
+                    $("#loading_manage").html(text);
+                } else {
+                    $("#loading_manage").html("请稍候,正在努力加载中…");
+                }
+            }
+
+        };
+        function getLevel(status) {
+
+            var color = "gray";
+            if (status == 1) {
+                color = "red";
+            }
+            if (status == 2) {
+                color = "orange";
+            }
+            if (status == 3) {
+                color = "yellow";
+            }
+            if (status == 4) {
+                color = "blue";
+            }
+            return color;
+        }
+        function showInfo(code, grade, items) {
+            var html = "<div style='padding:10px'><table style='width: 100%;text-align: center;border: 1px solid #ccc;' cellpadding='0' cellspacing='0' class='tab1' border='1' id='tab1'><tr><td>序号</td><td>作业负责人</td><td>作业内容</td><td>作业时间</td><td>作业单位</td><td>作业区域</td></tr>";
+            var json = JSON.parse(items);
+            var idx = 0;
+            $(json).each(function (j, item) {
+                if (grade == item.HazardLevel) {
+                    idx++;
+                    html += "<tr><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + idx + "</td><td  style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.WorkPrincipal) + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + item.WorkContent + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + item.StartDate.replace("T", " ") + "至" + item.EndDate.replace("T", " ") + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + item.WorkUnit + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + item.BeLongAreaName + "</td></tr>";
+                }
+            });
+            html += "</table>";
+            top.dialogContent({ width: "1000px", height: "500px", content: html, btn: null, title: "作业信息" });
+
+        }
+        function getWorkInfo(code, grade, items) {
+            var html = "";
+            var json = JSON.parse(items);
+            var idx = 0;
+            $(json).each(function (j, item) {
+                if (grade == item.HazardLevel) {
+                    idx++;
+                    html += "<tr><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + idx + "</td><td  style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.WorkPrincipal) + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.WorkContent) + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.StartDate).replace("T", " ") + "至" + convertText(item.EndDate).replace("T", " ") + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.WorkUnit) + "</td><td style='background-color: white;height: 30px;text-align: center;border: 1px solid #ccc;'>" + convertText(item.BeLongAreaName) + "</td></tr>";
+                }
+            });
+            html += "</table>";
+            return html;
+        }
+        $(function () {
+            Loading(true, "正在加载分布图……");
+            getSum();
+            $(".newIcon,.importAccident").hide();
+            var arr = new Array();
+            $("img[sno]").each(function (i, dom) {
+                if ($.inArray($(dom).attr("sno"), arr) < 0) {
+                    arr.push($(dom).attr("sno"));
+                }
+
+            });
+            if (arr.length > 0) {
+                $.post("../../../Desktop/GetAreaStatus", { areaCodes: arr.toString(), mode: mode }, function (data) {
+                    var json = JSON.parse(data);
+                    if(json.type==1){
+                        apiUrl = json.message;
+                        $(json.resultdata).each(function (i, item) {
+                           
+                            var imgs = $("img[sno='" + item.code + "']");
+                            if (imgs != undefined && imgs != null) {
+                                imgs.each(function (k, img0) {
+                                    var img = $(img0);
+                                    var src = img.attr("src");
+                                    var arr0 = src.split('/');
+                                    src = arr0[0] + "/" + arr0[1] + "/" + getLevel(item.status) + "/" + arr0[3];
+                                    img.attr("src", src);
+                                    var areaCode = item.areacode;
+                                    var content=item.content == null ? "" : encodeURIComponent(item.content);
+                                    img.attr("onclick", "showDlg('" + img.parent().attr("aid") + "','" + img.attr("sno") + "','" + content + "','" + areaCode + "','" + encodeURIComponent(item.fxnum) + "')");
+                                });
+
+                                if (item.htnum.length > 0) {
+                                        arr = item.htnum.split(',');
+                                        if (arr[0] != 0) {
+                                            imgs.parent().find(".importAccident").show();
+                                            imgs.parent().find(".newIcon").hide();
+                                        }
+                                        if (arr[1] != 0) {
+                                            imgs.parent().find(".importAccident").hide();
+                                            imgs.parent().find(".newIcon").show;
+                                             
+                                        }
+                                }
+
+                            }
+                        });
+                    }
+                    Loading(false);
+                });
+            }
+        });
+        function getSum() {
+            $.get("../../../Desktop/GetRiskAndHt", function (data) {
+                var json = $.parseJSON(data);
+                if (json.type==1) {
+                    for (var j = 1; j < json.resultdata.risk.length; j++) {
+                        $(".riskul1").find(".detailnum").eq(j-1).text(json.resultdata.risk[j]+"项");
+                    }
+                    for (var j = 1; j <3; j++) {
+                        $(".riskul2").find(".detailnum").eq(j - 1).text(json.resultdata.ht[3-j] + "项");
+                    }
+                    $(json.resultdata.work).each(function (j,item) {
+                       
+                        $(".riskul1").find(".msgnum").eq(j).text(item.data.length + "项");
+                        $(".riskul1").find(".msgnum").eq(j).click(function () {
+                            showWorkInfo(encodeURIComponent(JSON.stringify(item.data)));
+                        });
+                    });
+                }
+            });
+        }
+        function showWorkInfo(items,grade) {
+            if (items.length > 0) {
+                var j = 1;
+                var json = $.parseJSON(decodeURIComponent(items));
+                var html = "";
+                $(json).each(function (k, row) {
+                    if (grade != undefined) {
+                        if (grade == row.HazardLevel) {
+                            html += "<tr class='row0'><td>" + j + "</td><td>" + convertText(row.WorkPrincipal) + "</td><td>" + convertText(row.WorkContent) + "</td><td>" + convertText(row.StartDate).replace("T", " ") + "至" + convertText(row.EndDate).replace("T", " ") + "</td><td>" + convertText(row.WorkUnit) + "</td><td>" + convertText(row.BeLongAreaName) + "</td><td>" + convertText(row.HazardLevel) + "</td></tr>";
+                            j++;
+                        }
+                    } else {
+                        html += "<tr class='row0'><td>" + (k + 1) + "</td><td>" + convertText(row.WorkPrincipal) + "</td><td>" + convertText(row.WorkContent) + "</td><td>" + convertText(row.StartDate).replace("T", " ") + "至" + convertText(row.EndDate).replace("T", " ") + "</td><td>" + convertText(row.WorkUnit) + "</td><td>" + convertText(row.BeLongAreaName) + "</td><td>" + convertText(row.HazardLevel) + "</td></tr>";
+                    }
+                 
+                });
+                $('.pop.pop10').find(".highriskTable").find(".row0").remove();
+                $('.pop.pop10').find(".highriskTable").append(html);
+                $('.pop.pop10').show();
+            }
+        }
+        function convertText(text) {
+            return text == null ? "" : text;
+        }
+    </script>
+</head>
+<body style="margin:0px;">
+    <div class="contentBox">
+        <div class="svgBox">
+            <iframe class="mainbg" src="./images/home/mainbg2.svg"></iframe>
+            <div class="content">
+                <div class="instruct_section">
+                    <h3>荥阳电厂安全风险四色分布图</h3>
+                    <div class="warning-section">
+                        <ul class="riskul1 clearfix">
+                            <li>
+                                <span class="redColor"></span>
+                                重大风险:
+                                <i class="detailnum" onclick="top.openTab('d472030f-3094-4ad8-89cd-90c949fd4d91','../RiskDatabase/DangerSource/List?mode=1&year=&level=1&code=','重大风险清单')" title="查看风险详情">0项</i>
+                                <i class="msgnum" title="查看作业详情">0项</i>
+                            </li>
+                            <li>
+                                <span class="orangeColor"></span>
+                                较大风险:
+                                <i class="detailnum" onclick="top.openTab('d472030f-3094-4ad8-89cd-90c949fd4d91','../RiskDatabase/DangerSource/List?mode=1&year=&level=2&code=','较大风险清单')" title="查看风险详情">0项</i>
+                                <i class="msgnum" title="查看作业详情">0项</i>
+                            </li>
+                            <li>
+                                <span class="yellowColor"></span>
+                                一般风险:
+                                <i class="detailnum" onclick="top.openTab('d472030f-3094-4ad8-89cd-90c949fd4d91','../RiskDatabase/DangerSource/List?mode=1&year=&level=3&code=','一般风险清单')" title="查看风险详情">0项</i>
+                                <i class="msgnum" title="查看作业详情">0项</i>
+                            </li>
+                            <li>
+                                <span class="blueColor"></span>
+                                低风险:
+                                <i class="detailnum" onclick="top.openTab('d472030f-3094-4ad8-89cd-90c949fd4d91','../RiskDatabase/DangerSource/List?mode=1&year=&level=4&code=','低风险清单')" title="查看风险详情">0项</i>
+                                <i class="msgnum" title="查看作业详情">0项</i>
+                            </li>
+                        </ul>
+                        <ul class="riskul2 clearfix">
+                            <li>
+                                一般隐患:
+                                <i class="detailnum" onclick="top.openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0', '../HiddenTroubleManage/HTBaseInfo/Index?ChangeStatus=未整改结束&mode=ybqbyh&code=', '一般隐患')" title="查看隐患详情">0项</i>
+                            </li>
+                            <li>
+                                重大隐患:
+                                <i class="detailnum" onclick="top.openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0', '../HiddenTroubleManage/HTBaseInfo/Index?ChangeStatus=未整改结束&mode=bigHt&code=', '重大隐患')" title="查看隐患详情">0项</i>
+                            </li>
+                           
+                        </ul>
+                    </div>
+                </div>
+                <div class="index-1 area1" aid="area1">
+                    <img src="images/home/gray/1-1.png" sno="006">
+
+                </div>
+                <div class="index-2 area1" aid="area1">
+                    <img src="images/home/gray/1-2.png" sno="006">
+                    <img class="newIcon" src="./images/danger.png" alt="">
+                    <div class="importAccident"></div>
+                </div>
+                <div class="index-3 area1" aid="area1">
+                    <img src="images/home/gray/1-3.png" sno="006">
+                </div>
+
+                <div class="index-4 area2" aid="area2">
+                    <img src="images/home/gray/2-1.png" sno="005">
+                    <img class="newIcon newIcon-4" src="./images/danger.png" alt="">
+                    <div class="importAccident importAccident-4"></div>
+                </div>
+                <div class="index-5 area2" aid="area2">
+                    <img src="images/home/gray/2-2.png" sno="005">
+                </div>
+
+                <div class="index-6 area6" aid="area6">
+                    <img src="images/home/gray/6-1.png" sno="001">
+                    <img class="newIcon" src="./images/danger.png" alt="">
+                    <div class="importAccident"></div>
+                </div>
+                <div class="index-7 area6" aid="area6">
+                    <img src="images/home/gray/6-2.png" sno="001">
+                </div>
+
+                <div class="index-8 area3" aid="area3">
+                    <img src="images/home/gray/3-1.png" sno="007">
+                </div>
+                <div class="index-9 area3" aid="area3">
+                    <img src="images/home/gray/3-2.png" sno="007">
+                </div>
+                <div class="index-10 area3" aid="area3">
+                    <img src="images/home/gray/3-3.png" sno="007">
+                    <img class="newIcon" src="./images/danger.png" alt="">
+                    <div class="importAccident"></div>
+                </div>
+
+                <div class="index-11 area4" aid="area4">
+                    <img src="images/home/gray/4-1.png" sno="003">
+                </div>
+                <div class="index-12 area4" aid="area4">
+                    <img src="images/home/gray/4-2.png" sno="003">
+                    <img class="newIcon newIcon-12" src="./images/danger.png" alt="">
+                    <div class="importAccident"></div>
+                </div>
+                <div class="index-13 area4" aid="area4">
+                    <img src="images/home/gray/4-3.png" sno="003">
+                </div>
+
+                <div class="index-14 area5" aid="area5">
+                    <img src="images/home/gray/5-1.png" sno="002">
+                    <img class="newIcon" src="./images/danger.png" alt="">
+                    <div class="importAccident"></div>
+                </div>
+                <div class="index-15 area5" aid="area5">
+                    <img src="images/home/gray/5-2.png" sno="002">
+                </div>
+
+                <div class="index-16">
+                    <img src="images/home/gray/7-1.png">
+                </div>
+                <div class="index-17" aid="area7">
+                    <img src="images/home/gray/7-2.png" sno="004">
+                </div>
+                <div class="index-18" aid="area7">
+                    <img src="images/home/gray/7-3.png" sno="004">
+                </div>
+            </div>
+            <!-- 弹窗区域start -->
+            <div class="dialogBox">
+                <div class="frameDialog1">
+                    <div class="pop poparea1 import-pop">
+                        <div class="pop-conetent import-pop-content">
+                            <div class="pop-header clearfix">
+                                <span class="closeBtn fr">
+                                    <img src="./images/close2.png" alt="">
+                                </span>
+                            </div>
+                            <div class="pop-main">
+                                <ul class="area-sectionBox">
+                                    <li><a href="./page/carshop/floor1.html">汽机房</a></li>
+                                    <li><a href="./page/carshop/floor1.html">供热首站</a></li>
+                                </ul>
+                                <div class="warning-area clearfix">
+                                    <ul class="risk1 clearfix">
+                                        
+                                    </ul>
+                                    <ul class="risk2 clearfix">
+                                       
+                                    </ul>
+                                </div>
+                                <div class="highrisk-section">
+                                    <table class="highriskTable highrisktab" cellspacing="0" border="0">
+                                        <tr class="taskTable_head">
+                                            <th width="10%">序号</th>
+                                            <th width="10%">作业负责人</th>
+                                            <th width="20%">作业内容</th>
+                                            <th width="15%">作业时间</th>
+                                            <th width="15%">作业单位</th>
+                                            <th width="15%">作业区域</th>
+                                            <th width="10%">风险等级</th>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="frameDialog2">
+                    <div class="pop poparea2 import-pop">
+                        <div class="pop-conetent import-pop-content">
+                            <div class="pop-header clearfix">
+                                <span class="closeBtn fr">
+                                    <img src="./images/close2.png" alt="">
+                                </span>
+                            </div>
+                            <div class="pop-main">
+                                <ul class="area-sectionBox">
+                                    <li><a href="./page/guolu/floor1.html">锅炉</a></li>
+                                    <li><a href="./page/guolu/floor1.html">油库区</a></li>
+                                    <li><a href="./page/guolu/floor1.html">集控楼</a></li>
+                                    <li><a href="./page/guolu/floor1.html">液氮区</a></li>
+                                    <li><a href="./page/guolu/floor1.html">废水池</a></li>
+                                    <li><a href="./page/guolu/floor1.html">洗水池</a></li>
+                                    <li><a href="./page/guolu/floor1.html">原灰库</a></li>
+                                </ul>
+                                <div class="warning-area clearfix">
+                                    <ul class="risk1 clearfix">
+                                      
+                                    </ul>
+                                    <ul class="risk2 clearfix">
+                                        
+                                    </ul>
+                                </div>
+                                <div class="highrisk-section">
+                                    <table class="highriskTable highrisktab" cellspacing="0" border="0">
+                                        <tr class="taskTable_head">
+                                            <th width="10%">序号</th>
+                                            <th width="10%">作业负责人</th>
+                                            <th width="20%">作业内容</th>
+                                            <th width="15%">作业时间</th>
+                                            <th width="15%">作业单位</th>
+                                            <th width="15%">作业区域</th>
+                                            <th width="10%">风险等级</th>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="frameDialog3">
+                    <div class="pop poparea3 import-pop">
+                        <div class="pop-conetent import-pop-content">
+                            <div class="pop-header clearfix">
+                                <span class="closeBtn fr">
+                                    <img src="./images/close2.png" alt="">
+                                </span>
+                            </div>
+                            <div class="pop-main">
+                                <ul class="area-sectionBox">
+                                    <li><a href="javascript:;">脱硫区</a></li>
+                                </ul>
+                                <div class="warning-area clearfix">
+                                    <ul class="risk1 clearfix">
+                                        
+                                    </ul>
+                                    <ul class="risk2 clearfix">
+                                       
+                                    </ul>
+                                </div>
+                                <div class="highrisk-section">
+                                    <table class="highriskTable highrisktab" cellspacing="0" border="0">
+                                        <tr class="taskTable_head">
+                                            <th width="10%">序号</th>
+                                            <th width="10%">作业负责人</th>
+                                            <th width="20%">作业内容</th>
+                                            <th width="15%">作业时间</th>
+                                            <th width="15%">作业单位</th>
+                                            <th width="15%">作业区域</th>
+                                            <th width="10%">风险等级</th>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="frameDialog4">
+                    <div class="pop poparea4 import-pop">
+                        <div class="pop-conetent import-pop-content">
+                            <div class="pop-header clearfix">
+                                <span class="closeBtn fr">
+                                    <img src="./images/close2.png" alt="">
+                                </span>
+                            </div>
+                            <div class="pop-main">
+                                <ul class="area-sectionBox">
+                                    <li><a href="javascript:;">煤场</a></li>
+                                </ul>
+                                <div class="warning-area clearfix">
+                                    <ul class="risk1 clearfix">
+                                       
+                                    </ul>
+                                    <ul class="risk2 clearfix">
+                                       
+                                    </ul>
+                                </div>
+                                <div class="highrisk-section">
+                                    <table class="highriskTable highrisktab" cellspacing="0" border="0">
+                                        <tr class="taskTable_head">
+                                            <th width="10%">序号</th>
+                                            <th width="10%">作业负责人</th>
+                                            <th width="20%">作业内容</th>
+                                            <th width="15%">作业时间</th>
+                                            <th width="15%">作业单位</th>
+                                            <th width="15%">作业区域</th>
+                                            <th width="10%">风险等级</th>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="frameDialog5">
+                    <div class="pop poparea5 import-pop">
+                        <div class="pop-conetent import-pop-content">
+                            <div class="pop-header clearfix">
+                                <span class="closeBtn fr">
+                                    <img src="./images/close2.png" alt="">
+                                </span>
+                            </div>
+                            <div class="pop-main">
+                                <ul class="area-sectionBox">
+                                    <li><a href="javascript:;">化验区</a></li>
+                                </ul>
+                                <div class="warning-area clearfix">
+                                    <ul class="risk1 clearfix">
+                                        
+                                    </ul>
+                                    <ul class="risk2 clearfix">
+                                       
+                                    </ul>
+                                </div>
+                                <div class="highrisk-section">
+                                    <table class="highriskTable highrisktab" cellspacing="0" border="0">
+                                        <tr class="taskTable_head">
+                                            <th width="10%">序号</th>
+                                            <th width="10%">作业负责人</th>
+                                            <th width="20%">作业内容</th>
+                                            <th width="15%">作业时间</th>
+                                            <th width="15%">作业单位</th>
+                                            <th width="15%">作业区域</th>
+                                            <th width="10%">风险等级</th>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="frameDialog6">
+                    <div class="pop poparea6 import-pop">
+                        <div class="pop-conetent import-pop-content">
+                            <div class="pop-header clearfix">
+                                <span class="closeBtn fr">
+                                    <img src="./images/close2.png" alt="">
+                                </span>
+                            </div>
+                            <div class="pop-main">
+                                <ul class="area-sectionBox">
+                                    <li><a href="javascript:;">冷却塔</a></li>
+                                </ul>
+                                <div class="warning-area clearfix">
+                                    <ul class="risk1 clearfix">
+                                       
+                                    </ul>
+                                    <ul class="risk2 clearfix">
+                                       
+                                    </ul>
+                                </div>
+                                <div class="highrisk-section">
+                                    <table class="highriskTable highrisktab" cellspacing="0" border="0">
+                                        <tr class="taskTable_head">
+                                            <th width="10%">序号</th>
+                                            <th width="10%">作业负责人</th>
+                                            <th width="20%">作业内容</th>
+                                            <th width="15%">作业时间</th>
+                                            <th width="15%">作业单位</th>
+                                            <th width="15%">作业区域</th>
+                                            <th width="10%">风险等级</th>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frameDialog7">
+                    <div class="pop poparea7 import-pop">
+                        <div class="pop-conetent import-pop-content">
+                            <div class="pop-header clearfix">
+                                <span class="closeBtn fr">
+                                    <img src="./images/close2.png" alt="">
+                                </span>
+                            </div>
+                            <div class="pop-main">
+                                <ul class="area-sectionBox">
+                                    <li><a href="javascript:;">厂前区</a></li>
+                                </ul>
+                                <div class="warning-area clearfix">
+                                    <ul class="risk1 clearfix"></ul>
+                                    <ul class="risk2 clearfix"></ul>
+                                </div>
+                                <div class="highrisk-section">
+                                    <table class="highriskTable highrisktab" cellspacing="0" border="0">
+                                        <tr class="taskTable_head">
+                                            <th width="10%">序号</th>
+                                            <th width="10%">作业负责人</th>
+                                            <th width="20%">作业内容</th>
+                                            <th width="15%">作业时间</th>
+                                            <th width="15%">作业单位</th>
+                                            <th width="15%">作业区域</th>
+                                            <th width="10%">风险等级</th>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="frameDialog10">
+                    <div class="pop pop10 import-pop">
+                        <div class="pop-conetent import-pop-content" style="width:1000px">
+                            <div class="pop-header clearfix">
+                                <span class="closeBtn fr">
+                                    <img src="./images/close2.png" alt="">
+                                </span>
+                            </div>
+                            <div class="pop-main">
+                                <div class="highrisk-section">
+                                    <table class="highriskTable highrisktab" cellspacing="0" border="0">
+                                        <tr class="taskTable_head">
+                                            <th width="10%">序号</th>
+                                            <th width="10%">作业负责人</th>
+                                            <th width="20%">作业内容</th>
+                                            <th width="15%">作业时间</th>
+                                            <th width="15%">作业单位</th>
+                                            <th width="15%">作业区域</th>
+                                            <th width="10%">风险等级</th>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="loading_background" class="loading_background" style="display: none;"></div>
+    <div id="loading_manage">
+        请稍候,正在努力加载中…
+    </div>
+    <script type="text/javascript">
+        //查看区域下的风险，隐患及作业信息
+        function showDlg(id, code, items, areaCode, wzinfo) {
+            $.get(apiUrl + "basedata/GetRiskInfoByCode", { code: code, orgCode: top.currUserOrgCode }, function (json) {
+                        if (json.code == 0) {
+                            //  <li> 一般隐患:<i class="detailnum">15项</i> </li>
+                            var colors = ["blueColor", "yellowColor", "orangeColor", "redColor"];
+                            var html = "";
+                            items = decodeURIComponent(items);
+                            var num = items.length > 0 ? JSON.parse(items).length : 0;
+                            var works = $.parseJSON(decodeURIComponent(wzinfo));
+                            $(json.data.risk).each(function (i, item) {
+                                html += '<li> <span class="' + colors[i] + '"></span>' + item.grade + '：<i class="detailnum"  onclick=\"top.openTab(\'d472030f-3094-4ad8-89cd-90c949fd4d91\',\'../RiskDatabase/DangerSource/List?mode=1&year=&level=' + (4 - i) + "&code=" + areaCode + '\',\'风险清单\')\" title="点击查看风险详情" >' + item.num + '项</i>';
+                                html += '<i class="msgnum" onclick=\"showWorkInfo(\'' + encodeURIComponent(items) + '\',\'' + item.grade + '\')\" title="点击查看作业详情">' + works[i].Count + '项</i></li></li>';
+                            });
+                            $('.pop.pop' + id).find(".risk1").html(html);
+                            html = "";
+                            html += "<li>一般隐患：<a onclick=\"top.tablist.newTab({id:'67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0',title:'一般隐患',url: '../HiddenTroubleManage/HTBaseInfo/Index?ChangeStatus=" + encodeURIComponent("未整改结束") + "&mode=ybqbyh&code=" + areaCode + "'})\" title='点击查看详情'<i class='detailnum'>" + json.data.ht[0].num + '项</i></a></li>';
+                            html += "<li>重大隐患：<a onclick=\"top.tablist.newTab({id:'67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0',title:'重大隐患',url: '../HiddenTroubleManage/HTBaseInfo/Index?ChangeStatus=" + encodeURIComponent("未整改结束") + "&mode=bigHt&code=" + areaCode + "'})\" title='点击查看详情'<i class='detailnum'>" + json.data.ht[1].num + '项</i></a></li>';
+                            //html += "<li>重大隐患：<a onclick=\"top.tablist.newTab({id:'67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0',title:'重大隐患',url: '../HiddenTroubleManage/HTBaseInfo/Index?ChangeStatus=" + encodeURIComponent("未整改结束") + "&mode=bigHt&code=" + areaCode + "'})\" title='点击查看详情'>" + arr[1] + "</a></li>";
+                           // $(json.data.ht).each(function (i, item) {
+                               // html += '<li>' + item.name + '：<i class="detailnum">' + item.num + '项</i></li>';
+                           // });
+                            $('.pop.pop' + id).find(".risk2").html(html);
+                            if (items.length > 0) {
+                                html = "";
+                                var json = JSON.parse(items);
+                                $(json).each(function (j, item) {
+                                    html += "<tr class='row0'><td>" + (j+1) + "</td><td>" + item.WorkPrincipal + "</td><td>" + item.WorkContent + "</td><td>" + item.StartDate.replace("T", " ") + "至" + item.EndDate.replace("T", " ") + "</td><td>" + item.WorkUnit + "</td><td>" + item.BeLongAreaName + "</td><td>" + item.HazardLevel + "</td></tr>";
+                                });
+                                $('.pop.pop' + id).find(".highriskTable").find(".row0").remove();
+                                $('.pop.pop' + id).find(".highriskTable").append(html);
+                            }
+                        }
+                        $('.pop.pop' + id).show();
+                    });
+         
+        }
+        $(function () {
+            // 点击区域弹出区域选择弹框
+           
+
+            //关闭弹框
+            $('.closeBtn').click(function () {
+                $(this).parents().filter('div.pop').hide()
+            })
+
+            //按钮区域高亮
+            $('.area-sectionBox li').hover(function () {
+                $(this).toggleClass('active')
+            })
+        })
+    </script>
+</body>
+</html>

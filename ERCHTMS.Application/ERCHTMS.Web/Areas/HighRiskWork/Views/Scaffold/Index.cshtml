@@ -1,0 +1,562 @@
+﻿@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var currUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var useraccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+    var scaffoldtype = 0;
+    var scaffoldstr = "搭设";
+    var indexdeal = request('indexdeal');//首页待办跳转
+    $(function () {
+        InitialPage();
+        GetGrid();
+
+
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 230);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //脚手架类型
+        $("#SetupType").ComboBox({
+            param: { EnCode: "ScaffoldType" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "======请选择======",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+
+        //搭设申请
+        $("#tab1").click(function () {
+            scaffoldtype = 0;
+            scaffoldstr = "搭设";
+
+            $("#td_setupdate").html("计划搭设时间：");
+            $("#td_setupcompany").html("使用单位：");
+            var options = '<option value="">===请选择===</option><option value="0">申请中</option><option value="1">审核(批)中</option><option value="2">审核(批)未通过</option><option value="3">审核(批)通过</option>';
+            $("#AuditState").html(options);
+
+            ChangeTab();
+        });
+        //验收申请
+        $("#tab2").click(function () {
+            scaffoldtype = 1;
+            scaffoldstr = "验收";
+
+            $("#td_setupdate").html("实际搭设时间：");
+            $("#td_setupcompany").html("使用单位：");
+            var options = '<option value="">===请选择===</option><option value="0">申请中</option><option value="1">审核(批)中</option><option value="2">审核(批)未通过</option><option value="3">审核(批)通过</option><option value="4">验收中</option><option value="5">验收未通过</option><option value="6">验收通过</option>';
+            $("#AuditState").html(options);
+
+            ChangeTab();
+        });
+
+        //拆除申请
+        $("#tab3").click(function () {
+            scaffoldtype = 2;
+            scaffoldstr = "拆除";
+
+            $("#td_setupdate").html("计划拆除时间：");
+            $("#td_setupcompany").html("使用单位：");
+            var options = '<option value="">===请选择===</option><option value="0">申请中</option><option value="1">审核(批)中</option><option value="2">审核(批)未通过</option><option value="3">审核(批)通过</option>';
+            $("#AuditState").html(options);
+
+            ChangeTab();
+        });
+
+        if (!!indexdeal) {
+            $("#ViewRange").children().eq(3).attr("selected", "selected");
+        }
+
+        $("#btn_Search").click(function () {
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                //隐藏搜索框
+                var title = $(".ui-filter-text");
+                title.trigger("click");
+            }
+            $('#gridTable').jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+    }
+    //切换选项卡调用
+    function ChangeTab() {
+        //清空当前条件
+        ResetCondition();
+
+        var $gridTable = $('#gridTable');
+        if (scaffoldtype != 2) {
+            $gridTable.showCol(['setupdate']);
+            $gridTable.hideCol(['dismentledate']);
+        } else {
+            $gridTable.hideCol(['setupdate']);
+            $gridTable.showCol(['dismentledate']);
+        }
+
+
+        if (!!indexdeal) {
+            $("#ViewRange").get(0).options[3].selected = true;
+        }
+
+        $gridTable.setGridWidth(($('.gridPanel').width()));
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: getQueryJson() }, page: 1
+        }).trigger('reloadGrid');
+    }
+    function reload_current() {
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: getQueryJson() }, page: 1
+        }).trigger('reloadGrid');
+    }
+    //得到查询条件
+    function getQueryJson() {
+
+        var query = {
+            ScaffoldType: scaffoldtype,
+            SetupType: $("#SetupType").attr("data-value"),
+            AuditState: $("#AuditState").val(),
+            SetupCompanyId: $("#SetupCompanyId").val(),
+            SetupCompanyCode: $("#SetupCompanyCode").val(),
+            SetupStartDate: $("#SetupStartDate").val(),
+            SetupEndDate: $("#SetupEndDate").val(),
+            ApplyCode: $("#ApplyCode").val(),
+            ViewRange: $("#ViewRange").val()
+        }
+        console.log(query);
+        return JSON.stringify(query);
+    }
+    //重置所有查询条件
+    function ResetCondition() {
+        $("#filter-form").find(":input").val("");
+        //搭设类型
+        $("#SetupType").attr("data-text", "======请选择======");
+        $("#SetupType").attr("data-value", "");
+        $("#SetupType div:eq(0)").text("======请选择======");
+
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 230,
+            url: "../../HighRiskWork/Scaffold/GetListJson",
+            postData: { queryJson: getQueryJson() },
+            datatype: "json",
+            colModel: [
+                { label: 'ID', name: 'id', index: 'id', align: 'left', hidden: true },
+                { label: '申请用户ID', name: 'applyuserid', hidden: true },
+                { label: '搭设单位ID', name: 'setupcompanyid', hidden: true },
+                { label: '作业状态标识', name: 'auditstate', hidden: true },
+                { label: '搭设类型', name: 'scaffoldtype', hidden: true },
+                { label: '脚手架类型', name: 'setuptype', hidden: true },
+                { label: '使用单位类型', name: 'setupcompanytype', hidden: true },
+                { label: '外包工程关联的用户ID', name: 'projectuserid', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:btn_view()  title='查看'><i class='fa fa-eye'></i></a>";
+
+                        if (rowObject.auditstate == 1 || rowObject.auditstate == 4 || rowObject.auditstate == 6) {
+                            if (!!rowObject.approveuseraccount) {
+                                if (parseStrEmpty(rowObject.outtransferuseraccount).indexOf(useraccount + ',') < 0 && (rowObject.approveuseraccount.indexOf(useraccount + ',') >= 0 || parseStrEmpty(rowObject.intransferuseraccount).indexOf(useraccount + ',') >= 0)) {
+                                    html += "<a href=javascript:btn_audit()  title='审核'><i class='fa fa-check'></i></a>";
+                                }
+                            }
+                        }
+
+                        if (rowObject.auditstate == 0 && rowObject.applyuserid == currUserId) {
+                            html += '<a href="javascript:btn_edit()" title="编辑"><i class="fa fa-pencil-square-o"></i></a>';
+                            html += "<a href=javascript:btn_delete()  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '作业状态', name: 'auditstatestr', index: 'auditstatestr', width: 180, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+
+                        var linkstyle = '<a href="javascript:btn_viewflow(\'' + rowObject.id + '\')" style="color:blue; text-decoration:underline;">${0}</a>';
+                        //搭设申请、拆除申请作业状态
+                        if (rowObject.auditstate == 0) {
+                            return linkstyle.replace('${0}', '申请中');
+                        }
+                        if (rowObject.auditstate == 1) {
+                            return linkstyle.replace('${0}', '审核(批)中');
+                        }
+                        if (rowObject.auditstate == 2) {
+                            return linkstyle.replace('${0}', '审核(批)未通过');
+                        }
+                        if (rowObject.auditstate == 3) {
+                            return linkstyle.replace('${0}', '审核(批)通过');
+                        }
+                        if (rowObject.auditstate == 4) {
+                            return linkstyle.replace('${0}', '验收中');
+                        }
+                        if (rowObject.auditstate == 5) {
+                            return linkstyle.replace('${0}', '验收未通过');
+                        }
+                        if (rowObject.auditstate == 6) {
+                            return linkstyle.replace('${0}', '审核(批)中');
+                        }
+                    }
+                },
+                { label: '申请编号', name: 'applycode', index: 'applycode', width: 150, align: 'center' },
+                   {
+                       label: '工程名称', name: 'outprojectname', index: 'outprojectname', width: 150, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                           if (cellvalue) {
+                               if (cellvalue.length > 12) {
+                                   return '<div title=' + cellvalue + '>' + cellvalue.substring(0, 11) + "..." + '</div>'
+                               }
+                               return cellvalue;
+                           }
+                           return "";
+                       }
+                   },
+                {
+                    label: '单位类别', name: 'setupcompanytypestr', index: 'setupcompanytypestr', width: 150, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.setupcompanytype == 0) {
+                            return '单位内部';
+                        }
+                        return '外包单位';
+                    }
+                },
+                { label: '使用单位', name: 'setupcompanyname', index: 'senddeptname', width: 180, align: 'center', sortable: false },
+                {
+                    label: '计划搭设时间', name: 'setupdate', index: 'setupdate', width: 240, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(rowObject.setupstartdate, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.setupenddate, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                {
+                    label: '计划拆除时间', name: 'dismentledate', index: 'dismentledate', width: 240, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(rowObject.dismentlestartdate, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.dismentleenddate, 'yyyy-MM-dd hh:mm');
+                    }
+                },
+                { label: '申请人', name: 'applyusername', index: 'applyusername', width: 110, align: 'center', sortable: false },
+                { label: '申请时间', name: 'applydate', index: 'applydate', width: 110, align: 'center', formatter: "date", formatoptions: { srcformat: 'Y-m-d H:i', newformat: 'Y-m-d H:i' } },
+                { label: '审核部门', name: 'flowdeptname', width: 120, sortable: false, align: 'center' },
+                {
+                    label: '审核(批)流程', name: 'flowname', width: 200, sortable: false, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue) {
+                            if (cellvalue.length > 16) {
+                                return '<div title=' + cellvalue + '>' + cellvalue.substring(0, 15) + "..." + '</div>'
+                            }
+                            return cellvalue;
+                        }
+                        return "";
+                    }
+                },
+                { label: '搭设结束时间', name: 'setupenddate', hidden: true },
+                { label: '拆除开始时间', name: 'dismentlestartdate', hidden: true },
+                { label: '拆除结束时间', name: 'dismentleenddate', hidden: true },
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'a.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //页面初始时，隐藏拆除时间
+        $gridTable.hideCol(['dismentledate']);
+        $gridTable.setGridWidth(($('.gridPanel').width()));
+    }
+
+    function btn_audit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            if (scaffoldtype == 0) {
+                url = "/HighRiskWork/Scaffold/FormOne";
+            }
+            if (scaffoldtype == 1) {
+                url = "/HighRiskWork/Scaffold/FormTwo";
+            }
+            if (scaffoldtype == 2) {
+                url = "/HighRiskWork/Scaffold/FormThree";
+            }
+            dialogOpen({
+                id: 'Form',
+                title: '审核' + scaffoldstr + '申请',
+                url: url + '?mode=audit&keyValue=' + keyValue + '&scaffoldtype=' + scaffoldtype,
+                width: ($(window).width() - 400) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        } else {
+            dialogMsg('请选择需要审核行！', 0);
+        }
+    }
+
+    //查看
+    function btn_view() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            if (scaffoldtype == 0) {
+                url = "/HighRiskWork/Scaffold/FormOne";
+            }
+            if (scaffoldtype == 1) {
+                url = "/HighRiskWork/Scaffold/FormTwo";
+            }
+            if (scaffoldtype == 2) {
+                url = "/HighRiskWork/Scaffold/FormThree";
+            }
+            dialogOpen({
+                id: 'Form',
+                title: '查看' + scaffoldstr + '申请',
+                url: url + '?mode=view&keyValue=' + keyValue + '&scaffoldtype=' + scaffoldtype,
+                width: ($(window).width() - 400) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        } else {
+            dialogMsg('请选择需要查看行！', 0);
+        }
+    }
+    //新增
+    function btn_add() {
+        var url = "";
+        if (scaffoldtype == 0) {
+            url = "/HighRiskWork/Scaffold/FormOne";
+        }
+        if (scaffoldtype == 1) {
+            url = "/HighRiskWork/Scaffold/FormTwo";
+        }
+        if (scaffoldtype == 2) {
+            url = "/HighRiskWork/Scaffold/FormThree";
+        }
+
+        dialogOpen({
+            id: 'Form',
+            title: '新增' + scaffoldstr + '申请',
+            url: url + '?mode=add&scaffoldtype=' + scaffoldtype,
+            width: ($(window).width() - 400) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            var auditstate = $('#gridTable').jqGridRowValue('auditstate');
+            if (auditstate > 1) {
+                dialogMsg('作业状态为申请中才可以编辑！', 0);
+                return;
+            }
+            var url = "";
+            if (scaffoldtype == 0) {
+                url = "/HighRiskWork/Scaffold/FormOne";
+            }
+            if (scaffoldtype == 1) {
+                url = "/HighRiskWork/Scaffold/FormTwo";
+            }
+            if (scaffoldtype == 2) {
+                url = "/HighRiskWork/Scaffold/FormThree";
+            }
+
+            dialogOpen({
+                id: 'Form',
+                title: '编辑' + scaffoldstr + '申请',
+                url: url + '?mode=edit&keyValue=' + keyValue + '&scaffoldtype=' + scaffoldtype,
+                width: ($(window).width() - 400) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        } else {
+            dialogMsg('请选择需要编辑行！', 0);
+        }
+    }
+    //删除
+    function btn_delete() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            var auditstate = $('#gridTable').jqGridRowValue('auditstate');
+            if (auditstate > 0) {
+                dialogMsg('作业状态为申请中才可以删除！', 0);
+                return;
+            }
+            $.RemoveForm({
+                url: '../../HighRiskWork/Scaffold/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除行！', 0);
+        }
+    }
+    function btn_viewflow(id) {
+        if (id) {
+            var title = "脚手架流程图";
+            var rqUrl = "/HighRiskWork/Scaffold/Flow?keyValue=" + id;
+            dialogOpen({
+                id: 'ScaffoldFlowForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null
+            });
+        } else {
+            dialogMsg('请选择查看行！', 0);
+        }
+    }
+    //导出
+    function exportResult() {
+        location.href = "../../HighRiskWork/Scaffold/ExportData?queryJson=" + getQueryJson();
+    }
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title">脚手架作业</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 520px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle">许可状态：</td>
+                                                <td class="formValue">
+                                                    <select id="AuditState" name="AuditState" class="form-control">
+                                                        <option value="">===请选择===</option>
+                                                        <option value="0">申请中</option>
+                                                        <option value="1">审核(批)中</option>
+                                                        <option value="2">审核(批)未通过</option>
+                                                        <option value="3">审核(批)通过</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">搭设类型：</td>
+                                                <td class="formValue">
+                                                    <div id="SetupType" type="select" class="ui-select"></div>
+                                                    @*<select id="SetupType" name="SetupType" class="form-control">
+                                                    <option value="">===请选择===</option>
+                                                    <option value="0">6米以下脚手架搭设申请</option>
+                                                    <option value="1">6米以上脚手架搭设申请</option>
+                                                </select>*@
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" id="td_setupdate">搭设时间：</td>
+                                                <td class="formValue">
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="SetupStartDate" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'SetupEndDate\')}' })">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="SetupEndDate" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'SetupStartDate\')}' })">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle" id="td_setupcompany">搭设单位：</td>
+                                                <td class="formValue">
+                                                    <input id="SetupCompanyName" name="SetupCompanyName" type="text" class="form-control" placeholder="请选择单位" readonly onclick="selectDept('', 0, 2, '选择单位', document.body, 'SetupCompanyName,SetupCompanyCode,SetupCompanyId');" />
+                                                    <input id="SetupCompanyCode" name="SetupCompanyCode" type="hidden" />
+                                                    <input id="SetupCompanyId" name="SetupCompanyId" type="hidden" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">查看范围：</td>
+                                                <td class="formValue">
+                                                    <select id="ViewRange" name="ViewRange" class=" show-menu-arrow form-control">
+                                                        <option value="">===请选择===</option>
+                                                        <option value="all">全部</option>
+                                                        <option value="self">本人申请</option>
+                                                        <option value="selfaudit">本人待审核(批)</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">申请编号：</td>
+                                                <td class="formValue">
+                                                    <input type="text" class="form-control" id="ApplyCode" name="ApplyCode" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-primary" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()">导出</a>
+                        @*<a id="edit" class="btn btn-default" onclick="btn_edit()"><i class="fa fa-pencil-square-o"></i>编辑</a>
+                    <a id="delete" class="btn btn-default" onclick="btn_delete()"><i class="fa fa-trash-o"></i>删除</a>*@
+                    </div>
+                </div>
+            </div>
+            <div class="titlePanel">
+                <ul class="nav nav-tabs">
+                    <li class="active"><a id="tab1" data-toggle="tab">脚手架搭设申请</a></li>
+                    <li><a id="tab2" data-toggle="tab">脚手架验收申请</a></li>
+                    <li><a id="tab3" data-toggle="tab">脚手架拆除申请</a></li>
+                </ul>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+            

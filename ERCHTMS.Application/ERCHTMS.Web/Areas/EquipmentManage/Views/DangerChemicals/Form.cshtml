@@ -1,0 +1,333 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script src="~/Content/scripts/business/detailAgency.js"></script>
+<script>
+    //=================
+    //用户信息
+    //=================
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户ID
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var userAccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account"; //当前用户帐号
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Id
+    var deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";//当前用户所属部门Code
+    //页面请求参数
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    $(function () {
+        initControl();
+    })
+    function initControl() {
+        //危化品类型
+        $("#RiskType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ChemicalsRiskType" },
+            id: "ItemName",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        //单位
+        $("#SpecificationUnit").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ChemicalsUnit" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "请选择",
+            height: "200px"
+        }).bind("change", function () {
+            var unit = $("#SpecificationUnit").attr("data-text");
+            //判断字符串是否包含/
+            if (unit.indexOf('/') >= 0) {
+                var index = unit.lastIndexOf("\/");
+                $("#AmountUnit").val(unit.substring(index + 1, unit.length));//数量单位
+                $("#Unit").val(unit.substring(0, index));//库存单位
+            } else {
+                $("#AmountUnit").val(unit);//数量单位
+                $("#Unit").val(unit);//库存单位
+            }
+        });
+        $("#IsScene").ComboBox({
+            description: "==请选择==",
+        });
+        $("#IsScene").ComboBoxSetValue("仓库存放");
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../EquipmentManage/DangerChemicals/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        } else {//新增，先自动生成ID
+            keyValue = keyValue.length == 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+        }
+        var isDel = actiontype == "view" ? false : true;
+        file_upload.init({
+            keyValue: keyValue, extensions: '', isImage: false, el: '#uploader', extensions: 'doc,docx,xls,xlsx,ppt,pptx,pdf,jpg,jpeg,png,gif,mp4,avi', fileSingleSizeLimit: 500 * 1024 * 1024
+        });
+
+        file_upload.bindFiles(isDel, false, keyValue, "uploader", isDel);
+
+        //查看
+        if (actiontype == "view") {
+            $("#btn_Save").css("display", "none");
+            $("#btn_Submit").css("display", "none");
+            //$(".center-Panel").removeAttr("style");
+            $(".form-button").css("display", "none");
+            $("#form1 input,textarea,select , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var Files = GetFile(keyValue);
+        if (Files == "") {
+            dialogMsg('请上传SDS附件！', 0);
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        $.SaveForm({
+            url: "../../EquipmentManage/DangerChemicals/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().GetTree();
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                $.currentIframe().getDataAuthority();
+            }
+        })
+    }
+    //选择责任人
+    function selectDutyUser() {
+        selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'DutyUser,,DutyUserId,,DutyDeptCode,DutyDept,DutyTel' });
+    }
+    //选择发放人
+    function selectGrantPerson() {
+        selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'GrantPerson,,GrantPersonId,,,,' });
+    }
+    //计算 库存数量=规格*数量
+    function CountNum() {
+        var specification = $("#Specification").val();
+        var amount = $("#Amount").val();
+        if (specification != "" && amount != "") {
+            if (isDouble(specification) && isDouble(amount)) {
+                if (specification.indexOf('.') >= 0 || amount.indexOf('.') >= 0) {
+                    var inventory = parseFloat(specification) * parseFloat(amount);
+                    $("#Inventory").val(inventory.toFixed(2));
+                } else {
+                    var inventory = parseInt(specification) * parseInt(amount);
+                    $("#Inventory").val(inventory);
+                }
+            }
+        }
+    }
+    function isDouble(obj) {
+        if (obj.length != 0) {
+            reg = /^[-\+]?\d+(\.\d+)?$/;
+            if (!reg.test(obj)) {
+                return false;
+            }
+            else {
+                return true;
+            }
+        }
+    }
+
+    function setScore(id) {
+        selectCommon({ winObject: window.document.body, domId: "MAXNUM", checkMode: 1, }, '/HazardsourceManage/Ljl/Index?type=2&title=危险化学品', '危险化学品');
+    }
+</script>
+<div class="center-Panel" style="margin-top:5px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息</strong>
+            @*<span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>*@
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">危化品名称<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="Name" type="text" class="form-control" isvalid="yes" checkexpession="LenStr" length="50" />
+                            <input id="ID" type="hidden" />
+                        </td>
+                        <td class="formTitle">最大存储量</td>
+                        <td class="formValue">
+                            <input id="MAXNUM" type="text" class="form-control" isvalid="yes" checkexpession="PositiveDoubleOrNull" style="width:65%;display:inline-block;">
+                            &nbsp;&nbsp;&nbsp;&nbsp;t
+                            <a id="btn_Select" onclick="setScore(2)" class="btn btn-primary" style="margin-left:15%; background-color: #2e99d4; border-color: #2e99d4;display:inline-block;vertical-align:top;line-height:14px;">&nbsp;选&nbsp;&nbsp;择</a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">别名</td>
+                        <td class="formValue">
+                            <input id="Alias" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="50" />
+                        </td>
+                        <td class="formTitle">CAS号</td>
+                        <td class="formValue">
+                            <input id="Cas" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="50" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">规格<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            @*<input id="Specification" type="text" class="form-control" isvalid="yes" checkexpession="LenStr" length="50" />*@
+                            <div style="float:left;width:75%;">
+                                <input id="Specification" type="text" class="form-control" isvalid="yes" checkexpession="PositiveSpotNumNotNul" onblur="CountNum()" />
+                            </div>
+
+                            <div style="float:left;width:23%;text-align:center;margin-top:0px;margin-left:5px;">
+                                <div id="SpecificationUnit" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                            </div>
+                        </td>
+                        <td class="formTitle">数量<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div style="float:left;width:75%;">
+                                <input id="Amount" type="text" class="form-control" isvalid="yes" checkexpession="PositiveSpotNumNotNul" onblur="CountNum()" />
+                            </div>
+
+                            <div style="float:left;width:23%;text-align:center;margin-top:0px;margin-left:5px;">
+                                <input id="AmountUnit" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">库存数量<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div style="float:left;width:75%;">
+                                <input id="Inventory" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                            </div>
+
+                            <div style="float:left;width:23%;text-align:center;margin-top:0px;margin-left:5px;">
+                                <input id="Unit" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                            </div>
+                        </td>
+                        <td class="formTitle">危险品类型<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="RiskType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">生产日期<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="ProductionDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                        <td class="formTitle">入库日期<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="DepositDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">存放地点类型<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="IsScene" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull">
+                                <ul>
+                                    <li data-value="仓库存放">仓库存放</li>
+                                    <li data-value="现场存放">现场存放</li>
+                                </ul>
+                            </div>
+                        </td>
+                        <td class="formTitle">存放地点<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="Site" type="text" class="form-control" isvalid="yes" checkexpession="LenStr" length="50" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">存放期限<span style="color:red;">*</span></td>
+                        <td class="formValue">
+
+                            <div style="float:left;width:95%;">
+                                <input id="Deadline" type="text" class="form-control" isvalid="yes" checkexpession="PositiveNum" />
+                            </div>
+
+                            <div style="float:left;width:3%;text-align:center;margin-top:5px;margin-left:5px;">
+                                月
+                            </div>
+                        </td>
+                        <td class="formTitle">发放人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="GrantPersonId" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" />
+                            <input id="GrantPerson" type="text" class="form-control" onclick="selectGrantPerson()" isvalid="yes" checkexpession="NotNull" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">责任人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DutyUserId" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" />
+                            <input id="DutyUser" type="text" class="form-control" onclick="selectDutyUser()" isvalid="yes" checkexpession="NotNull" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" />
+                        </td>
+                        <td class="formTitle">责任部门<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DutyDeptCode" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode" />
+                            <input id="DutyDept" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">SDS</td>
+                        <td class="formValue" colspan="3">
+                            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="uploaderFile" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="divPlanDetails">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp; 安全风险及采取防范措施</strong>
+            @*<span class="tools pull-right">
+                <a id="addContents" href="javascript:void(0);" class="btn btn-litter"><i class="fa fa-plus"></i>&nbsp;新增</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>*@
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <div style="margin-right: 30px;">
+                    <table class="form">
+                        <tr>
+                            <td class="formTitle">主要安全风险</td>
+                            <td class="formValue">
+                                <textarea id="MainRisk" class="form-control" style="height: 150px;" isvalid="yes" checkexpession="LenStrOrNull" length="500"></textarea>
+                            </td>
+                            <td class="formTitle">采取的防范措施</td>
+                            <td class="formValue">
+                                <textarea id="Measure" class="form-control" style="height: 150px;" isvalid="yes" checkexpession="LenStrOrNull" length="500"></textarea>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

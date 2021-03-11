@@ -1,0 +1,127 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    //页面请求参数
+    var workid = request("workid");
+    //页面代理
+    var lagc = null;
+    $(function () {
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 136);
+            }, 200);
+            e.stopPropagation();
+        });
+        //
+        //创建页面代理
+        //
+        lagc = new listAgency({
+            hasPowerOper: false,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            },
+            gridId: "gridTable",
+            gridJustHeight: 136,
+            gridOptions: {
+                height: $(window).height() - 136,
+                url: "../../NosaManage/Nosaworkitem/GetListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'srt',
+                sortorder: 'asc,uploaddate desc'
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:checkresult('" + rowObject.id + "','" + rowObject.dutyuserid + "','view')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (rowObject.state == "待审核") {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:checkresult('" + rowObject.id + "','" + rowObject.dutyuserid + "','check')  title='审核'><i class='fa fa-check-square'></i></a>";
+                        }
+                        return html;
+                    }
+                },     
+                { label: '责任部门', name: 'dutydepartname', index: 'dutydepartname', width: 300, align: 'center', sortable: true },
+                { label: '责任人', name: 'dutyusername', index: 'dutyusername', width: 300, align: 'center', sortable: true },  
+                {
+                    label: '完成日期', name: 'uploaddate', index: 'uploaddate', width: 180, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '处理状态', name: 'state', index: 'state', width: 180, align: 'center', sortable: true }
+            ]
+        });
+        //
+        //绑定页面事件
+        //
+        lagc.addPageEvents({ onBuildQuery: buidQuery});
+        //
+        //初始化
+        //
+        lagc.initialPage();        
+    });    
+    //
+    //重新定义查询条件
+    //
+    function buidQuery() {
+        var rnd = Math.random();
+        var data = { workid: workid, rnd: rnd };
+        return JSON.stringify(data);
+    }
+    //
+    //刷新数据
+    //
+    function refreshGrid() {
+        lagc.queryData();
+    }
+    //
+    //成果审核
+    //
+    function checkresult(id, dutyuserid, actiontype) {        
+        var dlgArg = {
+            id: 'checkResult',
+            title: '审核成果',
+            url: '/NosaManage/Nosaworkitem/CheckResult?actiontype=' + actiontype + '&workid=' + workid + "&dutyuserid=" + dutyuserid + "&keyValue=" + id,
+            width: ($(top.window).width() - 250) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            callBack: function (iframeId) {
+                if (top.frames[iframeId].AcceptClick)
+                    top.frames[iframeId].AcceptClick();                
+            },
+            btn: null
+        };
+        dialogOpen(dlgArg);
+    }
+</script>
+<style type="text/css">
+    #gridTable tr td a:hover {
+        text-decoration: underline;
+    }
+</style>
+<div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+    <div class="panel-Title" style="height:10px;"></div>
+    <div class="gridPanel">
+        <table id="gridTable"></table>
+        <div id="gridPager"></div>
+    </div>
+</div>

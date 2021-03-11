@@ -1,0 +1,401 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<style type="text/css">
+    .tab1 {
+        width: 100%;
+        border: 1px solid #ccc;
+        text-align: center;
+    }
+
+    .tab1 td {
+        background-color: white;
+        height: 30px;
+        border: 1px solid #ccc;
+    }
+
+    .tdcss {
+        font-weight: bold;
+        font-size: 11pt;
+    }
+</style>
+<script>
+    var Standard = [];//分级标准
+    var keyValue = request('keyValue');
+    var action = request('action');
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        getStandard();
+        getWhsb();
+        getTxsm();
+        //绑定作业级别
+        $("#JobLevel").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "DangerousJobCheck", Remark: '001' },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        //绑定作业人数
+        $("#NumberofPeople").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "NumberofPeople" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+
+        if (action == "view") {//查看
+            $(".form-button").css("display", "none");
+            $("#formData").find("input,textarea,.ui-select,.ui-select-text,.ui-select-option-content,.show-menu-arrow").each(function (ele, index) {
+                var it = $(this);
+                it.attr("disabled", "disabled");
+                it.attr("readonly", "readonly");
+            });
+
+        }
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../DangerousJob/Dangerjoblist/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function(data) {
+                    $("#formData").formDeserialize(data);
+
+                    if (data.DangerFactors != null) {
+                        //循环绑定存在的危险因素
+                        $("input[name='Decipher']").each(function (i, dom) {
+                            if (("," + data.DangerFactors + ",").indexOf("," + $(dom).val() + ",") >= 0) {
+                                dom.checked = true;
+                            }
+                        });
+                    }
+
+
+                    if (data.AccidentCategories != null) {
+                        //循环绑定可能发生的事故类别
+                        $("input[name='sbType']").each(function (i, dom) {
+                            if (("," + data.AccidentCategories + ",").indexOf("," + $(dom).val() + ",") >= 0) {
+                                dom.checked = true;
+                            }
+                        });
+                    }
+                }
+            })
+        } else {
+            $("#CreateUserName").val(top.currUserName);
+
+            var curDate = "@DateTime.Now.ToString("yyyy-MM-dd")";
+            //默认给当前时间
+            $("#CreateDate").val(curDate);
+        }
+        $("#btnQr").click(function () {
+            $("#QrCodeModal").hide();
+        });
+
+        $("#xz").click(function () {
+            $("#Description").hide();
+        });
+    }
+
+
+    //作业单位
+    function seletJobDept() {
+        selectDept('', 1, 0, '作业单位', document.body, 'DeptNames,DeptCodes,DeptIds', $("#DeptIds").val(),'','');
+    }
+
+    //现场监护人
+    function selectDutyUser() {
+        selectUser({ deptId: '', checkMode: 1, mode: 0, winObject: window.document.body, domId: 'PrincipalNames,,PrincipalIds' });
+    }
+
+    //分级标准
+    function fjbzShow() {
+        $("#QrCodeModal").show();
+    }
+
+    //分级标准
+    function txsmShow() {
+        $("#Description").show();
+    }
+
+    //获取分级标准和存在危害因素
+    function getStandard() {
+        $.ajax({
+            url: '../../DangerousJobConfig/ClassStandardConfig/GetFormJsonByWorkType?WorkType=DangerousJobCheck',
+            dataType: 'Json',
+            async: false,
+            success: function(data) {
+                if (!!data.resultdata) {
+                    $("#modalBody tbody").html("");
+                    var html = "";
+                    Standard = eval("(" + data.resultdata.Standard + ")")
+                    for (var i = 0; i < Standard.length; i++) {
+                        html += "<tr><td>" +
+                            Standard[i].levelName +
+                            "</td><td style='text-align:left;white-space: pre-line; padding-left:5px'>" +
+                            Standard[i].levelStandard +
+                            "</td></tr>";
+                    }
+                    $("#modalBody tbody").html(html);
+                    if (!!data.resultdata.Whbs) {
+                        var whbs = data.resultdata.Whbs.split("$");
+                        for (var i = 0; i < whbs.length; i++) {
+                            if (i % 5 == 0) {
+                                $("#Decipher").append("<tr></tr>")
+                            }
+                            $("#Decipher").find("tr").eq(parseInt(i / 5)).append(
+                                "<td><input type=\"checkbox\" name=\"Decipher\" value=\"" +
+                                whbs[i] +
+                                "\" />" +
+                                whbs[i] +
+                                "</td>");
+                        }
+                    }
+                }
+
+            }
+        });
+    }
+
+
+
+    //获取填写说明
+    function getTxsm() {
+        $.ajax({
+            url: "../../DangerousJobConfig/SafetyMeasureConfig/GetConfigList?WorkType=DangerousJobList&ConfigType=0",
+            dataType: 'Json',
+            async: false,
+            success: function(data) {
+                if (!!data.resultdata) {
+                    $("#txsm tbody").html("");
+                    var html = "";
+                    for (var i = 0; i < data.resultdata.length; i++) {
+                        html += "<tr><td>" +
+                            data.resultdata[i].SortNum +
+                            "</td><td style='text-align: left'>" +
+                            data.resultdata[i].Content +
+                            "</td></tr>";
+                    }
+                    $("#txsm tbody").html(html);
+                }
+
+            }
+        });
+    }
+
+    //获取事故类别
+    function getWhsb() {
+        $.ajax({
+            url: '../../DangerousJobConfig/ClassStandardConfig/GetFormJsonByWorkType?WorkType=HeightWorking',
+            dataType: 'Json',
+            async: false,
+            success: function (data) {
+                if (!!data.resultdata) {
+                    if (!!data.resultdata.Whbs) {
+                        var whbs = data.resultdata.Whbs.split("$");
+                        for (var i = 0; i < whbs.length; i++) {
+                            if (i % 5 == 0) {
+                                $("#sbType").append("<tr></tr>")
+                            }
+                            $("#sbType").find("tr").eq(parseInt(i / 5)).append("<td><input type=\"checkbox\" name=\"sbType\" value=\"" + whbs[i] + "\" />" + whbs[i] + "</td>");
+                        }
+                    }
+                }
+
+            }
+        })
+    }
+
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#div').Validform()) {
+            return false;
+        }
+        //循环获取存在危害因素
+        var Decipher = "";
+        var d = $("input[name='Decipher']:checked");
+        d.each(function () {
+            Decipher += $(this).val() + ",";
+        });
+        if (Decipher.length > 0) {
+            Decipher = Decipher.substring(0, Decipher.length - 1);
+        } else {
+            dialogMsg('请选择存在危害因素！', 0);
+            return false;
+        }
+
+        //循环获取可能发生的事故类别
+        var sbType = "";
+        var d = $("input[name='sbType']:checked");
+        d.each(function () {
+            sbType += $(this).val() + ",";
+        });
+        if (sbType.length > 0) {
+            sbType = sbType.substring(0, sbType.length - 1);
+        } else {
+            dialogMsg('请选择可能发生的事故类别！', 0);
+            return false;
+        }
+
+        var postData = $("#div").formSerialize(keyValue);
+        postData["DangerFactors"] = Decipher;
+        postData["AccidentCategories"] = sbType;
+        postData["JobLevelName"] = $("#JobLevel").ComboBoxGetText();
+        postData["NumberofPeopleName"] = $("#NumberofPeople").ComboBoxGetText();;
+        $.SaveForm({
+            url: "../../DangerousJob/Dangerjoblist/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function() {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        });
+    };
+</script>
+<div style="margin-left: 10px; margin-right: 10px;">
+    <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px; padding-top: 40px;">
+        <div id="div" class="panel panel-default">
+            <table class="form" id="formData">
+                <tr>
+                    <td class="formTitle">危险作业名称<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DangerJobName" type="text" class="form-control" isvalid="yes" checkexpession="LenStr"  length="100" />
+                    </td>
+                    <td class="formTitle">作业人数<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="NumberofPeople" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width: 100%; float: left;"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">作业单位<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DeptNames" type="text" class="form-control" readonly onclick="seletJobDept()" isvalid="yes" checkexpession="NotNull" />
+                        <input id="DeptIds" type="hidden" />
+                        <input id="DeptCodes" type="hidden" />
+                    </td>
+                    <td class="formTitle">作业频次<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="JobFrequency" type="text" class="form-control" isvalid="yes" checkexpession="LenStr" length="20" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width: 100px;">存在危害因素<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <div style="border:1px solid #ccc;">
+                            <table id="Decipher" style="width:100%;margin-left:5px;line-height:28px;"></table>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width: 100px;">可能发生的事故类别<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <div style="border:1px solid #ccc;">
+                            <table id="sbType" style="width:100%;margin-left:5px;line-height:28px;"></table>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width:100px;">拟采取的安全措施<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="SafetyMeasures" class="form-control" style="height: 120px;" isvalid="yes" checkexpession="LenStr" length="5000"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">危险作业级别<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="JobLevel" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width: 70%; float: left;"></div>
+                        &nbsp;&nbsp;&nbsp;<a class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4;" onclick="fjbzShow()">分级标准</a>
+                    </td>
+                    <td class="formTitle">现场监护负责人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="PrincipalNames" type="text" class="form-control" onclick="selectDutyUser()" readonly isvalid="yes" checkexpession="NotNull" />
+                        <input id="PrincipalIds" type="hidden" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">创建人</td>
+                    <td class="formValue">
+                        <input id="CreateUserName" type="text" class="form-control" readonly />
+                    </td>
+                    <td class="formTitle">创建时间</td>
+                    <td class="formValue">
+                        <input id="CreateDate" type="text" class="form-control" readonly />
+                    </td>
+                </tr>
+            </table>
+            </div>
+
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a  class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="txsmShow()"><i class="fa fa-check"></i>&nbsp;填写说明</a>
+        &nbsp; &nbsp;
+    </div>
+</div>
+<div class="modal" id="QrCodeModal">
+    <div class="modal-dialog" style="width:677px;height:600px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header" style="text-align:left;background-color:#2e99d4;color:#fff;padding:9px;">
+                <h5>危险作业分级标准</h5>
+            </div>
+            <div class="modal-body" id="modalBody" style="height: auto;">
+                <table cellpadding="0" cellspacing="0" class="tab1" border="1">
+                    <thead>
+                    <tr>
+                        <td style="background-color:#ddd; width:100px">作业级别</td>
+                        <td style="background-color:#ddd;text-align:center">分级标准</td>
+                    </tr>
+                    </thead>
+                    <tbody>
+                   
+                    </tbody>
+
+                </table>
+            </div>
+            <div class="modal-footer" style="padding:5px;">
+                <button id="btnQr" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="Description">
+    <div class="modal-dialog" style="width:800px;height:600px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header" style="text-align:left;background-color:#2e99d4;color:#fff;padding:9px;">
+                <h5>填写说明</h5>
+            </div>
+            <div class="modal-body" id="txsm" style="height:390px;">
+                <table cellpadding="0" cellspacing="0" class="tab1" border="1">
+                    <thead>
+                        <tr>
+                            <td style="background-color:#ddd; width:20px"></td>
+                            <td style="background-color: #ddd; text-align: center; ">填写说明</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+                    </tbody>
+
+                </table>
+            </div>
+            <div class="modal-footer" style="padding:5px;">
+                <button id="xz" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal">确认</button>
+            </div>
+        </div>
+    </div>
+</div>

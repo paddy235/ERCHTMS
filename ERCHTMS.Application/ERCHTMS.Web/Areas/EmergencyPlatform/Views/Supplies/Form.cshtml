@@ -1,0 +1,335 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+<script>
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Code
+    var keyValue = request('keyValue');
+
+    var action = request('action');
+    $(function () {
+        initControl();
+        if (action == "show") {
+            $("input").attr("readonly", "readonly");
+            $("input").attr("readonly", "readonly");
+            $("input").attr("disabled", "disabled");
+            $("div").attr("disabled", "disabled");
+            $("textarea").attr("disabled", "disabled");
+            $("#SuppliesFactory").hide();
+        }
+    });
+    var FILES = "@Guid.NewGuid().ToString()";
+    //初始化控件
+    function initControl() {
+        InitCombox();
+        //区域的处理
+        $("#WorkAreaName").attr("onclick", "selectArea(window.document.body, 'WorkAreaName,WorkAreaCode');").attr("placeholder", "请选择存放区域");
+        //ComBoxForData("SUPPLIESUNTIL", "MAE_SUPPLIESUNTIL");
+        //ComBoxForData("SUPPLIESTYPE", "MAE_SUPPLIESTYPE");
+        //应急物资名称
+        //$("#SUPPLIESNAME").ComboBox({
+        //    url: "../../EmergencyPlatform/Suppliesfactory/GetListJson",
+        //    id: "Id",
+        //    text: "Name",
+        //    description: "==请选择==",
+        //    height: "200px"
+        //}).bind("change", function () {
+        //    var sel = $(this).attr('data-value');
+        //    if (!!sel) {
+        //        //GetEngineerInfo($(this).attr('data-value'));
+        //    }
+        //});
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../EmergencyPlatform/Supplies/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.FILES != null) FILES = data.FILES;
+                    $("#SUPPLIESTYPE").val(data.SUPPLIESTYPENAME);
+                    $("#SUPPLIESUNTIL").val(data.SUPPLIESUNTILNAME);
+                }
+            })
+        }
+        file_upload.init({
+            keyValue: FILES, extensions: 'jpg,gif,bmp,png', isImage: true, el: '#uploader', multiple: false
+        });
+        var isDel = action == "show" ? false : true;
+        file_upload.bindFiles(isDel, true, FILES, "uploader", isDel);
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var num = $("#NUM").val();
+        if (num < 0) {
+            dialogMsg('输入的数量必须大于0！', 0);
+            return;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if ($(".SUPPLIESUNTIL").val() != "" && $(".SUPPLIESUNTIL").val() != null && $(".SUPPLIESUNTIL").val() != undefined) {
+            postData["SUPPLIESUNTIL"] = $(".SUPPLIESUNTIL").val();
+        }
+        postData["SUPPLIESUNTILNAME"] = $("#SUPPLIESUNTIL").val();
+
+        if ($(".SUPPLIESTYPE").val() != "" && $(".SUPPLIESTYPE").val() != null && $(".SUPPLIESTYPE").val() != undefined) {
+            postData["SUPPLIESTYPE"] = $(".SUPPLIESTYPE").val();
+        }
+        postData["SUPPLIESTYPENAME"] = $("#SUPPLIESTYPE").val();
+        postData["FILES"] = FILES;
+        $.SaveForm({
+            url: "../../EmergencyPlatform/Supplies/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    };
+
+    function choseSupplies()
+    {
+        idx = dialogOpen({
+            id: "Form1",
+            title: '应急物资库',
+            url: '/EmergencyPlatform/Suppliesfactory/Select',
+            width: "800px",
+            height: ($(top.window).height() - 200) + "px",
+            callBack: function (iframeId) {
+                var option = {
+                    winObject: document.body,
+                    domId: 'SUPPLIESNAME,SUPPLIESTYPE,uploader'
+                    
+                };
+                
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(option);
+                var fileid = "";
+                if (top.Form1.window.getRecid()) {
+                    fileid = top.Form1.window.getRecid();
+                }
+                if (fileid) {
+                    $.ajax({
+                        url: "../../EmergencyPlatform/Supplies/CopyForm",
+                        data: { keyValue: FILES, recid: fileid },
+                        type: "Post",
+                        dataType: "json",
+                        success: function (result) {
+                            var isDel = action == "show" ? false : true;
+                            $("#uploader").find(".filelist").eq(0).find("li").remove();
+                            file_upload.bindFiles(isDel, true, FILES, "uploader", isDel, false);
+                        },
+                        error: function (result) {
+                            alert("Error");
+                        }
+                    });
+                }
+                
+            },
+            cancel: function (index) {
+            }
+        });
+    }
+    function InitCombox() {
+        var select = $(".SUPPLIESTYPE");
+        select.html('');
+        select.append('<option value="">请输入物资类型</option>');
+        $('.SUPPLIESTYPE').comboSelect();
+        $.ajax({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            type: "GET",
+            data: { EnCode: "MAE_SUPPLIESTYPE" },
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                select.html('');
+                select.append('<option value="">请输入物资类型</option>');
+                if (data) {
+                    for (var i = 0; i < data.length; i++) {
+                        select.append('<option value="' + data[i].ItemValue + '">' + data[i].ItemName + '</option>');
+                    }
+                }
+                //解决控件重新渲染 input id取不到的问题
+                if (!$(".SUPPLIESTYPE").attr("id")) {
+                    $(".SUPPLIESTYPE").attr("id", "SUPPLIESTYPE");
+                }
+                $('.SUPPLIESTYPE').comboSelect();
+            }
+        })
+
+        var select = $(".SUPPLIESUNTIL");
+        select.html('');
+        select.append('<option value="">请输入单位</option>');
+        $('.SUPPLIESUNTIL').comboSelect();
+        $.ajax({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            type: "GET",
+            data: { EnCode: "MAE_SUPPLIESUNTIL" },
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                select.html('');
+                select.append('<option value="">请输入单位</option>');
+                if (data) {
+                    for (var i = 0; i < data.length; i++) {
+                        select.append('<option value="' + data[i].ItemValue + '">' + data[i].ItemName + '</option>');
+                    }
+                }
+                //解决控件重新渲染 input id取不到的问题
+                if (!$(".SUPPLIESUNTIL").attr("id")) {
+                    $(".SUPPLIESUNTIL").attr("id", "SUPPLIESUNTIL");
+                }
+                $('.SUPPLIESUNTIL').comboSelect();
+            }
+        })
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基础信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+                <input id="ID" type="hidden" class="form-control" />
+            </span>
+        </div>
+        <div class="panel-body">
+
+            <table class="form">
+                <tr>
+                    <td class="formTitle">责任人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="USERID" type="hidden" class="form-control" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" />
+                        <input id="USERNAME" type="text" class="form-control" readonly value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" isvalid="yes" checkexpession="NotNull"  onclick="selectUser({ deptId: '', checkMode: 1, mode: 0, winObject: document.body, domId: 'USERNAME,,USERID,DEPARTID,,DEPARTNAME,MOBILE' });" />
+
+                    </td>
+                    <td class="formTitle">联系方式</td>
+                    <td class="formValue">
+                        <input id="MOBILE" type="text" class="form-control" value="@ViewBag.User.Mobile" />
+                    </td>
+                </tr>
+                <tr>
+
+                    <td class="formTitle">责任部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="DEPARTID" type="hidden" class="form-control" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId" />
+                        <input id="DEPARTNAME" type="text" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+
+                    </td>
+                    <td class="formTitle">新增时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="CREATEDATE" type="text" value="@DateTime.Now.ToString("yyyy-MM-dd")" class="form-control input-datepicker" isvalid="yes" checkexpession="NotNull" onfocus="WdatePicker()" />
+                    </td>
+                </tr>
+                <tr>
+
+                    <td class="formTitle">物资编号</td>
+                    <td class="formValue">
+                        <input id="SUPPLIESCODE" type="text" placeholder="由系统自动生成" class="form-control" readonly="readonly" />
+                    </td>
+                    <td class="formTitle">物资类型</td>
+                    <td class="formValue">
+                        <select id="SUPPLIESTYPE" class="SUPPLIESTYPE"></select>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">物资名称<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div style="float: left;width:88%">
+                            <input id="SUPPLIESNAME" type="text" class="form-control" isvalid="yes" checkexpession="NotNull"  />
+                        </div>
+                        <div style="float: left; width: 12%">
+                            <a href="#" id="SuppliesFactory" class="btn btn-primary" title='应急物资库' onclick="choseSupplies()"><i class='fa fa-pencil-square-o'></i>应急物资库</a>
+                        </div>
+                    </td>
+                    <td class="formTitle">规格型号</td>
+                    <td class="formValue">
+                        <input id="Models" type="text" class="form-control" maxlength="100" />
+                        @*<div id="SUPPLIESUNTIL" type="select" class="ui-select" ></div>*@
+                    </td>
+
+                </tr>
+
+                <tr>
+                    <td class="formTitle">数量<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="NUM" type="text" class="form-control" isvalid="yes" checkexpession="Num" />
+                    </td>
+                    <td class="formTitle">单位</td>
+                    <td class="formValue">
+                        <select id="SUPPLIESUNTIL" class="SUPPLIESUNTIL"></select>
+                        @*<div id="SUPPLIESUNTIL" type="select" class="ui-select" ></div>*@
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle">存放区域</td>
+                    <td class="formValue">
+                        <input id="WorkAreaName" type="text" class="form-control" readonly />
+                        <input id="WorkAreaCode" type="hidden" class="form-control" />
+                    </td>
+                    <td class="formTitle">存放地点</td>
+                    <td class="formValue">
+                        <input id="STORAGEPLACE" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">主要功能</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="MAINFUN" type="text" class="form-control"></textarea>
+                    </td>
+                </tr>
+
+
+            </table>
+
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;附件</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+
+                <tr>
+                    <td class="formTitle">附件</td>
+                    <td class="formValue" colspan='3'>
+                        <div id="uploader" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                            <div class="queueList" style="height: 200px;">
+                                <div id="dndArea" class="placeholder">
+                                    <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display: none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>

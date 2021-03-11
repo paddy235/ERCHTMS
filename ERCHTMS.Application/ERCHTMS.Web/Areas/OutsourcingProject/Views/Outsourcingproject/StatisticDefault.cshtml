@@ -1,0 +1,510 @@
+﻿@{
+    ViewBag.Title = "统计分析";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script src="~/Content/Scripts/plugins/highcharts/highcharts.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/modules/exporting.js"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var contrast = "Unit";//默认单位对比
+    var state = "Unit";
+    $(function () {
+        $("#DepartmentName").ComboBox({
+            url: "GetAllFactory",
+            id: "deptcode",
+            text: "fullname",
+            description: "==全部==",
+            height: "200px"
+        })
+        $("#QueryTab").hide();
+        StaQuery(contrast, "Unit");
+        $("#btn_Search").click(function () {
+            StaQuery(contrast, state);
+        })
+    })
+    function Contrast(str) {
+        if (str == "Unit") {
+            $("#QueryTab").hide();
+            $("#btnUnit").html("&nbsp;在场外包单位数量");
+            $("#btnProject").html("&nbsp;在建外包工程数量");
+            $("#btnPerson").html("&nbsp;在场外包人员数量");
+            
+        }
+        else {
+            $("#QueryTab").show();
+            $("#btnUnit").html("&nbsp;外包单位月度趋势图");
+            $("#btnProject").html("&nbsp;外包工程月度趋势图");
+            $("#btnPerson").html("&nbsp;外包人员月度趋势图");
+        } 
+        contrast = str;
+        StaQuery(contrast, "Unit");
+        $(".btn1").removeClass("btn-primary");
+        $("#btnUnit").addClass("btn-primary");
+        $(".btn1").addClass("btn-default");
+    }
+    function Stat(str, obj) {
+        $(".btn1").removeClass("btn-primary");
+
+        $(obj).addClass("btn-primary");
+        $(".btn1").addClass("btn-default");
+        state = str;
+        StaQuery(contrast, str);
+    }
+    function StaQuery(type, state) {
+        var queryJson = {
+            year: $("#Year").val(),
+            type: type,
+            state: state,
+            unit: $("#DepartmentName").attr("data-value")
+        }
+
+        var title = "在场外包单位数量";
+        var label = "外包工程数量";
+        switch (state) {
+            case "Project":
+                if (contrast == "Unit") {
+                    title = "在建外包工程数量";
+                    $("#remark").html("统计规则：当前处于在建状态的外包工程数量")
+                } else {
+                    title = "外包工程月度趋势图";
+                    $("#remark").html("统计规则：工程的实际开工时间、实际完工时间在同一月度的，统计到该月度；两个时间跨月度的，统计到两个时间节点所在月度及其中间月度。")
+                }
+                lable = "外包工程数量";
+                break;
+            case "Unit":
+                if (contrast == "Unit") {
+                    title = "在场外包单位数量";
+                    $("#remark").html("统计规则：当前处于在场状态的外包单位数量")
+                } else {
+                    title = "外包人员月度趋势图";
+                    $("#remark").html("统计规则：单位入、离场时间在同一月度的，统计到该月度；入、离场时间跨月度的，统计到两个时间节点所在月度及中间月度。")
+                }
+               
+                lable = "外包单位数量";
+                break;
+            case "Person":
+                if (contrast == "Unit") {
+                    title = "在场外包人员数量";
+                    $("#remark").html("统计规则：当前处于在场状态的外包人员数量")
+                } else {
+                    title = "外包人员月度趋势图";
+                    $("#remark").html("统计规则：人员入、离场时间在同一月度的，统计到该月度；入、离场时间跨月度的，统计到两个时间节点所在月度及中间月度。")
+                }
+                lable = "外包人员数量";
+                break;
+            default:
+
+        }
+        $.get("StaQueryList", { queryJson: JSON.stringify(queryJson) }, function (data) {
+            var json = eval("(" + data + ")");
+            switch (type) {
+                case "Unit":
+                    $("#piecontainer1").hide();
+                    $("#div1").hide();
+                    $("#piecontainer0").show();
+                    $("#div0").show();
+                    UnitChar(title, label, json);
+                    CreateTable(title, json);
+                   
+
+                    break;
+                case "Month":
+                    $("#piecontainer0").hide();
+                    $("#div0").hide();
+                    $("#piecontainer1").show();
+                    $("#div1").show();
+                    QsChar(title, label, json);
+                    CreateMonthTable(title, json);
+
+                    break;
+                default:
+
+            }
+
+        });
+
+    }
+    //单位对比图
+    function UnitChar(title, label, json) {
+        $('#piecontainer0').highcharts({
+            chart: {
+                type: 'column',
+                borderWidth: 1
+            },
+            title: {
+                text: title
+            },
+            exporting: {
+                enabled: false
+            },
+            credits: {
+                enabled: false
+            },
+            xAxis: {
+                categories: json.x
+            },
+            yAxis: {
+                title: {
+                    text: '数量（个）'
+                },
+            },
+            tooltip: {
+                crosshairs: true,
+                shared: true
+            },
+            tooltip: { pointFormat: ' <b>{point.y}</b>' },
+            series: json.y
+            , lang: { noData: "暂无数据可显示!" },
+            noData: {
+                position: {
+                    align: 'center',
+                    verticalAlign: 'middle'
+                },
+                attr: {
+                    'stroke-width': 1
+                },
+                style: {
+                    fontWeight: 'bold',
+                    fontSize: '15px',
+                    color: '#202030'
+                }
+            }
+
+        });
+    }
+    function CreateTable(title, json) {
+        $("#gridTable").jqGrid("clearGridData");
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            datatype: "local",
+            data: json.list,
+            mtype: "post",
+            autoheight: true,
+            autowidth: true,
+            colModel: [
+                { label: '电厂名称', name: 'name', align: 'center' },
+                {
+                    label: title, name: 'num', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_engineerDetail('" + rowObject.deptcode + "','" + state + "','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '占比', name: 'per', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != null) {
+                            return cellvalue + '%';
+                        }
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 100,
+            rownumbers: true
+        });
+        $gridTable.jqGrid("setGridParam", {
+            datatype: "local",
+            data: json.list,
+            rowNums: json.list.length
+        }).trigger("reloadGrid");
+        $("#jqgh_gridTable_num").html("");
+        $("#jqgh_gridTable_num").html(title);
+    }
+    //趋势图
+    function QsChar(title, label, json) {
+        $('#piecontainer1').highcharts({
+            chart: {
+                type: 'line'
+            },
+            title: {
+                text: title
+            },
+            xAxis: {
+                categories: json.y
+            },
+            yAxis: {
+                allowDecimals: false,
+                min: 0,
+                title: {
+                    text: '数量（个）'
+                },
+                labels: {
+                    formatter: function () {
+                        return this.value + '个'
+                    }
+                }
+            },
+            exporting: {
+                enabled: false
+            },
+            credits: {
+                enabled: false
+            },
+            tooltip: { pointFormat: ' <b>{point.y}</b>' },
+            plotOptions: {
+                line: {
+                    marker: {
+                        enable: true,
+                        radius: 5,
+                        lineWidth: 1
+                    },
+                    dataLabels: {
+                        enabled: true,
+                        formatter: function () {
+                            return +this.y + '个';
+                        }
+                    },
+                    showInLegend: true
+                }
+            },
+            series: [{
+                name: '月份',
+                marker: {
+                    symbol: 'square'
+                },
+                data: json.x
+
+            }]
+           , lang: { noData: "暂无数据可显示!" },
+            noData: {
+                position: {
+                    align: 'center',
+                    verticalAlign: 'middle'
+                },
+                attr: {
+                    'stroke-width': 1
+                },
+                style: {
+                    fontWeight: 'bold',
+                    fontSize: '15px',
+                    color: '#202030'
+                }
+            }
+        });
+    }
+
+    function CreateMonthTable(title, json) {
+        $("#gridTable1").jqGrid("clearGridData");
+        var $gridTable1 = $("#gridTable1");
+        $gridTable1.jqGrid({
+            datatype: "local",
+            data: json.list,
+            mtype: "post",
+            autoheight: true,
+            autowidth: true,
+            colModel: [
+                { label: '名称', name: 'name', align: 'center' },
+                {
+                    label: "1月", name: 'm1', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','1','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '2月', name: 'm2', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','2','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '3月', name: 'm3', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','3','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '4月', name: 'm4', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','4','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '5月', name: 'm5', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','5','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '6月', name: 'm6', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','6','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '7月', name: 'm7', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','7','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '8月', name: 'm8', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','8','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '9月', name: 'm9', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','9','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '10月', name: 'm10', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','10','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '11月', name: 'm11', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','11','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                },
+                {
+                    label: '12月', name: 'm12', align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "0") return cellvalue;
+                        return "<a href=javascript:f_showDetail('" + rowObject.deptcode + "','" + state + "','" + $("#Year").val() + "','12','" + rowObject.name + "')   style='text-decoration:underline;color:blue;'>" + cellvalue + "</a>";
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 100,
+            rownumbers: true
+        });
+        $gridTable1.jqGrid("setGridParam", {
+            datatype: "local",
+            data: json.list,
+            rowNums: json.list.length
+        }).trigger("reloadGrid");
+        //$("#jqgh_gridTable_num").html("");
+        //$("#jqgh_gridTable_num").html(title);
+    }
+
+    function f_engineerDetail(deptcode, state,name) {
+        switch (state) {
+            case "Project":
+
+                top.tablist.newTab({
+                    id: '4d44523d-852d-40d6-a9bb-1ef81c844456',
+                    url: top.contentPath + "/OutsourcingProject/Outsouringengineer/Index?EngState=002&orgCode="+deptcode+'&fullName='+name,
+                    title: "外包工程管理"
+                });
+                break;
+            case "Unit":
+                top.tablist.newTab({
+                    id: '6eddf548-5310-4294-b246-b18e4b6021a1',
+                    url: top.contentPath + "/OutsourcingProject/Outsourcingproject/Index?outorin=0&orgCode=" + deptcode + '&fullName=' + name,
+                    title: "外包单位管理"
+                });
+                break;
+            case "Person":
+                top.tablist.newTab({
+                    id: 'ea93dc6b-83fc-4ac2-a1b7-56ef6909445c',
+                    url: top.contentPath + "/PersonManage/Person/Index?deptCode=" + deptcode + '&fullName=' + name,
+                    title: "人员档案管理"
+                });
+                break;
+            default: break;
+
+        }
+    }
+    function f_showDetail(deptcode, state, year, month,name) {
+        var time = year + "-" + month + "-1";
+        
+        switch (state) {
+            case "Project":
+                top.tablist.newTab({
+                    id: '4d44523d-852d-40d6-a9bb-1ef81c844456',
+                    url: top.contentPath + "/OutsourcingProject/Outsouringengineer/Index?orgCode=" + deptcode + '&fullName=' + name + "&Time=" + time,
+                    title: "外包工程管理"
+                });
+                break;
+            case "Unit":
+                top.tablist.newTab({
+                    id: '6eddf548-5310-4294-b246-b18e4b6021a1',
+                    url: top.contentPath + "/OutsourcingProject/Outsourcingproject/Index?orgCode=" + deptcode + '&fullName=' + name + "&Time=" + time,
+                    title: "外包单位管理"
+                });
+                break;
+            case "Person":
+                top.tablist.newTab({
+                    id: 'ea93dc6b-83fc-4ac2-a1b7-56ef6909445c',
+                    url: top.contentPath + "/PersonManage/Person/Index?deptCode=" + deptcode + '&fullName=' + name,
+                    title: "人员档案管理"
+                });
+                break;
+            default: break;
+        }
+    }
+</script>
+
+<div class="center-Panel">
+    <div class="panel-Title">统计分析</div>
+    <div class="titlePanel">
+        <div class="title-search">
+            <table class="queryform">
+                <tr id="QueryTab">
+                    <th style="padding-left: 10px;">选择单位</th>
+                    <td style="padding-left: 5px;">
+                        <div id="DepartmentName" type="select" class="ui-select" style="width: 200px;"></div>
+                    </td>
+                    <th style="padding-left: 10px;">时间范围</th>
+                    <td>
+                        <input id="Year" type="text" style="width: 120px; " value="@DateTime.Now.ToString("yyyy")" class="form-control input-datepicker" onfocus="WdatePicker({ dateFmt: 'yyyy' })" />
+                    </td>
+                    <td style="padding-left: 20px;">
+                        <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>&nbsp;&nbsp;
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <button id="btnUnit" class="btn btn-primary btn1" onclick="Stat('Unit',this)" type="button"><i class="fa fa-exclamation-triangle"></i>&nbsp;在场外包单位数量</button>
+                <button id="btnProject" class="btn btn-default btn1" onclick="Stat('Project', this)" type="button"><i class="fa fa-bell-o"></i>&nbsp;在建外包工程数量</button>
+                <button id="btnPerson" class="btn btn-default btn1" onclick="Stat('Person', this)" type="button"><i class="fa fa-bell-o"></i>&nbsp;在场外包人员数量</button>
+                <button id="btndb" class="btn btn-default btn10 dropdown-toggle btn11" data-toggle="dropdown" type="button"><i class="fa fa fa-bar-chart"></i>&nbsp;统计图&nbsp;<i class="fa fa-caret-down"></i></button>
+                <ul class="dropdown-menu pull-right btn11">
+                    <li><a id="btndw" onclick="Contrast('Unit')"><i></i>单位对比图</a></li>
+                    <li><a id="btnqy" onclick="Contrast('Month')"><i></i>月度趋势图</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="portal-panel" style="margin-left: -20px; margin-right: -20px;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="piecontainer0">
+                </div>
+                <div id="piecontainer1">
+                </div>
+                <div>
+                    <span style="font:bold;font-size:14px;" id="remark">统计规则：当前处于在场状态的外包单位数量</span>
+                </div>
+            </div>
+        </div>
+        <div class="row" style="margin-left: -10px; margin-right: -10px;">
+            <div class="panel panel-default" style="margin:10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body" id="div0">
+                    <table class="tab" id="gridTable"></table>
+                </div>
+                <div class="panel-body" id="div1">
+                    <table class="tab1" id="gridTable1"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

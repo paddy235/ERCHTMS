@@ -1,0 +1,544 @@
+﻿@{
+    ViewBag.Title = "特种设备管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var _parentId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var _isOrg = "Organize";
+    var checkMode = request('checkMode');
+    var mode = request('mode');
+    var userIds = request('userIds');
+    var from = request('from');
+    var type = request('type');
+    var state = 0;
+    var curTab = 0;
+    var selectTab = 0;
+    @*var curUserRole = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";*@
+
+    $(function () {
+
+        if (checkMode == 0) {
+            $(".ui-layout-east").remove();
+        }
+
+        if (type == 'special') {
+            $("#litab2").hide();
+        }
+
+        //特种设备
+        $("#tab1").click(function () {
+            state = 1;
+            $("#div2").css("display", "none");
+            $("#div1").css("display", "");
+            var $gridTable = $('#gridTable');
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                Etype: $("#EquipmentType").attr('data-value'),
+                txtSearch: $("#txt_Keyword").val(),
+                code: _parentId,
+                isOrg: _isOrg
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+
+            curTab = 0;
+        });
+        //设备设施
+        $("#tab2").click(function () {
+            $("#div1").css("display", "none");
+            $("#div2").css("display", "");
+            if (state == 0) {
+                GetBaseGrid();
+            } else {
+                var $gridTable = $('#gridTable1');
+                var queryJson = {
+                    condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                    Etype: $("#EquipmentType").attr('data-value'),
+                    txtSearch: $("#txt_Keyword").val(),
+                    code: _parentId,
+                    isOrg: _isOrg
+                }
+                $gridTable.jqGrid('setGridParam', {
+                    postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+                }).trigger('reloadGrid');
+            }
+            curTab = 1;
+        });
+
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        if (userIds == "normal") {
+            userIds = top.LeaveForm.$("#SpecialEquipmentId").val();
+        }
+
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 141.5);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+
+            }, 200);
+            e.stopPropagation();
+        });
+        $("#users").height($(window).height() - 50);
+
+        if (checkMode == 1) {
+
+            var arr = [];
+            if (!!userIds) {
+                $.ajax({
+                    url: "../../EquipmentManage/SpecialEquipment/GetSpecialEquipmentTable",
+                    data: { Ids: userIds },
+                    type: "post",
+                    dataType: "JSON",
+                    async: false,
+                    success: function (result) {
+                        if (result.length > 0) {
+                            $.each(result, function (i, dom) {
+                                if (document.getElementById("div" + dom.id) == null) {
+                                    $("#users").append("<div id='div" + dom.id + "'><input type='checkbox' value='" + dom.id + "' id='" + dom.id + "' checked='checked' equipmentname='" + decodeURIComponent(dom.equipmentname) + "' equipmentno='" + decodeURIComponent(dom.equipmentno) + "' district='" + decodeURIComponent(dom.district) + "' districtid='" + decodeURIComponent(dom.districtid) + "' districtcode='" + decodeURIComponent(dom.districtcode) + "'>" + decodeURIComponent(dom.equipmentname) + "</div>");
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+        }
+
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        //var json = JSON.stringify(
+        //     {
+        //         SelectMode: 0,
+        //         Mode: 3
+        //     }
+        //   );
+        var json = JSON.stringify({ SelectMode: 0, Mode: 0 });
+        //if (curUserRole.indexOf("省级用户") >= 0) {
+        //    json = JSON.stringify({ SelectMode: 0, Mode: 9 });
+        //}
+        //else {
+        //    json = JSON.stringify({ SelectMode: 0, Mode: 0 });
+        //}
+        var item = {
+            height: $(window).height() - 35,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = item.Sort;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+
+    function selRow(obj, id, equipmentname, equipmentno, district, districtid, districtcode) {
+        if (obj.checked) {
+            if (document.getElementById("div" + id) == null) {
+                $("#users").append("<div id='div" + id + "'><input type='checkbox' value='" + id + "' id='" + id + "' checked='checked' equipmentname='" + decodeURIComponent(equipmentname) + "' equipmentno='" + decodeURIComponent(equipmentno) + "' district='" + decodeURIComponent(district) + "' districtid='" + decodeURIComponent(districtid) + "' districtcode='" + decodeURIComponent(districtcode) + "'>" + decodeURIComponent(equipmentname) + "</div>");
+            }
+        } else {
+            if (document.getElementById("div" + id) != null) {
+                $("#div" + id).remove();
+            }
+        }
+    }
+
+    var selectedRowIndex = -1;
+
+    //加载特种设备表格
+    function GetGrid() {
+        var queryJson = {
+            condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+            keyword: $("#txt_Keyword").val(),
+            code: _parentId,
+            isOrg: _isOrg
+        }
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1,
+            url: "../../EquipmentManage/SpecialEquipment/GetPageListJson",
+            datatype: "json",
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', index: 'id', width: 60, align: 'center', hidden: checkMode == 0 ? true : false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var ischked = "";
+                        if (userIds.indexOf(rowObject.id) >= 0) {
+
+                            ischked = "checked='checked'";
+                        }
+                        var html = "";
+                        html = "<input type='checkbox'" + ischked + " onclick=selRow(this,'" + rowObject.id + "','" + rowObject.equipmentname + "','" + rowObject.equipmentno + "','" + rowObject.district + "','" + rowObject.districtid + "','" + rowObject.districtcode + "') />";
+                        return html;
+                    }
+                },
+                { label: '设备名称', name: 'equipmentname', index: 'equipmentname', width: 160, align: 'center', sortable: true },
+                { label: '设备编号', name: 'equipmentno', index: 'equipmentno', width: 160, align: 'center', sortable: true },
+                { label: '规格型号', name: 'specifications', index: 'specifications', width: 160, align: 'center', sortable: true },
+                //{ label: '使用登记证编号', name: 'certificateno', index: 'certificateno', width: 180, align: 'center', sortable: true },
+                //{
+                //    label: '下次检验日期', name: 'nextcheckdate', index: 'nextcheckdate', width: 100, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                //        return formatDate(cellvalue, 'yyyy-MM-dd');
+                //    }
+                //},
+                { label: '所在区域', name: 'district', index: 'district', width: 180, align: 'center', sortable: true },
+                { label: '使用状况', name: 'state', index: 'state', width: 80, align: 'center', sortable: true },
+                { label: '所在区域ID', name: 'districtid', hidden: true },
+                { label: '所在区域编码', name: 'districtcode', hidden: true }
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [10, 20, 30],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectTab = 0;
+                if (checkMode == 0) {
+                    selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                    // alert($gridTable.jqGrid("getRowData", selectedRowIndex).Account);
+                }
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                if (!!$("#itemTree").html())
+                {
+                    if ($("#itemTree").html().length == 0 && checkMode == 0) {
+                        $(".ui-layout-west").remove(); $(".ui-layout-pane-center").css({ left: "10px", width: "100%" }); $(".ui-jqgrid-view").css({ width: "100%" });
+                        $("#gbox_gridTable").css({ width: "100%" }); $("#gridPager").css({ width: "100%" }); $(".ui-jqgrid-hdiv").css({ width: "100%" });
+                        $(".ui-jqgrid-bdiv").css({ width: "100%" });
+                    }
+                }
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                Etype: $("#EquipmentType").attr('data-value'),
+                txtSearch: $("#txt_Keyword").val(),
+                code: _parentId,
+                isOrg: _isOrg
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+    //加载设备设施列表
+    function GetBaseGrid() {
+        var queryJson = {
+            condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+            keyword: $("#txt_Keyword").val(),
+            code: _parentId,
+            isOrg: _isOrg
+        }
+        var $gridTable = $('#gridTable1');
+        $gridTable.jqGrid({
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1,
+            url: "../../EquipmentManage/Equipment/GetPageListJson",
+            datatype: "json",
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', index: 'id', width: 60, align: 'center', hidden: checkMode == 0 ? true : false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var ischked = "";
+                        if (userIds.indexOf(rowObject.id) >= 0) {
+
+                            ischked = "checked='checked'";
+                        }
+                        var html = "";
+                        html = "<input type='checkbox'" + ischked + " onclick=selRow(this,'" + rowObject.id + "','" + rowObject.equipmentname + "','" + rowObject.equipmentno + "','" + rowObject.district + "','" + rowObject.districtid + "','" + rowObject.districtcode + "') />";
+                        return html;
+                    }
+                },
+                { label: '设备名称', name: 'equipmentname', index: 'equipmentname', width: 160, align: 'center', sortable: true },
+                { label: '设备编号', name: 'equipmentno', index: 'equipmentno', width: 160, align: 'center', sortable: true },
+                { label: '规格型号', name: 'specifications', index: 'specifications', width: 160, align: 'center', sortable: true },
+                { label: '所在区域', name: 'district', index: 'district', width: 180, align: 'center', sortable: true },
+                { label: '使用状况', name: 'state', index: 'state', width: 80, align: 'center', sortable: true },
+                { label: '所在区域ID', name: 'districtid', hidden: true },
+                { label: '所在区域编码', name: 'districtcode', hidden: true }
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [10, 20, 30],
+            pager: "#gridPager1",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectTab = 1;
+                if (checkMode == 0) {
+                    selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                }
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+                if (!!$("#itemTree").html())
+                {
+                    if ($("#itemTree").html().length == 0 && checkMode == 0) {
+                        $(".ui-layout-west").remove(); $(".ui-layout-pane-center").css({ left: "10px", width: "100%" }); $(".ui-jqgrid-view").css({ width: "100%" });
+                        $("#gbox_gridTable").css({ width: "100%" }); $("#gridPager").css({ width: "100%" }); $(".ui-jqgrid-hdiv").css({ width: "100%" });
+                        $(".ui-jqgrid-bdiv").css({ width: "100%" });
+                    }
+                }
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                Etype: $("#EquipmentType").attr('data-value'),
+                txtSearch: $("#txt_Keyword").val(),
+                code: _parentId,
+                isOrg: _isOrg
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+    //返回选择后的结果并赋值到dom控件,多个值用逗号分隔
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔，顺序必须依次为设备ID,设备名称，设备编号,区域名称,区域ID,区域编码（多选用逗号分隔）
+    function AcceptClick(options) {
+        var winObject = options.winObject;
+        var domId = options.domId;
+        var selVal = new Array();
+
+        if (winObject != undefined && domId != undefined) {
+            if (domId.length > 0) {
+                var userIds = ""; var equipmentname = ""; var equipmentno = ""; var district = ""; var districtid = ""; var districtcode = ""; var type = "";
+                if (checkMode == 1) {
+                    var arr = $("#users").find("input:checked");
+                    if (arr.length == 0) {
+                        dialogAlert("请选择设备！", 2);
+                        return;
+                    } else {
+                        arr.each(function (i, dom) {
+                            userIds += dom.id + ",";
+                            equipmentname += $(dom).attr("equipmentname") + ",";
+                            equipmentno += $(dom).attr("equipmentno") + ",";
+                            district += $(dom).attr("district") + ",";
+                            districtid += $(dom).attr("districtid") + ",";
+                            districtcode += $(dom).attr("districtcode") + ",";
+                        });
+                        userIds = userIds.substring(0, userIds.length - 1);
+                        equipmentname = equipmentname.substring(0, equipmentname.length - 1);
+                        equipmentno = equipmentno.substring(0, equipmentno.length - 1);
+                        district = district.substring(0, district.length - 1);
+                        districtid = districtid.substring(0, districtid.length - 1);
+                        districtcode = districtcode.substring(0, districtcode.length - 1);
+                    }
+                } else {
+                    //如果当前选择的面板和选择的行的tab序号不一样，则将选择索引清除。
+                    if (curTab != selectTab) {
+                        selectedRowIndex = -1;
+                    }
+                    if (selectedRowIndex <= 0) {
+                        dialogAlert("请选择设备！", 2);
+                        return;
+                    } else {
+                        var rowObject;
+                        //特种设备
+                        if (curTab == 0) {
+                            rowObject = $('#gridTable').jqGrid("getRowData", selectedRowIndex);
+                        }
+                        else //设备设施
+                        {
+                            rowObject = $('#gridTable1').jqGrid("getRowData", selectedRowIndex);
+                        }
+
+                        userIds = rowObject.id;
+                        equipmentname = rowObject.equipmentname;
+                        equipmentno = rowObject.equipmentno;
+                        district = rowObject.district;
+                        districtid = rowObject.districtid;
+                        districtcode = rowObject.districtcode;
+                        type = "0";
+                        if (top.PrjectItem && top.PrjectItem.window != undefined) {
+                            top.PrjectItem.window.$("#CheckObjectType").val("0");
+                        }
+                        
+                    }
+
+                }
+                if (from == "0") {
+                    winObject.nodeSB.id = userIds;
+                    winObject.nodeSB.setAttribute("ctype", "0");
+                    if ($(winObject.nodeSB).attr("type")!=undefined) {
+                        winObject.nodeSB.value = equipmentname;
+                        if (winObject.arrNodeSB != null && winObject.arrNodeSB != undefined) {
+                            winObject.arrNodeSB.val(equipmentname);
+                           
+                        }
+                    } else {
+                        $(winObject.nodeSB).text(equipmentname);
+                        if (winObject.arrNodeSB != null && winObject.arrNodeSB != undefined) {
+                            winObject.arrNodeSB.text(equipmentname);
+                            
+                        }
+                    }
+                    if (winObject.arrNodeSB != null && winObject.arrNodeSB != undefined) {
+                        
+                        winObject.arrNodeSB.attr("id", userIds);
+                        winObject.arrNodeSB.attr("ctype", "0");
+                    }
+                  
+                } else {
+                    var ids = domId.split(',');
+                    var selVal = new Array(userIds, equipmentname, equipmentno, district, districtid, districtcode, type);
+                    for (var j = 0; j < ids.length; j++) {
+                        if (ids[j].length >= 0) {
+                            if (ids[j] != "") {
+                                var dom = $(winObject).find("#" + ids[j]).eq(0);
+                                if (dom != undefined) {
+                                    dom.val(selVal[j]);
+                                }
+                                if (ids[j] == "DEVICECODE")
+                                {
+                                    $(winObject).find("#" + ids[j]).eq(0).attr("disabled", "disabled");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (options.callBack) {
+                options.callBack();
+            }
+            dialogClose();
+        }
+
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a href="javascript:selectAll();">组织机构树</a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-right: 0px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a data-value="EQUIPMENTNAME">设备名称</a></li>
+                                        <li><a data-value="EQUIPMENTNO">设备编号</a></li>
+                                        <li><a data-value="SPECIFICATIONS">规格型号</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="lr-replace" class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="titlePanel">
+                <ul class="nav nav-tabs">
+                    <li id="litab1" class="active"><a id="tab1" data-toggle="tab">特种设备信息</a></li>
+                    <li id="litab2"><a id="tab2" data-toggle="tab">普通设备信息</a></li>
+                </ul>
+            </div>
+            <div class="gridPanel" id="div1">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+            <div class="gridPanel" id="div2" style="display:none;">
+                <table id="gridTable1"></table>
+                <div id="gridPager1"></div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-east" style="margin-left: 0px;">
+        <div class="west-Panel" style="margin-left: 0px;">
+            <div class="panel-Title">
+                <a href="javascript:selectAll();">已选中的设备</a>
+            </div>
+            <div id="users" style="overflow: auto; height: 450px; margin-left: 5px;">
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+

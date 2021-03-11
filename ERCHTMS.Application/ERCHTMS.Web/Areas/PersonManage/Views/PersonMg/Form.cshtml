@@ -1,0 +1,501 @@
+﻿@{
+    ViewBag.Title = "临时人员";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+
+
+<!--webUploader文件上传组件-->
+<script src="~/Content/scripts/plugins/uploadify/ajaxfileupload.js"></script>
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+
+<!DOCTYPE html>
+
+
+<style type="text/css">
+    .file {
+        position: relative;
+        display: inline-block;
+        overflow: hidden;
+        text-decoration: none;
+        text-indent: 0;
+        cursor: pointer !important;
+        margin-left: 27px;
+        margin-top: 9px;
+    }
+
+        .file input {
+            position: absolute;
+            font-size: 100px;
+            right: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer !important;
+        }
+
+        .file:hover {
+            text-decoration: none;
+            cursor: pointer !important;
+        }
+
+    #gridPerformance tr th {
+        vertical-align: central !important;
+    }
+</style>
+
+
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Form</title>
+
+    <script>
+
+        var keyValue = request('keyValue');
+        var IsTakePictures = false;//是否拍照，拍照才能保存 
+        var contentPath = '@Url.Content("~")'.substr(0, '@Url.Content("~")'.length - 1);
+        var time;//计时器
+        var listobj;//设备集
+
+        $(function () {
+            initControl();//加载设备区域
+            $("#Image").hide();
+            GetGroupsNameJson();
+            InitUpload();
+        });
+
+        //定时执行任务
+        function refreshData() {
+            var taskIds = "";
+            for (var i = 0; i < listobj.length; i++) {
+                if (i == 0) {
+                    taskIds += listobj[i].taskId
+                }
+                else {
+                    taskIds += ',' + listobj[i].taskId
+                }
+            }
+            $.ajax({//先查询添加或删除任务进度是否完成
+                url: '../../PersonManage/PersonMg/QuerySpeedofprogress?taskIds=' + taskIds,
+                type: "POST",
+                async: true,
+                dataType: "Json",
+                success: function (result) {
+                    if (result == "1") {
+                        window.clearInterval(time);
+                        $.SaveForm({//将人脸信息下载到指定设备中
+                            url: "../../PersonManage/PersonMg/DownloadToEquipment",
+                            param: { list: listobj },
+                            //loading: "正在下载数据...",
+                            close: true,
+                            success: function (data) {
+                                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                            }
+                        });
+                    }
+                }
+            })
+        };
+
+        function Cancel() {
+            IsTakePictures = false;
+            $("#play").show();
+            $("#Image").hide();
+            $("#cancel").hide();
+        }
+
+        //人员上传图片
+        function InitUpload() {
+            $('#uploadFile').change(function () {
+                Upload($(this));
+            });
+        }
+        //人员上传图片
+        function Upload(self) {
+            var file = self.get(0).files[0];
+            if (file.type.indexOf("image") >= 0) {
+                var size = file.size;
+                var file_id = self.attr("id");
+                var img_id = self.attr("img_id");
+                //上传应用图标
+                $.ajaxFileUpload({
+                    url: "UploadPhoto",
+                    secureuri: false,
+                    fileElementId: file_id,
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.resultdata != "1") {
+                            document.getElementById('uploadPreview').src = top.contentPath + data.resultdata;
+                            $("#HeadIcon").val(data.resultdata);
+                            dialogMsg(data.message, 1);
+                        }
+                        else {
+                            dialogMsg(data.message, 2);
+                        }
+                    },
+                    complete: function () {
+                        $("#uploadFile").change(function () {
+                            Upload($(this), file_id, img_id);
+                        })
+                    }
+                });
+            } else {
+                dialogMsg("仅支持上传图片！", 2);
+            }
+        }
+
+
+        //进入拍照区
+        function OpenPz() {
+            $("#PzImg").show();
+            //$("#ShowImg").hide();
+            getMedia();
+        }
+
+        //获取分组信息
+        function GetGroupsNameJson() {
+            var url = '../../PersonManage/PersonMg/GetListJson';
+            $.get(url, { type: 1 }, function (data) {
+                var list = eval("(" + data + ")");
+                var res = "";
+                for (var i = 0; i < list.length; i++) {
+                    res += " <option value=" + list[i].ID + ">" + list[i].GroupsName + "</option>";
+                }
+                $("#Groupsid").html(res);
+            });
+        }
+
+        //保存表单; 
+        function AcceptClick() {
+            var canvas = document.getElementById('canvas1');
+            var imgData = "";
+            if (IsTakePictures) {
+                imgData = canvas.toDataURL("image/jpg");
+            }
+            if (!$('#form1').Validform()) {
+                return false;
+            }
+            var postData = $("#form1").formSerialize(keyValue);
+            postData["GroupsName"] = $("#Groupsid option:selected").text();
+            var res = "";
+            $.each($("#AreaCheck>input"), (index, item) => {
+                if (item.checked) res += $(item).attr("name") + ",";
+            });
+            //if (document.getElementById("Post1").checked) {
+            //    res += "一号岗" + ",";
+            //}
+            //if (document.getElementById("Post2").checked) {
+            //    res += "码头岗" + ",";
+            //}
+            //if (document.getElementById("Post3").checked) {
+            //    res += "三号岗" + ",";
+            //}
+            //if (document.getElementById("Post4").checked) {
+            //    res += "生活区岗";
+            //}
+            if (!IsTakePictures && $("#HeadIcon").val() == "") {
+                dialogMsg("拍照或者上传照片不能同时为空！", 2);
+                return false;
+            }
+            if (res == "") {
+                dialogMsg("请至少选择一个通行岗！", 2);
+                return false;
+            }
+            postData["PassPost"] = res;
+            postData["UserImg"] = $("#HeadIcon").val();;
+
+            if (IsTakePictures) {
+                var url = "../../PersonManage/PersonMg/TempUserFaceImgIsQualified";
+                $.post(url, { UserEntity: postData, imgData: encodeURIComponent(imgData) }, function (data) {
+                   
+                    var list = eval("(" + data + ")");
+                    if (list.message == "false") {
+                        dialogMsg("人脸照片不合格，请重新进行拍照！", 2);
+                        return false;
+                    }
+                    else {
+                        postData["UserImg"] = list.resultdata;
+                        Loading(true, "请稍候,正在保存并下发数据……");
+                        var url = "../../PersonManage/PersonMg/SaveUForm";
+                        $.post(url, { UserEntity: postData, imgData: encodeURIComponent(imgData) }, function (result) {
+                            listobj = eval("(" + result + ")");
+                            time = window.setInterval("refreshData()", 4000);
+                        });
+                    }
+                });
+            }
+            else {
+                Loading(true, "请稍候,正在保存并下发数据……");
+                var url = "../../PersonManage/PersonMg/SaveUForm";
+                $.post(url, { UserEntity: postData, imgData: encodeURIComponent(imgData) }, function (result) {
+                    listobj = eval("(" + result + ")");
+                    time = window.setInterval("refreshData()", 4000);
+                });
+            }
+
+        }
+
+               /**加载设备区域 */
+        var initControl = () => {
+            $.ajax({
+                url: '@Url.Action("GetDeviceArea")',
+                type: "GET",
+                success: function (data) {
+                    var html = "";
+                    if (!!data && data.length > 0) {
+                        data.forEach((item, index) => {
+                            html += '<input id="' + item.ItemId + '" type="checkbox" name="' + item.ItemName + '" />' + item.ItemName;
+                        });
+                    }
+                    $("#AreaCheck").html(html);
+                },
+                error: function (error) {
+                    console.error(error)
+                }
+            })
+        }
+
+    </script>
+
+
+</head>
+<body>
+    <div>
+        <div style="float:left; width:50%;" class="tabel-container1">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">姓名：<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="UserName" type="text" checkexpession="NotNull" isvalid="yes" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">性别：<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <select style="width:380px;" id="Gender"><option>男</option><option>女</option></select>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">身份证号码：</td>
+                    <td class="formValue">
+                        <input id="Identifyid" type="text" maxlength="18" checkexpession="NotNull" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">单位：<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ComName" type="text" isvalid="yes" checkexpession="NotNull" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">选择分组：</td>
+                    <td class="formValue">
+                        <select id="Groupsid" style="width:380px;"></select>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">手机号码：<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="Tel" type="text" isvalid="yes" maxlength="11" checkexpession="NotNull" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">考勤开始时间：<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="startTime" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm'})">
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">考勤结束时间：<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="EndTime" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm'})">
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" rowspan="3" style="padding-left: 28px;">
+                        通行岗选择：<font face="宋体">*</font>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formValue" id="AreaCheck">
+                        @*&nbsp;&nbsp;&nbsp; <input checked="checked" id="Post1" type="checkbox" />一号岗
+                        &nbsp;&nbsp;&nbsp;<input id="Post2" type="checkbox" />码头岗
+                        &nbsp;&nbsp;&nbsp; <input id="Post3" type="checkbox" />三号岗*@
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formValue">
+                       
+                        @*<input id="Post4" type="checkbox" />生活区岗*@
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div style="float:left; padding-left:70px;padding-top:0px;text-align:center;">
+            <a class="btn btn-default" onclick="getMedia()">开启摄像头</a> <a id="getPhoto" class="btn btn-default" onclick="getPhoto()">拍照</a><br />
+            <div style="width: 400px; height: 300px; border: 1px solid rgb(204, 204, 204);" id="play">
+                <video width="400" height="300" autoplay="autoplay"></video>
+            </div>
+            <div style="width: 400px; height: 300px; border: 1px solid rgb(204, 204, 204);" id="Image">
+                <canvas id="canvas1" width="400" height="300"></canvas>
+            </div>
+            <div style="width: 400px; height: 273px; z-index: 999; position: absolute; right: 30px; top: 52px; background-image: url('../../Content/img/UserImg.png'); background-size: 100% 100%; background-repeat: no-repeat; "></div>
+            <div style="width: 400px; height: 31px; padding-top: 7px;">
+                <a id="cancel" style="display: none;" class="btn btn-default" onclick="Cancel()">取消</a>
+            </div>
+        </div>
+
+
+
+
+
+
+        @*<div style="text-align:center;" class="panel-body">
+            <a class="btn btn-default" onclick="getMedia()">开启摄像头</a> <a id="getPhoto" class="btn btn-default" onclick="getPhoto()">拍照</a><br />
+            <div style="width: 400px; height: 300px; margin-left: 72px; border: 1px solid rgb(204, 204, 204);  " id="play">
+                <video width="400" height="300" autoplay="autoplay"></video>
+            </div>
+            <div style="width: 400px; height: 300px; margin-left: 72px; border: 1px solid rgb(204, 204, 204);" id="Image">
+                <canvas id="canvas1" width="400" height="300"></canvas>
+            </div>
+            <div style="width: 400px; height: 273px; z-index: 999; position:absolute; top:325px;left:94px; background-image: url('../../Content/img/UserImg.png'); background-size: 100% 100%; background-repeat:no-repeat"></div>
+            <div>
+                <a id="sub" class="btn btn-default" onclick="Submit()">确定</a><a id="cancel" class="btn btn-default" onclick="Cancel()">取消</a>
+            </div>
+        </div>*@
+
+
+
+
+
+
+
+        <div style="margin-top: 10px;margin-left: 87px; text-align: left;">
+            <div class="file" title="点击上传照片">
+                <img id="uploadPreview" style="width: 115px; height: 115px;" src="~/Content/images/App.png" />
+                <input type="file" name="uploadFile" id="uploadFile">
+                <input type="hidden" id="HeadIcon" />
+            </div>
+            <div style="line-height: 14px; color: #75777A; text-align: left; margin-left: 29px;" id="divTips">
+                点击图片可上传照片
+            </div>
+        </div>
+
+
+
+
+
+    </div>
+</body>
+</html>
+
+<script>
+    var video = document.querySelector('video');
+    var audio, audioType;
+
+    var canvas1 = document.getElementById('canvas1');
+    var context1 = canvas1.getContext('2d');
+
+    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+    window.URL = window.URL || window.webkitURL || window.mozURL || window.msURL;
+
+    var exArray = []; //存储设备源ID
+    MediaStreamTrack.getSources(function (sourceInfos) {
+        for (var i = 0; i != sourceInfos.length; ++i) {
+            var sourceInfo = sourceInfos[i];
+            //这里会遍历audio,video，所以要加以区分
+            if (sourceInfo.kind === 'video') {
+                exArray.push(sourceInfo.id);
+            }
+        }
+    });
+
+    //点击开摄像头
+    function getMedia() {
+        if (navigator.getUserMedia) {
+            navigator.getUserMedia({
+                'video': {
+                    'optional': [{
+                        'sourceId': exArray[1] //0为前置摄像头，1为后置
+                    }]
+                },
+                'audio': true
+            }, successFunc, errorFunc);    //success是获取成功的回调函数
+        }
+        else {
+            alert('Native device media streaming (getUserMedia) not supported in this browser.');
+        }
+    }
+
+    function successFunc(stream) {
+        //alert('Succeed to get media!');
+        if (video.mozSrcObject !== undefined) {
+            //Firefox中，video.mozSrcObject最初为null，而不是未定义的，我们可以靠这个来检测Firefox的支持
+            video.mozSrcObject = stream;
+        }
+        else {
+            try {
+                video.src = window.URL && window.URL.createObjectURL(stream) || stream;
+            } catch (e) {
+                video.srcObject = stream;
+            }
+        }
+
+        //video.play();
+
+        // 音频
+        audio = new Audio();
+        audioType = getAudioType(audio);
+        if (audioType) {
+            audio.src = 'polaroid.' + audioType;
+            audio.play();
+        }
+    }
+
+    function errorFunc(e) {
+        alert('Error！' + e);
+    }
+
+
+    // 将视频帧绘制到Canvas对象上,Canvas每60ms切换帧，形成肉眼视频效果
+    function drawVideoAtCanvas(video, context) {
+        window.setInterval(function () {
+            context.drawImage(video, 0, 0, 90, 120);
+        }, 60);
+    }
+
+    //获取音频格式
+    function getAudioType(element) {
+        if (element.canPlayType) {
+            if (element.canPlayType('audio/mp4; codecs="mp4a.40.5"') !== '') {
+                return ('aac');
+            } else if (element.canPlayType('audio/ogg; codecs="vorbis"') !== '') {
+                return ("ogg");
+            }
+        }
+        return false;
+    }
+
+    //拍照
+    function getPhoto() {
+        context1.drawImage(video, 0, 0, 400, 300); //将video对象内指定的区域捕捉绘制到画布上指定的区域，实现拍照。
+        IsTakePictures = true;
+        $("#play").hide();
+        $("#Image").show();
+        $("#cancel").show();
+    }
+
+    //视频
+    function getVedio() {
+        drawVideoAtCanvas(video, context2);
+    }
+
+</script>

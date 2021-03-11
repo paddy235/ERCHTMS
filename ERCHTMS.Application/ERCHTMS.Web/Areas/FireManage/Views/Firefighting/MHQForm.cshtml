@@ -1,0 +1,352 @@
+﻿@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script>
+    var keyValue = request('keyValue');
+    var equipmentName = request('name');//设备名称
+    var extinguisherType = request('type');//灭火器类型
+    $(function () {
+        initControl();
+        GetGrid();
+    });
+    //初始化控件
+    function initControl() {
+        $("#EquipmentName").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "EquipmentName" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        $("#ExtinguisherType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ExtinguisherType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        $("#Specifications").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "Specifications" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../FireManage/Firefighting/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        } else {//新增，先自动生成ID
+            keyValue = keyValue.length == 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+            $("#EquipmentName div:eq(0)").text(equipmentName);
+            $("#ExtinguisherType div:eq(0)").text(extinguisherType);
+            $("#EquipmentName").ComboBoxSetValue(equipmentName);
+            $("#ExtinguisherType").ComboBoxSetValue(extinguisherType);
+            $("#EquipmentName").attr("readonly", "readonly");
+            $("#ExtinguisherType").attr("readonly", "readonly");
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        $.SaveForm({
+            url: "../../FireManage/Firefighting/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            EquipmentId: keyValue//主表id
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 250,
+            url: "../../FireManage/ExamineRecord/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'occdetailid', hidden: true, width: 150, sortable: false },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if ("show" != "show") {
+                            html = "<a href=javascript:btn_edit('" + rowObject.occdetailid + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:btn_delete('" + rowObject.occdetailid + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        } else {
+                            html = "";
+                        }
+                        return html;
+                    }
+                },
+                { label: '检查时间', name: 'EXAMINEDATE', index: 'EXAMINEDATE', width: 100, align: 'center', sortable: true },
+                { label: '检查人', name: 'EXAMINEPERSON', index: 'EXAMINEPERSON', width: 100, align: 'center', sortable: true },
+                { label: '筒体', name: 'BARREL', index: 'BARREL', width: 100, align: 'center', sortable: true },
+                { label: '压力', name: 'STRESS', index: 'STRESS', width: 100, align: 'center', sortable: true },
+                { label: '喷管', name: 'EFFUSER', index: 'EFFUSER', width: 100, align: 'center', sortable: true },
+                { label: '封铅', name: 'SEAL', index: 'SEAL', width: 100, align: 'center', sortable: true },
+                { label: '卫生', name: 'SANITATION', index: 'SANITATION', width: 100, align: 'center', sortable: true },
+                { label: '重量', name: 'WEIGHT', index: 'WEIGHT', width: 100, align: 'center', sortable: true },
+                { label: '备注', name: 'REMARK', index: 'REMARK', width: 100, align: 'center', sortable: true }
+            ],
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                //$('#' + this.id).setSelection(selectedRowIndex, false);
+                //var num = $('#' + this.id).jqGrid('getGridParam', 'records');
+                //if (num > 0) {
+                //    document.getElementById("yes").checked = true;
+                //} else {
+                //    document.getElementById("no").checked = true;
+                //}
+            }
+        });
+    }
+    //新增
+    function btn_add() {
+        if ($("#CHECKMANNAME").val().trim() == "") {
+            alert("请先选择体检人员");
+            return;
+        }
+        dialogOpen({
+            id: 'Sikp',
+            title: '添加职业病人员表',
+            url: '/FireManage/Firefighting/Form?pid=' + keyValue + '&type=',
+            width: '500px',
+            height: '300px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+</script>
+<div style="margin-left: 10px; margin-right: 10px;">
+    <div class="tab-content" style="padding-top: 15px;">
+        <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px;">
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;基本信息</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table class="form">
+                            <tr>
+                                <td class="formTitle">设备名称</td>
+                                <td class="formValue">
+                                    @*<input id="EquipmentName" type="text" class="form-control" />*@
+                                    <div id="EquipmentName" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" onchange="setNo()"></div>
+                                </td>
+                                <td class="formTitle">设备编号</td>
+                                <td class="formValue">
+                                    <input id="EquipmentCode" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">类型</td>
+                                <td class="formValue">
+                                    <div id="ExtinguisherType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                                    @*<input id="ExtinguisherTypeName" type="hidden" class="form-control" />*@
+                                </td>
+                                <td class="formTitle">规格型号</td>
+                                <td class="formValue">
+                                    @*<input id="Specifications" type="text" class="form-control" />*@
+                                    <div id="Specifications" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                                </td>
+                            </tr>
+                            <tr>
+
+                                <td class="formTitle">出厂时间</td>
+                                <td class="formValue">
+                                    <input id="LeaveDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM' })" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">检查周期</td>
+                                <td class="formValue">
+                                    <input id="ExaminePeriod" type="text" class="form-control" checkexpession="PositiveNum" />
+                                </td>
+                                <td class="formTitle">检查时间</td>
+                                <td class="formValue">
+                                    <input id="ExamineDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">下次检查时间</td>
+                                <td class="formValue">
+                                    <input id="NextExamineDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                                <td class="formTitle">上次充装时间</td>
+                                <td class="formValue">
+                                    <input id="LastFillDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM' })" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">下次充装时间</td>
+                                <td class="formValue">
+                                    <input id="NextFillDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM' })" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                                <td class="formTitle">配置区域</td>
+                                <td class="formValue">
+                                    <input id="DistrictId" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">配置区域</td>
+                                <td class="formValue">
+                                    <input id="District" type="text" class="form-control" />
+                                </td>
+                                <td class="formTitle">配置位置</td>
+                                <td class="formValue">
+                                    <input id="Location" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">责任人</td>
+                                <td class="formValue">
+                                    <input id="DutyUser" type="text" class="form-control" />
+                                </td>
+                                <td class="formTitle">责任人ID</td>
+                                <td class="formValue">
+                                    <input id="DutyUserId" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">责任部门</td>
+                                <td class="formValue">
+                                    <input id="DutyDept" type="text" class="form-control" />
+                                </td>
+                                <td class="formTitle">责任人电话</td>
+                                <td class="formValue">
+                                    <input id="DutyTel" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">枪头数</td>
+                                <td class="formValue">
+                                    <input id="Spearhead" type="text" class="form-control" isvalid="yes" checkexpession="PositiveNum" />
+                                </td>
+                                <td class="formTitle">水带数</td>
+                                <td class="formValue">
+                                    <input id="WaterBelt" type="text" class="form-control" isvalid="yes" checkexpession="PositiveNum" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">保护对象</td>
+                                <td class="formValue" colspan='3'>
+                                    <input id="ProtectObject" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">主要参数</td>
+                                <td class="formValue" colspan='3'>
+                                    <input id="MainParameter" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">设计单位</td>
+                                <td class="formValue">
+                                    <input id="DesignUnit" type="text" class="form-control" />
+                                </td>
+                                <td class="formTitle">安装单位</td>
+                                <td class="formValue">
+                                    <input id="InstallUnit" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">维护单位</td>
+                                <td class="formValue">
+                                    <input id="SafeguardUnit" type="text" class="form-control" />
+                                </td>
+                                <td class="formTitle">竣工时间</td>
+                                <td class="formValue">
+                                    <input id="DoneDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM' })" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">检测时间</td>
+                                <td class="formValue">
+                                    <input id="DetectionDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                                <td class="formTitle">检测单位</td>
+                                <td class="formValue">
+                                    <input id="DetectionUnit" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">检测结论</td>
+                                <td class="formValue">
+                                    <input id="DetectionVerdict" type="text" class="form-control" />
+                                </td>
+                                <td class="formTitle">检测周期</td>
+                                <td class="formValue">
+                                    <input id="DetectionPeriod" type="text" class="form-control" checkexpession="PositiveNum" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">下次检测时间</td>
+                                <td class="formValue">
+                                    <input id="NextDetectionDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" checkexpession="NotNull" />
+                                </td>
+                                <td class="formTitle">配置区域</td>
+                                <td class="formValue">
+                                    <input id="DistrictCode" type="text" class="form-control" />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="formTitle">备注</td>
+                                <td class="formValue">
+                                    <input id="Remark" type="text" class="form-control" />
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="center-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;检查记录</strong>
+                        <span class="tools pull-right">
+                            <a id="addHid" onclick="btn_add()" style="cursor:pointer;"><i class="fa fa-plus"></i>&nbsp;登记检查记录</a>&nbsp;&nbsp;
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="gridPanel">
+                        <table id="gridTable"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

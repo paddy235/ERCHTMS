@@ -1,0 +1,522 @@
+﻿@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+
+
+
+<script>
+
+    var keyValue = request('keyValue');
+    var currUserAccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+        //查询事件
+        $("#btn_Search").click(function () {
+           
+            if (($("#Stime").val() != "" && $("#Etime").val() == "") || ($("#Etime").val() != "" && $("#Stime").val() == "")) {
+                dialogMsg('起始时间和结束时间不能为空！', 0);
+                return false;
+            }
+            if ($("#Stime").val() != "" && $("#Etime").val() != "") {
+                var dt1 = new Date($("#Stime").val().replace(/\-/g, '\/'));
+                var dt2 = new Date($("#Etime").val().replace(/-/g, '\/'));
+                if (dt1 > dt2) {
+                    dialogMsg('起始时间不能大于结束时间！', 0);
+                    return false;
+                }
+            }
+            jQuery("#gridTable").jqGrid('setGridParam', {
+                postData: { queryJson: CreateParams() },
+                page: 1
+            }).trigger('reloadGrid');
+        });
+        //重置
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val('');
+            $("#Stime").val(''); $("#Etime").val('');
+            document.getElementById("Transporttype1")[0].selected = true;
+            document.getElementById("Producttype1")[0].selected = true;
+            document.getElementById("Takegoodsname1")[0].selected = true;
+            document.getElementById("QueryDress")[0].selected = true;
+            jQuery("#gridTable").jqGrid('setGridParam', {
+                postData: { queryJson: CreateParams() },
+                page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    });
+
+    function CreateParams() {
+        var queryJson = {
+            keyword: $("#txt_Keyword").val(),
+            OutStartTime: $("#Stime").val(),
+            OutEndtime: $("#Etime").val(),
+            Takegoodsname: $("#Takegoodsname1 option:selected").text(),
+            Transporttype: $("#Transporttype1").val(),
+            Producttype: $("#Producttype1").val(),
+            QueryDress: $("#QueryDress").val(),
+        }
+        return JSON.stringify(queryJson);
+    }
+
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 300);
+            }, 200);
+            e.stopPropagation();
+        });
+
+    }
+
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(top.window).height() - 300,
+            url: "../../MatterManage/OurTicket/GetPageList",
+            datatype: "json",
+            postData: {
+                queryJson: J CreateParams()
+            },
+            colModel: [
+                { label: 'Id', name: 'id', hidden: true },
+                { label: '操作', name: 'Oper', index: 'Oper', width: 170, align: 'center'},
+                { label: '提货/转运单号', name: 'numbers', index: 'Numbers', width: 250, align: 'center', sortable: true },
+                { label: '提货方', name: 'takegoodsname', index: 'TakeGoodsName', width: 350, align: 'center', sortable: true },
+                { label: '车牌号', name: 'platenumber', index: 'PlateNumber', width: 200, align: 'center', sortable: true },
+                { label: '运输类型', name: 'transporttype', index: 'TransportType', width: 200, align: 'center', sortable: true },
+                { label: '副产品类型', name: 'producttype', index: 'ProductType', width: 200, align: 'center', sortable: true },
+                { label: '装灰点', name: 'dress', index: 'Dress', width: 200, align: 'center', sortable: true },
+                //{ label: '是否第一次入厂', name: 'isfirst', index: 'IsFirst', width: 100, align: 'center', sortable: true },
+                //{ label: '是否按轨迹行驶', name: 'istrajectory', index: 'IsTrajectory', width: 100, align: 'center', sortable: true },
+                //{ label: '入库次数', name: 'databasenum', index: 'DataBaseNum', width: 100, align: 'center', sortable: true },
+                //{ label: '称重次数', name: 'weighingnum', index: 'WeighingNum', width: 100, align: 'center', sortable: true },
+                { label: '车数', name: 'zcount', index: 'zcount', width: 100, align: 'center', sortable: true },
+                {
+                    label: '重量（吨）', name: 'znetwneight', index: 'znetwneight', width: 100, align: 'center', sortable: true
+                },
+                {
+                    label: '进厂时间', name: 'getdata', index: 'GetData', width: 200, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var html = formatDate(cellvalue, 'hh:mm');
+                        if (html == "00:00") {
+                            return formatDate(cellvalue, 'yyyy-MM-dd')
+                        }
+                        else {
+                            return formatDate(cellvalue, 'yyyy-MM-dd hh:mm')
+                        }
+                    }
+                },
+                {
+                    label: '出厂时间', name: 'outdate', index: 'OutDate', width: 200, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm')
+                    }
+                },
+                { label: '厂内逗留时间(分钟)', name: 'staytime', index: 'StayTime', width: 200, align: 'center', sortable: true },
+                {
+                    label: '厂内状态', name: 'status', index: 'Status', width: 200, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var html = rowObject.status;
+                        if (rowObject.staytime != null && Number(rowObject.staytime) > 150) {
+                            html = "异常";
+                        }
+                        else if (rowObject.travelstatus != null) {
+                            html = "异常";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '出厂打印时间', name: 'outdatabasetime', index: 'outdatabasetime', width: 200, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm')
+                    }
+                },
+                {
+                    label: '备注', name: 'passremark', index: 'PassRemark', width: 300, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var res = rowObject.passremark;
+                        if (rowObject.remark != null && res != null) {
+                            res += "/" + rowObject.remark;
+                        }
+                        else if (rowObject.remark != null) {
+                            res = rowObject.remark;
+                        }
+                        return res == null ? "" : res;
+                    }
+                },
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                gridqx($gridTable);
+            },
+            viewrecords: true,
+            rowNum: 10,
+            // rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'getdata',
+            sortorder: 'desc',
+            rownumbers: true,
+        });
+       
+    }
+
+
+    //查看详情
+    function show(obj) {
+        var id = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看详情',
+                url: '/MatterManage/OurTicket/ShowForm?keyValue=' + id,
+                width: 1600 + "px",
+                height: 600 + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+
+    //打印
+    function edit() {
+        var weight = $('#gridTable').jqGridRowValue('znetwneight');
+        f_stamp(weight);
+    }
+
+    //异常放行
+    function del() {
+        var id = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '车辆放行',
+                url: '/MatterManage/OurTicket/Form?keyValue=' + id,
+                width: 600 + "px",
+                height: 500 + "px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        }
+    }
+
+    //过程记录
+    function notes() {
+        var id = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '过程管理记录',
+                url: '/MatterManage/OurTicket/NotesForm?keyValue=' + id,
+                width: 1100 + "px",
+                height: 1400 + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //导出
+    function exportResult() {
+        var queryJson = JSON.stringify({
+            keyword: $("#txt_Keyword").val(),
+            Stime: $("#Stime").val(),
+            Etime: $("#Etime").val(),
+            Takegoodsname: $("#Takegoodsname1 option:selected").text(),
+            Transporttype: $("#Transporttype1").val(),
+            Producttype: $("#Producttype1").val(),
+            QueryDress: $("#QueryDress").val(),
+
+        })
+        location.href = "../../MatterManage/OurTicket/ExportData?queryJson=" + queryJson;
+    }
+
+
+</script>
+
+
+
+
+
+<div style="margin: 20px 10px 0 10px;overflow:hidden; display:none;">
+    <ul class="table-title1">
+        <li>
+            入厂开票：
+            <input type="radio" value="1" disabled="disabled" id="TransportTypeY" name="Gender" checked="checked" />&nbsp;<label for="man">提货</label>&nbsp;&nbsp;&nbsp;
+            <input type="radio" value="0" disabled="disabled" id="TransportTypeN" name="Gender" />&nbsp;<label for="woman">转运</label>
+        </li>
+        <li style="width:28%;float:right;">
+            工作记录
+        </li>
+    </ul>
+    <div class="tabel-container1">
+        <table class="form">
+            <tr>
+                <td class="formTitle">提货/转运单号：</td>
+                <td class="formValue">
+                    <input id="Numbers" type="text" readonly="readonly" class="form-control" />
+                </td>
+                <td class="formTitle">进厂时间：</td>
+                <td class="formValue">
+                    <input id="Getdata" readonly="readonly" disabled="disabled" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm'})">
+                </td>
+                <td class="formTitle">车牌号：</td>
+                <td class="formValue">
+                    <input id="Platenumber" readonly="readonly" type="text" class="form-control" />
+                </td>
+            </tr>
+
+            <tr>
+                <td class="formTitle">副产品类型：</td>
+                <td class="formValue">
+                    <select id="Producttype" onchange="f_checktext(this,0)" disabled="disabled" type="text" class="form-control">
+                        <option>粉煤灰</option>
+                        <option>石膏</option>
+                        <option>炉底渣</option>
+                    </select>
+                </td>
+                <td class="formTitle">装灰点：</td>
+                <td class="formValue">
+                    <select id="Dress" disabled="disabled" class="form-control"></select>
+                </td>
+                <td class="formTitle">提货方：</td>
+                <td class="formValue">
+                    <input id="Takegoodsname" readonly="readonly" type="text" class="form-control" />
+                </td>
+            </tr>
+
+            <tr>
+                <td class="formTitle">供货方：</td>
+                <td class="formValue">
+                    <input id="Supplyname" type="text" readonly="readonly" class="form-control" />
+                </td>
+                <td class="formTitle">开单员：</td>
+                <td class="formValue">
+                    <input id="Opername" type="text" readonly="readonly" class="form-control" />
+                </td>
+                <td class="formTitle">备注：</td>
+                <td class="formValue">
+                    <input id="Remark" type="text" readonly="readonly" class="form-control" />
+                    <input id="Weight" type="hidden" />
+                </td>
+            </tr>
+        </table>
+        <div class="btn-group1">
+            <a onclick="AcceptClick()" id="bit_saeve" style="display:none;" class="layui-layer-btn0">保存</a>
+            <a onclick="f_stamp()" id="bit_stamp" class="layui-layer-btn0">打印</a>
+        </div>
+    </div>
+    <div id="WorkRecord" class="list-container1">
+        @*<p>
+                2018-3-3 <span>12:10:34</span> 审批浩翔宇报
+            </p>*@
+    </div>
+</div>
+
+
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px;float:left;">
+                                        <table class="form" id="filter-form" style="margin-left:-20%">
+                                            <tr>
+                                                <td style="float: right; ">进厂时间起：</td>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; ">
+                                                        <input id="Stime" type="text" style="width:180px;" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" />
+                                                    </div>
+
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float:right; ">进厂时间止：</td>
+                                                <td class="formValue">
+                                                    <div style="float: left;">
+                                                        <input id="Etime" style="width:180px;" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd  HH:mm' })" />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float: right; ">装灰点：</td>
+                                                <td class="formValue">
+                                                    <select id="QueryDress" type="text" style="width:180px;">
+                                                        <option>全部</option>
+                                                        <option>一期灰库</option>
+                                                        <option>二期灰库</option>
+                                                        <option>石膏库</option>
+                                                        <option></option>
+                                                        <option>渣仓</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float: right; ">
+                                                    提货方：
+                                                </td>
+                                                <td class="formValue">
+                                                    <select id="Takegoodsname1" style="width: 180px;"></select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float: right; ">
+                                                    运输类型：
+                                                </td>
+                                                <td class="formValue">
+                                                    <select id="Transporttype1" style="width:180px;">
+                                                        <option>全部</option>
+                                                        <option>提货</option>
+                                                        <option>转运</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float: right; ">
+                                                    副产品类型：
+                                                </td>
+                                                <td class="formValue">
+                                                    <select id="Producttype1" style="width:180px;">
+                                                        <option>全部</option>
+                                                        <option>粉煤灰</option>
+                                                        <option>石膏</option>
+                                                        <option>炉底渣</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="float: right; ">车牌号：</td>
+                                                <td class="formValue">
+                                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 180px;" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                            <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+
+                    &nbsp;<a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download"></i>导出</a>
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+    $(function () {
+        GetTree();
+        //GetWorkRecord();
+        //BinNewData();
+    });
+
+
+    //加载承包商
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 22
+            }
+        );
+        var url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+        //$.get(url, { json: json }, function (data) {
+        //    var list = eval("(" + data + ")");
+        //    var res = "";
+        //    for (var i = 0; i < list.length; i++) {
+        //        res += "<option value='" + list[i].id + "'>" + list[i].text + "</option>";
+        //    }
+        //    $("#Takegoodsname1").html("<option value='全部'>全部</option>" + res);
+        //});
+        jQuery.getJSON(url, { json: json }, function (data) {
+            if (data) {
+                var res = "";
+                jQuery.each(data[0].ChildNodes, function (index, item) {
+                    if (item.ShortName)
+                        res += "<option value='" + item.id + "'>" + item.ShortName + "</option>";
+                });
+                $("#Takegoodsname1").html("<option value='全部'>全部</option>" + res);
+            }
+        });
+    }
+
+
+    //打印预览
+    function f_stamp(weight) {
+        var rowDatas = $("#gridTable").jqGrid("getRowData");
+        var id = $('#gridTable').jqGridRowValue('id');
+        if (rowDatas.length > 0) {
+            //if ($("#Weight").val() == "0") {
+            //    dialogMsg('打印前请先完善称重信息！', 0);
+            //    return false;
+            //}
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '出厂打印',
+                url: '/MatterManage/OurTicket/Stamp?keyValue=' + id + "&weight=" + weight,
+                width: 1000 + "px",
+                height: 530 + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+        else {
+            dialogMsg('没有可以打印的数据！', 0);
+        }
+    }
+
+
+
+
+
+</script>

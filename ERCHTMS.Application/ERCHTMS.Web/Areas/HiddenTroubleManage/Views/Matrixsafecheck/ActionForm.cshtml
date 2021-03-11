@@ -1,0 +1,594 @@
+﻿@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+;
+    var orgid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    var userid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var seltype = 1; // 0：台历  1：列表
+    var nowy = "@DateTime.Now.ToString("yyyy")";
+    var nowm = "@DateTime.Now.ToString("MM")";
+    var timetype = 0; // 0:月度  1：年度
+    var examinetodeptid = ""; //左边的组织部门
+    var dmydeptname = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var qtype = request('qtype');
+    $(function () {
+        InitialPage();
+        //GetTree();
+        GetGrid();
+    });
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 1,
+                Ids: orgid
+            }
+        );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                console.log(item)
+                examinetodeptid = item.id;
+                dmydeptname = item.text;
+                //$('#btn_Search').trigger("click");
+                search();
+                //get_ContentList();
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+
+    // 列表搜索
+    function search() {
+        var $gridTable = $('#gridTable');
+        var StartTime = $("#sTime").val();
+        var EndTime = $("#eTime").val();
+        var queryJson = {
+            //examinetodeptid: examinetodeptid,
+            //year: $('#yearSel').val(),
+            //month: $('#monthSel').val(),
+            //timetype: timetype
+            year: '',
+            month: '',
+            timetype: '',
+            sTime: StartTime,
+            eTime: EndTime,
+            qtype:1
+        }
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        }).trigger('reloadGrid');
+
+        $('#myyear').html($('#yearSel').val());
+        $('#mymonth').html($('#monthSel').find("option:selected").text());
+        $('#mydeptn').html(dmydeptname);
+        if (timetype == 1) {
+            $('#mymonth').html('');
+        }
+
+    }
+
+    //初始化页面
+    function InitialPage() {
+        $('#monthSel').val(nowm);
+        $.ajax({
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetYearList",
+            type: "GET",
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                $('#yearSel').empty();
+                if (data.length != 0) {
+                    $(data).each(function () {
+                        $('#yearSel').append(' <option value="' + this.yealname + '">' + this.yealname +'</option>');
+                    });
+                } else {
+                    $('#yearSel').append(' <option value="' + nowy + '">' + nowy + '</option>');
+                }
+
+            }
+        })
+
+        $('#layout').layout({
+           applyDemoStyles: false,
+            onresize: function () {
+               $(window).resize();
+             }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 110);
+            }, 200);
+            e.stopPropagation();
+        });
+        $('#monthTable').height($(window).height() - 110);
+        $('#yearTable').height($(window).height() - 110);
+        $('#monthSel,#yearSel').change(function () {
+            search();
+            get_ContentList();
+        });
+
+        $('#btn_Search').click(function () {
+            search();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var StartTime = $("#sTime").val();
+        var EndTime = $("#eTime").val();
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            examinetodeptid: examinetodeptid,
+            //year: $('#yearSel').val(),
+            //month: $('#monthSel').val(),
+            //timetype: timetype
+            year: '',
+            month: '',
+            timetype: '',
+            sTime: StartTime,
+            eTime: EndTime,
+            qtype: 1
+        };
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 200,
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'isover', name: 'isover', hidden: true },
+                { label: 'checkid', name: 'checkid', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 60, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                        if (rowObject.isover == '1') {
+                            html += "<a href=javascript:btn_apply('" + rowObject.id + "')  title='新建检查计划'><i class='fa fa-plus'></i></a>&nbsp;";
+                        } else {
+                            if (rowObject.createuserid == userid) {
+                                html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='编辑'><i class='fa fa-pencil-square-o'></i></a>&nbsp;";
+                                html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i ></a >&nbsp; ";
+                            }
+
+                        }
+
+                        return html;
+                    }
+                },
+                { label: '检查时间', name: 'checktime', index: 'checktime', width: 60, align: 'center', sortable: true },
+                { label: '检查内容', name: 'content', index: 'content', width: 250, align: 'center', sortable: false },
+                { label: '组织部门', name: 'checkorgin', index: 'checkorgin', width: 200, align: 'center', sortable: false },
+                { label: '参与部门', name: 'checkdeptaction', index: 'checkdeptaction', width: 200, align: 'center', sortable: false },
+                { label: '参与人员', name: 'checkusername', index: 'checkusername', align: 'center', sortable: true },
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 't.CHECKTIME ',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true
+        });
+        //if ($('#mydeptn').length == 0) {
+        //    var groupHeaders = new Array();
+        //    groupHeaders.push(
+        //        {
+        //            startColumnName: "rn",
+        //            numberOfColumns: 10,
+        //            titleText: '<div><b><span id="mydeptn">' + dmydeptname + '</span><span id="myyear">' + $('#yearSel').val() + '</span>年<span id="mymonth">' + $('#monthSel').find("option:selected").text() + '份</span>矩阵式安全检查表</b></div>'
+        //        }
+        //    );
+        //    $('#gridTable').jqGrid("setGroupHeaders", {
+        //        useColSpanStyle: true,
+        //        groupHeaders: groupHeaders
+        //    });
+        //}
+
+
+
+        //if (timetype == 1) {
+        //    $('#mymonth').html('');
+        //}
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '新增矩阵安全检查',
+            url: '/HiddenTroubleManage/Matrixsafecheck/Form?action=add',
+            width: "750px",
+            height: "600px",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    function show(id) {
+        dialogOpen({
+            id: 'Form',
+            title: '新增矩阵安全检查',
+            url: '/HiddenTroubleManage/Matrixsafecheck/Form?action=view&recid='+ id,
+            width: "750px",
+            height: "600px",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //编辑
+    function btn_edit(id) {
+        dialogOpen({
+            id: 'Form',
+            title: '新增矩阵安全检查',
+            url: '/HiddenTroubleManage/Matrixsafecheck/Form?action=edit&recid=' + id,
+            width: "750px",
+            height: "600px",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //删除
+    function btn_delete(id) {
+        $.RemoveForm({
+            url: '../../HiddenTroubleManage/Matrixsafecheck/RemoveForm',
+            param: { keyValue: id },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        })
+    }
+
+    // 设置
+    function set() {
+        dialogOpen({
+            id: 'SetForm',
+            title: '设置矩阵安全检查',
+            url: '/HiddenTroubleManage/Matrixsafecheck/SetForm',
+            width:   "850px",
+            height:  "750px",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    function selday(numtype) {
+        seltype = numtype;
+        $('#rlSel,#listSel').removeClass('matrixSel').removeClass('matrixSelR');
+        if (seltype == 0) {
+            $('#rlSel').addClass("matrixSel");
+            $('#listSel').addClass("matrixSelR");
+        } else if (seltype == 1) {
+            $('#listSel').addClass("matrixSel");
+        }
+
+        if (seltype == 0) {
+            $('#listshow').hide();
+            $('#canledarshow').show();
+        } else if (seltype == 1) {
+            $('#listshow').show();
+            $('#canledarshow').hide();
+            GetGrid();
+        }
+        get_ContentList();
+    }
+
+    function timeday(numtype) {
+        timetype = numtype;
+        $('#mSel,#ySel').removeClass('matrixSel');
+        if (timetype == 0) {
+            $('#mSel').addClass("matrixSel");
+
+        } else if (timetype == 1) {
+            $('#ySel').addClass("matrixSel");
+        }
+
+        get_ContentList();
+        search();
+    }
+
+    // 日历部门的变化
+    function get_ContentList() {
+        // 不同日历的显隐
+        if (seltype == 0) {
+            if (timetype == 0) { // 月度
+                $('#monthTable').show();
+                $('#yearTable').hide();
+            } else {
+                $('#monthTable').hide();
+                $('#yearTable').show();
+            }
+        }
+
+        var queryJson = {
+            examinetodeptid: examinetodeptid
+        };
+        // 获取日历检查内容
+        $.ajax({
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetContentPageJson",
+            type: "GET",
+            data: { queryJson: JSON.stringify(queryJson) },
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                $('#month_dept_content,#year_dept_content').empty();
+                $(data).each(function (i, va) {
+                    $('#month_dept_content').append('<p style="font-size: 20px;">' + va.code + '、' + va.content + '</p>');
+                    $('#year_dept_content').append('<li style="font-size: 20px;">' + va.code + '、' + va.content + '</li>');
+                });
+
+            }
+        })
+
+        // 获取日历部门内容
+        $.ajax({
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetDeptPageJson",
+            type: "GET",
+            data: { queryJson: JSON.stringify(queryJson) },
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                $('#month_dept_dept,#year_dept_dept').empty();
+                $(data).each(function (i, va) {
+                    $('#month_dept_dept').append('<p style="font-size: 20px;">' + va.code + '、' + va.deptname + '</p>');
+                    $('#year_dept_dept').append('<li style="font-size: 20px;">' + va.code + '、' + va.deptname + '</li>');
+                });
+            }
+        })
+
+        var calendarname = "";
+        calendarname += dmydeptname;
+        calendarname += $('#yearSel').val();
+        if (timetype == 0) {
+            calendarname += $('#monthSel').find("option:selected").text();
+        }
+
+
+        // 修改日历标题
+        $('#calendar_titleV2,#calendar_title').html(calendarname + '矩阵式安全检查表');
+
+
+        getCanlendarList();
+
+
+
+    }
+
+    // 获取日历检查计划内容
+    function getCanlendarList() {
+        var queryJson = {
+            examinetodeptid: examinetodeptid,
+            year: $('#yearSel').val(),
+            month: $('#monthSel').val(),
+            timetype: timetype
+        };
+        // 获取日历检查计划内容
+        $.ajax({
+            url: "../../HiddenTroubleManage/Matrixsafecheck/GetCanlendarListJson",
+            type: "GET",
+            data: { queryJson: JSON.stringify(queryJson) },
+            dataType: "JSON",
+            async: false,
+            success: function (canlendardata) {
+                //console.log(data);
+
+                var days = getDaysbymonth($('#yearSel').val(), $('#monthSel').val());
+                var week = getDaysbyWeek($('#yearSel').val(), $('#monthSel').val());
+
+                if (timetype == 0) { // 月度
+                    var monthcell = $('#matrixContent');
+                    monthcell.empty();
+                    var cellNum = 35;// 默认情况下35
+                    if ((parseInt(days) + parseInt(week)) > 35) {
+                        cellNum = 42; //超过需要42个格子
+                        $('#checkConstyle').height('85.6vh');
+                    } else {
+                        $('#checkConstyle').height('71.5vh');
+                    }
+                    for (var i = 0; i < cellNum; i++) {
+                        if (i < parseInt(week) || i >= ((parseInt(days) + parseInt(week)))) {
+                            monthcell.append('<li></li>');
+                        } else {
+                            var htmlcon = '<li >' + (i - parseInt(week) + 1) + '</li>';
+                            var isnum = 0;
+                            $(canlendardata).each(function (e,val) {
+                                if ((val.checktime == ($('#yearSel').val() + "-" + $('#monthSel').val() + "-" + (i - parseInt(week) + 1))) && isnum == 0) {
+                                    var color_back = "";
+                                    if (val.issubmit == '1') {
+                                        color_back = 'style="background-color: #73b131;"';
+                                    } else if(val.issubmit == '3') {
+                                        color_back = 'style="background-color: #c00000;"';
+                                    }
+                                    htmlcon = '<li ' + color_back+'><p style="font-size: 26px;">7</p><p class="redDesc">' + (val.contentnum + '-' + val.checkdeptnum) + '</p ></li>';
+                                    isnum = 1;
+                                }
+                            });
+                            //monthcell.append('<li name="toolcanlendar" data-toggle="tooltip" title="<table><tr><td>检查内容：<td><td>时段3<td></tr><tr><td>检查部门：<td><td>时段3<td></tr></table>">' + (i - parseInt(week) + 1) + '</li>');
+                            monthcell.append(htmlcon);
+                        }
+                    }
+                    $('[name="toolcanlendar"]').tooltip({ html: true });
+                    $('[name="toolcanlendar"]').click(function () {
+                        alert(12)
+                    });
+
+                } else { //年度
+                    $('[name="month_conte"]').empty();
+                    $(canlendardata).each(function (e, val) {
+                        $('#month_' + val.checktimemonth).append('<li style="font-size: 20px;">' + (val.contentnum + '-' + val.checkdeptnum) + '</li>');
+                    });
+                }
+
+            }
+        })
+    }
+
+    // 获取当前月有多少周
+    function getDaysbymonth(year, month) {
+        var days = new Date(year, parseInt(month), 0).getDate()
+        return days;
+    }
+
+    // 获取时间是星期几
+    function getDaysbyWeek(year, month) {
+        var day = new Date(year, parseInt(month)-1, 1);
+
+        //var week = new Array('星期天', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六');
+        var week = new Array(0,1, 2, 3, 4, 5, 6);
+        return week[day.getDay()];
+    }
+
+    // 待办页面
+    function actionform() {
+        dialogOpen({
+            id: 'ActionForm',
+            title: '待办',
+            url: '/HiddenTroubleManage/Matrixsafecheck/ActionForm',
+            width: "",
+            height: "",
+            btn: "",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //  新增安全检查
+    function btn_apply(id) {
+        var title = "选择安全检查类型";
+        var url = "/HiddenTroubleManage/Matrixsafecheck/CheckForm?keyType=" + id;
+        var dlg = dialogOpen({
+            id: "ActionCheckForm",
+            title: title,
+            url: url,
+            width: "350px",
+            height: "250px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+</script>
+<style>
+    .matrixSel {
+        border-color: #337ab7 !important;
+        color: #337ab7 !important;
+    }
+
+    .matrixSelR {
+        border-left-color: #337ab7 !important;
+    }
+
+
+
+
+    
+</style>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    @*<div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a href="javascript:void(0);">组织机构树</a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>*@
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title" id="schemeTitle">检查列表</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        @*<tr>
+            <td>
+                <div> 查询时间：</div>
+            </td>
+            <td>
+                <div style="margin-left:20px;">
+                    <select id="yearSel" class="form-control" style="height:26px;">
+                    </select>
+                </div>
+
+            </td>
+            <td>
+                <div style="margin-left:5px;">
+                    <select id="monthSel" class="form-control" style="height:26px;">
+                        <option value="01">一月</option>
+                        <option value="02">二月</option>
+                        <option value="03">三月</option>
+                        <option value="04">四月</option>
+                        <option value="05">五月</option>
+                        <option value="06">六月</option>
+                        <option value="07">七月</option>
+                        <option value="08">八月</option>
+                        <option value="09">九月</option>
+                        <option value="10">十月</option>
+                        <option value="11">十一月</option>
+                        <option value="12">十二月</option>
+                    </select>
+                </div>
+            </td>
+            <td>
+                <div style="margin-left:15px;">
+                    <a class="btn  matrixSel" id="mSel" style="height:26px;width:50px;font-weight:200; border-color: rgb(204, 204, 204);" onclick="timeday(0)">月度</a>
+                    <a class="btn " id="ySel" style="height:26px;width:50px;font-weight:200;border-color: rgb(204, 204, 204);margin-left:-4px;" onclick="timeday(1)">年度</a>
+                </div>
+            </td>
+        </tr>*@
+                        <tr>
+                            <td>
+                                时间范围：
+                            </td>
+                            <td>
+                                <input id="sTime" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                            </td>
+                            <td style="padding-left:5px;">至</td>
+                            <td style="padding-left:5px;">
+                                <input id="eTime" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.AddMonths(1).ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search"  class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar" style="margin-left:10px; margin-bottom:5px;">
+                    <div class="btn-group">
+                        @*<a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>*@
+                        @*<a class="btn btn-default" onclick="actionform()"><i class="fa fa-refresh"></i>待办</a>*@
+                    </div>
+                    @*<script>$('.toolbar').authorizeButton()</script>*@
+                </div>
+            </div>
+            <div class="gridPanel" id="listshow">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+
+        </div>
+    </div>
+</div>

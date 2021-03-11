@@ -1,0 +1,590 @@
+@{
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var userRole = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName"; //当前用户角色
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var belongcode = deptCode;//选择部门
+    var ehsDeptCode = "@ViewBag.ehsDepartCode";//EHS部门Code
+    var currentdate = '@DateTime.Now.ToString("yyyy-MM-dd")';
+    //页面代理
+    var lagc = null;//部门工作计划
+    var lagP = null;//个人工作计划
+    //
+    //页面加载完成
+    //
+    $(function () {
+        var winHeight = $(window).height();
+        //加载树
+        GetTree();
+        //
+        //创建页面代理
+        //
+        lagc = new listAgency({
+            gridId: "gridTable",
+            gridHeight: winHeight - 185,
+            gridOptions: {
+                height: winHeight - 185,
+                url: "../../WorkPlan/PlanDetails/GetListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'planfindate',
+                sortorder: 'asc,createdate asc'
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return buildOper(rowObject);
+                    }
+                },
+                {
+                    label: '变更记录', name: 'changed', index: 'changed', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = '无';
+                        if (cellvalue > 0) {
+                            html = "<a href=javascript:history('" + rowObject.id + "')  style='text-decoration:underline;'  title='查看历史'>查看</a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '工作内容', name: 'contents', index: 'contents', width: 180, align: 'center', sortable: false },
+                { label: '责任部门', name: 'dutydepartname', index: 'dutydepartname', width: 120, align: 'center', sortable: true },
+                { label: '责任人', name: 'dutyusername', index: 'dutyusername', width: 120, align: 'center', sortable: true },
+                {
+                    label: '计划完成时间', name: 'planfindate', index: 'planfindate', width: 120, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM');
+                    }
+                },
+                {
+                    label: '实际完成时间', name: 'realfindate', index: 'realfindate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '管理标准', name: 'stdname', index: 'stdname', width: 100, align: 'center', sortable: true },
+                {
+                    label: '完成情况', name: 'state', index: 'state', width: 80, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return buidState(rowObject);
+                    }
+                },
+            ],
+            hasPowerOper: false,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            }
+        });
+        //
+        //绑定页面控件
+        //
+        lagc.bindPageControls({
+            searchId: "btn_Search",
+            resetId: "btn_Reset",
+            refreshId: "refresh",
+            btns: [
+                { id: 'btn_Export', url: '../../WorkPlan/PlanDetails/Export', args: "javascript:getExpQueryD()" }
+            ]
+        });
+        //
+        //添加页面事件
+        //
+        lagc.addPageEvents({
+            onBuildQuery: buidQuery, onReset: reset, onReload: reloadGridD, onResize: resize
+        });
+        //
+        //初始化
+        //
+        lagc.initialPage([            
+            {
+                data: [{ value: "未完成", text: "未完成" }, { value: "超期完成", text: "超期完成" }, { value: "按时完成", text: "按时完成" }, { value: "待完成", text: "待完成" }],
+                ctrl: { Id: 'State', memberId: 'value', memberText: 'text', description: '==全部==' }
+            },
+            {
+                url: '../../WorkPlan/PlanDetails/GetInitDataJson',
+                callBack: setPageData,
+                ctrls: []
+            }
+        ]);
+
+        //
+        //创建页面代理
+        //
+        lagcP = new listAgency({
+            trgResize: false,
+            hasPowerOper: false,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            },
+            gridId: "gridTableP",
+            gridJustHeight: 185,
+            gridOptions: {
+                height: winHeight - 185,
+                url: "../../WorkPlan/PlanDetails/GetListJson",
+                datatype: "json",
+                pager: "#gridPagerP",
+                sortname: 'planfindate',
+                sortorder: 'asc,createdate asc'
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return buildOper(rowObject);
+                    }
+                },
+                {
+                    label: '变更记录', name: 'changed', index: 'changed', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = '无';
+                        if (cellvalue > 0) {
+                            html = "<a href=javascript:history('" + rowObject.id + "')  style='text-decoration:underline;'  title='查看历史'>查看</a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '工作内容', name: 'contents', index: 'contents', width: 180, align: 'center', sortable: false },
+                { label: '责任部门', name: 'dutydepartname', index: 'dutydepartname', width: 120, align: 'center', sortable: true },
+                { label: '责任人', name: 'dutyusername', index: 'dutyusername', width: 120, align: 'center', sortable: true },
+                {
+                    label: '计划完成时间', name: 'planfindate', index: 'planfindate', width: 120, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM');
+                    }
+                },
+                {
+                    label: '实际完成时间', name: 'realfindate', index: 'realfindate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '管理标准', name: 'stdname', index: 'stdname', width: 100, align: 'center', sortable: true },
+                {
+                    label: '完成情况', name: 'state', index: 'state', width: 125, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return buidState(rowObject);
+                    }
+                },
+            ],
+            completeCallback: function (data) {
+                var gw = $(".active .gridPanel").width();
+                $("#gridTableP").setGridWidth(gw);
+            }
+        });
+        //
+        //绑定页面控件
+        //
+        lagcP.bindPageControls({
+            searchId: "btn_SearchP",
+            resetId: "btn_ResetP",
+            refreshId: "refreshP",
+            btns: [
+                { id: 'btn_ExportP', url: '../../WorkPlan/PlanDetails/Export', args: "javascript:getExpQueryP()" }
+            ]
+        });
+        //
+        //添加页面事件
+        //
+        lagcP.addPageEvents({
+            onBuildQuery: buidQueryP, onReset: resetP, onReload: reloadGridP
+        });
+        //
+        //初始化
+        //
+        lagcP.initialPage([           
+            {
+                data: [{ value: "未完成", text: "未完成" }, { value: "超期完成", text: "超期完成" }, { value: "按时完成", text: "按时完成" }, { value: "待完成", text: "待完成" }],
+                ctrl: { Id: 'StateP', memberId: 'value', memberText: 'text', description: '==全部==' }
+            }
+        ]);
+        //====================
+        //修改
+        //====================
+        edit = function (id) {
+            var keyValue = id;
+            var dlgArg = {
+                id: 'PlanDetails',
+                url: '/WorkPlan/PlanDetails/BaseForm',
+                title: '编辑工作计划',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    if (top.frames[iframeId].AcceptClick)
+                        top.frames[iframeId].AcceptClick();
+                }
+            };
+            var lnkChar = dlgArg.url.indexOf("?") < 0 ? "?" : "&";
+            dlgArg.url += lnkChar + "actiontype=edit&keyValue=" + keyValue;
+            dialogOpen(dlgArg);
+        };
+        //====================
+        //删除
+        //====================
+        del = function (id) {
+            var keyValue = id;
+            if (!!keyValue) {
+                var delOpt = {
+                    url: '../../WorkPlan/PlanDetails/RemoveForm',
+                    param: { keyValue: keyValue },
+                    success: function (data) {
+                        reloadGrid();
+                    }
+                };
+                $.RemoveForm(delOpt);
+            }
+        };
+        //====================
+        //详细
+        //====================
+        detail = function (id) {
+            var keyValue = id;
+            var dlgArg = {
+                id: "PlanDetails",
+                url: "/WorkPlan/PlanDetails/BaseForm",
+                title: '查看工作计划',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: null
+            };
+            var lnkChar = dlgArg.url.indexOf("?") < 0 ? "?" : "&";
+            dlgArg.url += lnkChar + "actiontype=view&keyValue=" + keyValue;
+            dialogOpen(dlgArg);
+        };
+        //
+        //导出
+        //
+        getExpQueryD = function () {
+            var grid = $("#gridTable")
+            return "queryJson=" + buidQuery() + "&sortname=" + grid.jqGrid("getGridParam", "sortname") + "&sortorder=" + grid.jqGrid("getGridParam", "sortorder");
+        }
+        getExpQueryP = function () {
+            var gridP = $("#gridTableP")
+            return "queryJson=" + buidQueryP() + "&sortname=" + gridP.jqGrid("getGridParam", "sortname") + "&sortorder=" + gridP.jqGrid("getGridParam", "sortorder");
+        }
+    });
+    //加载组织机构树
+    function GetTree() {        
+        var json = JSON.stringify({
+            Ids: '',
+            SelectMode: 0,
+            Mode: 0
+        });
+        var item = {
+            height: $(window).height() - 52,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                belongcode = item.Code;//部门编码              
+                $('#btn_Search').trigger("click");
+                $('#btn_SearchP').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+        //选中当前部门
+        var nodeId = "itemTree_" + deptId.replace(/-/g, '_');
+        $("#" + nodeId).toggleClass("bbit-tree-selected");
+    }
+    //
+    //重新定义查询条件
+    //
+    function buidQuery() {
+        var starttime = $("#StartTime").val();
+        var endtime = $("#EndTime").val();
+        var state = $("#State").attr("data-value");
+        var contents = $("#Contents").val();
+        var applytype = "部门工作计划";
+        var ismy = $("#chkIsMy")[0].checked == true ? "1" : "";
+        var rnd = Math.random();
+        var data = { starttime: starttime, endtime: endtime, state: state, contents: contents, deptcode: belongcode, applytype: applytype, contents: contents, ismy: ismy, isavailable: 1, plandetailsindex:1,rnd: rnd };
+        return JSON.stringify(data);
+    }
+    function buidQueryP() {
+        var starttime = $("#StartTimeP").val();
+        var endtime = $("#EndTimeP").val();
+        var state = $("#StateP").attr("data-value");
+        var contents = $("#ContentsP").val();
+        var applytype = "个人工作计划";
+        var ismy = $("#chkIsMyP")[0].checked == true ? "1" : "";
+        var rnd = Math.random();
+        var data = { starttime: starttime, endtime: endtime, state: state, contents: contents, deptcode: belongcode, applytype: applytype, contents: contents, ismy: ismy, isavailable: 1, plandetailsindex: 1, rnd: rnd };
+        return JSON.stringify(data);
+    }
+    //
+    //重置条件
+    //
+    function reset() {
+        $("#State").resetCombobox("==全部==", "");
+        $("#StartTime,#EndTime,#Contents").val("");
+        $("#chkIsMy")[0].checked=false;
+        belongcode = orgCode;        
+    }
+    function resetP() {
+        $("#StateP").resetCombobox("==全部==", "");
+        $("#StartTimeP,#EndTimeP,#ContentsP").val("");
+        $("#chkIsMyP")[0].checked = false;
+        belongcode = orgCode;
+    }
+    //
+    //窗口大小改变
+    //
+    function resize() {
+        var gh = $(window).height() - 185;
+        var gw = $(".active .gridPanel").width();
+        var th = $(window).height() - 55;
+        $("#itemTree").setTreeHeight(th);
+        $("#gridTable,#gridTableP").setGridHeight(gh);
+        $("#gridTable,#gridTableP").setGridWidth(gw);
+    }
+    //
+    //刷新数据
+    //
+    function reloadGrid() {
+        if ($("#DepartPlan").hasClass("active"))
+            reloadGridD();
+        else
+            reloadGridP();
+    }
+    function reloadGridD() {
+        lagc.queryData();
+    }
+    function reloadGridP() {
+        lagcP.queryData();
+    }
+    //
+    //操作列
+    //
+    function buildOper(rowObject) {
+        var html = '';
+
+        html += "<a href=javascript:detail('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+        if (rowObject.createuserid == userId || (rowObject.flowstate == "结束" && (userRole.indexOf("公司级用户") >= 0 || ehsDeptCode == deptCode)) || (rowObject.flowstate == "结束" && rowObject.createuserdeptcode.indexOf(deptCode)>=0 && (userRole.indexOf("安全管理员") >= 0 || userRole.indexOf("负责人") >= 0)))
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";        
+        if ((rowObject.createuserid == userId && rowObject.flowstate == "上报计划") || rolename.indexOf("公司管理员") >= 0)
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+
+        return html;
+    }    
+    //
+    //完成情况
+    //
+    function buidState(rowObject) {
+        html = "";
+
+        var cdt = new Date(currentdate.replace(/\-/g, "\/"));  //当前时间
+        var pdt = !!rowObject.planfindate?new Date(rowObject.planfindate.replace(/\-/g, "\/")):null;//计划完成时间
+        var rdt = !!rowObject.realfindate?new Date(rowObject.realfindate.replace(/\-/g, "\/")):null;//实际完成时间
+        if (!rdt && cdt > pdt)
+            html = "<div style='background-color:red;'>未完成</div>";
+        else if (!!rdt && rdt > pdt) {
+            html = "<div style='background-color:orange;'>超期完成</div>";
+        }
+        else if (!!rdt && rdt <= pdt) {
+            html = "<div style='background-color:green;'>按时完成</div>";
+        }
+        else if (!rdt && cdt <= pdt) {
+            html = "<div style='background-color:white;'>待完成</div>";
+        }
+
+        return html;
+    }
+    //
+    //变更历史
+    //
+    function history(id) {
+        var dlgArg = {
+            id: 'Form',
+            url: '/WorkPlan/PlanDetails/History?baseId=' + id,
+            title: '变更历史',
+            width: ($(top.window).width() - 50) + "px",
+            height: ($(top.window).height() - 50) + "px",
+            callBack: function (iframeId) {
+                if (top.frames[iframeId].AcceptClick)
+                    top.frames[iframeId].AcceptClick();
+            },
+            btn: null
+        };
+        dialogOpen(dlgArg);
+    }
+    //
+    //设置页面信息
+    //
+    function setPageData(data) {
+        ehsDeptCode = data.ehsDeptCode;
+    }
+</script>
+<style type="text/css">
+    .ui-select {
+        width: 200px;
+    }
+
+    .ui-filter .ui-filter-list .formTitle{
+        width:90px;
+        text-align:right;
+    }
+    .titlePanel,.gridPanel{
+        min-width:1070px;
+    }
+</style>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                组织机构树
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <ul class="nav nav-tabs">
+            <li class="active"><a href="#DepartPlan" data-toggle="tab">部门工作计划</a></li>
+            <li><a href="#PersonPlan" data-toggle="tab">个人工作计划</a></li>
+        </ul>
+        <div class="tab-content" style="padding-top: 0px;">
+            <div id="DepartPlan" class="tab-pane active">
+                <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+                    <div class="panel-Title" style="height:0px;"></div>
+                    <div class="titlePanel">
+                        <div class="title-search" id="queryArea">                            
+                            <table class="queryform" >
+                                <tr>                                                                  
+                                    <td class="formTitle">计划完成时间：</td>
+                                    <td class="formValue">
+                                        <input id="StartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM'})" style="width:80px;display:inline-block;" />-<input id="EndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM'})" style="width:80px;display:inline-block;" />
+                                    </td>
+                                    <td class="formTitle">&nbsp;完成情况：</td>
+                                    <td class="formValue">
+                                        <div id="State" type="select" class="ui-select" style="width:100px;" />
+                                    </td>
+                                    <td class="formTitle">&nbsp;工作内容：</td>
+                                    <td class="formValue">
+                                        <input id="Contents" type="text" class="form-control" style="width: 120px;" />
+                                    </td>
+                                    <td class="formValue" style="padding-left:10px;">
+                                        <input type="checkbox" id="chkIsMy" /><label for="chkIsMy">&nbsp;&nbsp;我的工作记录</label>
+                                    </td>                                 
+                                    <td style="padding-left:10px;">
+                                        <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                        <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                                    </td>
+                                    <td style="padding-left:10px;">
+                                        <div id="queryCondition" class="btn-group">
+                                            <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                                            <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                            <ul class="dropdown-menu">
+                                                <li style="width:200px;"><a style="float:left" data-value="未完成">未完成</a><div style="float: left; margin-left:12px; background-color: red; height: 22px; width: 80px;"></div></li>
+                                                <li style="width:200px;"><a style="float:left" data-value="超期完成">超期完成</a><div style="float: left; background-color: orange; height: 22px; width: 80px;"></div></li>
+                                                <li style="width:200px;"><a style="float:left" data-value="按期完成">按时完成</a><div style="float: left; background-color: green; height: 22px; width: 80px;"></div></li>
+                                                <li style="width:200px;"><a style="float:left" data-value="待完成">待完成</a><div style="float: left; background-color: white; margin-left: 12px; height: 22px; width: 80px;"></div></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>        
+                        </div>
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <a id="btn_Export" class="btn btn-default"><i class="fa fa-file-excel-o"></i>&nbsp;导出</a>
+                                <a id="refresh" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gridPanel">
+                        <table id="gridTable"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="PersonPlan" class="tab-pane">
+                <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+                    <div class="panel-Title" style="height:0px;"></div>
+                    <div class="titlePanel">
+                        <div class="title-search" id="queryArea">
+                            <table class="queryform">
+                                <tr>
+                                    <td class="formTitle">计划完成时间：</td>
+                                    <td class="formValue">
+                                        <input id="StartTimeP" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM'})" style="width:80px;display:inline-block;" />-<input id="EndTimeP" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM'})" style="width:80px;display:inline-block;" />
+                                    </td>
+                                    <td class="formTitle">&nbsp;完成情况：</td>
+                                    <td class="formValue">
+                                        <div id="StateP" type="select" class="ui-select" style="width:100px;" />
+                                    </td>
+                                    <td class="formTitle">&nbsp;工作内容：</td>
+                                    <td class="formValue">
+                                        <input id="ContentsP" type="text" class="form-control" style="width: 120px;" />
+                                    </td>
+                                    <td class="formValue" style="padding-left:10px;">
+                                        <input type="checkbox" id="chkIsMyP" /><label for="chkIsMyP">&nbsp;&nbsp;我的工作记录</label>
+                                    </td>
+                                    <td style="padding-left:10px;">
+                                        <a id="btn_SearchP" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                        <a id="btn_ResetP" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                                    </td>
+                                    <td style="padding-left:10px;">
+                                        <div id="queryConditionP" class="btn-group">
+                                            <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                                            <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                            <ul class="dropdown-menu">
+                                                <li style="width:200px;"><a style="float:left" data-value="未完成">未完成</a><div style="float: left; margin-left:12px; background-color: red; height: 22px; width: 80px;"></div></li>
+                                                <li style="width:200px;"><a style="float:left" data-value="超期完成">超期完成</a><div style="float: left; background-color: orange; height: 22px; width: 80px;"></div></li>
+                                                <li style="width:200px;"><a style="float:left" data-value="按期完成">按时完成</a><div style="float: left; background-color: green; height: 22px; width: 80px;"></div></li>
+                                                <li style="width:200px;"><a style="float:left" data-value="待完成">待完成</a><div style="float: left; background-color: white; margin-left: 12px; height: 22px; width: 80px;"></div></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <a id="btn_ExportP" class="btn btn-default"><i class="fa fa-file-excel-o"></i>&nbsp;导出</a>
+                                <a id="refreshP" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gridPanel">
+                        <table id="gridTableP"></table>
+                        <div id="gridPagerP"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,190 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+
+<script src="~/Content/scripts/plugins/jquery.md5.js"></script>
+
+
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var userId = request('userId');
+    $(function () {
+        
+        initControl();
+    });
+
+
+
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../PersonManage/Transfer/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    IniDropDownList(data.OutDeptId);
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+    }
+
+    function IniDropDownList(value) {
+        $.ajax({
+            url: '../../PersonManage/Transfer/GetOrganizeId',
+            type: "GET",
+            async: false,
+            dataType: "text",
+            success: function (result) {
+                //加载岗位
+                $("#OutPostId").ComboBox({
+                    url: top.contentPath + "/BaseManage/Post/GetListJson?organizeId=" + result + '&isOrg=' + value,
+                    id: "RoleId",
+                    text: "FullName",
+                    height: "200px",
+                    description: "==请选择=="
+                    , allowSearch: true
+                });
+                IntiPost(value);
+            }
+        });
+
+
+        //岗位
+        $("#OutPostId").ComboBox({
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+    }
+
+    //绑定职务方法
+    function IntiPost(organizeId) {
+        $.ajax({
+            url: top.contentPath + "/BaseManage/Job/NewGetListJson?organizeId=" + organizeId,
+            type: "GET",
+            async: false,
+            dataType: "text",
+            success: function (data) {
+                $("#OutJobId").html("");
+                $("#OutJobId").append(data);
+                $("#OutJobId").selectpicker('refresh');
+                //$("#PostId").html(data);
+            }
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["OutPostName"] = $("#OutPostId").attr('data-text');
+        
+        var postids = $("#OutJobId").selectpicker('val');
+        if (postids != null && postids != "") {
+            var postid;
+            for (var i = 0; i < postids.length; i++) {
+                if (i == 0) {
+                    postid = postids[i];
+                } else {
+                    postid += "," + postids[i];
+                }
+            }
+            postData["OutJobName"] = $("button[data-id='OutJobId']").attr("title").replace(/\s+/, "");
+        } else {
+            postData["OutJobName"] = "";
+        }
+        postData["OutJobId"] = postid;
+        $.SaveForm({
+            url: "../../PersonManage/Transfer/Update?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+</script>
+<style>
+    .formTitle {
+        width: 40%;
+    }
+
+    .formValue {
+        width: 60%;
+    }
+</style>
+
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">转岗人员</td>
+            <td class="formValue">
+                <input id="UserName" class="form-control" readonly="readonly"></input>
+                <input type="hidden" id="UserId" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">原部门</td>
+            <td class="formValue">
+                <input id="InDeptName" class="form-control" readonly="readonly"></input>
+                <input type="hidden" id="InDeptId" />
+                <input type="hidden" id="InDeptCode" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">原岗位</td>
+            <td class="formValue">
+                <input id="InPostName" class="form-control" readonly="readonly"></input>
+                <input type="hidden" id="InPostId" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">原职务</td>
+            <td class="formValue">
+                <input id="InJobName" class="form-control" readonly="readonly"></input>
+                <input type="hidden" id="InJobId" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">转岗日期<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="TransferTime" type="text" class="form-control input-wdatepicker"  onfocus="WdatePicker({readOnly:true})" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">转入部门/班组<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="OutDeptName" type="text" class="form-control" readonly="readonly"></input>
+                <input type="hidden" id="OutDeptId" />
+                <input type="hidden" id="OutDeptCode" />
+                <input type="hidden" id="IsConfirm" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">转入岗位<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="OutPostId" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">转入职务</td>
+            <td class="formValue">
+                <select id="OutJobId" class="selectpicker show-menu-arrow form-control" multiple placeholder="请选择职务"></select>
+            </td>
+        </tr>
+    </table>
+</div>

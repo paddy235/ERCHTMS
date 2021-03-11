@@ -1,0 +1,965 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+<script>
+    var keyValue = request("keyValue"); //主键 违章信息主键
+    var actiontype = request("actiontype"); //操作动作
+    var applianceClass = ""; //装置类
+    var curMark = ""; //标记类
+    var isenableback = true;
+    var IsDeliver = "";
+    var ControlPicMustUpload = ""; //相关图片必传控制配置
+    var LllegalAwardDetailAuth = ""; //违章奖励权限控制
+    //初始方法
+    $(function () {
+
+        $.SetForm({
+            url: "../../LllegalManage/LllegalRegister/GetInitDataJson",
+            success: function (data) {
+                ControlPicMustUpload = data.ControlPicMustUpload; //相关图片必传控制
+                //用于判定是否具有转交功能
+                IsDeliver = data.IsDeliver;
+                //为空则隐藏
+                if (!IsDeliver) { $("#btn_Deliver").css("display", "none"); }
+                LllegalAwardDetailAuth = data.LllegalAwardDetailAuth;
+                //启用违章奖励信息
+                if (!!LllegalAwardDetailAuth) {
+                    $(".marginTop:eq(2)").css("display", "");
+                    $("#panel6").css("display", "");
+                }
+                //整改人和单位
+                $("#REFORMPEOPLE").val(data.User.UserName);
+                $("#REFORMPEOPLEID").val(data.User.UserId);
+                $("#REFORMDEPTCODE").val(data.User.DeptCode);
+                $("#REFORMDEPTNAME").val(data.User.DeptName);
+
+                //违章类型
+                $("#LLLEGALTYPE").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.LllegalType
+                });
+
+                //违章级别
+                $("#LLLEGALLEVEL").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.LllegalLevel
+                });
+
+                //流程状态
+                $("#FLOWSTATE").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.FlowState
+                });
+                //专业分类
+                $("#MAJORCLASSIFY").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    height: '200px',
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.MajorClassify
+                });
+            }
+        });
+        //考核信息
+        getExaminGrid();
+        //奖励信息
+        getAwardGrid();
+
+        if (actiontype == "view") {
+            $("#btn_Submit").attr("disabled", "disabled");//btn_Save
+            $("#btn_Save").attr("disabled", "disabled");//btn_Save
+            $("#btn_Deliver").attr("disabled", "disabled");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+        //违章整改确认只能保存
+        if (actiontype == "affirm") {
+            $("#btn_Submit").css("display", "none");
+            $("#btn_Deliver").css("display", "");
+        }
+
+        //获取表单数据
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../LllegalManage/LllegalRegister/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+
+                    //违章基本信息
+                    if (null != data.baseInfo) {
+                        $("#form1").formDeserialize(data.baseInfo);
+
+                        $("#LLLEGALTYPE").ComboBoxSetValue(data.baseInfo.LLLEGALTYPE); //违章类型
+                        $("#LLLEGALLEVEL").ComboBoxSetValue(data.baseInfo.LLLEGALLEVEL);  //违章级别
+                        $("#MAJORCLASSIFY").ComboBoxSetValue(data.baseInfo.MAJORCLASSIFY);  //专业分类
+
+                        //是否曝光
+                        if (data.baseInfo.ISEXPOSURE == "1") {
+                            $("input[name='ISEXPOSURE']:eq(0)").prop("checked", "checked");  //通过
+                        }
+                        else {
+                            $("input[name='ISEXPOSURE']:eq(1)").prop("checked", "checked"); //不通过
+                        }
+                        $("input[name='RESEVERFOUR']:eq(1)").prop("checked", "checked"); //否
+                    }
+                    if (null != data.approveInfo) {
+                        $("#form1").formDeserialize(data.approveInfo);
+                    }
+                    //违章整改
+                    if (null != data.reformInfo) {
+                        $("#REFORMID").val(data.reformInfo.ID);
+                        $("#form1").formDeserialize(data.reformInfo);
+
+                        if (!data.reformInfo.REFORMFINISHDATE) {
+                            var curDate = "@DateTime.Now.ToString("yyyy-MM-dd")";
+                            $("#REFORMFINISHDATE").val(curDate); //当前时间
+                        }
+
+                        var applicationstatus = data.reformInfo.APPLICATIONSTATUS;
+                        //正在延期申请中的，无法进行转交
+                        if (applicationstatus == "1") {
+                            $("#btn_Deliver").remove();
+                        }
+
+                        //整改完成情况
+                        if (data.reformInfo.REFORMSTATUS == "0") {
+                            $("input[name='REFORMSTATUS']:eq(1)").prop("checked", "checked"); //未完成
+                        }
+                        else {
+                            $("input[name='REFORMSTATUS']:eq(0)").prop("checked", "checked");  //完成
+                        }
+                    }
+
+                    //违章考核信息
+                    if (null != data.relevanceInfo) {
+                        $('#examinGridTable').jqGrid("setGridParam", { data: data.relevanceInfo }).trigger("reloadGrid");
+                    }
+                    //违章奖励信息
+                    if (!!data.awardInfo) {
+                        $('#awardGridTable').jqGrid("setGridParam", { data: data.awardInfo }).trigger("reloadGrid");
+                    }
+                    //违章验收
+                    if (null != data.acceptInfo) {
+                        $("#ACCEPTID").val(data.acceptInfo.ID);
+                        $("#form1").formDeserialize(data.acceptInfo);
+                    }
+
+                    //整改是否具有退回操作
+                    if (!!data.isreformback && data.isreformback == 1) {
+                        isenableback = false;
+                        //是否退回
+                        $("input[name='RESEVERFOUR']:eq(1)").prop("checked", "checked"); //否
+                        $("input[name='RESEVERFOUR']").attr("disabled", "disabled");
+                    }
+                }
+            });
+        }
+
+        uploadify("uploader"); //违章图片
+        uploadify("uploader_reformpic"); //整改图片
+        uploadify("uploader_attachment"); //整改附件
+        GetApproveGrid(); //违章核准内容
+
+
+        //转交功能
+        $("#btn_Deliver").click(function () {
+            var idx = dialogOpen({
+                id: "DeliverForm",
+                title: "违章整改转交",
+                url: '/LllegalManage/LllegalReform/DeliverForm?keyValue=' + keyValue + "&reformid=" + $("#REFORMID").val(),
+                width: ($(top.window).width() / 2) + "px",
+                height: ($(top.window).height() / 2) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(idx);
+                }
+            });
+        });
+
+        //登记
+        $("#btn_Save").click(function () {
+            AcceptClick();
+        });
+        //提交流程
+        $("#btn_Submit").click(function () {
+            SubmitAction();
+        });
+        //是否退回
+        $("input[name='RESEVERFOUR']").change(function () {
+            var isbackVal = $("input[name='RESEVERFOUR']:checked").val(); //是否退回选中的值
+
+            var isdoneVal = $("input[name='REFORMSTATUS']:checked").val(); //整改完成情况
+            //退回的时候
+            if (isbackVal == "是") {
+                //回退原因
+                $(".form:eq(0)  tr:eq(5) td:eq(0)").html("回退原因<span style=\"color:red;\">*</span>");
+                $("#RESEVERFIVE").attr("isvalid", "yes");
+                $("#RESEVERFIVE").attr("errormsg", "回退原因");
+                $("#RESEVERFIVE").attr("checkexpession", "NotNull");
+
+                $(".form:eq(0)  tr:eq(5)").css("display", "");
+                $("input[name='REFORMSTATUS']:eq(1)").prop("checked", "checked"); //设置未完成
+                $("input[name='REFORMSTATUS']").attr("disabled", "disabled"); //禁用整改完成情况
+
+                $("#REFORMFINISHDATE").removeAttr("isvalid");
+                $(".form:eq(0)  tr:eq(1) td:eq(2)").html("整改完成时间");
+
+                $("#btn_Save").attr("disabled", "disabled");
+            }
+            else {
+
+                //回退原因
+                $(".form:eq(0)  tr:eq(5) td:eq(0)").html("回退原因");
+                $("#RESEVERFIVE").removeAttr("isvalid");
+                $("#RESEVERFIVE").removeAttr("errormsg");
+                $("#RESEVERFIVE").removeAttr("checkexpession");
+
+                $(".form:eq(0)  tr:eq(5)").css("display", "none");
+                $("input[name='REFORMSTATUS']").removeAttr("disabled"); //禁用整改完成情况
+                $("#btn_Save").removeAttr("disabled");
+            }
+        });
+        //整改完成情况
+        $("input[name='REFORMSTATUS']").change(function () {
+            var isdone = $("input[name='REFORMSTATUS']:checked").val(); //整改是否完成
+            //整改完成的情况下
+            if (isdone == "1") {
+                $("#REFORMFINISHDATE").attr("isvalid", "yes");
+                $(".form:eq(0)  tr:eq(1) td:eq(2)").html("整改完成时间<span style=\"color:red;\">*</span>");
+                $("input[name='RESEVERFOUR']:eq(1)").prop("checked", "checked"); //设置不退回
+                $("input[name='RESEVERFOUR']").attr("disabled", "disabled");
+            }
+            else {
+                $("#REFORMFINISHDATE").removeAttr("isvalid");
+                $(".form:eq(0)  tr:eq(1) td:eq(2)").html("整改完成时间");
+                if (isenableback) {
+                    $("input[name='RESEVERFOUR']").removeAttr("disabled"); //禁用整改完成情况
+                }
+            }
+        });
+    });
+
+    //上传文件
+    function uploadify(objId) {
+        var folderId = "";
+        var fileType = 'bmp,ico,gif,jpeg,jpg,png,psd';
+        var isImage = true;
+        var isdelete = actiontype == "view" ? false : true;
+        switch (objId) {
+            case "uploader": //违章图片
+                isdelete = false;
+                folderId = $("#LLLEGALPIC").val();
+                if (!folderId) {
+                    folderId = "@Guid.NewGuid().ToString()";
+                    $("#LLLEGALPIC").val(folderId);
+                }
+                break;
+            case "uploader_reformpic": //整改图片
+                folderId = $("#REFORMPIC").val();
+                if (!folderId) {
+                    folderId = "@Guid.NewGuid().ToString()";
+                    $("#REFORMPIC").val(folderId);
+                }
+                if (actiontype != "view") {
+                    file_upload.init({
+                        keyValue: folderId, extensions: fileType, isImage: isImage, el: '#uploader_reformpic'
+                    });
+                }
+                break;
+            case "uploader_attachment": //整改附件
+                folderId = $("#REFORMATTACHMENT").val();
+                isImage = false;
+                fileType = 'bmp,ico,gif,jpeg,jpg,png,psd,zip,rar,doc,docx,xls,xlsx,pdf,txt,chm';
+                if (!folderId) {
+                    folderId = "@Guid.NewGuid().ToString()";
+                    $("#REFORMATTACHMENT").val(folderId);
+                }
+                if (actiontype != "view") {
+                    file_upload.init({
+                        keyValue: folderId, extensions: fileType, isImage: isImage, el: '#uploader_attachment'
+                    });
+                }
+                break;
+        }
+
+        $.ajax({
+            url: '../../PublicInfoManage/ResourceFile/GetFilesByRecId',
+            data: { recId: folderId },
+            type: "post",
+            success: function (data) {
+                var objdata = eval("(" + data + ")"); //转化为对象类型
+                file_upload.bind(objdata, isdelete, isImage, folderId, objId);
+            }
+        });
+    }
+
+    //加载考核信息
+    function getExaminGrid(data) {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#examinGridTable');
+        //隐患基本信息
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: parseFloat($(window).height() / 2 - 100),
+            datatype: "local",
+            data: data,
+            colModel: [
+                 {
+                     label: '主键', name: 'ID', index: 'ID', align: 'center', hidden: true
+                 },
+                {
+                    label: '考核人员/单位', name: 'PERSONINCHARGEID', index: 'PERSONINCHARGEID', align: 'center', hidden: true
+                },
+                {
+                    label: '考核对象', name: 'ASSESSOBJECT', index: 'ASSESSOBJECT', width: 150, align: 'center'
+                },
+                {
+                    label: '考核人员/单位', name: 'PERSONINCHARGENAME', index: 'PERSONINCHARGENAME', width: 150, align: 'center'
+                },
+                {
+                    label: '经济处罚(元)', name: 'ECONOMICSPUNISH', index: 'ECONOMICSPUNISH', width: 150, align: 'center'
+                },
+                {
+                    label: 'EHS绩效考核(分)', name: 'PERFORMANCEPOINT', index: 'PERFORMANCEPOINT', width: 150, align: 'center'
+                },
+                {
+                    label: '教育培训(学时)', name: 'EDUCATION', index: 'EDUCATION', width: 150, align: 'center'
+                },
+                {
+                    label: '违章扣分(分)', name: 'LLLEGALPOINT', index: 'LLLEGALPOINT', width: 150, align: 'center'
+                },
+                {
+                    label: '待岗(月)', name: 'AWAITJOB', index: 'AWAITJOB', width: 150, align: 'center'
+                }
+            ],
+            sortname: 'CREATEDATE',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+        $('#examinGridTable').jqGrid("setGroupHeaders", {
+            useColSpanStyle: true,
+            groupHeaders: [{ startColumnName: "ECONOMICSPUNISH", numberOfColumns: 5, titleText: "<span style=\"font-weight:bold;font-size:9px;\">考核内容</span>" }]
+        });
+    }
+
+    //加载违章奖励信息
+    function getAwardGrid(data) {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#awardGridTable');
+        //违章奖励信息
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: parseFloat($(window).height() / 2 - 100),
+            datatype: "local",
+            data: data,
+            colModel: [
+                {
+                    label: '主键', name: 'ID', index: 'ID', align: 'center', hidden: true
+                },
+                {
+                    label: '奖励人员ID', name: 'USERID', index: 'USERID', align: 'center', hidden: true
+                },
+                {
+                    label: '奖励人员单位', name: 'DEPTID', index: 'DEPTID', align: 'center', hidden: true
+                },
+                {
+                    label: '奖励人员', name: 'USERNAME', index: 'USERNAME', width: 150, align: 'center'
+                },
+                {
+                    label: '奖励人员单位', name: 'DEPTNAME', index: 'DEPTNAME', width: 200, align: 'center'
+                },
+                {
+                    label: '奖励积分(分)', name: 'POINTS', index: 'POINTS', width: 150, align: 'center'
+                },
+                {
+                    label: '奖励金额(元)', name: 'MONEY', index: 'MONEY', width: 150, align: 'center'
+                }
+            ],
+            sortname: 'CREATEDATE',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //核准
+    function GetApproveGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#approveGridTable');
+        $gridTable.jqGrid({
+            url: "../../LllegalManage/LllegalApprove/GetHistoryListJson?keyValue=" + keyValue,
+            datatype: "json",
+            height: $(window).height() - 500,
+            autowidth: true,
+            colModel: [
+                {
+                    label: '操作', name: 'ID', index: 'ID', width: 120, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:Detail('" + rowObject.ID + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        return html;
+                    }
+                },
+                { label: '核准人', name: 'APPROVEPERSON', index: 'APPROVEPERSON', width: 150, align: 'center' },
+                { label: '核准单位', name: 'APPROVEDEPTNAME', index: 'APPROVEDEPTNAME', width: 120, align: 'center' },
+                {
+                    label: '核准结果', name: 'APPROVERESULT', index: 'APPROVERESULT', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = rowObject.APPROVERESULT == "1" ? "通过" : "不通过";
+                        return html;
+                    }
+                },
+                {
+                    label: '核准时间', name: 'APPROVEDATE', index: 'APPROVEDATE', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = formatDate(cellvalue, 'yyyy-MM-dd');
+                        return html;
+                    }
+                }
+            ],
+            pager: false,
+            rowNum: "20",
+            sortname: 'approvedate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+    }
+    //查看核准详情
+    function Detail(keyValue) {
+        dialogOpen({
+            id: 'DetailForm',
+            title: '违章核准详情',
+            url: '/LllegalManage/LllegalApprove/Detail?keyValue=' + keyValue,
+            width: ($(top.window).width() - 200) + "px",
+            height: '680px',
+            btn: null
+        });
+    }
+    //获取历史整改信息
+    function GetHistoryReform() {
+        dialogOpen({
+            id: 'HistoryForm',
+            title: '违章整改信息',
+            url: '/LllegalManage/LllegalReform/DetailList?keyValue=' + keyValue,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: null
+        });
+    }
+    //获取历史验收信息
+    function GetHistoryAccetp() {
+        var keyCode = $("#HIDCODE").val();
+        dialogOpen({
+            id: 'HistoryForm',
+            title: '违章验收信息',
+            url: '/LllegalManage/LllegalAccept/DetailList?keyValue=' + keyValue,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 200) + "px",
+            btn: null
+        });
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        //整改完成情况
+        var reformStatus = $("input[name='REFORMSTATUS']:checked").val();
+        postData["REFORMSTATUS"] = reformStatus;
+        var reseverfour = $("input[name='RESEVERFOUR']:checked").val();
+        postData["RESEVERFOUR"] = reseverfour;
+        $("#btn_Save").attr("disabled", "disabled");
+        $.SaveForm({
+            url: "../../LllegalManage/LllegalReform/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        });
+        $("#btn_Save").removeAttr("disabled");
+    }
+    //提交流程
+    function SubmitAction() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        //整改完成情况
+        var reformStatus = $("input[name='REFORMSTATUS']:checked").val();
+        var reseverfour = $("input[name='RESEVERFOUR']:checked").val();
+        var subCount = 0;
+        if (!!ControlPicMustUpload) {
+            var array = new Array();
+            if (ControlPicMustUpload.indexOf("REFORMPIC") >= 0) {
+                array.push({ key: "REFORMPIC", value: $("#REFORMPIC").val() });
+            }
+            if (array.length > 0) {
+                //绑定附件
+                $.ajax({
+                    url: '../../PublicInfoManage/ResourceFile/GetFilesByJsonData',
+                    data: { jsonData: JSON.stringify(array) },
+                    type: "post",
+                    success: function (data) {
+                        var yesSubmit = "";
+                        if (!!data) {
+                            var result = eval("(" + data + ")");
+                            $(result).each(function (i, ele) {
+                                var key = ele.key;
+                                switch (key) {
+                                    case "REFORMPIC":
+                                        yesSubmit += parseInt(ele.value) > 0 ? "2" : ""; //违章整改图片
+                                        break;
+                                }
+                            });
+
+                            var errorMsg = "请上传";
+                            if (ControlPicMustUpload.indexOf("REFORMPIC") >= 0) {
+                                if (yesSubmit.indexOf("2") >= 0) {
+                                    subCount += 1;
+                                }
+                                else {
+                                    errorMsg += "违章整改图片,";
+                                }
+                            }
+                            if (subCount == result.length || reformStatus == "1" || reseverfour == "是") {
+                                SubmitData();
+                            }
+                            else {
+                                if (subCount < result.length) {
+                                    errorMsg = errorMsg.substring(0, errorMsg.length - 1);
+                                }
+                                dialogMsg(errorMsg, 0);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        else {
+            SubmitData();
+        }
+    }
+
+    function SubmitData(postData)
+    {
+        var postData = $("#form1").formSerialize(keyValue);
+        //整改完成情况
+        var reformStatus = $("input[name='REFORMSTATUS']:checked").val();
+        postData["REFORMSTATUS"] = reformStatus;
+        var reseverfour = $("input[name='RESEVERFOUR']:checked").val();
+        postData["RESEVERFOUR"] = reseverfour;
+        //完成状态下去，且不退回
+        if (reformStatus == "1" || reseverfour == "是") {
+            $("#btn_Submit").attr("disabled", "disabled");
+            $.SaveForm({
+                url: "../../LllegalManage/LllegalReform/SubmitForm?keyValue=" + keyValue,
+                param: postData,
+                loading: "正在保存数据...",
+                success: function () {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            });
+            $("#btn_Submit").removeAttr("disabled");
+        }
+        else {
+            dialogMsg('请确认整改是否完成!', 0);
+        }
+    }
+
+    function exportReport() {  //违章整改通知单
+        window.location.href = "../../LllegalManage/LllegalRegister/ExportReformReport?keyValue=" + keyValue;
+    }
+    function exportKhReport() {  //违章考核通知单
+        window.location.href = "../../LllegalManage/LllegalRegister/ExportExamReport?keyValue=" + keyValue;
+    }
+</script>
+
+<div class="center-Panel">
+    <div style="margin-top:42px;"></div>
+    <div class="panel panel-default" id="panel3">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章整改信息&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#" onclick="GetHistoryReform()">历史整改记录</a>&nbsp;&nbsp;<a href="#" onclick="viewlllegalext(keyValue)">整改延期记录</a></strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form" style="height:230px;">
+                    <tr>
+                        <td class="formTitle">整改责任人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="REFORMPEOPLE" class="form-control" placeholder="请选择整改责任人" errormsg="整改责任人" isvalid="yes" checkexpession="NotNull" readonly />
+                            <input id="REFORMPEOPLEID" type="hidden" />
+                            <input id="REFORMID" type="hidden" />
+                        </td>
+                        <td class="formTitle">整改责任单位<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="REFORMDEPTNAME" type="text" class="form-control" readonly errormsg="整改责任单位" isvalid="yes" readonly />
+                            <input id="REFORMDEPTCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改截止时间<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="REFORMDEADLINE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="整改截止时间" readonly disabled="disabled" />
+                        </td>
+                        <td class="formTitle">整改完成时间<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="REFORMFINISHDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="整改完成时间" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改措施</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REFORMREQUIRE" class="form-control" checkexpession="NotNull" length="2000" errormsg="整改措施" disabled="disabled"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改情况描述</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="REFORMMEASURE" class="form-control" checkexpession="NotNull" length="2000" errormsg="整改情况描述"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改完成情况</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="REFORMSTATUS" id="REFORMSTATUS1" value="1" checked="checked" />完成
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="REFORMSTATUS" id="REFORMSTATUS2" value="0" />未完成
+                                </label>
+                            </div>
+                        </td>
+                        <td class="formTitle">是否回退</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="RESEVERFOUR" id="RESEVERFOUR1" value="是" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="RESEVERFOUR" id="RESEVERFOUR2" value="否" checked="checked" />否
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr style="display:none">
+                        <td class="formTitle">回退原因</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="RESEVERFIVE" class="form-control" length="2000"></textarea>
+                        </td>
+                    </tr>
+                </table>
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">整改图片</td>
+                        <td class="formValue" colspan="3">
+                            <input id="REFORMPIC" type="hidden" /><!--整改相片-->
+                            <div id="uploader_reformpic" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 120px; margin-bottom: 10px;">
+                                <div class="queueList">
+                                    <div id="uploader_reformpic_place" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">整改附件</td>
+                        <td class="formValue" colspan="3">
+                            <input id="REFORMATTACHMENT" type="hidden" /><!--整改附件-->
+                            <div id="uploader_attachment" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 120px; margin-bottom: 10px;">
+                                <div class="queueList">
+                                    <div id="uploader_attachment_place" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">违章编号<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="LLLEGALNUMBER" type="text" class="form-control" disabled="disabled" />
+                            <input id="ADDTYPE" type="hidden" value="1" />
+                        </td>
+                        <td class="formTitle">违章类型<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="LLLEGALTYPE" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="违章类型" disabled="disabled" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章级别<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="LLLEGALLEVEL" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" errormsg="违章级别" disabled="disabled" />
+                        </td>
+                        <td class="formTitle">专业分类<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="MAJORCLASSIFY" type="select" class="ui-select" checkexpession="NotNull" errormsg="专业分类" disabled="disabled" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章人员</td>
+                        <td class="formValue">
+                            <input id="LLLEGALPERSON" type="text" class="form-control" placeholder="请选择违章人员" checkexpession="NotNull" errormsg="违章人员" disabled="disabled" />
+                            <input id="LLLEGALPERSONID" type="hidden" />
+                        </td>
+                        <td class="formTitle">违章单位<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="LLLEGALTEAM" type="text" class="form-control" placeholder="请选择违章单位" disabled="disabled" />
+                            <input id="LLLEGALTEAMCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">外包工程</td>
+                        <td class="formValue">
+                            <input id="ENGINEERNAME" type="text" class="form-control" placeholder="请选择外包工程" disabled="disabled" readonly onclick="selectProject(window.document.body, 'ENGINEERNAME,ENGINEERID');" />
+                            <input id="ENGINEERID" type="hidden" />
+                        </td>
+                        <td class="formTitle">违章责任单位</td>
+                        <td class="formValue">
+                            <input id="LLLEGALDEPART" type="text" class="form-control" placeholder="请选择违章责任单位" disabled="disabled" />
+                            <input id="LLLEGALDEPARTCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章地点</td>
+                        <td class="formValue">
+                            <input id="LLLEGALADDRESS" type="text" class="form-control" errormsg="违章地点" placeholder="请输入违章地点" checkexpession="NotNull" disabled="disabled" />
+                        </td>
+                        <td class="formTitle">违章时间<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="LLLEGALTIME" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="违章时间" disabled="disabled" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章描述<span style="color:red;">*</span></td>
+                        <td class="formValue" colspan="3">
+                            <div>
+                                <div style="float:left; width:90%">
+                                    <textarea id="LLLEGALDESCRIBE" class="form-control" style="width: 98%; height: 80px;" errormsg="违章描述" isvalid="yes" checkexpession="LenStr" length="2000" disabled="disabled"></textarea>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">登记人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="CREATEUSERNAME" type="text" class="form-control" disabled="disabled" />
+
+                        </td>
+                        <td class="formTitle">登记单位<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="CREATEDEPTNAME" type="text" class="form-control" disabled="disabled" />
+                            <input id="CREATEDEPTID" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">登记时间<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="CREATEDATE" type="text" class="form-control input-wdatepicker" disabled="disabled" onfocus="WdatePicker({ maxDate: '%y-%M-%d' })" value="@DateTime.Now.ToString("yyyy-MM-dd")" isvalid="yes" checkexpession="NotNull" errormsg="登记时间" />
+                        </td>
+                        <td class="formTitle">是否曝光</td>
+                        <td class="formValue">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISEXPOSURE" id="ISEXPOSURE1" value="1" checked="checked" disabled="disabled" disabled="disabled" />是
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="ISEXPOSURE" id="ISEXPOSURE2" value="0" disabled="disabled" disabled="disabled" />否
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">违章照片</td>
+                        <td class="formValue" colspan="3">
+                            <input id="LLLEGALPIC" type="hidden" /><!--违章照片-->
+                            <div id="uploader" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 120px; margin-bottom: 10px;">
+                                <div class="queueList">
+                                    <div id="lllegalpic_place" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel5">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章考核信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form" id="examinGridTable"></table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;display:none;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel6" style="display:none;">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章奖励信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form" id="awardGridTable"></table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章核准信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-left:10px;">
+                <table id="approveGridTable"></table>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 5px;" class="marginTop"></div>
+    <div class="panel panel-default" id="panel4">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;违章验收信息&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#" onclick="GetHistoryAccetp()">历史验收记录</a></strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">验收人<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="ACCEPTPEOPLE" class="form-control" placeholder="请选择验收人" errormsg="验收人" isvalid="yes" checkexpession="NotNull" disabled="disabled" />
+                            <input id="ACCEPTPEOPLEID" type="hidden" />
+                            <input id="ACCEPTID" type="hidden" />
+                        </td>
+                        <td class="formTitle">验收单位</td>
+                        <td class="formValue">
+                            <input id="ACCEPTDEPTNAME" type="text" class="form-control" disabled="disabled" disabled="disabled" />
+                            <input id="ACCEPTDEPTCODE" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">验收日期<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="ACCEPTTIME" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" errormsg="验收日期" disabled="disabled" />
+                        </td>
+                        <td class="formTitle"></td>
+                        <td class="formValue"></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+        <a id="btn_Deliver" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;转&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+        <a id="btn_KhExport" onclick="exportKhReport()" class="btn btn-primary">违章考核通知单</a>
+        &nbsp; &nbsp;
+        <a id="btn_Export" onclick="exportReport()" class="btn btn-primary">违章整改通知单</a>
+    </div>
+    <div id="HidMessage" style="width:360px; margin-left:20px; float:left;"></div>
+</div>

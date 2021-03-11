@@ -1,0 +1,404 @@
+﻿@{
+    ViewBag.Title = "SpecificToolFroms";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<script type="text/javascript">
+    var DeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户部门ID
+    var DeptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";//当前用部门
+    var DeptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用部门CODE
+    var keyValue = request('keyValue');
+    var actiontype = request("actiontype");
+    var ENGINEERNAME = request("ENGINEERNAME");
+    var OUTPROJECTID = request("OUTPROJECTID");//外包工程id
+    var toolsId = request('toolsId');//工器具主表ID
+    $(function () {
+        initPage();
+    })
+
+    function initPage() {
+        $("#TOOLSID").val(toolsId);
+        if (actiontype == "view") {
+            $("input").attr("readonly", "readonly");
+        } else {
+            if (ENGINEERNAME != null && ENGINEERNAME != "") {
+                $("#OUTPROJECTNAME").val(ENGINEERNAME);
+                $("#OUTPROJECTID").val(OUTPROJECTID);
+            }
+        }
+        //区域
+        $("#AREAID").ComboBoxTree({
+            url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + top.currUserOrgId,
+            height: "300px",
+            description: "==请选择=="
+        }).bind("change", function () {
+            var areaId = $("#AREAID").attr("data-value");
+            bangEqName(areaId, "");
+        });
+
+        $("#TOOLSTYPE").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "EQUIPMENTTYPE" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+
+        loadDeptData();
+
+        var isDel = actiontype == "view" ? false : true;
+        var file1 = "@Guid.NewGuid().ToString()";//登记证书附件
+        var file2 = "@Guid.NewGuid().ToString()";//质量合格证明
+        var file3 = "@Guid.NewGuid().ToString()";//检验报告
+        var file4 = "@Guid.NewGuid().ToString()";//特种设备档案
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../OutsourcingProject/ToolsCheckMain/GetSpecificToolsFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    if (data != null) {
+                        var EquipmentName = data.AREANAME;
+                        data.AREANAME = EquipmentName.replace(/\s/g, "");
+                    }
+                    $("#form1").formDeserialize(data);
+                    if (data != null) {
+                        bangEqName(data.AREAID, data.TOOLSNAME);
+                        file1 = $("#REGISTERCARDFILE").val();//登记证书附件
+                        file2 = $("#QUALIFIED").val();//质量合格证明
+                        file3 = $("#CHECKREPORTFILE").val();//检验报告
+                        file4 = $("#SPECIFICTOOLSFILE").val();//特种设备档案
+                    }
+                }
+            })
+        } else {
+            $("#REGISTERCARDFILE").val(file1);//登记证书附件
+            $("#QUALIFIED").val(file2);//质量合格证明
+            $("#CHECKREPORTFILE").val(file3);//检验报告
+            $("#SPECIFICTOOLSFILE").val(file4);//特种设备档案
+        }
+        //登记证书附件
+        file1 = file1.length == 0 ? "@Guid.NewGuid().ToString()" : file1;
+        file_upload.init({
+            keyValue: file1, extensions: '*', isImage: false, el: '#uploader'
+        });
+
+        //质量合格证明
+        file2 = file2.length == 0 ? "@Guid.NewGuid().ToString()" : file2;
+        file_upload.init({
+            keyValue: file2, extensions: '*', isImage: false, el: '#uploader2'
+        });
+
+        //检验报告
+        file3 = file3.length == 0 ? "@Guid.NewGuid().ToString()" : file3;
+        file_upload.init({
+            keyValue: file3, extensions: '*', isImage: false, el: '#uploader3'
+        });
+
+        //特种设备档案
+        file4 = file1.length == 0 ? "@Guid.NewGuid().ToString()" : file4;
+        file_upload.init({
+            keyValue: file4, extensions: '*', isImage: false, el: '#uploader4'
+        });
+        file_upload.bindFiles(isDel, false, file1, "uploader", isDel);
+        file_upload.bindFiles(isDel, false, file2, "uploader2", isDel);
+        file_upload.bindFiles(isDel, false, file3, "uploader3", isDel);
+        file_upload.bindFiles(isDel, false, file4, "uploader4", isDel);
+    }
+
+    //根据单位工程id获取外包单位信息
+    function loadDeptData() {
+        $.ajax({
+            url: '../../OutsourcingProject/ToolsCheckMain/GetOutDeptData',
+            data: { outengineerid: OUTPROJECTID },
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                if (!!result) {
+                    //外包工程名称,外包单位id,外包单位名称,外包单位code
+                    $("#OUTCOMPANYID,#MANAGERDEPTID").val(result[1]);
+                    $("#OUTCOMPANYNAME,#MANAGERDEPT").val(result[2]);
+                    $("#MANAGERDEPTCODE").val(result[3]);//管控部门CODE
+                }
+            }
+        });
+    }
+
+    function AcceptClick() {
+        var value = $.trim($("#TOOLSNAME").val());
+        if (value.length == 0 || value == null || value == undefined) {
+            var Validatemsg ="值不能为空！\n";
+            ValidationMessage($("#TOOLSNAME"), Validatemsg);
+            return false;
+        }
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize();
+        postData["AREACODE"] = $("#AREAID").attr("data-code");
+        postData["AREANAME"] = $("#AREAID").attr("data-text");
+        $.SaveForm({
+            url: "../../OutsourcingProject/ToolsCheckMain/SaveSpecificToolsForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                top.Form.$("#spToolsTable").trigger("reloadGrid");
+            }
+        });
+    }
+    function bangEqName(areaId, TOOLSNAME) {
+        //$("#TOOLSNAME").attr("data-text", "");
+        //$("#TOOLSNAME").attr("data-value", "");
+
+        //$("#TOOLSNAME").html("");
+        //绑定设备名称
+        //$("#TOOLSNAME").ComboBox({
+        //    url: top.contentPath + "/RiskDatabase/RiskAssess/GetEquipmentJson?areaId=" + areaId,
+        //    id: "namevalue",
+        //    height: "300px",
+        //    text: "equipmentname",
+        //    allowSearch: true,
+        //    description: "==请选择=="
+        //});
+        $.ajax({
+            url: top.contentPath + "/RiskDatabase/RiskAssess/GetEquipmentJson?areaId=" + areaId,
+            success: function (data, status) {
+                $("#tdEqSelect").html("");
+                $("#tdEqSelect").append("<select id='TOOLSNAME' class='form-control'></select>");
+                $("#TOOLSNAME").append(
+                        "<option></option>");
+                $.each(eval(data), function (index, item) {
+                    $("#TOOLSNAME").append(
+                        "<option value=" + item.namevalue + ">" + item.equipmentname + "</option>");
+                })
+                $('#TOOLSNAME').comboSelect();
+                if (TOOLSNAME != "") {
+                    $("#TOOLSNAME").val(TOOLSNAME);
+                }
+            }
+        })
+    }
+    function setDate() {
+        var CheckDate = $("#CHECKDATE").val();
+        var CheckDateCycle = $("#CHECKDAYS").val();
+        if (!CheckDateCycle) { }
+        else if (!(/(^[1-9]\d*$)/.test(CheckDateCycle))) {
+            dialogMsg('检验周期请输入整数！', 0);
+            $("#CHECKDAYS").val("");
+        } else {
+            if (CheckDate != null && CheckDate.length > 0 && CheckDate.indexOf("-") > 0) {
+                var date = new Date(CheckDate.replace(/-/g, "/"));
+                date.setDate(date.getDate() + parseInt(CheckDateCycle));
+                var retime = date.getFullYear() + "-" + ("00" + (date.getMonth() + 1).toString()).substr(("00" + (date.getMonth() + 1).toString()).length - 2, 2) + "-" + ("00" + date.getDate().toString()).substr(("00" + date.getDate().toString()).length - 2, 2);
+                $("#NEXTCHECKDATE").val(retime);
+            }
+        }
+
+    }
+</script>
+<div style="margin-left: 10px; margin-right: 10px; padding-right: 20px">
+    <table class="form" style="margin-top: 10px; margin-right: 10px">
+        <tr>
+            <td class="formTitle">所在区域<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="AREAID" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                <input id="AREANAME" type="hidden" class="form-control" /><input id="AREACODE" type="hidden" class="form-control" />
+            </td>
+            <td class="formTitle">设备名称<font face="宋体">*</font></td>
+            <td class="formValue" id="tdEqSelect">
+                <select id="TOOLSNAME" class="form-control"></select>
+                @*<div id="TOOLSNAME" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull">
+                <div class="ui-select-text" style="color:#999;">==请选择==</div>
+            </div>*@
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">所属关系<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="RELATION" type="text" value="外包单位所有" class="form-control" readonly />
+            </td>
+            <td class="formTitle">设备类别<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="TOOLSTYPE" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">外包单位<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="OUTCOMPANYNAME" type="text" value="" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                <input id="OUTCOMPANYID" type="hidden" value="" />
+            </td>
+            <td class="formTitle">外包工程<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="OUTPROJECTNAME" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                <input id="OUTPROJECTID" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">操作人员</td>
+            <td class="formValue">
+                <input id="OPERATIONPEOPLE" type="text" class="form-control" style="width:85%;display:inline-block;"/>
+                <input id="OPERATIONPEOPLEID" type="hidden" />
+                <a id="btn_Select" class="btn btn-primary" onclick="selectUser({ deptId: '', userIds: $('#OperUserID').val(), checkMode: 1, mode: 0, winObject: window.document.body, domId: 'OPERATIONPEOPLE,,OPERATIONPEOPLEID', userKind: 2 });" style="background-color: #2e99d4; border-color: #2e99d4;display:inline-block;vertical-align:top;line-height:14px;">&nbsp;选&nbsp;&nbsp;择</a>
+            </td>
+            <td class="formTitle">规格型号<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="TOOLSMODEL" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">安全管理人员<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="SAFEMANAGER" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" style="width:85%;display:inline-block;" />
+                <input id="SAFEMANAGERID" type="hidden" />
+                <a id="btn_Select" class="btn btn-primary" onclick="selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'SAFEMANAGER,,SAFEMANAGERID,,,,PHONENUMBER', userKind: 2 });" style="background-color: #2e99d4; border-color: #2e99d4;display:inline-block;vertical-align:top;line-height:14px;">&nbsp;选&nbsp;&nbsp;择</a>
+            </td>
+            <td class="formTitle">联系电话</td>
+            <td class="formValue">
+                <input id="PHONENUMBER" type="text" class="form-control" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">最近检验日期<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="CHECKDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" onblur="setDate()" isvalid="yes" checkexpession="NotNull"/>
+            </td>
+            <td class="formTitle">检验周期（天）<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="CHECKDAYS" type="text" class="form-control" onblur="setDate()" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">下次检验日期<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="NEXTCHECKDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" disabled="disabled" isvalid="yes" checkexpession="NotNull"/>
+            </td>
+            <td class="formTitle">出厂编号</td>
+            <td class="formValue">
+                <input id="TOOLSINITNUMBER" type="text" class="form-control" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">购置时间</td>
+            <td class="formValue">
+                <input id="TOOLSBUYDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+            </td>
+            <td class="formTitle">制造单位</td>
+            <td class="formValue">
+                <input id="TOOLSMADECOMPANY" type="text" class="form-control" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">管控部门</td>
+            <td class="formValue">
+                <input id="MANAGERDEPT" type="text" class="form-control" readonly />
+                <input id="MANAGERDEPTID" type="hidden" />
+                <input id="MANAGERDEPTCODE" type="hidden" />
+            </td>
+            <td class="formTitle">出厂年月</td>
+            <td class="formValue">
+                <input id="TOOLSMADEDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">使用登记书编号<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="REGISTERNUMBER" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                <input id="TOOLSID" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">使用登记<br />
+                证书</td>
+            <td class="formValue" colspan='3'>
+                <input id="REGISTERCARDFILE" type="text" hidden="hidden" />
+                <div id="uploader" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                    <div class="queueList">
+                        <div id="dndArea" class="placeholder">
+                            <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display: none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle">质量合格证明</td>
+            <td class="formValue" colspan='3'>
+                <input id="QUALIFIED" type="text" hidden="hidden" />
+                <div id="uploader2" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                    <div class="queueList">
+                        <div id="dndArea1" class="placeholder">
+                            <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display: none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">检验报告</td>
+            <td class="formValue" colspan='3'>
+                <input id="CHECKREPORTFILE" type="text" hidden="hidden" />
+                <div id="uploader3" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                    <div class="queueList">
+                        <div id="dndArea2" class="placeholder">
+                            <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display: none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">特种设备档案</td>
+            <td class="formValue" colspan='3'>
+                <input id="SPECIFICTOOLSFILE" type="text" hidden="hidden" />
+                <div id="uploader4" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                    <div class="queueList">
+                        <div id="dndArea3" class="placeholder">
+                            <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display: none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>
+

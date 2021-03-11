@@ -1,0 +1,280 @@
+﻿
+@{
+    ViewBag.Title = "菜单配置表单";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/Content/scripts/plugins/jqgrid/jqgrid.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/jqgrid/grid.locale-cn.js"></script>
+<script src="~/Content/scripts/plugins/jqgrid/jqgrid.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script src="~/Content/scripts/plugins/jquery.md5.js"></script>
+<script src="~/Content/scripts/plugins/uploadify/ajaxfileupload.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+<style type="text/css">
+    .file {
+        position: relative;
+        display: inline-block;
+        overflow: hidden;
+        text-decoration: none;
+        text-indent: 0;
+        cursor: pointer !important;
+    }
+
+        .file input {
+            position: absolute;
+            font-size: 100px;
+            right: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer !important;
+        }
+
+        .file:hover {
+            text-decoration: none;
+            cursor: pointer !important;
+        }
+</style>
+<script>
+    var keyValue = request('keyValue');
+    var action = request('action');
+    var parentId = request("ParentId");
+    var platform = request("platform");
+    var checkNodeName = request("checkNodeName")
+    //初始化
+    $(function () {
+        InitUpload();
+        FullForm();
+
+    })
+
+    function InitContrl() {
+
+        $("#ModuleName").ComboBoxTree({
+            url: "../../AuthorizeManage/Module/GetTreeJson?paltformType=-1",
+            description: "==请选择==",
+            height: "195px",
+            allowSearch: true
+        });
+
+        $("#PaltformType").ComboBox({
+            description: "==请选择==",
+        }).bind("change", function () {
+            var paltformtype = $("#PaltformType").attr('data-value');
+            $("#ModuleName").ComboBoxTree({
+                url: "../../AuthorizeManage/Module/GetTreeJson?paltformType=" + paltformtype,
+                description: "==请选择==",
+                height: "195px",
+                allowSearch: true
+            });
+            $("#ModuleName").attr("data-text", "==请选择==");
+            $("#ModuleName").attr("data-value", "");
+            $("#ModuleName div:eq(0)").text("==请选择==");
+        });
+
+        ;
+        $("#IsView").ComboBox({
+            description: "==请选择==",
+        })
+    }
+    function FullForm() {
+        if (action == "show") {
+            $("input").attr("readonly", "readonly");
+            $("input").attr("disabled", "disabled");
+            $("a").attr("disabled", "disabled");
+            $("div").attr("disabled", "disabled");
+            $("textarea").attr("disabled", "disabled");
+            top.window.$(".layui-layer-btn0").hide();
+        }
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../SystemManage/MenuConfig/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#PaltformType").ComboBoxSetValue(data.PaltformType);
+                    $("#ModuleName").ComboBoxSetValue(data.ModuleId);
+                    if (data.MenuIcon) {
+                        document.getElementById('uploadPreview').src = top.contentPath + data.MenuIcon;
+                    }
+                }
+            });
+        }
+        if (!!checkNodeName) {
+            $("#ParentName").val(checkNodeName);
+        }
+        if (!!parentId) {
+            $("#ParentId").val(parentId);
+        }
+        if (!!platform) {
+            $("#PaltformType").val(platform)
+        }
+    }
+    
+    //人员上传图片
+    function InitUpload() {
+        $('#uploadFile').change(function () {
+            Upload($(this));
+        });
+
+    }
+    //人员上传图片
+    function Upload(self) {
+        var file = self.get(0).files[0];
+        if (file.type.indexOf("image") >= 0) {
+            var size = file.size;
+            var file_id = self.attr("id");
+            var img_id = self.attr("img_id");
+            //上传应用图标
+            $.ajaxFileUpload({
+                url: top.contentPath + "/SystemManage/MenuConfig/SaveImg",
+                secureuri: false,
+                fileElementId: file_id,
+                dataType: 'json',
+                success: function (data) {
+                    document.getElementById('uploadPreview').src = top.contentPath + data.resultdata;
+                    $("#MenuIcon").val(data.resultdata);
+                    dialogMsg(data.message, 1);
+                },
+                complete: function () {
+                    $("#uploadFile").change(function () {
+                        Upload($(this), file_id, img_id);
+                    })
+                }
+            });
+        } else {
+            dialogMsg("仅支持上传图片！", 2);
+        }
+    }
+    //选择搭设单位
+    function selectCompany() {
+        var setupcompanytype = $("input[type=radio]:checked").val();
+        /**
+        1.选择单位内部时，工程名称隐藏,当前角色为“厂级部门”，搭设单位为所有单位，否则为搭设单位本部门及以下单位。
+        2.选择外包单位时，工程名称显示,当前角色为“厂级部门”，搭设单位为所有外包单位,否则搭设单位为本部门及以下级部门管辖的外包单位。
+        3.另工程名称为选择搭设单位后单位管辖的工程，选择工程后把作业区域代入文本框。
+        **/
+        if (setupcompanytype == "0") {
+            selectDept('&type=highrisk', 0, 24, '选择所属单位', document.body, 'DeptName,DeptCode,DeptId', "", function () {
+
+            });
+        } else {
+            selectDept('', 0, 24, '选择所属单位', document.body, 'DeptName,DeptCode,DeptId', "1", function () {
+
+            });
+        }
+    }
+
+    function AssociationFunc() {
+        dialogOpen({
+            id: "ASS",
+            title: '关联功能',
+            url: '/SystemManage/MenuConfig/AssociationSetting',
+            width: "800px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(window.document.body, "AssociationId", "AssociationName");
+            }
+        });
+    }
+
+    //保存表单
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["PaltformType"] = platform;
+
+        console.log(postData)
+        $.SaveForm({
+            url: "../../SystemManage/MenuConfig/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                $.currentIframe().GetTree();
+            }
+        })
+    }
+</script>
+<div class="border-left border-right border-top" style="margin: 5px; margin-bottom: 0px; padding-bottom: 2px;">
+    <div style="height: 350px;">
+        <table class="form">
+            <tr>
+                <th class="formTitle" style="text-align: left; padding-left: 7px; width: 55px;">功能名称<font face="宋体">*</font></th>
+                <td class="formValue">
+                    <input id="ModuleName" type="text" class="form-control" style="" placeholder="功能名称" isvalid="yes" checkexpession="NotNull" />
+                    <input type="hidden" id="PaltformType" />
+                    @*<input id="DeptName" type="text" class="form-control" readonly onclick="selectCompany()" isvalid="yes" checkexpession="NotNull" />
+                        <input id="DeptCode" type="hidden" />
+                        <input id="DeptId" type="hidden" />*@
+                </td>
+
+                <th class="formTitle" style="text-align: left; padding-left: 7px; width: 55px;">上级</th>
+                <td class="formValue">
+                    <input id="ParentName" type="text" class="form-control" placeholder="上级菜单" readonly="readonly" />
+                    <input type="hidden" id="ParentId" />
+                </td>
+            </tr>
+            <tr>
+                <th class="formTitle" style="text-align: left; padding-left: 7px; width: 55px;">图标</th>
+                <td>
+                    <div style="margin-top: 10px; text-align: left;">
+                        <div class="file" title="点击上传图标">
+                            <img id="uploadPreview" style="width: 115px; height: 115px;" src="~/Content/images/icon_app_add.png" />
+                            <input type="file" name="uploadFile" id="uploadFile" accept=" image/jpg, image/png, image/jpeg, image/gif, image/bmp">
+                            <input type="hidden" id="MenuIcon"  />
+                        </div>
+                        <div style="line-height: 14px; color: #75777A; text-align: left;" id="divTips">
+                            点击图片可上传新的图标
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <th class="formTitle" style="text-align: left; padding-left: 7px; width: 55px;">编码<font face="宋体">*</font></th>
+                <td class="formValue">
+                    <input id="ModuleCode" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                </td>
+
+                <th class="formTitle" style="text-align: left; padding-left: 7px; width: 55px;">关联功能</th>
+                <td class="formValue">
+                    <input id="AssociationName" type="text" class="form-control" placeholder="关联的功能" readonly="readonly" onclick="AssociationFunc()" />
+                    <input type="hidden" id="AssociationId" />
+                </td>
+            </tr>
+            <tr>
+                <th class="formTitle" style="text-align: left; padding-left: 7px; width: 55px;">角色授权</th>
+                <td class="formValue">
+                    <input id="AuthorizeName" type="text" class="form-control" placeholder="角色授权" readonly="readonly" onclick=" selectRole($('#AuthorizeId').val(), undefined, 1, 2, window.document.body, 'AuthorizeName,AuthorizeId')" />
+                    <input type="hidden" id="AuthorizeId" />
+                </td>
+                <th class="formTitle" style="text-align: left; padding-left: 7px; width: 55px;">排序<font face="宋体">*</font></th>
+                <td class="formValue">
+                    <input id="Sort" type="text" class="form-control" placeholder="请输入数字" isvalid="yes" checkexpession="Num" />
+                </td>
+            </tr>
+            <tr>
+                <th class="formTitle" style="text-align: left; padding-left: 7px; width: 55px;">说明</th>
+                <td class="formValue">
+                    <input id="Remark" type="text" class="form-control" placeholder="添加备注" />
+                </td>
+                <th class="formTitle" style="text-align: left; padding-left: 7px; width: 55px;">配置</th>
+                <td class="formValue">
+                    <textarea class="form-control" rows="3" id="JsonData"></textarea>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+
+
+

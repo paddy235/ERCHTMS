@@ -1,0 +1,795 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<style type="text/css">
+    #tb tr td, th {
+        border: 1px solid rgb(204, 204, 204);
+    }
+
+        #tb tr td:first-child {
+            text-align: center;
+        }
+
+            #tb tr td:first-child + td {
+                padding-left: 5px;
+                padding-right: 5px;
+            }
+
+    .form .formTitle {
+        position: relative;
+        left: 0px;
+        text-align: right;
+        white-space: nowrap;
+        font-weight: normal;
+        width: 110px;
+    }
+</style>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var typecode = "@ViewBag.ItemDetailValue1";//日常巡查编码
+    var patrolType = request('type');//巡查类型编号
+    var patrolTypeStr = request('typeStr');//巡查类型
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var _deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户部门ID
+    var _deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户部门编码
+    var _deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";//当前用户部门
+    $(function () {
+        initControl();
+        LoadMeasureList();
+    });
+    //初始化控件
+    function initControl() {
+        if (patrolType == 'YJ') {
+            $("#tb_Bydept").html("被检查单位/部门<font face=\"宋体\">*</font>");
+        } else {
+            $("#ByDept").attr("isvalid", "no");
+        }
+        var orgID = "";
+        if (roleName.includes("省级用户")) {
+            orgID = CreateuserOrgid;
+        }
+        else {
+            orgID = top.currUserOrgId;
+        }
+        //区域
+        ComboxArea("DistrictId", top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + orgID);
+        $("#DistrictId").bind("change", function () {
+            $("#DistrictCode").val($("#DistrictId").attr("data-code"));
+            $("#District").val($("#DistrictId").attr("data-text"));
+        });
+        $('#czPanel').hide();
+        $("#btn_Affirm").css("display", "none");
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../FireManage/EverydayPatrol/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#ByUserId").val(data.ByUserId);
+                    $("#PatrolId").val(keyValue);
+                    //document.getElementById('signPreview').src = data.Signature;
+                    //$("#signPreview").attr("src", "../.." + data.Signature);
+                    if (data.Signature.indexOf("http") >= 0) {
+                        $("#signPreview").attr("src", data.Signature);
+                    } else {
+                        $("#signPreview").attr("src", "../.." + data.Signature);
+                    }
+                }
+            })
+        } else {//新增，先自动生成ID
+            keyValue = keyValue.length == 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+            $("#PatrolTypeCode").val(patrolType);
+            $("#PatrolType").val(patrolTypeStr);
+            if (patrolType == 'RJ') {
+                typecode = "@ViewBag.ItemDetailValue1";
+            } else if (patrolType == 'ZJ') {
+                typecode = "@ViewBag.ItemDetailValue2";
+            } else if (patrolType == 'YJ') {
+                typecode = "@ViewBag.ItemDetailValue3";
+            } else {
+                typecode = "@ViewBag.ItemDetailValue4";
+            }
+            //加载签名
+            //$.SetForm({
+            //    url: "../../BaseManage/User/GetUserInfo",
+            //    param: { keyValue: userId },
+            //    success: function (data) {
+            //        if (data != null) {
+            //            if (data.SignImg) {
+            //                if (data.SignImg.indexOf("http") >= 0) {
+            //                    $('#Signature').val(data.SignImg);
+            //                    document.getElementById('signPreview').src = data.SignImg;
+            //                } else {
+            //                    $('#Signature').val(top.contentPath + data.SignImg);
+            //                    document.getElementById('signPreview').src = top.contentPath + data.SignImg;
+            //                }
+
+            //            } else {
+            //                dialogMsg('请在个人设置里上传签名，否则记录将无法保存！', 0);
+            //            }
+            //        }
+            //    }
+            //});
+            IsSignImg();
+        }
+        //查看
+        if (actiontype == "view") {
+            $("#btn_Save").css("display", "none");
+            $("#btn_Submit").css("display", "none");
+            $("#btn_Affirm").css("display", "none");
+            //$(".center-Panel").removeAttr("style");
+            $(".form-button").css("display", "none");
+            $("#form1 input,textarea,select , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+            $('#czPanel').show();//查看和确认时可查看记录
+            GetCZGrid();
+            
+        }
+        //确认
+        if (actiontype == "affirm") {
+            $("#btn_Affirm").css("display", "");
+
+            $("#btn_Save").css("display", "none");
+            $("#btn_Submit").css("display", "none");
+            //$(".center-Panel").removeAttr("style");
+            //$(".form-button").css("display", "none");
+            $("#form1 input,textarea,select , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+            $('#czPanel').show();//查看和确认时可查看记录
+            GetCZGrid();
+
+        }
+    }
+    //保存表单;
+    //function AcceptClick() {
+    //    if (!$('#form1').Validform()) {
+    //        return false;
+    //    }
+    //    var postData = $("#form1").formSerialize(keyValue);
+    //    $.SaveForm({
+    //        url: "../../FireManage/EverydayPatrol/SaveForm?keyValue=" + keyValue,
+    //        param: postData,
+    //        loading: "正在保存数据...",
+    //        success: function () {
+    //            $.currentIframe().$("#gridTable").trigger("reloadGrid");
+    //        }
+    //    })
+    //}
+    //加载巡查内容
+    function LoadMeasureList() {
+        //新增-只是显示 提交-保存数据
+        //如果状态为验收中，则显示可操作安全措施配置项
+        var queryJson;
+        var url = "";
+        var colModel = [];
+        var sortname = "";
+        if (!actiontype.includes('add')) {
+            queryJson = {
+                 queryJson: JSON.stringify({ PatrolId: keyValue })
+            }
+            url = "../../FireManage/EverydayPatrolDetail/GetListJson";
+            colModel = [
+                { label: '主键', name: 'Id', hidden: true },
+                { label: '项目ID', name: 'ProjectId', hidden: true },
+                { label: 'true', name: 'ResultTrue', hidden: true },
+                { label: 'false', name: 'ResultFalse', hidden: true },
+                { label: '巡查内容', name: 'PatrolContent', index: 'PatrolContent', width: 300, align: 'center', sortable: false },
+                {
+                    label: '巡查结果', name: 'Result', index: 'Result', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (!!rowObject.Id) {
+                            var yVal = "";
+                            var wVal = "";
+                            var disabledhtml = "  ";
+                            var displayStr = " ";
+                            if (rowObject.Result != null) {
+                                if (rowObject.Result == "0") {
+                                    yVal = " checked = \"checked\"";
+                                }
+                                if (rowObject.Result == "1") {
+                                    wVal = " checked = \"checked\"";
+                                }
+                            }
+                            if (actiontype == "view") {
+                                disabledhtml = "  disabled=\"disabled\"  ";
+                            }
+
+                            var html = "<label><input type=\"radio\"  name=\"result_" + rowObject.Id + "\" " + yVal + disabledhtml + " value=\"0\">" + rowObject.ResultTrue + "</label>&nbsp;";
+                            html += "<label><input type=\"radio\"  name=\"result_" + rowObject.Id + "\" " + wVal + disabledhtml + " value=\"1\">" + rowObject.ResultFalse + "</label>&nbsp;";
+
+                            return html;
+                        }
+                    }
+                },
+                {
+                    label: '存在问题', name: 'Problem', index: 'Problem', width: 350, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var valstr = "";
+                        if (!!cellvalue) {
+                            valstr = 'value = "' + cellvalue + '"';
+                        }
+                        var html = ' <input id="Problem_' + rowObject.Id + '" type="text" class="form-control"  isvalid="yes" checkexpession="LenStrOrNull" length="100" style="width:98%;" ' + valstr +' onmouseover="this.title=this.value"/>';
+                        return html;
+                    }
+                },
+                {
+                    label: '处置结果', name: 'Dispose', index: 'Dispose', width: 350, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var valstr = "";
+                        if (!!cellvalue) {
+                            valstr = 'value = "' + cellvalue + '"';
+                        }
+                        var html = '<input id="Dispose_' + rowObject.Id + '" type="text" class="form-control"  isvalid="yes" checkexpession="LenStrOrNull" length="100" style="width:98%;" ' + valstr +' onmouseover="this.title=this.value"/>';
+                        return html;
+                    }
+                },
+                {
+                    label: '操作', name: 'dispose', index: 'dispose', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<i class='btn btn-success' style='border:none;width:60px;height:30px;' title='登记隐患' onclick=addHt('" + rowObject.Id + "',this)>登记隐患</i>";
+                        html += "&nbsp;&nbsp;<i class='btn btn-success' style='border:none;width:60px;height:30px;' title='登记违章' onclick=addWz('" + rowObject.Id + "',this)>登记违章</i>";
+                        return html;
+                    }
+                },
+                {
+                    label: '发现隐患、违章数量', name: 'YhCount', index: 'YhCount', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var innerText = "<span style='display:none;' co='" + rowObject.name + "' class='" + rowObject.stid + "'></span>";
+                        if (cellvalue > 0) {
+                            innerText += "发现隐患：<a onclick=\"showHt('" + rowObject.Id + "'," + cellvalue + ")\" style='text-decoration:underline;cursor:pointer;' id='yhCount_" + rowObject.Id + "'>" + cellvalue + "</a><br />";
+                        } else {
+                            innerText += "发现隐患：<a style='text-decoration:underline;cursor:pointer;' id='yhCount_" + rowObject.Id + "'>0</a><br/>";
+                        }
+                        if (rowObject.WzCount == undefined || rowObject.WzCount == "0") {
+                            innerText += "发现违章：<a style='text-decoration:underline;cursor:pointer;' id='wzCount_" + rowObject.Id + "'>0</a>";
+                        } else {
+                            innerText += "发现违章：<a onclick=\"showWz('" + rowObject.Id + "'," + rowObject.WzCount + ")\" style='text-decoration:underline;cursor:pointer;' id='wzCount_" + rowObject.Id + "'>" + rowObject.WzCount + "</a>";
+                        }
+
+                        return innerText;
+                    }
+                },
+                { label: '排序号', name: 'OrderNumber', width: 10, align: 'left', sortable: true, hidden: true }
+            ];
+            sortname = 'OrderNumber';
+        } else {
+            queryJson = { queryJson: JSON.stringify({ code: typecode, type:1 }) };
+            url = "../../FireManage/EverydayProjectSet/GetPageListJson";
+            colModel = [
+                { label: '主键', name: 'id', width: 10, align: 'left', sortable: true, hidden: true },
+                { label: '巡查内容', name: 'measurename', index: 'measurename', width: 300, align: 'center', sortable: false },
+                {
+                    label: '巡查结果', name: 'measureresult', index: 'measureresult', width: 150, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = '<input type="radio" name="result_' + rowObject.id + '" id="ResultTrue_' + rowObject.id + '" value="0"  checked = "checked"/>' + rowObject.measureresultone + '&nbsp;&nbsp;&nbsp; <input type="radio" name="result_' + rowObject.id + '" id="ResultFalse_' + rowObject.id + '" value="1"/>' + rowObject.measureresulttwo + '';
+                        return html;
+                    }
+                },
+                { label: '结果1', name: 'measureresultone', width: 10, align: 'left', sortable: true, hidden: true },
+                { label: '结果2', name: 'measureresulttwo', width: 10, align: 'left', sortable: true, hidden: true },
+                {
+                    label: '存在问题', name: 'problem', index: 'problem', width: 350, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = ' <input id="Problem_' + rowObject.id + '" type="text" class="form-control"  isvalid="yes" checkexpession="LenStrOrNull" length="100" style="width:98%;" onmouseover="this.title=this.value"/>';
+                        return html;
+                    }
+                },
+                {
+                    label: '处置结果', name: 'dispose', index: 'dispose', width: 350, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = '<input id="Dispose_' + rowObject.id + '" type="text" class="form-control"  isvalid="yes" checkexpession="LenStrOrNull" length="100" style="width:98%;" onmouseover="this.title=this.value"/>';
+                        return html;
+                    }
+                },
+                {
+                    label: '操作', name: 'dispose', index: 'dispose', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<i class='btn btn-success' style='border:none;width:60px;height:30px;' title='登记隐患' onclick=addHt('" + rowObject.id + "',this)>登记隐患</i>";
+                        html += "&nbsp;&nbsp;<i class='btn btn-success' style='border:none;width:60px;height:30px;' title='登记违章' onclick=addWz('" + rowObject.id + "',this)>登记违章</i>";
+                        return html;
+                    }
+                },
+                {
+                    label: '发现隐患、违章数量', name: 'yhcount', index: 'yhcount', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var innerText = "<span style='display:none;' co='" + rowObject.name + "' class='" + rowObject.stid + "'></span>";
+                        if (cellvalue > 0) {
+                            innerText += "发现隐患：<a onclick=\"showHt('" + rowObject.id + "',1)\" style='text-decoration:underline;cursor:pointer;' id='yhCount_" + rowObject.id + "'>" + cellvalue + "</a><br />";
+                        } else {
+                            innerText += "发现隐患：<a style='text-decoration:underline;cursor:pointer;' id='yhCount_" + rowObject.id + "'>0</a><br/>";
+                        }
+                        if (rowObject.wzcount == undefined || rowObject.wzcount == "0") {
+                            innerText += "发现违章：<a style='text-decoration:underline;cursor:pointer;' id='wzCount_" + rowObject.id + "'>0</a>";
+                        } else {
+                            innerText += "发现违章：<a onclick=\"showWz('" + rowObject.id + "',1)\" style='text-decoration:underline;cursor:pointer;' id='wzCount_" + rowObject.id + "'>" + rowObject.wzcount + "</a>";
+                        }
+
+                        return innerText;
+                    }
+                },
+
+                { label: '排序号', name: 'ordernumber', width: 10, align: 'left', sortable: true, hidden: true }
+            ];
+            sortname = 'ordernumber';
+        }
+
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridEverydayPatrolDetail');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 350,
+            url: url,
+            postData: queryJson,
+            datatype: "json",
+            colModel: colModel,
+            sortname: sortname,
+            viewrecords: true,
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+
+                if (actiontype == "view" || actiontype == "affirm") {
+                    $("#gridEverydayPatrolDetail i").removeAttr("onclick");
+                }
+            }
+        });
+
+    }
+    //巡查项目保存
+    function AcceptClick(AffirmState) {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        if ($('#District').val() == null || $('#District').val() == '') {
+            dialogMsg('请选择巡查区域！', 0);
+            return false;
+        }
+        var measures = $('#gridEverydayPatrolDetail').jqGrid('getRowData');
+        if (measures.length < 1) {
+            dialogMsg('请配置巡查内容！', 0);
+            return false;
+        }
+        var signature = $('#Signature').val();
+        if (signature == null || signature == "") {
+            dialogMsg('请在个人设置中上传签名！', 0);
+            return false;
+        }
+        var projects = [];
+        for (var i = 0; i < measures.length; i++) {
+            var item = measures[i];
+            var curId = item.Id == null ? item.id : item.Id;
+            var ProblemID = "#Problem_" + curId;
+            var DisposeID = "#Dispose_" + curId;
+            var result = $("input[name='result_" + curId + "']:checked").val();
+            var Problem = $(ProblemID).val();
+            var Dispose = $(DisposeID).val();
+            if (actiontype.includes('add')) {
+                projects.push({ Id: curId, PatrolId: keyValue, PatrolContent: item.measurename, Problem: Problem, Dispose: Dispose, ResultTrue: item.measureresultone, ResultFalse: item.measureresulttwo, Result: result, OrderNumber: item.ordernumber });
+            } else {
+                projects.push({ Id: curId, PatrolId: item.PatrolId, PatrolContent: item.PatrolContent, Problem: Problem, Dispose: Dispose, ResultTrue: item.ResultTrue, ResultFalse: item.ResultFalse, Result: result, OrderNumber: item.OrderNumber });
+            }
+        }
+        $.ajax({
+            url: "../../FireManage/EverydayPatrol/GetMajorUserId?departmentid=" + $('#ByDeptId').val(),
+            data: null,
+            type: "get",
+            dataType: "text",
+            async: false,
+            success: function (data) {
+                $('#ByUserId').val(data);
+
+                if (patrolType == 'YJ') {
+                    if ($('#ByUserId').val() == null || $('#ByUserId').val() == '') {
+                        dialogMsg('请配置被检查单位负责人！', 0);
+                        return false;
+                    }
+                }
+
+                var AffirmUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+                if (patrolType == 'YJ') {
+                    AffirmUserId = $('#ByUserId').val();
+                }
+                var postData = {
+                    PatrolDeptCode: $('#PatrolDeptCode').val(),
+                    PatrolDept: $('#PatrolDept').val(),
+                    PatrolPersonId: $('#PatrolPersonId').val(),
+                    PatrolPerson: $('#PatrolPerson').val(),
+                    PatrolDate: $('#PatrolDate').val(),
+                    PatrolPlace: $('#PatrolPlace').val(),
+                    AffirmState: AffirmState,
+                    //AffirmUserId: AffirmUserId,//流程下一步确认人
+                    PatrolTypeCode: $('#PatrolTypeCode').val(),
+                    PatrolType: $('#PatrolType').val(),
+                    DutyUser: $('#DutyUser').val(),
+                    DutyUserId: $('#DutyUserId').val(),
+                    DutyDept: $('#DutyDept').val(),
+                    DutyDeptCode: $('#DutyDeptCode').val(),
+                    ByDeptId: $('#ByDeptId').val(),
+                    ByDept: $('#ByDept').val(),
+                    ByDeptCode: $('#ByDeptCode').val(),
+                    ByUser: $('#ByUser').val(),
+                    ByUserId: $('#ByUserId').val(),
+                    District: $('#District').val(),
+                    DistrictId: $("#DistrictId").attr("data-value"),
+                    DistrictCode: $('#DistrictCode').val(),
+                    Signature: $('#Signature').val()
+                };
+
+                $.SaveForm({
+                    url: "../../FireManage/EverydayPatrol/SaveForm?keyValue=" + keyValue,
+                    param: { postData: JSON.stringify(postData), jsonData: JSON.stringify(projects) },
+                    loading: "正在保存数据...",
+                    success: function () {
+                        $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                    }
+                });
+
+            },
+            error: function (XMLHttpRequest, textStatus, errorThrown) {
+                dialogMsg(errorThrown, -1);
+            }
+        });
+
+    }
+    //选择责任人
+    function selectDutyUser() {
+        IsSignImg();
+        var signature = $('#Signature').val();
+        if (signature == null || signature == "") {
+            return false;
+        }
+        //if (roleName.indexOf("厂级部门用户") >= 0 || roleName.indexOf("超级管理员") >= 0 || roleName.indexOf("公司管理员") >= 0) {
+        selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'DutyUser,DutyUserId,,,DutyDeptCode,DutyDept,DutyTel' });
+        //} else {
+        //    selectUser({ deptId: _deptId, checkMode: 0, mode: 1, winObject: window.document.body, domId: 'DutyUser,,DutyUserId,,DutyDeptCode,DutyDept,DutyTel' });
+        //}
+    }
+    //-------------------------确认记录增删改查-----------------开始
+    function GetCZGrid() {
+        var queryJson = {
+            PatrolId: keyValue//主表id
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridCZTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: 150,
+            url: "../../FireManage/AffirmRecord/GetListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true, width: 150, sortable: false },
+                { label: '确认人', name: 'AffirmUser', index: 'AffirmUser', width: 400, align: 'center', sortable: true },
+                {
+                    label: '签名', name: 'Signature', index: 'Signature', width: 400, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue == null || cellvalue == "") {
+                            html = "<img id=\"signPreview\" style=\"width: 100px; height: 40px; \" src=\"~/Content/images/logo-headere47d5.png\" />";
+                        } else {
+                            if (cellvalue.indexOf("http") >= 0) {
+                                html = "<img id=\"signPreview\" style=\"width: 100px; height: 40px; \" src='" + cellvalue + "' />";
+                            } else {
+                                html = "<img id=\"signPreview\" style=\"width: 100px; height: 40px; \" src='../.." + cellvalue + "' />";
+                            }
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '确认时间', name: 'AffirmDate', index: 'AffirmDate', width: 400, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm:ss');
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 5,
+            rowList: [30, 50, 100],
+            pager: "#gridCZPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $gridTable.setGridWidth(($('.gridPanel').width() - 2));
+            }
+        });
+    }
+    //查看
+    //function showCZ(keyValue) {
+    //    var idx0 = dialogOpen({
+    //        id: 'Sikp',
+    //        title: '查看充装/更换记录',
+    //        url: '/FireManage/FillRecord/Form?actiontype=view&keyValue=' + keyValue + '&name=' + equipmentName + '&type=' + extinguisherType,
+    //        width: '900px',
+    //        height: '350px',
+    //        btn: null,
+    //        callBack: function (iframeId) {
+    //            top.layer.close(idx0);
+    //        }
+    //    });
+    //}
+    //-------------------------确认记录增删改查-----------------结束
+
+    var node = null;
+    //登记隐患
+    function addHt(objId, obj) {
+        if ($('#District').val() == null || $('#District').val() == '') {
+            dialogMsg('请选择巡查区域！', 0);
+            return false;
+        }
+        //ID和标记
+        node = obj;
+        var relevanceId = objId;
+        var ProblemID = "#Problem_" + objId;
+        var Problem = $(ProblemID).val();//问题
+        var DisposeID = "#Dispose_" + objId;
+        var Dispose = $(DisposeID).val();//结果
+        var relevanceType = 'EverydayPatrolDetail';
+        //区域信息 区域编码（注意是编码） 区域名称
+        var districtid = $("#DistrictId").attr("data-code");
+        var districname = encodeURIComponent($("#DistrictId").attr("data-text"));
+
+        var url = "/HiddenTroubleManage/HTBaseInfo/Form?relevanceId=" + relevanceId
+            + "&relevanceType=" + relevanceType
+            + "&districtid=" + districtid
+            + "&districname=" + districname
+            + "&hiddescribe=" + Problem
+            + "&ctype=2"
+            + "&changemeasure=" + Dispose;
+        var idx = dialogOpen({
+            id: 'HidForm',
+            title: '登记隐患',
+            url: url,
+            width: ($(top.window).width() - 150) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null
+        });
+    }
+    //登记违章
+    function addWz(objId, obj) {
+        if ($('#District').val() == null || $('#District').val() == '') {
+            dialogMsg('请选择巡查区域！', 0);
+            return false;
+        }
+        node = obj;
+        //var type = mode == undefined ? $(obj).attr("ctype") : 3;//检查对象类型（0：设备，1：危险源）
+        var objId = objId;//检查对象Id
+        var ProblemID = "#Problem_" + objId;
+        var Problem = $(ProblemID).val();//问题
+        var DisposeID = "#Dispose_" + objId;
+        var Dispose = $(DisposeID).val();//结果
+        var desc = Problem;//事故隐患描述(简题)
+        //var measure = mode == undefined ? $(obj).attr("measure") : "";//整改要求
+        var dataType = "EverydayPatrolDetail";
+        var url = '/LllegalManage/LllegalRegister/Form?callFormId=LllegalForm&lllegaldescribe=' + encodeURIComponent(desc)
+            + "&reseverid=" + objId
+            + "&resevertype=" + dataType
+            + "&resevertwo=" + dataType
+            + "&reseverone=" + objId
+            + "&reformmeasure=" + Dispose;
+        dialogOpen({
+            id: 'LllegalForm',
+            title: '登记违章',
+            url: url,
+            width: ($(top.window).width() - 100) + 'px',
+            height: ($(top.window).height() - 100) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    //查看登记的隐患
+    function showHt(objId, count) {
+        if (count > 0) {
+            var url = '/HiddenTroubleManage/HTBaseInfo/Index?relevanceType=EverydayPatrolDetail&relevanceId=' + objId;
+            var idx = dialogOpen({
+                id: 'ht',
+                title: '隐患列表',
+                url: url,
+                width: ($(top.window).width() - 300) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    top.layer.close(idx);
+                }
+            });
+        }
+
+    }
+    //查看登记的违章
+    function showWz(id, count) {
+        if (count > 0) {
+            var url = '/LllegalManage/LllegalRegister/SdIndex?resevertwo=EverydayPatrolDetail&reseverone=' + id;
+            var idx = dialogOpen({
+                id: 'wz',
+                title: '违章列表',
+                url: url,
+                width: ($(top.window).width() - 300) + "px",
+                btns: 1,
+                btn: ["关闭"],
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    top.layer.close(idx);
+                }
+            });
+        }
+
+    }
+    var pfrom = 0;
+    var idx = -1;
+    function setRadioStatus(obj,type) {
+        if (type == 'yh') {
+            var yhCountID = "#yhCount_" + obj;
+            var num = parseInt($(yhCountID).text()) + 1;
+            $(yhCountID).text(num);
+            if (num == 1) {
+                $(yhCountID).attr("onclick", "showHt('" + obj + "',1)");
+            }
+        }
+        if (type == 'wz') {
+            var wzCountID = "#wzCount_" + obj;
+            var num = parseInt($(wzCountID).text()) + 1;
+            $(wzCountID).text(num);
+            if (num == 1) {
+                $(wzCountID).attr("onclick", "showWz('" + obj + "',1)");
+            }
+        }
+
+    }
+    function setDeptValue() {
+        selectDept('', 0, 0, '被检查单位/部门', document.body, 'ByDept,ByDeptCode,ByDeptId,ByUser,ByUserId', function () {
+            
+        });
+    }
+    //确认;
+    var signUrlStr = "";
+    function AffirmClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var signImg = getUserSignPic(userId);
+        if (signImg != "" && signImg != undefined) {
+            signUrlStr = signImg;
+        } else {
+            signUrlStr = "";
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        //加载签名
+        if (signUrlStr != "") {
+            postData.Signature = signUrlStr;
+            $.SaveForm({
+                url: "../../FireManage/AffirmRecord/SaveForm",
+                param: postData,
+                loading: "正在保存数据...",
+                success: function () {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            return false;
+        }
+    }
+
+    function IsSignImg() {
+        var signImg = getUserSignPic(userId);
+        if (signImg != "" && signImg != undefined) {
+            $('#Signature').val(signImg);
+            if (signImg.indexOf("http") >= 0) {
+                $("#signPreview").attr("src", signImg);
+            } else {
+                $("#signPreview").attr("src", "../.." + signImg);
+            }
+            
+        } else {
+
+            //IsSignImg();
+            //$(obj).get(0).checked = false;
+        }
+    }
+</script>
+<div style="margin-top: 60px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">巡查类型<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="PatrolId" type="hidden" />
+                <input id="PatrolTypeCode" type="hidden" />
+                <input id="PatrolType" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" />
+            </td>
+            <td class="formTitle">巡查人<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="PatrolPersonId" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" />
+                <input id="PatrolPerson" type="text" class="form-control" readonly value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">巡查部门<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="PatrolDeptCode" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode" />
+                <input id="PatrolDept" type="text" class="form-control" readonly value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName" isvalid="yes" checkexpession="NotNull" />
+            </td>
+            <td class="formTitle">巡查时间<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="PatrolDate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">责任人<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DutyUserId" type="hidden" />
+                <input id="DutyUser" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" onclick="selectDutyUser()" />
+            </td>
+            <td class="formTitle">责任部门<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DutyDeptCode" type="hidden" />
+                <input id="DutyDept" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" id="tb_Bydept">被检查单位/部门</td>
+            <td class="formValue">
+                <input id="ByDeptCode" type="hidden" />
+                <input id="ByDeptId" type="hidden" />
+                <input id="ByDept" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="setDeptValue()" />
+                <input id="ByUserId" type="hidden" />
+                <input id="ByUser" type="hidden" />
+            </td>
+            <td class="formTitle">巡查区域<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="DistrictId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                <input id="District" type="hidden" class="form-control" /><input id="DistrictCode" type="hidden" class="form-control" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">巡查人签名<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="AffirmState" type="hidden" />
+                <input id="Signature" type="hidden" />
+                <img id="signPreview" style="width: 100px; height: 40px; " src="~/Content/images/logo-headere47d5.png" />
+            </td>
+
+        </tr>
+
+    </table>
+    <div class="panel-body">
+        <table id="gridEverydayPatrolDetail"></table>
+    </div>
+    <div class="center-Panel" id="czPanel" style="padding-left:15px;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp; 确认记录</strong>
+                <span class="tools pull-right">
+                    @*<a class="fa fa-chevron-down" title="展开/收起"></a>*@
+                </span>
+            </div>
+            <div class="gridPanel">
+                <table id="gridCZTable"></table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="AcceptClick(0)"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="AcceptClick(1)"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+        <a id="btn_Affirm" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="AffirmClick()"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+        &nbsp; &nbsp;
+    </div>
+</div>

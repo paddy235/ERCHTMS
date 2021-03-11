@@ -1,0 +1,1314 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+<script src="~/content/scripts/plugins/highcharts/highcharts.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/highcharts/modules/exporting.js" type="text/javascript" ></script>
+<style type="text/css">
+    $ {
+        demo .css;
+    }
+</style>
+
+<script src="~/content/scripts/plugins/highcharts/modules/no-data-to-display.js" type="text/javascript" ></script>
+
+<script type="text/javascript">
+    var curRoleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var _parentId = "";
+    var _isOrg = "";
+    var _deptId = "";
+    $(function () {
+        Highcharts.setOptions({
+            exporting:{
+                url: "../../HiddenTroubleManage/HTStatistics/Export",
+                enabled: true,
+                filename: 'MyChart',
+                width: 1200
+            },
+            lang: {
+                printChart: "打印图表",
+                downloadJPEG: "下载JPEG图片",
+                downloadPDF: "下载PDF文件",
+                downloadPNG: "下载PNG图片",
+                downloadSVG: "下载SVG文件"
+            }
+        });
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $("#itemTree").setTreeHeight($(window).height());
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //加载树列表
+        GetTree();
+
+        $("#lr-panel-one").css("background-color", "#337ab7");
+        $("#lr-panel-one").css("color", "#fff");
+        $("#CurPanel").val("统计图"); //标记当前活动的统计图
+        $("#lr-panel-one i").css("color", "#fff");
+
+        //初始化内容
+        InitialPage();
+
+        //隐患级别
+        var newRankVal = "";
+        var hidRank = $("#HidRank").selectpicker('val'); //获取选中的隐患级别
+        if (!!hidRank && hidRank.length==1) {
+            newRankVal = hidRank[0];
+        }
+        var queryJson = {
+            deptid: _deptId,
+            startdate: $("#startdate").val(),
+            enddate: $("#enddate").val(),
+            year: $("#TimeScope").attr("data-value"),
+            hidPoint: $("#HidPoint").val(),
+            hidRank: newRankVal
+        };
+
+        //获取统计图
+        $.ajax({
+            type: "get",
+            url: "../../HiddenTroubleManage/HTStatistics/QueryProvHidNumberPie",
+            data: { queryJson: JSON.stringify(queryJson) },
+            success: function (data) {
+                if (!!data) {
+                    var ndata = eval("(" + data + ")");
+                    //默认设置隐患数量统计图及列表
+                    var oneValue = (parseFloat($(top.window).width() / 2) - 300) + "px";
+                    var widthValue = ($(top.window).width() - 400) + "px";
+                    var heightValue = $(top.window).height()/2;
+
+                    /*统计图*/
+
+                    //隐患数量统计
+                    $("#container1").css("width", oneValue);
+                    $("#container1").css("height", heightValue);
+                    $("#container1").css("float", "left");
+                    //隐患区域分布统计
+                    $("#container2").css("margin-left", "100px");
+                    $("#container2").css("width", oneValue);
+                    $("#container2").css("height", heightValue);
+                    $("#container2").css("float", "left");
+
+                    /*趋势图*/
+                    $("#container3").css("width", widthValue);
+                    $("#container3").css("height", heightValue);
+
+                    /*对比图*/
+                    $("#container4").css("width", widthValue);
+                    $("#container4").css("height", heightValue);
+
+                    $("#container5").css("width", widthValue);
+                    $("#container5").css("height", heightValue);
+
+                    LoadContainer1(ndata.hiddata);
+          
+                    LoadContainer2(ndata.areadata);
+
+                    GetGridTable1(ndata.tdata);
+                }
+            }
+        });
+
+        //重置控件
+        $("#btn_Reset").click(function () {
+         
+            //区域范围
+            $("#HidPointName").val("");
+            $("#HidPoint").val("");
+            //时间范围
+            $("#startdate").val("");
+            $("#enddate").val("");
+            //时间范围
+            var curTime = $("#TimeScope-option li:eq(0)").attr("data-value");
+            $("#TimeScope").ComboBoxSetValue(curTime);
+            $("#TimeScope").attr("data-text", curTime);
+            $("#TimeScope").attr("data-value", curTime);
+
+            //隐患级别
+            $("button[data-id='HidRank']").removeClass().addClass("btn dropdown-toggle btn-default bs-placeholder");
+            $("button[data-id='HidRank']").attr("title", "请选择");
+            $("button[data-id='HidRank'] span:eq(0)").text("请选择");
+            $("button[data-id='HidRank']").next().find("ul li").each(function (index, ele) {
+                $(this).removeClass();
+            });
+        });
+
+        //导出内容
+        $("#btn_Export").click(function ()
+        {
+            var model = 0;  //默认省级统计图
+            if ($("#CurPanel").val() == "对比图")
+            {
+                if ($("#ComparisonPanel").val() == "按单位对比")
+                {
+                    model = 1;
+                }
+            }
+            var newRankVal = "";
+            var hidRank = $("#HidRank").selectpicker('val'); //获取选中的隐患级别
+            if (!!hidRank && hidRank.length == 1) {
+                newRankVal = hidRank[0];
+            }
+            //参数
+            var queryJson = JSON.stringify({
+                model: model,
+                mark: 'province',
+                deptid: _deptId,
+                startdate: $("#startdate").val(),
+                enddate: $("#enddate").val(),
+                year: $("#TimeScope").attr("data-value"),
+                hidPoint: $("#HidPoint").val(),
+                hidRank: newRankVal
+            });
+            window.location.href = "../../HiddenTroubleManage/HTStatistics/ExportExcel?queryJson=" + queryJson;
+        });
+    })
+
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify({ SelectMode: 0, Mode: 9 });
+        var url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+        var item = {
+            height: $(window).height() - 50,
+            url: url,
+            onnodeclick: function (item) {
+                _parentId = item.Code;
+                _isOrg = item.Sort;
+                _deptId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+    //加载统计图一
+    function LoadContainer1(data) {
+
+        //图形
+        $('#container1').highcharts({
+            chart: {
+                plotBackgroundColor: null,
+                plotBorderWidth: null,
+                plotShadow: false,
+                type: 'pie'
+            },
+            tooltip: { pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>' },
+            exporting: { enabled: true },
+            title: { text: '隐患数量统计' },
+            plotOptions: {
+                pie: {
+                    allowPointSelect: true,
+                    cursor: 'pointer',
+                    dataLabels: {
+                        enabled: true,
+                        format: '<b>{point.name}</b><br/>{point.percentage:.1f} %',
+                        style: {
+                            color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
+                        }
+                    }
+                }
+            },
+            series: [{
+                name: '百分比',
+                colorByPoint: true,
+                data: data
+            }],
+            lang: { noData: "暂无数据可显示!" },
+            noData: {
+                position: {
+                    align: 'center',
+                    verticalAlign: 'middle'
+                },
+                attr: {
+                    'stroke-width': 1
+                },
+                style: {
+                    fontWeight: 'bold',
+                    fontSize: '15px',
+                    color: '#202030'
+                }
+            }
+        });
+    }
+
+    //加载统计图二
+    function LoadContainer2(data) {
+
+        //图形
+        $('#container2').highcharts({
+            chart: {
+                plotBackgroundColor: null,
+                plotBorderWidth: null,
+                plotShadow: false,
+                type: 'pie'
+            },
+            tooltip: { pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>' },
+            title: { text: '隐患区域分布统计' },
+            plotOptions: {
+                pie: {
+                    allowPointSelect: true,
+                    cursor: 'pointer',
+                    dataLabels: {
+                        enabled: true,
+                        format: '<b>{point.name}</b><br/>{point.percentage:.1f} %',
+                        style: {
+                            color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
+                        }
+                    }
+                }
+            },
+            series: [{
+                name: '百分比',
+                colorByPoint: true,
+                data: data
+            }],
+            lang: { noData: "暂无数据可显示!" },
+            noData: {
+                position: {
+                    align: 'center',
+                    verticalAlign: 'middle'
+                },
+                attr: {
+                    'stroke-width': 1
+                },
+                style: {
+                    fontWeight: 'bold',
+                    fontSize: '15px',
+                    color: '#202030'
+                }
+            }
+        });
+    }
+
+    //加载趋势图
+    function LoadContainer3(data) {
+
+        $('#container3').highcharts({
+            chart: {
+                type: 'spline'
+            },
+            title: {
+                text: '隐患数量变化趋势图'
+            },
+            subtitle: {
+                text: ''
+            },
+            xAxis: {
+                categories: ['1月', '2月', '3月', '4月', '5月', '6月',
+                    '7月', '8月', '9月', '10月', '11月', '12月']
+            },
+            yAxis: {
+                min: 0,
+                allowDecimal: false,
+                title: {
+                    text: '数量'
+                },
+                labels: {
+                    formatter: function () {
+                        return this.value;
+                    }
+                }
+            },
+            tooltip: {
+                crosshairs: true,
+                shared: true
+            },
+            plotOptions: {
+                spline: {
+                    marker: {
+                        radius: 4,
+                        lineColor: '#666666',
+                        lineWidth: 1
+                    },
+                    dataLabels: {
+                        enabled: true,  //在数据点上显示对应的数据值
+                        formatter: function () { //格式化提示信息
+                            return '<b>' + this.series.name + '</b><br/>' + this.x + ':' + this.y + '条';
+                        }
+                    }
+                }
+            },
+            series: data,
+            lang: { noData: "暂无数据可显示!" },
+            noData: {
+                position: {
+                    align: 'center',
+                    verticalAlign: 'middle'
+                },
+                attr: {
+                    'stroke-width': 1
+                },
+                style: {
+                    fontWeight: 'bold',
+                    fontSize: '15px',
+                    color: '#202030'
+                }
+            }
+        });
+    }
+
+    //加载对比图
+    function LoadContainer4(xdata, sdata) {
+
+        $('#container4').highcharts({
+            chart: {
+                type: 'column'
+            },
+            title: {
+                text: '各等级隐患统计'
+            },
+            xAxis: {
+                categories: xdata  //['安环部', '计划部', '生技部', '运行部', '检修部', '综合部', '燃管部', '除灰部', '监审部', '政工部', '商务部', '财务部']
+            },
+            yAxis: {
+                min: 0,
+                allowDecimal: false,
+                title: {
+                    text: '数量'
+                },
+                stackLabels: {
+                    enabled: true,
+                    style: {
+                        fontWeight: 'bold',
+                        color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                    }
+                }
+            },
+            legend: {
+                align: 'right',
+                x: -30,
+                verticalAlign: 'top',
+                y: 25,
+                floating: true,
+                backgroundColor: (Highcharts.theme && Highcharts.theme.background2) || 'white',
+                borderColor: '#CCC',
+                borderWidth: 1,
+                shadow: false
+            },
+            tooltip: {
+                headerFormat: '<b>{point.x}</b><br/>',
+                pointFormat: '{series.name}: {point.y}<br/>合计: {point.stackTotal}'
+            },
+            plotOptions: {
+                column: {
+                    stacking: 'normal',
+                    dataLabels: {
+                        enabled: true,
+                        color: (Highcharts.theme && Highcharts.theme.dataLabelsColor) || 'white',
+                        style: {
+                            textShadow: '0 0 3px black'
+                        }
+                    }
+                }
+            },
+            series: sdata,
+            lang: { noData: "暂无数据可显示!" },
+            noData: {
+                position: {
+                    align: 'center',
+                    verticalAlign: 'middle'
+                },
+                attr: {
+                    'stroke-width': 1
+                },
+                style: {
+                    fontWeight: 'bold',
+                    fontSize: '15px',
+                    color: '#202030'
+                }
+            }
+        });
+    }
+
+    //加载对比图
+    function LoadContainer5(xdata, sdata) {
+        $('#container5').highcharts({
+            chart: {
+                type: 'column'
+            },
+            title: {
+                text: '各等级隐患统计'
+            },
+            xAxis: {
+                categories: xdata  //['xx区域1', 'xx区域2', 'xx区域3','xx区域4', 'xx区域5','xx区域6']
+            },
+            yAxis: {
+                min: 0,
+                allowDecimal: false,
+                title: {
+                    text: '数量'
+                },
+                stackLabels: {
+                    enabled: true,
+                    style: {
+                        fontWeight: 'bold',
+                        color: (Highcharts.theme && Highcharts.theme.textColor) || 'gray'
+                    }
+                }
+            },
+            legend: {
+                align: 'right',
+                x: -30,
+                verticalAlign: 'top',
+                y: 25,
+                floating: true,
+                backgroundColor: (Highcharts.theme && Highcharts.theme.background2) || 'white',
+                borderColor: '#CCC',
+                borderWidth: 1,
+                shadow: false
+            },
+            tooltip: {
+                headerFormat: '<b>{point.x}</b><br/>',
+                pointFormat: '{series.name}: {point.y}<br/>合计: {point.stackTotal}'
+            },
+            plotOptions: {
+                column: {
+                    stacking: 'normal',
+                    dataLabels: {
+                        enabled: true,
+                        color: (Highcharts.theme && Highcharts.theme.dataLabelsColor) || 'white',
+                        style: {
+                            textShadow: '0 0 3px black'
+                        }
+                    }
+                }
+            },
+            series: sdata,
+            lang: { noData: "暂无数据可显示!" },
+            noData: {
+                position: {
+                    align: 'center',
+                    verticalAlign: 'middle'
+                },
+                attr: {
+                    'stroke-width': 1
+                },
+                style: {
+                    fontWeight: 'bold',
+                    fontSize: '15px',
+                    color: '#202030'
+                }
+            }
+        });
+    }
+
+    //加载表格1
+    function GetGridTable1(tdata) {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable1');
+        //隐患基本信息
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: parseFloat($(window).height() / 2 - 100),
+            datatype: "local",
+            data: tdata,
+            colModel: [
+               { label: '主键', name: 'hidpoint', index: 'hidpoint', width: 100, align: 'center', hidden: true },
+                {
+                    label: '区域名称', name: 'hidpointname', index: 'hidpointname', width: 150, align: 'center', sortable: true, 
+                },
+                {
+                    label: '一般隐患', name: 'ordinaryhid', index: 'ordinaryhid', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var point = !!rowObject.hidpoint ? rowObject.hidpoint : "";
+                        var rval = rowObject.ordinaryhid;
+                        if (rval > 0) {
+                            rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoHiddenList(0,'" + point + "','一般隐患')>" + rowObject.ordinaryhid + "</a>";
+                        }
+                        return rval;
+                    }
+                },
+                {
+                    label: '重大隐患', name: 'importanhid', index: 'importanhid', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var rval = rowObject.importanhid;
+                        var point = !!rowObject.hidpoint ? rowObject.hidpoint : "";
+                        if (rval > 0) {
+                            rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoHiddenList(0,'" + point + "','重大隐患')>" + rowObject.importanhid + "</a>";
+                        }
+                        return rval;
+                    }
+                },
+                {
+                    label: '合计', name: 'total', index: 'total', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var rval = rowObject.total;
+                        var point = !!rowObject.hidpoint ? rowObject.hidpoint : "";
+                        if (rval > 0) {
+                            rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoHiddenList(0,'" + point + "','')>" + rowObject.total + "</a>";
+                        }
+                        return rval;
+                    }
+                }
+            ],
+            sortname: 'hidpoint',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //加载表格2
+    function GetGridTable2(tdata) {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable2');
+        //隐患基本信息
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: parseFloat($(window).height() / 2 - 100),
+            datatype: "local",
+            data: tdata,
+            colModel: [
+               { label: '主键', name: 'hiddepart', index: 'hiddepart', width: 100, align: 'center', hidden: true },
+                { label: '部门名称', name: 'fullname', index: 'fullname', width: 150, align: 'center', sortable: true },
+                {
+                    label: '一般隐患', name: 'ordinaryhid', index: 'ordinaryhid', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                       
+                        var rval = rowObject.ordinaryhid;
+                        if (rval > 0) {
+                            rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoHiddenList(1,'" + rowObject.encode + "','一般隐患')>" + rowObject.ordinaryhid + "</a>";
+                        }
+                        return rval;
+                    }
+                },
+                {
+                    label: '重大隐患', name: 'importanhid', index: 'importanhid', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var rval = rowObject.importanhid;
+                        if (rval > 0) {
+                            rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoHiddenList(1,'" + rowObject.encode + "','重大隐患')>" + rowObject.importanhid + "</a>";
+                        }
+                        return rval;
+                    }
+                },
+                {
+                    label: '合计', name: 'total', index: 'total', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var rval = rowObject.total;
+                        if (rval > 0) {
+                            rval = "<a style='color:#1688f5;text-decoration:underline;' href=javascript:GoHiddenList(1,'" + rowObject.encode + "','')>" + rowObject.total + "</a>";
+                        }
+                        return rval;
+                    }
+                }
+            ],
+            sortname: 'sortcode',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //跳转到隐患列表页面
+    function GoHiddenList(qtype, qargs, qval) {
+
+        var url = "";
+        //选择的年度
+        var qyear = ""; //年度()
+
+        var qhidpoint = $("#HidPoint").val();  //区域
+
+        var qdeptcode = ""; //单位
+
+        //统计条件构成:单位、年度、区域、隐患级别
+
+        //按区域
+        if (qtype == 0) {
+
+            url = '/HiddenTroubleManage/HTBaseInfo/Index?mode=yhtjinfo&qdeptcode=' + qdeptcode + '&qrankname=' + qval + '&qyear=' + qyear + '&code=' + qargs;
+        }
+        else  //按部门(单位)
+        {
+            if (!qval)
+            {
+                //隐患级别
+                var newRankVal = "";
+                var hidRank = $("#HidRank").selectpicker('val'); //获取选中的隐患级别
+                if (!!hidRank && hidRank.length == 1) {
+                    newRankVal = hidRank[0];
+                    qval = newRankVal;
+                }
+              
+            }
+            url = '/HiddenTroubleManage/HTBaseInfo/Index?mode=yhtjinfo&qdeptcode=' + qargs + '&qrankname=' + qval + '&qyear=' + qyear + '&code=' + qhidpoint;
+        }
+        var idx = dialogOpen({
+            id: 'HTWindow',
+            title: '隐患列表',
+            url: url,
+            btns: 1,
+            btn: ["关闭"],
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //初始化页面
+    function InitialPage() {
+        //时间范围
+        $("#TimeScope").ComboBox({
+            id: "id",
+            text: "text",
+            url: "../../HiddenTroubleManage/HTStatistics/QueryTime",
+            description: "",
+            allowSearch: false
+        });
+        var curTimeScope = $("#TimeScope-option li:eq(0)").attr("data-value");
+        $("#TimeScope").ComboBoxSetValue(curTimeScope);
+        $("#TimeScope").attr("data-text", curTimeScope);
+        $("#TimeScope").attr("data-value", curTimeScope);
+
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            var curStatistics = $("#CurPanel").val();
+            var newRankVal = "";
+            var hidRank = $("#HidRank").selectpicker('val'); //获取选中的隐患级别
+            if (!!hidRank && hidRank.length == 1) {
+                newRankVal = hidRank[0];
+            }
+
+            var queryJson = {
+                deptid: _deptId,
+                startdate: $("#startdate").val(),
+                enddate: $("#enddate").val(),
+                year: $("#TimeScope").attr("data-value"),
+                hidPoint: $("#HidPoint").val(),
+                hidRank: newRankVal
+            };
+
+            switch (curStatistics) {
+                case "统计图":
+                    //加载图表
+                    $.ajax({
+                        type: "get",
+                        url: "../../HiddenTroubleManage/HTStatistics/QueryProvHidNumberPie", //饼图
+                        data: { queryJson: JSON.stringify(queryJson) },
+                        success: function (data) {
+                            if (!!data) {
+                                var nData = eval("(" + data + ")");
+                                $("#container1").highcharts().series[0].setData(nData.hiddata);
+                                $("#container2").highcharts().series[0].setData(nData.areadata);
+                                $('#gridTable1').jqGrid('clearGridData');
+                                $('#gridTable1').jqGrid('setGridParam', { dataType: 'local', data: nData.tdata }).trigger('reloadGrid');
+                            }
+                        }
+                    });
+                    break;
+                case "趋势图":
+                    $.ajax({
+                        type: "get",
+                        url: "../../HiddenTroubleManage/HTStatistics/QueryProvHidNumberTendency",
+                        data: { queryJson: JSON.stringify(queryJson) },
+                        success: function (data) {
+                            if (!!data) {
+                                var nData = eval("(" + data + ")");
+                                LoadContainer3(nData);
+                            }
+                        }
+                    });
+                    break;
+                case "对比图":
+                    var curComparison = $("#ComparisonPanel").val();
+                    if (curComparison == "按区域对比") {
+                        $.ajax({
+                            type: "get",
+                            url: "../../HiddenTroubleManage/HTStatistics/QueryProvComparisonForDistrict",  //获取对比图
+                            data: { queryJson: JSON.stringify(queryJson) },
+                            success: function (data) {
+                                if (!!data) {
+                                    var nData = eval("(" + data + ")");
+                                    //按条件加载各等级隐患对比图
+                                    $('#gridTable1').jqGrid('clearGridData');
+                                    $('#gridTable1').jqGrid('setGridParam', { dataType: 'local', data: nData.tdata }).trigger('reloadGrid');
+                                    //按条件加载各等级隐患列表
+                                    LoadContainer5(nData.xdata, nData.sdata);
+                                }
+                            }
+                        });
+                    }
+                    else {
+                        $.ajax({
+                            type: "get",
+                            url: "../../HiddenTroubleManage/HTStatistics/QueryProvHidNumberComparison",  //获取对比图
+                            data: { queryJson: JSON.stringify(queryJson) },
+                            success: function (data) {
+                                if (!!data) {
+                                    var nData = eval("(" + data + ")");
+                                    //按条件加载各等级隐患对比图
+                                    $('#gridTable2').jqGrid('clearGridData');
+                                    $('#gridTable2').jqGrid('setGridParam', { dataType: 'local', data: nData.tdata }).trigger('reloadGrid');
+                                    //按条件加载各等级隐患列表
+                                    LoadContainer4(nData.xdata, nData.sdata);
+                                }
+                            }
+                        });
+                    }
+                    break;
+            }
+        });
+
+
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+
+    //切换
+    function showChart(obj, sType) {
+
+        //切换过程清空条件
+
+        //区域范围
+        $("#HidPointName").val("");
+        $("#HidPoint").val("");
+        $("#startdate").val(""); //开始时间
+        $("#enddate").val("");//结束时间
+        //时间范围
+        var curTime = $("#TimeScope-option li:eq(0)").attr("data-value");
+        $("#TimeScope").ComboBoxSetValue(curTime);
+        $("#TimeScope").attr("data-text", curTime);
+        $("#TimeScope").attr("data-value", curTime);
+        //隐患级别
+        $("button[data-id='HidRank']").removeClass().addClass("btn dropdown-toggle btn-default bs-placeholder");
+        $("button[data-id='HidRank']").attr("title", "请选择");
+        $("button[data-id='HidRank'] span:eq(0)").text("请选择");
+        $("button[data-id='HidRank']").next().find("ul li").each(function (index, ele) {
+            $(this).removeClass();
+        });
+
+        var newRankVal = "";
+        var hidRank = $("#HidRank").selectpicker('val'); //获取选中的隐患级别
+        if (!!hidRank && hidRank.length == 1) {
+            newRankVal = hidRank[0];
+        }
+        var queryJson = {
+            deptid: _deptId,
+            startdate: $("#startdate").val(),
+            enddate: $("#enddate").val(),
+            year: $("#TimeScope").attr("data-value"),
+            hidPoint: $("#HidPoint").val(),
+            hidRank: newRankVal
+        };
+
+        switch (sType) {
+            case "统计图":
+                $("#btn_Export").css("display", "");
+
+                //改变当前按钮样式
+                $(obj).css("background-color", "#337ab7");
+                $(obj).css("color", "#fff");
+                $(obj).find("i:eq(0)").css("color", "#fff");
+
+                if ($("#CurPanel").val() == "趋势图") {
+                    $("#lr-panel-two").css("background-color", "#fff");
+                    $("#lr-panel-two").css("color", "#333");
+                    $("#lr-panel-two i").css("color", "#666666");
+                }
+                if ($("#CurPanel").val() == "对比图") {
+                    $("#lr-panel-three").css("background-color", "#fff");
+                    $("#lr-panel-three").css("color", "#333");
+                    $("#lr-panel-three i").css("color", "#666666");
+                }
+
+                $("#statisticsList").removeAttr("style");
+
+                $("#gbox_gridTable1").css("display", "");
+                $("#gridTable1").css("display", "");
+
+                $("#gbox_gridTable2").css("display", "none");
+                $("#gridTable2").css("display", "none");
+
+                $("#container1").css("display", "");
+                $("#container2").css("display", "");
+                $("#container3").css("display", "none");
+                $("#container4").css("display", "none");
+                $("#container5").css("display", "none");
+
+                $(".queryform th").each(function (index, ele) {
+                    $(this).removeAttr("Style");
+                    $(this).css("padding-left", "10px");
+                });
+                $(".queryform td").each(function (index, ele) {
+                    $(this).removeAttr("Style");
+                    $(this).css("padding-left", "5px");
+                });
+                /*隐藏筛选条件*/
+                $(".queryform th:eq(0)").css("display", "none"); //区域 
+                $(".queryform th:eq(1)").css("display", "none"); //区域
+                $(".queryform td:eq(0)").css("display", "none"); //隐患级别
+                $(".queryform td:eq(1)").css("display", "none"); //隐患级别
+                $(".queryform td:eq(2)").css("display", "none"); //年度时间范围 
+                //获取统计图
+                $.ajax({
+                    type: "get",
+                    url: "../../HiddenTroubleManage/HTStatistics/QueryProvHidNumberPie",  //获取饼图
+                    data: { queryJson: JSON.stringify(queryJson) },
+                    success: function (data) {
+                        if (!!data) {
+                            var nData = eval("(" + data + ")");
+                            $("#container1").highcharts().series[0].setData(nData.hiddata);
+                            $("#container2").highcharts().series[0].setData(nData.areadata);
+                            $('#gridTable1').jqGrid('clearGridData');
+                            $('#gridTable1').jqGrid('setGridParam', { dataType: 'local', data: nData.tdata }).trigger('reloadGrid');
+                        }
+                    }
+                });
+                break;
+            case "趋势图":
+                $("#btn_Export").css("display", "none");
+
+                ////改变当前按钮样式
+                $(obj).css("background-color", "#337ab7");
+                $(obj).css("color", "#fff");
+                $(obj).find("i:eq(0)").css("color", "#fff");
+                if ($("#CurPanel").val() == "统计图") {
+                    $("#lr-panel-one").css("background-color", "#fff");
+                    $("#lr-panel-one").css("color", "#333");
+                    $("#lr-panel-one i").css("color", "#666666");
+                }
+                if ($("#CurPanel").val() == "对比图") {
+                    $("#lr-panel-three").css("background-color", "#fff");
+                    $("#lr-panel-three").css("color", "#333");
+                    $("#lr-panel-three i").css("color", "#666666");
+                }
+
+                $("#statisticsList").css("display", "none");
+
+                $("#container1").css("display", "none");
+                $("#container2").css("display", "none");
+                $("#container4").css("display", "none");
+                $("#container5").css("display", "none");
+                $("#container3").css("display", "");
+
+                $(".queryform th").each(function (index, ele) {
+                    $(this).removeAttr("Style");
+                    $(this).css("padding-left", "10px");
+                });
+                $(".queryform td").each(function (index, ele) {
+                    $(this).removeAttr("Style");
+                    $(this).css("padding-left", "5px");
+                });
+                $(".queryform td:eq(3)").css("display", "none"); //年度时间范围 
+                $(".queryform td:eq(4)").css("display", "none"); //年度时间范围 
+                $(".queryform td:eq(5)").css("display", "none"); //年度时间范围 
+
+                //趋势图
+                $.ajax({
+                    type: "get",
+                    url: "../../HiddenTroubleManage/HTStatistics/QueryProvHidNumberTendency",
+                    data: { queryJson: JSON.stringify(queryJson) },
+                    success: function (data) {
+                        if (!!data) {
+                            var nData = eval("(" + data + ")");
+                            LoadContainer3(nData);
+                        }
+                    }
+                });
+                break;
+            case "对比图":
+                $("#btn_Export").css("display", "");
+
+                $(obj).css("background-color", "#337ab7");
+                $(obj).css("color", "#fff");
+                $(obj).find("i:eq(0)").css("color", "#fff");
+                if ($("#CurPanel").val() == "统计图") {
+                    $("#lr-panel-one").css("background-color", "#fff");
+                    $("#lr-panel-one").css("color", "#333");
+                    $("#lr-panel-one i").css("color", "#666666");
+                }
+                if ($("#CurPanel").val() == "趋势图") {
+                    $("#lr-panel-two").css("background-color", "#fff");
+                    $("#lr-panel-two").css("color", "#333");
+                    $("#lr-panel-two i").css("color", "#666666");
+                }
+
+                $("#statisticsList").removeAttr("style");
+
+                $("#gbox_gridTable1").css("display", "none");
+                $("#gridTable1").css("display", "none");
+
+                $("#gbox_gridTable2").css("display", "");
+                $("#gridTable2").css("display", "");
+
+                $("#container1").css("display", "none");
+                $("#container2").css("display", "none");
+                $("#container3").css("display", "none");
+                $("#container5").css("display", "none");
+
+                $("#container4").css("display", "");
+                $(".queryform th").each(function (index, ele) {
+                    $(this).removeAttr("Style");
+                    $(this).css("padding-left", "10px");
+                });
+                $(".queryform td").each(function (index, ele) {
+                    $(this).removeAttr("Style");
+                    $(this).css("padding-left", "5px");
+                });
+
+                $.ajax({
+                    type: "get",
+                    url: "../../HiddenTroubleManage/HTStatistics/QueryProvHidNumberComparison",  //获取对比图
+                    data: { queryJson: JSON.stringify(queryJson) },
+                    success: function (data) {
+                        if (!!data) {
+                            var nData = eval("(" + data + ")");
+                            //按条件加载各等级隐患对比图
+                            GetGridTable2(nData.tdata);
+                            //按条件加载各等级隐患列表
+                            LoadContainer4(nData.xdata, nData.sdata);
+                        }
+                    }
+                });
+                break;
+        }
+
+        if (sType == "统计图" || sType == "趋势图" || sType == "对比图") {
+            $("#CurPanel").val(sType); //标记当前活动的统计图
+            if (sType == "对比图") {
+                $("#ComparisonPanel").val("按单位对比");
+            }
+        }
+
+    }
+
+
+    //按单位进行对比
+    function dwQuery() {
+        //切换过程清空条件
+        $("#btn_Export").css("display", "");
+        //区域范围
+        $("#HidPointName").val("");
+        $("#HidPoint").val("");
+        $("#startdate").val(""); //开始时间
+        $("#enddate").val("");//结束时间
+        //时间范围
+        var curTime = $("#TimeScope-option li:eq(0)").attr("data-value");
+        $("#TimeScope").ComboBoxSetValue(curTime);
+        $("#TimeScope").attr("data-text", curTime);
+        $("#TimeScope").attr("data-value", curTime);
+        //隐患级别
+        $("button[data-id='HidRank']").removeClass().addClass("btn dropdown-toggle btn-default bs-placeholder");
+        $("button[data-id='HidRank']").attr("title", "请选择");
+        $("button[data-id='HidRank'] span:eq(0)").text("请选择");
+        $("button[data-id='HidRank']").next().find("ul li").each(function (index, ele) {
+            $(this).removeClass();
+        });
+
+        $("#lr-panel-three").css("background-color", "#337ab7");
+        $("#lr-panel-three").css("color", "#fff");
+        $("#lr-panel-three").find("i:eq(0)").css("color", "#fff");
+        if ($("#CurPanel").val() == "统计图") {
+            $("#lr-panel-one").css("background-color", "#fff");
+            $("#lr-panel-one").css("color", "#333");
+            $("#lr-panel-one i").css("color", "#666666");
+        }
+        if ($("#CurPanel").val() == "趋势图") {
+            $("#lr-panel-two").css("background-color", "#fff");
+            $("#lr-panel-two").css("color", "#333");
+            $("#lr-panel-two i").css("color", "#666666");
+        }
+
+        $("#statisticsList").removeAttr("style");
+
+        $("#container1").css("display", "none");
+        $("#container2").css("display", "none");
+        $("#container3").css("display", "none");
+
+        $(".queryform th").each(function (index, ele) {
+            $(this).removeAttr("Style");
+            $(this).css("padding-left", "10px");
+        });
+        $(".queryform td").each(function (index, ele) {
+            $(this).removeAttr("Style");
+            $(this).css("padding-left", "5px");
+        });
+        $(".queryform th:eq(0)").css("display", "none");
+        $(".queryform td:eq(0)").css("display", "none");
+        $(".queryform td:eq(2)").css("display", "none"); //年度时间范围 
+
+        $("#container4").css("display", "");
+        $("#container5").css("display", "none");
+
+        $("#gbox_gridTable1").css("display", "none");
+        $("#gridTable1").css("display", "none");
+
+        $("#gbox_gridTable2").css("display", "");
+        $("#gridTable2").css("display", "");
+
+        $("#CurPanel").val("对比图");
+        $("#ComparisonPanel").val("按单位对比");
+
+        var newRankVal = "";
+        var hidRank = $("#HidRank").selectpicker('val'); //获取选中的隐患级别
+        if (!!hidRank && hidRank.length == 1) {
+            newRankVal = hidRank[0];
+        }
+        var queryJson = {
+            deptid: _deptId,
+            startdate: $("#startdate").val(),
+            enddate: $("#enddate").val(),
+            year: $("#TimeScope").attr("data-value"),
+            hidPoint: $("#HidPoint").val(),
+            hidRank: newRankVal
+        };
+
+        $.ajax({
+            type: "get",
+            url: "../../HiddenTroubleManage/HTStatistics/QueryProvHidNumberComparison",  //获取对比图
+            data: { queryJson: JSON.stringify(queryJson) },
+            success: function (data) {
+                if (!!data) {
+                    var nData = eval("(" + data + ")");
+                    //按条件加载各等级隐患对比图
+                    GetGridTable2(nData.tdata);
+                    //按条件加载各等级隐患列表
+                    LoadContainer4(nData.xdata, nData.sdata);
+                }
+            }
+        });
+    }
+
+    //按区域进行对比
+    function qyQuery() {
+        $("#btn_Export").css("display", "");
+        //切换过程清空条件
+        //区域范围
+        $("#HidPointName").val("");
+        $("#HidPoint").val("");
+
+        $("#startdate").val(""); //开始时间
+        $("#enddate").val("");//结束时间
+        //时间范围
+        var curTime = $("#TimeScope-option li:eq(0)").attr("data-value");
+        $("#TimeScope").ComboBoxSetValue(curTime);
+        $("#TimeScope").attr("data-text", curTime);
+        $("#TimeScope").attr("data-value", curTime);
+        //隐患级别
+        $("button[data-id='HidRank']").removeClass().addClass("btn dropdown-toggle btn-default bs-placeholder");
+        $("button[data-id='HidRank']").attr("title", "请选择");
+        $("button[data-id='HidRank'] span:eq(0)").text("请选择");
+        $("button[data-id='HidRank']").next().find("ul li").each(function (index, ele) {
+            $(this).removeClass();
+        });
+
+        $("#lr-panel-three").css("background-color", "#337ab7");
+        $("#lr-panel-three").css("color", "#fff");
+        $("#lr-panel-three").find("i:eq(0)").css("color", "#fff");
+
+        if ($("#CurPanel").val() == "统计图") {
+            $("#lr-panel-one").css("background-color", "#fff");
+            $("#lr-panel-one").css("color", "#333");
+            $("#lr-panel-one i").css("color", "#666666");
+        }
+        if ($("#CurPanel").val() == "趋势图") {
+            $("#lr-panel-two").css("background-color", "#fff");
+            $("#lr-panel-two").css("color", "#333");
+            $("#lr-panel-two i").css("color", "#666666");
+        }
+
+        $("#statisticsList").removeAttr("style");
+
+        $("#container1").css("display", "none");
+        $("#container2").css("display", "none");
+        $("#container3").css("display", "none");
+
+        $(".queryform th").each(function (index, ele) {
+            $(this).removeAttr("Style");
+            $(this).css("padding-left", "10px");
+        });
+        $(".queryform td").each(function (index, ele) {
+            $(this).removeAttr("Style");
+            $(this).css("padding-left", "5px");
+        });
+        $(".queryform th:eq(1)").css("display", "none");
+        $(".queryform td:eq(1)").css("display", "none");
+        $(".queryform td:eq(2)").css("display", "none"); //年度时间范围 
+
+
+        $("#container5").css("display", "");
+        $("#container4").css("display", "none");
+
+        $("#gbox_gridTable1").css("display", "");
+        $("#gridTable1").css("display", "");
+
+        $("#gbox_gridTable2").css("display", "none");
+        $("#gridTable2").css("display", "none");
+
+
+        $("#CurPanel").val("对比图");
+        $("#ComparisonPanel").val("按区域对比");
+
+        var newRankVal = "";
+        var hidRank = $("#HidRank").selectpicker('val'); //获取选中的隐患级别
+        if (!!hidRank && hidRank.length == 1) {
+            newRankVal = hidRank[0];
+        }
+        var queryJson = {
+            deptid: _deptId,
+            startdate: $("#startdate").val(),
+            enddate: $("#enddate").val(),
+            year: $("#TimeScope").attr("data-value"),
+            hidPoint: $("#HidPoint").val(),
+            hidRank: newRankVal
+        };
+
+        $.ajax({
+            type: "get",
+            url: "../../HiddenTroubleManage/HTStatistics/QueryProvComparisonForDistrict",  //获取对比图
+            data: { queryJson: JSON.stringify(queryJson) },
+            success: function (data) {
+                if (!!data) {
+                    var nData = eval("(" + data + ")");
+                    //按条件加载各等级隐患对比图
+                    GetGridTable1(nData.tdata);
+                    //按条件加载各等级隐患列表
+                    LoadContainer5(nData.xdata, nData.sdata);
+                }
+            }
+        });
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center" style="overflow-y:auto;">
+        <div class="center-Panel">
+            <div class="panel-Title"></div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table class="queryform">
+                        <tr>
+                            <th style="padding-left: 10px; display:none">区域范围</th>@********selectArea(window.document.body, 'HidPointName,HidPoint');***@
+                            <td style="padding-left: 5px; display: none">    
+                                <input id="HidPointName" type="text" class="form-control" readonly onclick="sjSelectArea(window.document.body, 'HidPointName,HidPoint,,,,,', _deptId);" />
+                                <input id="HidPoint" type="hidden" class="form-control" />
+                            </td>
+                            <th style="padding-left: 10px; display: none">隐患级别</th>
+                            <td style="padding-left: 5px; display: none">
+                                <select id="HidRank" class="selectpicker show-menu-arrow form-control" width="120px" multiple placeholder="请选择隐患级别" isvalid="yes" checkexpession="NotNull">
+                                    <option value="一般隐患">一般隐患</option>
+                                    <option value="重大隐患">重大隐患</option>
+                                </select>
+                            </td>
+                            <th style="padding-left: 10px;">时间范围</th>
+                            <td style="padding-left: 5px; display: none">
+                                <div id="TimeScope" type="select" class="ui-select" style="width:120px;"></div>
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <input id="startdate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" style="width:120px" />
+                            </td>
+                            <td style="padding-left: 5px;">至</td>
+                            <td style="padding-left: 5px;"><input id="enddate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" style="width:120px" /></td>
+                            <td style="padding-left: 20px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>&nbsp;&nbsp;
+                                <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                                &nbsp;&nbsp;
+                                <a id="btn_Export" class="btn btn-primary"><i class="fa fa-file"></i>&nbsp;导出</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="lr-panel-one" class="btn btn-default" onclick="showChart(this,'统计图')"><i class="fa fa fa-pie-chart"></i>&nbsp;统计图</a>
+                        <a id="lr-panel-two" class="btn btn-default" onclick="showChart(this, '趋势图')"><i class="fa fa fa-area-chart"></i>&nbsp;趋势图</a>
+                        <a id="lr-panel-three" class="btn btn-default btn10 dropdown-toggle btn11" data-toggle="dropdown"><i class="fa fa fa-bar-chart"></i>&nbsp;对比图&nbsp;<i class="fa fa-caret-down"></i></a>
+                        <ul class="dropdown-menu pull-right btn11" id="drop-lr-panel-three">
+                            <li><a id="btndw" onclick="dwQuery()"><i></i>按单位对比</a></li>
+                            <li><a id="btnqy" onclick="qyQuery()"><i></i>按区域对比</a></li>
+                        </ul>
+                        <input id="CurPanel" type="hidden" />@*标记当前活动的统计图*@
+                        <input id="ComparisonPanel" type="hidden" />@*标记当前活动的统计图*@
+                    </div>
+                </div>
+            </div>
+            <div class="west-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计图</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        @*饼图*@
+                        <div id="container1"></div>
+                        <div id="container2"></div>
+                        @*趋势图*@
+                        <div id="container3" style="display:none;"></div> @*隐患数量变化趋势图*@
+                        @*对比图*@
+                        <div id="container4" style="display:none;"></div> @*各单位数量对比图*@
+                        @*对比图*@
+                        <div id="container5" style="display:none;"></div> @*各区域数量对比图*@
+                    </div>
+                </div>
+                <div class="panel panel-default" id="statisticsList">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计列表</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTable1"></table>
+                        @*各单位整改对比列表*@
+                        <table id="gridTable2" style="display:none"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

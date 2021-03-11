@@ -1,0 +1,373 @@
+@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    //施工方案
+    var ConstructFiles = request('ConstructFiles');
+    //安全技术交底
+    var TaskFiles = request('TaskFiles');
+    //查看
+    var mode = request('mode');
+    var username = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    var rolenames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        ConstructFiles = ConstructFiles.length == 0 ? "@Guid.NewGuid().ToString()" : ConstructFiles;
+        TaskFiles = TaskFiles.length == 0 ? "@Guid.NewGuid().ToString()" : TaskFiles;
+
+        file_upload.init({
+            keyValue: ConstructFiles, extensions: 'jpg,png,pdf,doc,docx', isImage: false
+        });
+
+        file_upload.init({
+            el: '#uploader1', keyValue: TaskFiles, extensions: 'jpg,png,pdf,doc,docx,mp3', isImage: false
+        });
+
+        //编制人，编制时间，审核时间,交底人,交底时间默认值
+        $("#WriteUserName,#TaskPerson").val(username);
+        $("#WriteDate,#ExamineTime,#TaskTime").val("@BSFramework.Util.Time.GetToday()");
+        if (rolenames.includes("承包商") || rolenames.includes("分包商")) {
+            $("input[name='UnitType']:eq(1)").prop("checked", "checked");
+
+            $("input[name='UnitType']").attr("disabled", "disabled");
+            $("#BelongDeptName").attr("onclick", "selectDept('', 0, 7, '选择所属单位', document.body, 'BelongDeptName,,BelongDeptId', '1');");
+           
+        }
+        else {
+            $("input[name='UnitType']:eq(0)").prop("checked", "checked");
+            $("#BelongDeptName").attr("onclick", "selectDept('', 0, 4, '选择所属单位', document.body, 'BelongDeptName,,BelongDeptId');");
+        }
+
+        //切换单位类别
+        $("input[name='UnitType']").click(function () {
+            if ($(this).val() == "2") {
+                $("#BelongDeptName").attr("onclick", "selectDept('', 0, 7, '选择所属单位', document.body, 'BelongDeptName,,BelongDeptId', '1');");
+            }
+            else {
+                $("#BelongDeptName").attr("onclick", "selectDept('', 0, 4, '选择所属单位', document.body, 'BelongDeptName,,BelongDeptId');");
+            }
+            $("#BelongDeptName").val("");   
+            $("#BelongDeptId").val("");
+        });
+
+        //进展情况
+        $("#EvolveCase").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "EvolveSituation" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "150px"
+        });
+
+        var queryJson = {
+        }
+
+        //工程类别
+        $("#EngineeringType").ComboBox({
+            url: "../../EngineeringManage/EngineeringSetting/GetListJson",
+            param: { queryJson: JSON.stringify(queryJson) },
+            id: "Id",
+            text: "ProgrammeCategory",
+            description: "==请选择==",
+            height: "180px"
+        });
+
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../EngineeringManage/PerilEngineering/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.UnitType == "1") {
+                        $("input[name='UnitType']:eq(0)").prop("checked", "checked");
+                    }
+                    if (data.UnitType == "2") {
+                        $("input[name='UnitType']:eq(1)").prop("checked", "checked");
+                    }
+                }
+            })
+        }
+        
+        //$.ajax({
+        //    url: '../../SaftProductTargetManage/SafeProductDutyBook/GetFiles',
+        //    data: { fileId: ConstructFiles },
+        //    dataType: "JSON",
+        //    async: false,
+        //    success: function (result) {
+        //        var status = mode == "view" ? false : true;
+        //        file_upload.bind(result, status, false, ConstructFiles, "uploader", status);
+        //    }
+        //});
+
+        //$.ajax({
+        //    url: '../../SaftProductTargetManage/SafeProductDutyBook/GetFiles',
+        //    data: { fileId: TaskFiles },
+        //    dataType: "JSON",
+        //    async: false,
+        //    success: function (result) {
+        //        var status = mode == "view" ? false : true;
+        //        file_upload.bind(result, status, false, TaskFiles, "uploader1", status);
+        //    }
+        //});
+
+        var status = mode == "view" ? false : true;
+        file_upload.bindFiles(status, false, ConstructFiles, "uploader", status);
+        file_upload.bindFiles(status, false, TaskFiles, "uploader1", status);
+    }
+    //保存表单;
+    function AcceptClick() {
+        if ($("#EngineeringType").attr("data-value") != "" && $("#EngineeringName").val() != "" && $("#EngineeringSpot").val() != ""
+            && $("#EStartTime").val() != "" && $("#EFinishTime").val() != "" && $("#BelongDeptName").val() != "" && ($("#EvolveCase").attr("data-value") == "" || $("#EvolveCase").attr("data-value")==undefined))
+        {
+            $("#EvolveCase").focus();
+            $("html,body").animate({
+                scrollTop: $("#EvolveCase").offset().top - 80
+            }, 1000);
+        }
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        else {
+            var start = $("#EStartTime").val();
+            var end = $("#EFinishTime").val();
+            if (start > end && start != "" && end != "") {
+                dialogMsg('开始时间不能大于结束时间！', 2);
+                return false;
+            }
+        }
+        $("#ConstructFiles").val(ConstructFiles);
+        $("#TaskFiles").val(TaskFiles);
+        var postData = $("#form1").formSerialize(keyValue);
+        var unittype = $("input[name='UnitType']:checked").val();
+        postData["UnitType"] = unittype;
+        $.SaveForm({
+            url: "../../EngineeringManage/PerilEngineering/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                $.currentIframe().loadData();
+            }
+        })
+    }
+
+    function changeType(a) {
+        var id = $(a).attr('data-value');
+        $.ajax({
+            url: '../../EngineeringManage/EngineeringSetting/GetFormJson',
+            data: { keyValue: id },
+            dataType: "JSON",
+            async: true,
+            success: function (result) {
+                if (result != null && result != "" && result != undefined)
+                {
+                    $("#EngineeringSpot").val(result.ProgrammeRisk);
+                    $("#TaskContent").val(result.ProgrammeContent);
+                }
+            }
+        });
+    }
+</script>
+<div style="margin: 0px; background-color: white;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基础信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle" style="width: 150px;">工程类别<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="EngineeringType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" onchange="changeType(this);"></div>
+                    </td>
+                    <td class="formTitle">工程名称<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="EngineeringName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">工程风险点<font face="宋体">*</font></td>
+                    <td class="formValue" colspan='3'>
+                        <textarea id="EngineeringSpot" class="form-control" isvalid="yes" checkexpession="NotNull" style="min-height: 80px;"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">开始时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="EStartTime" style="width: 150px;" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})">
+                    </td>
+                    <td class="formTitle">结束时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="EFinishTime" style="width: 150px;" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})">
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" id="tddept">单位类别<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="UnitType" id="UnitType1" value="1" />单位内部
+                            </label>
+                        </div>
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="UnitType" id="UnitType2" value="2" checked="checked" />外包单位
+                            </label>
+                        </div>
+                    </td>
+                    <td class="formTitle">所属单位<font face="宋体">*</font></td>
+                    <td class="formValue">@*
+                        <input id="BelongDeptName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" placeholder="请选择所属单位" readonly onclick="selectDept('', 0, 8, '选择部门', document.body, 'BelongDeptName,'',BelongDeptId', '1');" />
+                        <input id="BelongDeptId" type="hidden" />*@
+                        <input id="BelongDeptName" type="text" class="form-control" placeholder="请选择所属单位" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDept('', 0, 4, '选择所属单位', document.body, 'BelongDeptName,,BelongDeptId');" />
+                        <input type="hidden" id="BelongDeptId" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel panel-default">
+        <div class="panel-heading" style="vertical-align: central;">
+            <strong>&nbsp;&nbsp;施工方案</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle" style="width: 150px;">编制人</td>
+                    <td class="formValue">
+                        <input id="WriteUserName" style="width: 200px;" type="text" class="form-control" />
+                    </td>
+                    <td class="formTitle">编制时间</td>
+                    <td class="formValue">
+                        <input id="WriteDate" style="width: 150px;" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审核人</td>
+                    <td class="formValue">
+                        <input id="ExaminePerson" type="text" class="form-control" style="width: 200px;" />
+                    </td>
+                    <td class="formTitle">审核时间</td>
+                    <td class="formValue">
+                        <input id="ExamineTime" style="width: 150px;" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">施工方案文件</td>
+                    <td class="formValue" colspan='3'>
+                        <input id="ConstructFiles" type="text" hidden="hidden" />
+                        <div id="uploader" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                            <div class="queueList">
+                                <div id="dndArea" class="placeholder">
+                                    <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display: none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;安全技术交底</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle" style="width: 150px;">交底人</td>
+                    <td class="formValue">
+                        <input id="TaskPerson" type="text" class="form-control" style="width: 200px;" />
+                    </td>
+                    <td class="formTitle">交底时间</td>
+                    <td class="formValue">
+                        <input id="TaskTime" style="width: 150px;" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">交底内容</td>
+                    <td class="formValue" colspan='3'>
+                        <textarea id="TaskContent" class="form-control" style="min-height: 150px;"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">交底附件</td>
+                    <td class="formValue" colspan='3'>
+                        <input id="TaskFiles" type="text" hidden="hidden" />
+                        <div id="uploader1" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                            <div class="queueList" style="height: 200px;">
+                                <div id="dndArea1" class="placeholder">
+                                    <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display: none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;进展情况</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle" style="width: 150px;">进展情况<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="EvolveCase" type="select" class="ui-select" style="width: 200px;" isvalid="yes" checkexpession="NotNull"></div>
+                        <input id="Hidden1" type="hidden" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">备注</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="Remark" class="form-control" style="min-height: 80px;"></textarea>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>

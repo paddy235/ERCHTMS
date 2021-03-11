@@ -1,0 +1,274 @@
+@{
+    ViewBag.Title = "重大危险源监控";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script src="~/Content/scripts/business/Grid.js"></script>
+<script>
+    var _parentId = "";
+    var _isOrg = "";
+    var IsDanger = "1";
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var TimeYear = request("TimeYear");//省级统计页面跳转-年份
+    var State = request("State");//省级统计页面跳转-未建档状态
+
+    //加载页面
+    $(function () {
+        //页面初始化
+        InitialPage();
+        //加载按钮权限
+        LoadToolBar();
+        //（搜索条件）
+        ComboxBindData("DistrictId", top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + top.currUserOrgId);
+
+        //加载列表createuserid
+        var arrCol = new Array();
+        arrCol.push(
+                { label: '主键', name: 'id', index: 'id', align: 'center', sortable: true, hidden: true },
+                {
+                    label: '主键', name: 'dealid', index: 'dealid', align: 'center', hidden: true, sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == null || cellvalue == undefined)
+                            return "";
+                        return cellvalue;
+                    }
+                },
+                { label: '所属区域', name: 'districtname', index: 'districtname', align: 'center', sortable: true },
+                { label: '危险源名称/场所', name: 'dangersource', index: 'dangersource', align: 'center', sortable: true },
+                { label: '监控地点', name: 'jkarear', index: 'jkarear', align: 'center', sortable: true },
+                {
+                    label: '监控时间起', name: 'time', index: 'time', align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.jktimestart != "" && rowObject.jktimestart != null)
+                            return formatDate(rowObject.jktimestart, 'yyyy-MM-dd');
+                        return "";
+                    }
+                },
+                       {
+                           label: '监控时间止', name: 'time', index: 'time', align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                               if (rowObject.jktimeend != "" && rowObject.jktimeend != null)
+                                   return formatDate(rowObject.jktimeend, 'yyyy-MM-dd');
+                               return "";
+                           }
+                       },
+                    {
+                        label: '隐患', name: 'jkyhzgids', index: 'jkyhzgids', align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                            if (cellvalue != null && cellvalue != undefined)
+                                return "<a href=javascript:DialogOpenShow('/HiddenTroubleManage/HTBaseInfo/AppIndex?relevanceType=DangerSource&relevanceId=" + rowObject.dealid + "','隐患','',''," + true + ") style='color:blue; text-decoration:underline'  title='隐患'>" + cellvalue + "</a>";
+                            return 0;
+                        }
+                    },
+                      {
+                          label: '监控状态', name: 'jkskstatus', index: 'jkskstatus', align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                              if (cellvalue == 1) return "已受控"; else if (cellvalue == 0) return "<span style='color:red'>不受控</span>";
+                              else return "<span style='color:blue'>未监控</span>";
+
+                          }
+                      }
+
+                );
+        GetGrid("../../HazardsourceManage/Hazardsource/GetJkPageListJson?TimeYear=" + TimeYear + "&State=" + State, arrCol, "asc", "jkskstatus,id", true, false, $(window).height() - 170, 40)
+        //加载树
+        GetTree();
+    });
+    //初始化页面
+    function InitialPage() {
+        $("#btnModal").click(function () {
+            $('#QrCodeModal').modal('hide');
+        });
+
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载地区
+    function ComboxBindData(id, url) {
+        $("#" + id).ComboBoxTree({
+            //url: ?orgID=" + value,
+            url: url,
+            description: "==请选择==",
+            height: "180px",
+            allowSearch: true
+        });
+    }
+    //加载组织机构树
+    function GetTree() {
+        var json;
+        if (roleName.indexOf("省级") >= 0) {
+            json = JSON.stringify(
+             {
+                 SelectMode: 0,
+                 Mode: 5
+             }
+           );
+        } else {
+            json = JSON.stringify(
+                        {
+                            SelectMode: 0,
+                            Mode: 0
+                        }
+                      );
+        }
+
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = item.Sort;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    function GetQueryJson() {
+        var dId = $("#DistrictId").attr('data-value');
+        var dName = $("#DistrictId").attr('data-text');
+        if (dId == "" || dId == undefined || dId == null) {
+            dId = "";
+            dName = "";
+        }
+        var queryJson = {
+            DistrictId: dId,
+            DistrictName: dName,
+            DangerSource: $("#DangerSource").val(),
+            IsDanger: IsDanger,
+            code:_parentId,
+            isOrg: _isOrg,
+            type: 1,
+            TimeYear: TimeYear,
+            State: State
+        }
+        return queryJson;
+    }
+
+    //登记建档
+    function jk() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        //链表查询时判断
+        var keyValuedeal = $('#gridTable').jqGridRowValue('dealid');
+        if (checkedRow(keyValue)) { DialogOpenShow("/HazardsourceManage/Jkjc/Form?keyValue=" + keyValue + "&keyValuedeal=" + keyValuedeal, "危险源监控", "", "", false); }
+
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">重大危险源监控</div>
+            <div class="titlePanel">
+
+
+                <div class="title-search">
+
+
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 400px;">
+                                        <table class="form">
+                                            <tr>
+                                                <td class="formTitle" style="width:120px;">所属区域：</td>
+                                                <td class="formValue">
+                                                    <div id="DistrictId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width: 200px;"></div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">名称：</td>
+                                                <td class="formValue">
+                                                    <input id="DangerSource" type="text" class="form-control" placeholder="请输入危险源名称" style="width: 200px;" />
+                                                </td>
+                                            </tr>
+
+
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+
+                </div>
+
+                <div class="toolbar" id="divToolBar">
+
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal" id="QrCodeModal">
+    <div class="modal-dialog" style="width:210px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header">
+                <h5>特种设备二维码</h5>
+            </div>
+            <div class="modal-body" id="modalBody">
+
+            </div>
+            <div class="modal-footer">
+                <a id="aDow" href="#" target="_blank" style="float: left; color: black; text-decoration: underline; font-size: 12px; margin-top:7px;">下载二维码</a>
+                <button id="btnModal" type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>

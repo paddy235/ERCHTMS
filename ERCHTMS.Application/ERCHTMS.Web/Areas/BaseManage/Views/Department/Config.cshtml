@@ -1,0 +1,154 @@
+﻿@{
+    ViewBag.Title = "关系配置";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    var organizeId = request('organizeId');
+    var departmentId = request('departmentId');
+    var parentId = request('parentId');
+    var action = request('action');
+    var a = null;
+    $(function () {
+        initControl();
+    })
+    //初始化控件
+    function initControl() {
+        $("#Dept").ComboBoxTree({
+            allowSearch:true,
+            height: "300px",
+            url: top.contentPath + "/BaseManage/Department/GetTreeJson?organizeId=" + organizeId,
+            description: ""
+        }).bind("change", function () {            $("#Post").ComboBox({
+                height: "300px",
+                url: top.contentPath + "/BaseManage/Post/GetListJson?organizeId=" + organizeId + "&isOrg=" + $("#Dept").attr("data-value"),
+                id: "RoleId",
+                text: "FullName",
+                description: "==请选择=="
+            })        });        
+        ////部门
+        //$("#DepartmentId").ComboBoxTree({
+        //    description: "==请选择==",
+        //    height: "200px",
+        //    allowSearch: true
+        //}).bind("change", function () {
+        //    var value = $(this).attr('data-value');
+        //    var isorg = $(this).attr('data-isorg');
+        //    //如果是厂级部门的话，在角色那会自动赋值 “厂级部门用户”
+        //    if (isorg == "1") {
+        //        $.ajax({
+        //            url: '../../BaseManage/Post/GetListByCode',
+        //            data: { code: "100103" },
+        //            dataType: "JSON",
+        //            success: function (result) {
+        //                $("#RoleName").val(result.FullName);
+        //                $("#RoleId").val(result.RoleId);
+        //            }
+        //        });
+        //    }
+        //    //加载岗位
+        //    $("#Post").ComboBox({
+        //        url: top.contentPath + "/BaseManage/Post/GetListJson?organizeId=" + $("#OrganizeId").attr('data-value') + '&isOrg=' + value,
+        //        id: "RoleId",
+        //        text: "FullName",
+        //        description: "==请选择=="
+        //    })
+        //});
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../BaseManage/Department/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.RelatedDeptName != null) {
+                        $("#InitDept").val(data.RelatedDeptName);
+                        $("#InitDept").find("option").each(function (i, dom) {
+                            if (data.RelatedDeptName.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+
+                    }
+                }
+            });
+            $("#Dept").ComboBoxTreeSetValue(keyValue);
+            $("#Dept").trigger("change");
+        } 
+    }
+    //保存表单
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var newDeptName = $("#tdDept").find(".filter-option").text().replace("请选择", "").replace(/\s+/g, '');
+        var newPostName = $("#tdNewPost").find(".filter-option").text().replace("请选择", "").replace(/\s+/g, '');
+        var postName = $("#Post").attr("data-text");
+        postName = postName == undefined ? "" : postName;
+        var postId = $("#Post").attr("data-value");
+        postId = postId == undefined ? "" : postId;
+        $.SaveForm({
+            url: "../../RiskDatabase/DangerSource/SaveConfig?deptCode=" + $("#Dept").attr("data-code") + "&deptName=" + encodeURIComponent($("#Dept").attr("data-text")) + "&newDeptName=" + encodeURI(newDeptName) + "&postName=" + encodeURI(postName) + "&newPostName=" + encodeURI(newPostName) + "&postId=" + postId,
+            loading: "正在设置...",
+            param: { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val(),deptId:keyValue },
+            success: function () {
+            }
+        })
+    }
+    function setPost(obj) {
+        var deptName = $("#tdDept").find(".filter-option").text().replace("请选择", "");
+        var postName = $("#Post").attr("data-value");
+        //if (deptName.length==0 || postName.length==0) {
+        //    dialogMsg("请先选择关联部门和岗位！", 2);
+        //    return false;
+        //} else {
+            $.post("../../RiskDatabase/DangerSource/GetPostTreeJson", { deptName: deptName.replace(/\s+/g, '') }, function (data) {
+                $("#InitPost").html("");
+                $("#InitPost").append(data);
+                $("#InitPost").selectpicker('refresh');
+            });
+       // }
+       
+    }
+</script>
+<div style="margin-left: 10px; margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">部门<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="Dept" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull" ></div>
+            </td>
+        </tr>
+        <tr>
+            
+            <td class="formTitle">关联部门<font face="宋体">*</font></td>
+            <td class="formValue" id="tdDept">
+                <select id="InitDept" class="form-control selectpicker show-menu-arrow" isvalid="yes" checkexpession="NotNull" multiple>
+                    @Html.Raw(new ERCHTMS.Busines.RiskDatabase.DangerSourceBLL().GetOptionsStringForInitDept())
+                </select>
+            </td>
+        </tr>
+
+        <tr>
+            <td class="formTitle">岗位<font face="宋体"></font></td>
+            <td class="formValue" id="tdPost">
+                <div id="Post" type="selectTree" class="ui-select" ></div>
+            </td>
+        </tr>
+
+
+        <tr>
+            <td class="formTitle"><font face="宋体"></font>
+                关联岗位
+            </td>
+            <td class="formValue" onclick="setPost(this)" id="tdNewPost">
+                <select id="InitPost" class="form-control selectpicker show-menu-arrow"  multiple>
+                </select>
+            </td>
+        </tr>
+    </table>
+</div>

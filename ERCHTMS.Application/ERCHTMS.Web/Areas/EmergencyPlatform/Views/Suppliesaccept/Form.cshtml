@@ -1,0 +1,504 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script type="text/javascript" src="~/Content/scripts/business/common.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var issubmit = false; //判断是否提交
+    var action = request("action");
+    var islastaudit = false;
+    $(function () {
+        initControl();
+        getGrid();
+        bingAuditGrid();
+    });
+    //初始化控件
+    function initControl() {
+        switch (action) {
+            case "add":
+            case "edit":
+                $("#btn_Save").show();
+                $("#btn_Submit").show();
+                $("#btn_Check").hide();
+                $("#conAudit").hide();
+                $("#conHistory").hide();
+                break;
+            case "show":
+                $("#btn_Save").hide();
+                $("#btn_Submit").hide();
+                $("#btn_Check").hide();
+                $("#choose").hide();
+                $("#conAudit").hide();
+                disabledControl();
+                break;
+            case "audit":
+                $("#btn_Save").hide();
+                $("#btn_Submit").hide();
+                $("#btn_Check").show();
+                $("#choose").hide();
+                disabledControl("div1");
+                disabledControl("div2");
+                break;
+            default:
+                break;
+        }
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../EmergencyPlatform/Suppliesaccept/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    issubmit = data.IsSubmit == 1 ? true : false;
+                    if (action == "show" || action == "audit") {
+                        issubmit = true;
+                    }
+                    if (data.IsSubmit == 1) {
+                        $("#btn_Export").show();
+                    }
+                    islastaudit = data.IsLastAudit;
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+        else {
+            keyValue = "@Guid.NewGuid().ToString()";
+        }
+        $("#btn_Save").click(function () {
+            AcceptClick(0);
+        })
+        $("#btn_Submit").click(function () {
+            AcceptClick(1);
+        })
+        $("#btn_Check").click(function () {
+            AuditClick();
+        })
+    }
+    //保存表单;
+    function AcceptClick(type) {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var arr = [];
+        var rows = $("#SuppliesTable").jqGrid("getRowData");
+        var yz = true;
+        var SuppliesName = "";
+        if (rows.length > 0) {
+            $(rows).each(function (i, item) {
+                if (parseInt($("#AcceptNum_" + item.Id).val()) > parseInt(item.CorrectNum)) {
+                    SuppliesName = item.SuppliesName;
+                    yz = false;
+                }
+                else {
+                    var tempRow = { SuppliesId: item.SuppliesId, DepartId: item.DepartId, UserId: item.UserId, SuppliesName: item.SuppliesName, Models: item.Models, CorrectNum: item.CorrectNum,SuppliesUntilName:item.SuppliesUntilName, DepartName: item.DepartName, UserName: item.UserName, AcceptNum: $("#AcceptNum_" + item.Id).val(), RecId: keyValue };
+                    arr.push(tempRow);
+                }
+            })
+        }
+        else {
+            dialogMsg('请先填写物资信息！', 0);
+            return false;
+        }
+        if (!yz) {
+            dialogMsg(SuppliesName + '申领数量大于库存数量！', 0);
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["DetailData"] = arr;
+        postData["IsSubmit"] = type;
+        $.SaveForm({
+            url: "../../EmergencyPlatform/Suppliesaccept/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    function AuditClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if ($("#tdResult").find("input:checked").length == 0) {
+            dialogMsg("请选择审批结果！");
+            return false;
+        }
+        if ($("#img1").attr("src") == undefined) {
+            dialogMsg("请先签名！");
+            return false;
+        }
+        if ($("#tdResult").find("input:checked").eq(0).val() == "1") {
+            if ($("#AUDITOPINION").val().length == 0) {
+                dialogMsg("请填写审批意见！");
+                return false;
+            }
+        }
+        var arr = [];
+        if (islastaudit) {
+            var rows = $("#SuppliesTable").jqGrid("getRowData");
+            var yz = true;
+            var SuppliesName = "";
+            if (rows.length > 0) {
+                $(rows).each(function (i, item) {
+                    if (parseInt($("#AcceptNum_" + item.Id).val()) > parseInt(item.CorrectNum)) {
+                        SuppliesName = item.SuppliesName;
+                        yz = false;
+                    }
+                    else {
+                        var tempRow = {Id:item.Id, SuppliesId: item.SuppliesId, DepartId: item.DepartId, UserId: item.UserId, SuppliesName: item.SuppliesName, Models: item.Models, CorrectNum: item.CorrectNum, DepartName: item.DepartName, UserName: item.UserName, AcceptNum: $("#AcceptNum_" + item.Id).val(), RecId: keyValue };
+                        arr.push(tempRow);
+                    }
+                })
+            }
+            else {
+                dialogMsg('请先填写物资信息！', 0);
+                return false;
+            }
+            if (!yz) {
+                dialogMsg(SuppliesName + '申领数量大于库存数量！', 0);
+                return false;
+            }
+        }
+        
+        var postData = $("#tab2").formSerialize(keyValue);
+        postData["DetailData"] = JSON.stringify(arr);
+        var dlg = dialogConfirm("确认提交吗？",
+          function (isSure) {
+              if (isSure) {
+                  top.layer.close(dlg);
+                  postData["AUDITRESULT"] = $("#tdResult").find("input:checked").eq(0).val();
+                  postData["AUDITSIGNIMG"] = $("#AUDITSIGNIMG").val();
+                  $.SaveForm({
+                      url: "../../EmergencyPlatform/Suppliesaccept/AuditForm?keyValue=" + keyValue,
+                      param: postData,
+                      loading: "正在提交数据...",
+                      success: function () {
+                          $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                      }
+                  })
+              }
+          });
+    }
+
+    function ChooseSupplies() {
+        var rows = $("#SuppliesTable").jqGrid("getRowData");
+        var ids = "";
+        if (rows.length > 0) {
+            $(rows).each(function (i, item) {
+                ids += item.SuppliesId + ",";
+            })
+        }
+        ids = ids.length > 0 ? ids.substr(0, ids.length - 1) : "";
+        $("#SuppliesIds").val(ids);
+        var options = {
+            callBack: function (Id, suppliesname, models, correctnum, suppliesuntilname, departname, departid, userid, username) {
+                var arrid = Id.split(',');
+                var arrsuppliesname = suppliesname.split(',');
+                var arrmodels = models.split(',');
+                var arrcorrectnum = correctnum.split(',');
+                var arrsuppliesuntilname = suppliesuntilname.split(',');
+                var arrdepartname = departname.split(',');
+                var arrdepartid = departid.split(',');
+                var arruserid = userid.split(',');
+                var arrusername = username.split(',');
+                $(arrid).each(function (index, ele) {
+                    if (ids.indexOf(ele) < 0) {
+                        var rowId = $("#SuppliesTable").jqGrid('getRowData').length + 1;
+                        $("#SuppliesTable").addRowData(rowId, {
+                            Id: newGuid(),
+                            SuppliesId: arrid[index],
+                            SuppliesName: arrsuppliesname[index],
+                            Models: arrmodels[index],
+                            CorrectNum: arrcorrectnum[index],
+                            SuppliesUntilName: arrsuppliesuntilname[index],
+                            DepartName: arrdepartname[index],
+                            DepartId: arrdepartid[index],
+                            UserId: arruserid[index],
+                            UserName: arrusername[index],
+                            CreateUserId: userId,
+                            AcceptNum: ""
+                        }, "first");
+                    }
+                });
+            }
+        };
+        var url = '/EmergencyPlatform/Supplies/Select?Ids=' + ids;
+        dialogOpen({
+            id: "SuppliesSelect",
+            title: "选择应急物资",
+            url: url,
+            width: ($(top.window).width() - 10) + "px",
+            height: ($(top.window).height()) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(options);
+            }
+        });
+    }
+
+
+    function getGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#SuppliesTable');
+        $gridTable.jqGrid({
+            url: "../../EmergencyPlatform/SuppliesAcceptDetail/GetListJson?keyValue=" + keyValue,
+            datatype: "json",
+            height: 400,
+            postData: {},
+            autowidth: true,
+            colModel: [
+                { label: 'Id', name: 'Id', width: 200, align: 'center', sortable: false, hidden: true },
+                { label: 'SuppliesId', name: 'SuppliesId', width: 200, align: 'center', sortable: false, hidden: true },
+                { label: 'DepartId', name: 'DepartId', width: 200, align: 'center', sortable: false, hidden: true },
+                { label: 'UserId', name: 'UserId', width: 200, align: 'center', sortable: false, hidden: true },
+                 {
+                     label: '操作', name: 'oper', width: 200, align: 'center',  hidden: issubmit,
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "";
+                         if (rowObject.CreateUserId == userId) {
+                             html += "<a href=javascript:btn_delete('" + options.rowId + "') title='删除'><i class='fa fa-trash-o'></i></a>";
+                         }
+                         return html;
+                     }
+                 },
+                { label: '物资名称', name: 'SuppliesName', index: 'SuppliesName', width: 250, align: 'center',sortable:false},
+                {
+                    label: '规格型号', name: 'Models', index: 'Models', width: 150, align: 'center', sortable: false
+                },
+                {
+                    label: '现存数量', name: 'CorrectNum', index: 'CorrectNum', width: 150, align: 'center', sortable: false
+                },
+                {
+                    label: '单位', name: 'SuppliesUntilName', index: 'SuppliesUntilName', width: 100, align: 'center', sortable: false
+                },
+                {
+                    label: '责任部门', name: 'DepartName', index: 'DepartName', width: 200, align: 'center', sortable: false
+                },
+                {
+                    label: '责任人', name: 'UserName', index: 'UserName', width: 150, align: 'center', sortable: false
+                },
+                {
+                    label: '领用数量', name: 'AcceptNum', index: 'AcceptNum', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (issubmit && !islastaudit) {
+                            return cellvalue;
+                        }
+                        else {
+                            var html = "<input id='AcceptNum_" + rowObject.Id + "' value='" + emptystr(rowObject.AcceptNum) + "' class='form-control' isvalid='yes' checkexpession='Num' />";
+                            return html;
+                        }
+                        
+                    }
+                }
+            ],
+            pager: false,
+            rowNum: "20",
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+    }
+    function emptystr(str) {
+        if (str == null || str == "" || str == undefined) {
+            return "";
+        }
+        else {
+            return str;
+        }
+    }
+    function sign() {
+
+        var signImg = getUserSignPic(top.currUserId);
+        if (!!signImg) {
+            $("#btnSign").hide();
+            $("#img1").show();
+            $("#img1").attr("src", "../.." + signImg);
+            $("#AUDITSIGNIMG").val(signImg);
+        }
+    }
+    //绑定审核历史信息
+    function bingAuditGrid() {
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            height: 400,
+            autowidth: true,
+            postData: { recId: keyValue },
+            url: "../../OutsourcingProject/Aptitudeinvestigateaudit/GetAuditListJson",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                { label: '操作人', name: 'auditpeople', width: 200, align: 'center', sortable: false },
+                { label: '操作时间', name: 'audittime', width: 200, align: 'center', sortable: false },
+                {
+                    label: '审批结果', name: 'auditresult', width: 200, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return cellvalue == "0" ? "同意" : "不同意";
+                    }
+                },
+                { label: '审批意见', name: 'auditopinion', width: 200, align: 'center', sortable: false },
+                { label: '审批部门', name: 'auditdept', align: 'center', sortable: false },
+                {
+                    label: '签名', name: 'auditsignimg', align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (!!cellvalue) {
+                            return "<img src='../../" + cellvalue + "' height='60px;' />";
+                        }
+
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 10000,
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true
+
+        });
+    }
+
+    function btn_delete(id) {
+        $('#SuppliesTable').delRowData(id);
+    }
+    
+    function ExportData() {
+        location.href = "../../EmergencyPlatform/Suppliesaccept/ExportData?keyValue=" + keyValue;
+    }
+</script>
+<div style="margin-left: 10px; margin-right: 10px;">
+    <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px;padding-top:40px;">
+        <div class="panel panel-default" id="div1">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;基本信息</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body" style="">
+                <table class="form">
+                    <tr id="HandleTr">
+                        <td class="formTitle">申请人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApplyPerson" type="text" class="form-control" disabled="disabled" isvalid="yes" checkexpession="NotNull" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" />
+                            <input id="ApplyPersonId" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" />
+                            <input id="SuppliesIds" type="hidden"/>
+                        </td>
+                        <td class="formTitle">申请部门<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApplyDept" type="text" class="form-control" disabled="disabled" isvalid="yes" checkexpession="NotNull"  value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName"/>
+                            <input id="ApplyDeptId" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId" />
+                            <input id="ApplyDeptCode" type="hidden"  value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode"/>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">申请时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ApplyDate" type="text" isvalid="yes" checkexpession="NotNull" disabled="disabled" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">领用原因<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="AcceptReason" class="form-control" style="height: 120px;" isvalid="yes" checkexpession="LenStr" length="500"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <div class="panel panel-default" id="div2">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;物资信息</strong>
+                @*<span class="tools pull-right">
+                    <a href="javascript:btn_add()" id="addAnalysis" class="btn btn-primary btn-xs">新增</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>*@
+            </div>
+            <div class="panel-body">
+                <div style="height:50px">
+                    <input type="button" id="choose" class="btn btn-primary" value="选择应急物资" onclick="ChooseSupplies()" />
+                </div>
+                <div style="margin-top: 5px; margin-right: 30px;">
+                    <table id="SuppliesTable"></table>
+                </div>
+            </div>
+        </div>
+        <div class="panel panel-default con" id="conAudit">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;审批信息</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table class="form" id="tab2">
+                    <tr>
+                        <td class="formTitle">审批人</td>
+                        <td class="formValue">
+                            <input id="AUDITPEOPLE" type="text" class="form-control" readonly value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" />
+                        </td>
+                        <td class="formTitle">审批时间</td>
+                        <td class="formValue">
+                            <input id="AUDITTIME" type="text" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd HH:mm")" readonly />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">审批结果</td>
+                        <td class="formValue icheck" id="tdResult">
+                            <input type="radio" value="0" id="Result1" name="Result" />&nbsp;<label for="Result1">同意</label>&nbsp;&nbsp;&nbsp;
+                            <input type="radio" value="1" id="Result2" name="Result" />&nbsp;<label for="Result2">不同意</label>
+                        </td>
+                        <td class="formTitle">审批部门</td>
+                        <td class="formValue">
+                            <input id="AUDITDEPT" type="text" class="form-control" readonly value="@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">签名</td>
+                        <td class="formValue" colspan="3">
+                            <img id="img1" height="80" alt="点击上传签名" style="display:none;" />
+                            <input type="button" class="btn btn-default" id="btnSign" onclick="sign()" value="点击上传签名" />
+                            <input type="hidden" id="AUDITSIGNIMG" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">审批意见</td>
+                        <td class="formValue" colspan="3">
+                            <input id="AUDITOPINION" type="text" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="888"/>
+                        </td>
+
+                    </tr>
+
+                </table>
+            </div>
+        </div>
+
+        <div class="panel panel-default" id="conHistory">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;审批历史记录</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div style="margin-top:20px;">
+                    <table id="gridTable"></table>
+                    <div id="gridPager"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style="top:40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index:1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+        <a id="btn_Check" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4;display:none" ><i class="fa fa-mail-forward"></i>&nbsp;审&nbsp;&nbsp;批</a>
+        &nbsp; &nbsp;
+        <a id="btn_Export" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4;display:none" onclick="ExportData()"><i class="fa fa-mail-forward"></i>导出领用审批单</a>
+    </div>
+</div>

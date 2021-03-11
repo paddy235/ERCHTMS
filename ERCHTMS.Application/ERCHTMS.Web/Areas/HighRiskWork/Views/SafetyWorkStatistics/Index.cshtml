@@ -1,0 +1,615 @@
+﻿@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+<!--第三方统计图start-->
+<script src="~/Content/Scripts/plugins/highcharts/highcharts.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/highcharts-more.js"></script>
+<script src="~/Content/Scripts/plugins/highcharts/modules/exporting.js"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Grid.js"></script>
+
+<style type="text/css">
+    $ {
+        demo .css;
+    }
+
+    .css1 {
+        width: 50px;
+        font-weight: bold;
+    }
+
+    .css2 {
+        width: 100px;
+    }
+</style>
+<script src="~/Content/scripts/business/Common.js"></script>
+<!--第三方统计图end-->
+<script>
+    var state = 1;
+    var deptname = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var deptid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var deptcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var rolenames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+
+    var starttime = "", endtime = ""; year = ""; deptid = ""; deptcode = "";
+    $(function () {
+        dafaultdata();
+        InitialPage();
+        statTJ();
+    })
+
+    function InitialPage() {
+        $('#desktop').height(1000);
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable1').setGridWidth($(window).width() - 100);
+                $('#gridTable2').setGridWidth($(window).width() - 100);
+                $('#gridTable3').setGridWidth($(window).width() - 100);
+                $('#desktop').height(1000);
+            }, 800);
+            e.stopPropagation();
+        });
+
+        $("#btn_Export").click(function () {
+            var filename;
+            switch (state) {
+                case 1:
+                    filename = "高风险作业类型统计";
+                    break;
+                case 2:
+                    filename = "高风险作业月度变化趋势";
+                    break;
+                case 3:
+                    filename = "单位对比";
+                    break;
+                default:
+                    filename = "统计表";
+                    break;
+            }
+
+            var statetable = $("#gridTable" + state)
+            var projectItem = statetable.jqGrid('getRowData')
+            var table = "<table  style='text-align: center; ' border='1'  cellpadding='0' cellspacing='0'>"
+            if (state == 1) {
+                table += "<th width='40px'>序号</th><th width='100px'>高风险作业类型</th><th width='40px'>作业数量</th><th width='40px'>比例</th>";
+            }
+            else if (state == 2) {
+                table += "<th width='40px'>  </th><th width='40px'>1月</th><th width='40px'>2月</th><th width='40px'>3月</th><th width='40px'>4月</th><th width='40px'>5月</th><th width='40px'>6月</th><th width='40px'>7月</th><th width='40px'>8月</th><th width='40px'>9月</th><th width='40px'>10月</th><th width='40px'>11月</th><th width='40px'>12月</th>";
+            }
+            else if (state == 3)
+            {
+                table += "<th width='60px'>单位/部门</th><th width='80px'>高风险作业数量</th>";
+            }
+            $(projectItem).each(function (i, dom) {
+                var html = "<tr style=' background-color:white'>";
+                //高风险作业类型
+                if (state == 1) {
+                    var numbercode = (i + 1).toString();
+                    html += "<td>" + numbercode + "</td>";
+
+                    var worktype = statetable.find("tr").eq(i + 1).find("td[aria-describedby='gridTable" + state + "_worktype']").eq(0).text();
+                    html += "<td>" + worktype + "</td>";
+
+                    var typenum = statetable.find("tr").eq(i + 1).find("td[aria-describedby='gridTable" + state + "_typenum']").eq(0).text();
+                    html += "<td>" + typenum + "</td>";
+
+                    var percent = statetable.find("tr").eq(i + 1).find("td[aria-describedby='gridTable" + state + "_percent']").eq(0).text();
+                    html += "<td>" + percent + "</td>";
+                }
+                //高风险作业月度变化趋势
+                else if (state == 2) {
+                    var name = statetable.find("tr").eq(i + 1).find("td[aria-describedby='gridTable" + state + "_name']").eq(0).text();
+                    html += "<td>" + name + "</td>";
+
+                    for (var k = 1; k <= 12; k++) {
+                        var num = statetable.find("tr").eq(i + 1).find("td[aria-describedby='gridTable" + state + "_num" + k + "']").eq(0).text();
+                        html += "<td>" + num + "</td>";
+                    }
+                }
+                //单位对比
+                else if (state == 3) {
+                    var deptname = statetable.find("tr").eq(i + 1).find("td[aria-describedby='gridTable" + state + "_deptname']").eq(0).text();
+                    html += "<td>" + deptname + "</td>";
+
+                    var deptcount = statetable.find("tr").eq(i + 1).find("td[aria-describedby='gridTable" + state + "_deptcount']").eq(0).text();
+                    html += "<td>" + deptcount + "</td>";
+                }
+                html += "</tr>"
+                table += html;
+            });
+            table += "</table>";
+            $.post("../../HighRiskWork/SafetyWorkStatistics/SaveWork",
+                 { TableHtml: encodeURIComponent(table) }
+                 , function (data) {
+                     window.location.href = "../../HighRiskWork/SafetyWorkStatistics/ExportWork?PID=" + data + "&filename=" + encodeURIComponent(filename);
+                 });
+        });
+    }
+
+    //高风险作业类型统计
+    function statTJ() {
+        $("#divDW").hide();
+        $("#divTJ").show();
+        $("#divQS").hide();
+
+        $("#td1,#td2").attr("style", "display:none");
+        $("#td3,#td4,#tdworkdeptname,#tdworkdept").removeAttr("style");
+        $("#td3").attr("style", "width: 65px; font-weight: bold;");
+        $("#td4").attr("style", "width: 300px;");
+        $("#tdworkdeptname").attr("style", 'width: 70px; font-weight: bold;" align="right');
+        $("#tdworkdept").attr("style", 'width: 145px;');
+
+        starttime = $("#starttime").val();
+        endtime = $("#endtime").val();
+        deptid = $("#deptid").val();
+        deptcode = $("#deptcode").val();
+        $.get("GetHighWorkCount", { starttime: starttime, endtime: endtime, deptid: deptid, deptcode: deptcode }, function (data) {
+            var json = eval("(" + data + ")");
+            $('#tjcontainer').highcharts({
+                chart: {
+                    plotBackgroundColor: null,
+                    plotBorderWidth: null,
+                    plotShadow: false,
+                    type: 'pie'
+                },
+                tooltip: { pointFormat: '{series.name}: <b>{point.percentage:.2f}%</b>' },
+                exporting: { enabled: false },
+                title: { text: '高风险作业类型统计' },
+                plotOptions: {
+                    pie: {
+                        allowPointSelect: true,
+                        cursor: 'pointer',
+                        dataLabels: {
+                            enabled: true,
+                            format: '<b>{point.name}</b>: {point.percentage:.2f} %',
+                            style: {
+                                color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
+                            }
+                        }
+                    }
+                },
+                series: [{
+                    name: '百分比',
+                    colorByPoint: true,
+                    data: json
+                }],
+                lang: { noData: "暂无数据可显示!" },
+                noData: {
+                    position: {
+                        align: 'center',
+                        verticalAlign: 'middle'
+                    },
+                    attr: {
+                        'stroke-width': 1
+                    },
+                    style: {
+                        fontWeight: 'bold',
+                        fontSize: '15px',
+                        color: '#202030'
+                    }
+                }
+            });
+        });
+        //加载表格
+        loadtj();
+    }
+
+    //高风险作业类型表格
+    function loadtj() {
+        var $gridTable = $("#gridTable1");
+        $gridTable.jqGrid({
+            url: "../../HighRiskWork/SafetyWorkStatistics/GetHighWorkList",
+            postData: { starttime: starttime, endtime: endtime, deptid: deptid, deptcode: deptcode },
+            datatype: "json",
+            mtype: "post",
+            height: 300,
+            width: $(window).width() -100,
+            autoheight: true,
+            autowidth: true,
+            colModel: [
+                 { label: '高风险作业类型', name: 'worktype', align: 'center', sortable: false },
+                 { label: '作业数量', name: 'typenum', align: 'center', sortable: false },
+                 { label: '比例(%)', name: 'percent', align: 'center', sortable: false }
+            ],
+            viewrecords: true,
+            rowNum: 100,
+            rownumbers: true,
+            shrinkToFit: true,
+            gridComplete: function () {
+
+            }, loadComplete: function (xhr) {
+                var data = $gridTable.jqGrid('getRowData');
+                var num1 = 0;
+                $(data).each(function (i, item) {
+                    num1 += parseInt(item.typenum);
+
+                });
+                $gridTable.addRowData(3, { worktype: '全部', typenum: num1, percent: '-' });
+            }
+        });
+    }
+
+    //月度变化
+    function statQS() {
+        $("#td3,#td4").attr("style", "display:none");
+        $("#td1,#td2,#tdworkdeptname,#tdworkdept").removeAttr("style");
+        $("#td1").attr("style", "width: 40px; font-weight: bold;");
+        $("#td2").attr("style", "width: 80px;");
+        $("#tdworkdeptname").attr("style", 'width: 70px; font-weight: bold;" align="right');
+        $("#tdworkdept").attr("style", 'width: 145px;');
+
+        deptid = $("#deptid").val();
+        deptcode = $("#deptcode").val();
+        year = $("#year").val();
+        $.get("GetHighWorkYearCount", { year: year, deptid: deptid, deptcode: deptcode }, function (data) {
+            var json = eval("(" + data + ")");
+            $('#qscontainer').highcharts({
+                chart: {
+                    type: 'spline'
+                },
+                title: {
+                    text: '高风险作业变化趋势'
+                },
+                xAxis: {
+                    categories: json.x
+                },
+                yAxis: {
+                    title: {
+                        text: '数量'
+                    },
+                    labels: {
+                        formatter: function () {
+                            return this.value;
+                        }
+                    }
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    crosshairs: true,
+                    shared: true
+                },
+                plotOptions: {
+                    spline: {
+                        marker: {
+                            radius: 4,
+                            lineColor: '#666666',
+                            lineWidth: 1
+                        }
+                    }
+                },
+                series: [{
+                    name: '高风险作业数量',
+                    marker: {
+                        symbol: 'square'
+                    },
+                    data: json.y
+                }]
+            });
+        });
+        loadQS();
+    }
+
+    function loadQS() {
+        var $gridTable = $("#gridTable2");
+        $gridTable.jqGrid({
+            url: "../../HighRiskWork/SafetyWorkStatistics/GetHighWorkYearList",
+            postData: { year: year, deptid: deptid, deptcode: deptcode },
+            datatype: "json",
+            mtype: "post",
+            height: 300,
+            width: $(window).width()-100,
+            autoheight: true,
+            autowidth: true,
+            colModel: [
+                 { label: '名称', name: 'name', align: 'center', sortable: false },
+                 { label: '1月', name: 'num1', align: 'center', sortable: false },
+                 { label: '2月', name: 'num2', align: 'center', sortable: false },
+                 { label: '3月', name: 'num3', align: 'center', sortable: false },
+                 { label: '4月', name: 'num4', align: 'center', sortable: false },
+                 { label: '5月', name: 'num5', align: 'center', sortable: false },
+                 { label: '6月', name: 'num6', align: 'center', sortable: false },
+                 { label: '7月', name: 'num7', align: 'center', sortable: false },
+                 { label: '8月', name: 'num8', align: 'center', sortable: false },
+                 { label: '9月', name: 'num9', align: 'center', sortable: false },
+                 { label: '10月', name: 'num10', align: 'center', sortable: false },
+                 { label: '11月', name: 'num11', align: 'center', sortable: false },
+                 { label: '12月', name: 'num12', align: 'center', sortable: false },
+            ],
+            viewrecords: true,
+            rowNum: 100,
+            rownumbers: true,
+            shrinkToFit: true,
+            gridComplete: function () {
+
+            }
+        });
+    }
+
+    //单位对比
+    function statDW() {
+        $("#td1,#td2,#tdworkdeptname,#tdworkdept").attr("style", "display:none");
+        $("#td4,#td3").removeAttr("style");
+        $("#td3").attr("style", "width: 65px; font-weight: bold;");
+        $("#td4").attr("style", "width: 300px;");
+
+        $.get("GetHighWorkDepartCount", { starttime: starttime, endtime: endtime }, function (data) {
+            var json = eval("(" + data + ")");
+            $('#dwcontainer').highcharts({
+                chart: {
+                    type: 'column'
+                },
+                title: {
+                    text: '高风险作业数量统计'
+                },
+                exporting: {
+                    enabled: false
+                },
+                credits: {
+                    enabled: false
+                },
+                xAxis: {
+                    categories: json.x,
+                    crosshair: true
+                },
+                yAxis: {
+                    min: 0,
+                    title: {
+                        text: '高风险作业数量'
+                    }
+                },
+                tooltip: {
+                    headerFormat: '<span style="font-size:10px">{point.key}</span><table>',
+                    pointFormat: '<tr><td style="color:{series.color};padding:0">{series.name}: </td>' +
+                        '<td style="padding:0"><b>{point.y:f}</b></td></tr>',
+                    footerFormat: '</table>',
+                    shared: true,
+                    useHTML: true
+                },
+                plotOptions: {
+                    column: {
+                        pointPadding: 0.2,
+                        borderWidth: 0
+                    }
+                },
+                series: [{
+                    name: '高风险作业数量',
+                    data: json.y
+                }]
+            });
+        });
+        loadDW();
+    }
+
+    function loadDW() {
+        var $gridTable = $("#gridTable3");
+        $gridTable.jqGrid({
+            url: "../../HighRiskWork/SafetyWorkStatistics/GetHighWorkDepartList",
+            postData: { starttime: starttime, endtime: endtime },
+            datatype: "json",
+            mtype: "post",
+            height: 300,
+            width: $(window).width() - 100,
+            autoheight: true,
+            autowidth: true,
+            colModel: [
+                 { label: '单位/部门', name: 'deptname', align: 'center', sortable: false },
+                 { label: '高风险作业数量', name: 'deptcount', align: 'center', sortable: false }
+            ],
+            viewrecords: true,
+            rowNum: 100,
+            rownumbers: true,
+            shrinkToFit: true,
+            gridComplete: function () {
+
+            }, loadComplete: function (xhr) {
+                var data = $gridTable.jqGrid('getRowData');
+                var num1 = 0;
+                $(data).each(function (i, item) {
+                    num1 += parseInt(item.deptcount);
+
+                });
+                $gridTable.addRowData(3, { deptname: '合计', deptcount: num1 });
+            }
+        });
+    }
+
+    function query() {
+        starttime = $("#starttime").val();
+        endtime = $("#endtime").val();
+        deptid = $("#deptid").val();
+        deptcode = $("#deptcode").val();
+
+        if (state == 1) {
+            $("#btntj").trigger("click");
+            $("#gridTable1").jqGrid('setGridParam', {
+                postData: { starttime: starttime, endtime: endtime, deptid: deptid, deptcode: deptcode }, page: 1
+            }).trigger('reloadGrid');
+        }
+        else if (state == 2) {
+            $('#divQS').show();
+            $('#divTJ').hide();
+            $('#divDW').hide();
+            $(this).addClass('btn-primary');
+            statQS();
+            $("#gridTable2").jqGrid('setGridParam', {
+                postData: { year: year, deptid: deptid, deptcode: deptcode }, page: 1
+            }).trigger('reloadGrid');
+        }
+        else if (state == 3) {
+            $('#divQS').hide();
+            $('#divTJ').hide();
+            $('#divDW').show();
+            $(this).addClass('btn-primary');
+            statDW();
+            $("#gridTable3").jqGrid('setGridParam', {
+                postData: { starttime: starttime, endtime: endtime }, page: 1
+            }).trigger('reloadGrid');
+        }
+    }
+
+
+    function dafaultdata() {
+        $("#starttime").val("@DateTime.Now.ToString("yyyy")" + "-01-01");
+        $("#endtime").val("@DateTime.Now.ToString("yyyy-MM-dd")");
+        $("#year").val("@DateTime.Now.ToString("yyyy")");
+
+        $("#deptname").val(deptname);
+        $("#deptid").val(deptid);
+        $("#deptcode").val(deptcode);
+        if (rolenames.includes("公司") || rolenames.includes("厂级")) {
+            $("#btndw").show();
+        }
+        else {
+            $("#btndw").hide();
+        }
+    }
+
+    //重置
+    function reset() {
+        dafaultdata();
+        query();
+    }
+</script>
+<div class="border" id="desktop" style="background: #fff; overflow-y: auto; overflow-x: hidden;">
+    <div style="margin-top: 10px;">
+        <div class="row">
+            <table style="width: 100%;">
+                <tr>
+                    <td id="td3" style="width: 65px; font-weight: bold;" align="right">作业时间：</td>
+                    <td id="td4" style="width: 300px;">
+                        <div id="div1">
+                            <div style="float: left; width: 120px;">
+                                <input id="starttime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd'})">
+                            </div>
+                            <div style="float: left; width: 20px; text-align: center; margin-top: 5px;">-</div>
+                            <div style="float: left; width: 120px;">
+                                <input id="endtime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt:'yyyy-MM-dd' })">
+                            </div>
+                        </div>
+                    </td>
+                    <td id="td1" style="width: 40px; font-weight: bold; display: none" align="right">年度：</td>
+                    <td id="td2" style="width: 80px; display: none">
+                        <div id="div2">
+                            <div style="float: left; width: 150px;">
+                                <input id="year" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy'})">
+                            </div>
+                        </div>
+                    </td>
+                    <td id="tdworkdeptname" style="width: 70px; font-weight: bold;" align="right">作业单位：</td>
+                    <td id="tdworkdept" style="width: 145px;">
+                        <input id="deptname" type="text" style="width: 140px;" class="form-control" placeholder="请选择作业单位" readonly onclick="selectDept('', 0, 2, '选择作业单位', window.document.body, 'deptname,deptcode,deptid,,,');" />
+                        <input id="deptcode" type="hidden" /><input id="deptid" type="hidden" />
+
+                    </td>
+                    <td align="right" style="width: 300px;">
+                        <a id="btn_Search" class="btn btn-primary" onclick="query()"><i class="fa fa-search"></i>&nbsp;查询</a>
+                        &nbsp;<a id="btn_Reset" class="btn btn-primary" onclick="reset()"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                        &nbsp;
+                         <a id="btn_Export" class="btn btn-primary" style="margin-left: 60px;"><i class="fa fa-download"></i>&nbsp;导出</a>
+                    </td>
+                    
+                   
+                    <td align="right">
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <button id="btntj" class="btn btn-primary btn10" type="button" onclick="state = 1; $('#divTJ').show(); $('#divQS').hide();$('#divDW').hide(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); statTJ();"><i class="fa fa fa-pie-chart"></i>&nbsp;高风险作业类型统计</button>
+                                <button id="btnqs" class="btn btn-default btn10" type="button" onclick="state = 2; $('#divQS').show(); $('#divTJ').hide();$('#divDW').hide(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); statQS();"><i class="fa fa fa-area-chart"></i>&nbsp;高风险作业月度变化趋势</button>
+                                <button id="btndw" class="btn btn-default btn10" type="button" onclick="state = 3; $('#divDW').show(); $('#divTJ').hide(); $('#divQS').hide();$('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); statDW();"><i class="fa fa fa-bar-chart"></i>&nbsp;单位对比</button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+
+    </div>
+    <div id="divTJ">
+        <div class="panel panel-default" style="margin-top: 10px;">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="tjcontainer" style="margin: 10px;"></div>
+            </div>
+        </div>
+        <div class="row" id="gridtj">
+            <div class="panel panel-default" style="margin: 10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <table id="gridTable1" title="aaaa"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="divQS" style="display: none;">
+        <div class="panel panel-default" style="margin-top: 10px;">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="qscontainer" style="margin: 10px;"></div>
+            </div>
+        </div>
+        <div class="row" id="grid1">
+            <div class="panel panel-default" style="margin: 10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <table id="gridTable2"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="divDW">
+        <div class="panel panel-default" style="margin-top: 10px;">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;统计图表</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <div id="dwcontainer" style="margin: 10px;"></div>
+            </div>
+        </div>
+        <div class="row" id="griddw">
+            <div class="panel panel-default" style="margin: 10px;">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计数据</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <table id="gridTable3" title="aaaa"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+

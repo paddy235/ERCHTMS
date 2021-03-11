@@ -1,0 +1,502 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script src="~/Content/scripts/business/openword.js"></script>
+<script src="~/pageoffice/js/pageoffice.js" id="po_js_main"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+<script>
+    var isrefesh = false;//切换选项卡是否刷新
+    var Cardtype = 1;//本单位为1 公共为2
+    var isSystem = '@ViewBag.IsSystem';
+    $(function () {
+        InitialPage();
+        //初始化边框高度
+        document.getElementById("desktop").style.height = ($(window).height() - 20) + "px";
+        GetGrid();
+        //LibraryGetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $('#desktop').height(1000);
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#desktop').height($(window).height() - 30);
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 220);
+                $('#LibrarygridTable').setGridWidth(($('.gridPanel1').width()));
+                $('#LibrarygridTable').setGridHeight($(window).height() - 220);
+            }, 800);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.setGridWidth(($('.gridPanel').width())); $gridTable.setGridHeight($(window).height() - 220);
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 220,
+            url: "../../OccupationalHealthManage/Staffinformcard/GetListJson?type=0",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'ID',  hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false
+                },
+                { label: '告知卡名称', name: 'informcardname', index: 'INFORMCARDNAME', width: 300, align: 'center', sortable: false },
+                { label: '告知卡设置位置', name: 'informacardposition', index: 'INFORMACARDPOSITION', width: 300, align: 'center', sortable: false },
+                {
+                    label: '设置日期', name: 'settingtime', index: 'SETTINGTIME', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '附件路径', name: 'filepath', hidden: true
+                },
+
+            {
+                label: '附件', name: 'filename', index: 'FILENAME', width: 100, align: 'center', sortable: false,
+                formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != null && cellvalue != "") {
+                            html = "<a href=javascript:OpenWord('" + rowObject.filepath + "','" + rowObject.id+"') style = 'color:blue; text-decoration:underline;padding-left:0px;' title = '修改' > " + cellvalue + "</a > ";
+
+                        return html;
+                    } else {
+                        return "";
+                    }
+                }
+            }
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            // rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            loadError: function (xhr, status, error) {
+                top.location.href = "../../Login/Index?Login_Error=1";
+            },
+            gridComplete: function () {
+             
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                gridqx($gridTable);
+                
+            }
+        });
+        ////查询条件
+        //$("#queryCondition .dropdown-menu li").click(function () {
+        //    var text = $(this).find('a').html();
+        //    var value = $(this).find('a').attr('data-value');
+        //    $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        //});
+        ////查询事件
+        //$("#btn_Search").click(function () {
+        //    var queryJson = {
+        //        condition: "name", //$("#queryCondition").find('.dropdown-text').attr('data-value'),
+        //        keyword: $("#txt_Keyword").val(),
+        //    }
+        //    $gridTable.jqGrid('setGridParam', {
+        //        postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        //    }).trigger('reloadGrid');
+        //});
+        ////查询回车
+        //$('#txt_Keyword').bind('keypress', function (event) {
+        //    if (event.keyCode == "13") {
+        //        $('#btn_Search').trigger("click");
+        //    }
+        //});
+    }
+    //告知卡库
+    function LibraryGetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#LibrarygridTable');
+        $gridTable.setGridWidth(($('.gridPanel1').width()));
+        $gridTable.setGridHeight($(window).height() - 220);
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 220,
+            url: "../../OccupationalHealthManage/Staffinformcard/GetListJson?type=1",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'ID', hidden: true,  align: 'center', sortable: false },
+                 {
+                     label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         if (isSystem == "True") {
+
+                             html = "<a href=javascript:btn_Libedit();  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+
+                             html += "<a href=javascript:btn_Libdelete();  title='删除'><i class='fa fa-trash-o'></i></a>";
+
+                         } else {
+                             html = "";
+                         }
+                         return html;
+                     }
+                 },
+                { label: '告知卡名称', name: 'informcardname', index: 'INFORMCARDNAME', width: 300, align: 'center', sortable: false },
+                {
+                    label: '附件', name: 'filename', index: 'FILENAME', width: 300, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != null && cellvalue != "") {
+                            html = "<a href=javascript:OpenWord('" + rowObject.filepath + "') style='color:blue; text-decoration:underline;padding-left:0px;' title='修改'>" + cellvalue + "</a>";
+
+                            return html;
+                        } else {
+                            return "";
+                        }
+                    }
+                },
+                { label: '附件id', name: 'fileid', index: 'FILEID', hidden: true },
+                { label: '附件路径', name: 'filepath', hidden: true }
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            // rowList: [30, 50, 100],
+            pager: "#LibrarygridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            loadError: function (xhr, status, error) {
+                top.location.href = "../../Login/Index?Login_Error=1";
+            },
+            gridComplete: function () {
+              
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                
+            }
+        });
+        ////查询条件
+        //$("#LibraryqueryCondition .dropdown-menu li").click(function () {
+        //    var text = $(this).find('a').html();
+        //    var value = $(this).find('a').attr('data-value');
+        //    $("#LibraryqueryCondition .dropdown-text").html(text).attr('data-value', value)
+        //});
+        ////查询事件
+        //$("#Librarybtn_Search").click(function () {
+        //    var queryJson = {
+        //        condition: "name", //$("#LibraryqueryCondition").find('.dropdown-text').attr('data-value'),
+        //        keyword: $("#Librarytxt_Keyword").val(),
+        //    }
+        //    $gridTable.jqGrid('setGridParam', {
+        //        postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        //    }).trigger('reloadGrid');
+        //});
+        ////查询回车
+        //$('#Librarytxt_Keyword').bind('keypress', function (event) {
+        //    if (event.keyCode == "13") {
+        //        $('#Librarybtn_Search').trigger("click");
+        //    }
+        //});
+    }
+    //查看
+    function select() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看用户信息',
+                url: '/OccupationalHealthManage/Staffinformcard/Form?action=show&keyValue=' + keyValue,
+                width: '500px',
+                height: '450px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //导出
+    function exp() {
+        var queryJson = {
+            condition: "name",
+            keyword: $("#txt_Keyword").val()
+        }
+
+        location.href = "../../OccupationalHealthManage/Staffinformcard/Excel?queryJson=" + JSON.stringify(queryJson);
+    }
+
+    //新增
+    function btn_add() {
+        if (Cardtype == 1) {
+            dialogOpen({
+                id: 'Form',
+                title: '添加职业病危害告知卡',
+                url: '/OccupationalHealthManage/Staffinformcard/Form',
+                width: '500px',
+                height: '450px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        } else {
+
+            btn_Libadd();
+
+        }
+    }
+    //编辑
+    function btn_edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑职业病危害告知卡',
+                url: '/OccupationalHealthManage/Staffinformcard/Form?keyValue=' + keyValue,
+                width: '500px',
+                height: '450px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_delete() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../OccupationalHealthManage/Staffinformcard/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的职业病危害告知卡！', 0);
+        }
+    }
+
+
+    //新增
+    function btn_Libadd() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加职业病危害告知卡',
+            url: '/OccupationalHealthManage/Staffinformcard/CardLibraryForm',
+            width: '500px',
+            height: '350px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_Libedit() {
+        var keyValue = $('#LibrarygridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑职业病危害告知卡',
+                url: '/OccupationalHealthManage/Staffinformcard/CardLibraryForm?keyValue=' + keyValue,
+                width: '500px',
+                height: '350px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_Libdelete() {
+        var keyValue = $('#LibrarygridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../OccupationalHealthManage/Staffinformcard/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#LibrarygridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的职业病危害告知卡！', 0);
+        }
+    }
+
+    //复制到本单位告知卡
+    function btn_LibCopy() {
+        if (Cardtype == 2) {
+            var keyValue = $('#LibrarygridTable').jqGridRowValue('id');
+            var fileid = $('#LibrarygridTable').jqGridRowValue('fileid');
+            if (keyValue) {
+                $.SaveForm({
+                    url: "../../OccupationalHealthManage/Staffinformcard/CopyForm?keyValue=" + keyValue,
+                    param: { "Fileid": fileid },
+                    loading: "正在保存数据...",
+                    success: function (data) {
+                        dialogMsg('加入成功！', 1);
+                        isrefesh = true;
+                    }
+                })
+            } else {
+                dialogMsg('请选择需要加入的告知卡！', 0);
+            }
+        } else {
+            dialogMsg('请在告知卡库中选择需要加入的告知卡！', 0);
+        }
+    }
+
+    function SetWidth() {
+        $('#LibrarygridTable').setGridWidth($('.gridPanel').width());
+    }
+
+    function Refesh() {
+        if (isrefesh) {
+            isrefesh = false;//刷新后还原
+            $("#btn_Search").click();
+        }
+    }
+
+    function download() {
+        var keyValue = $('#gridTable').jqGridRowValue('filepath');
+        var FileName = $('#gridTable').jqGridRowValue('informcardname');
+        if (keyValue != null && keyValue != "" && FileName != null && FileName != "") {
+            window.location.href = "../../Utility/DownloadFile?filePath=" + keyValue + "&speed=1024000&newFileName=" + encodeURIComponent(FileName);
+        }
+    }
+
+    function Search() {
+        if (Cardtype == 1) {
+            var queryJson = {
+                condition: "name", //$("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $("#txt_Keyword").val(),
+            }
+            $('#gridTable').jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        } else {
+            var queryJson = {
+                condition: "name", //$("#LibraryqueryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $("#txt_Keyword").val(),
+            }
+            $('#LibrarygridTable').jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        }
+    }
+
+    function hid() {
+
+        if (isSystem == "False") {//不等于管理员
+            if (Cardtype == 2) {
+                document.getElementById("add").style.display = "none";
+            } else {
+                document.getElementById("add").style.display = "";
+            }
+        }
+
+        if (Cardtype == 2) {
+            document.getElementById("export").style.display = "none";
+        } else {
+            document.getElementById("export").style.display = "";
+        }
+    }
+
+</script>
+<div class="border" id="desktop" style="background: #fff; overflow-y:hidden; overflow-x: hidden;">
+    <div style="margin-top: 10px; padding-right:10px;">
+        <div class="row">
+            <table style="width: 100%;">
+                <tr>
+                    <td></td>
+                    <td align="right">
+                        <div>
+                            <div class="btn-group">
+                                <button id="btntj" class="btn btn-primary btn10" type="button" onclick="Cardtype = 1; $('#divZl').show(); $('#divDept').hide(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); GetGrid(); Refesh(); hid();"><i class="fa fa-bar-chart"></i>&nbsp;本单位告知卡</button>
+                                <button id="btnqs" class="btn btn-default btn10" type="button" onclick="Cardtype = 2; $('#divDept').show(); $('#divZl').hide(); $('.btn10').removeClass('btn-primary'); $('.btn10').addClass('btn-default'); $(this).addClass('btn-primary'); LibraryGetGrid(); hid();"><i class="fa fa-bar-chart"></i>&nbsp;告知卡库</button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="titlePanel" style="margin-top:5px;">
+        <div class="title-search">
+            <table>
+                <tr>
+                    <td style="padding-left: 2px;">
+                        <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询的告知卡名称" style="width: 200px;" />
+                    </td>
+                    <td style="padding-left: 5px;">
+                        <a id="btn_Search" class="btn btn-primary" onclick="Search()"><i class="fa fa-search"></i>&nbsp;查询</a>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                @*<a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                                <a id="edit" class="btn btn-default" onclick="btn_edit()"><i class="fa fa-pencil-square-o"></i>编辑</a>
+                    <a id="delete" class="btn btn-default" onclick="btn_delete()"><i class="fa fa-trash-o"></i>删除</a>
+                    <a id="Libraryadd" class="btn btn-default" onclick="btn_LibCopy()"><i class="fa fa-plus"></i>加入本单位告知卡</a>*@
+            </div>
+            <script>$('.toolbar').authorizeButton()</script>
+        </div>
+    </div>
+
+
+    <div id="divZl">
+        <div class="row" id="grid1" style="margin-top: 10px;">
+
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="divDept" style="display: none;">
+        <div class="row" id="grid2" style="margin-top: 10px;">
+            @*<div class="titlePanel">
+                    <div class="title-search">
+                        <table>
+                            <tr>
+                                <td style="padding-left: 2px;">
+                                    <input id="Librarytxt_Keyword" type="text" class="form-control" placeholder="请输入要查询的告知卡名称" style="width: 200px;" />
+                                </td>
+                                <td style="padding-left: 5px;">
+                                    <a id="Librarybtn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    @*<div class="toolbar">
+                        <div class="btn-group">
+                            <a id="Libraryreplace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                            <a id="Libraryadd" class="btn btn-default" onclick="btn_Libadd()"><i class="fa fa-plus"></i>新增</a>
+                            <a id="Libraryedit" class="btn btn-default" onclick="btn_Libedit()"><i class="fa fa-pencil-square-o"></i>编辑</a>
+                            <a id="Librarydelete" class="btn btn-default" onclick="btn_Libdelete()"><i class="fa fa-trash-o"></i>删除</a>
+
+                        </div>
+                    </div>
+                </div>*@
+            <div class="gridPanel gridPanel1">
+                <table id="LibrarygridTable"></table>
+                <div id="LibrarygridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

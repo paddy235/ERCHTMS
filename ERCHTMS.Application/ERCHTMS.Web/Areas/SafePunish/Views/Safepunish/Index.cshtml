@@ -1,0 +1,464 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script>
+
+    $.ajaxSetup({
+        async:false
+    });
+    //是否只查看本人待审核记录
+    var ispager = request('mode');
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var queryJson = "";
+    $(function() {
+        InitialPage();
+        GetGrid();
+    });
+
+    window.onload = function () {
+        if (rolename.indexOf("公司级用户") >= 0 || rolename.indexOf("承包商级用户") >= 0) {
+            $("#add").hide();
+            $("#delete").hide();
+            $("#edit").hide();
+        }
+    };
+
+    //初始化页面
+    function InitialPage() {
+        $('#Ispager').attr("checked", ispager == "1");
+        //resize重设布局;
+        $(window).resize(function(e) {
+            window.setTimeout(function() {
+                    $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                    $('#gridTable').setGridHeight($(window).height() - 170);
+                },
+                200);
+            e.stopPropagation();
+        });
+        //类型
+        $("#flowstate").ComboBox({
+            description: "==请选择=="
+        });
+
+        //类型
+        $("#amercetype").ComboBox({
+            description: "==请选择=="
+        });
+
+        
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        queryJson = {
+            sTime: $("#sTime").val(),
+            eTime: $("#eTime").val(),
+            flowstate: $("#flowstate").attr('data-value'),
+            pager: $("#Ispager").is(":checked"),
+            amercetype:$("#amercetype").attr('data-value')
+        };
+        $gridTable.jqGridEx({
+            autowidth: true,
+            height: $(window).height() -170,
+            url: "../../SafePunish/Safepunish/GetListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'id', align: 'left', sortable: true, hidden: true },
+                //操作name不等于Oper 不读取后台配置
+                {
+                    label: '操作', name: 'oper', index: 'id', width: 100, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        var participant = rowObject.approverpeopleids;
+                        if ((participant !== "" && participant !== null)) {
+                            if ((participant.indexOf(top.currUserId) != -1 && rowObject.applystate !== "已完成")) {
+                                html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" +
+                                    rowObject.id +
+                                    "')  title='审核'><i class='fa fa-check'></i></a>";
+                            }
+                        } else if (rowObject.applyuserid == top.currUserId && rowObject.applystate == "申请中") {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        }
+                        if ((rowObject.applyuserid == top.currUserId && rowObject.applystate == "申请中") || top.currUserRoleName == "公司管理员") {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '创建用户id',
+                    name: 'createuserid',
+                    index: 'createuserid',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '创建时间',
+                    name: 'createdate',
+                    index: 'createdate',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '创建用户',
+                    name: 'createusername',
+                    index: 'createusername',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '修改用户id',
+                    name: 'modifyuserid',
+                    index: 'modifyuserid',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '修改时间',
+                    name: 'modifydate',
+                    index: 'modifydate',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '修改用户',
+                    name: 'modifyusername',
+                    index: 'modifyusername',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '创建用户所属部门编码',
+                    name: 'createuserdeptcode',
+                    index: 'createuserdeptcode',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '创建用户所属机构编码',
+                    name: 'createuserorgcode',
+                    index: 'createuserorgcode',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '流程状态',
+                    name: 'flowstate',
+                    index: 'flowstate',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '流程状态', name: 'applystate', index: 'applystate', align: 'center', sortable: true,width:100,
+                    formatter: function (lvalue, options, rowobject) {
+                        if (rowobject.flowstate !== "") {
+                            if (rowobject.flowstate === "0") {
+                                var html = "<div  title='正在处理'><a  href=javascript:OpenViewFlow('" + rowobject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>" + lvalue + "</a></div>";
+                                return html;
+                            } else if (rowobject.flowstate === "1") {
+                                var html = "<div  title='已处理'><a  href=javascript:OpenViewFlow('" + rowobject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>" + lvalue + "</a></div>";
+                                return html;
+                            } else if (rowobject.flowstate === "2") {
+                                //var html = "<div class='data-wcl' title='未处理'>未处理</div>";
+                                var html = "<div  title='未处理'><a  href=javascript:OpenViewFlow('" + rowobject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>" + lvalue + "</a></div>";
+                                return html;
+                            }
+                        }
+                        var html = "<div  title='正在处理'><a  href=javascript:OpenViewFlow('" + rowobject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>正在处理</a></div>";
+                        return html;
+                    }
+                },
+                //{
+                //    label: '事故/事件',
+                //    name: 'punishtype',
+                //    index: 'punishtype',
+                //    align: 'left',
+                //    sortable: true,
+                //    formatter: function(lvalue, options, rowobject) {
+                //        if (lvalue !== "") {
+                //            if (lvalue === "1") {
+                //                return "未遂";
+                //            } else if (lvalue === "2") {
+                //                return "一类障碍";
+                //            } else if (lvalue === "3") {
+                //                return "二类障碍";
+                //            } else if (lvalue === "4") {
+                //                return "其他";
+                //            } else if (lvalue === "5") {
+                //                return "异常";
+                //            } else {
+                //                return "其他";
+                //            }
+
+                //        }
+                //        return "<div class='data-zzcl' title='正在处理'>正在处理</div>";
+                //    }
+                //},
+                { label: '申请人', name: 'applyusername', index: 'applyusername', align: 'center', sortable: true, width: 60 },
+                {
+                    label: '考核类型', name: 'amercetype', index: 'amercetype', align: 'center', sortable: true, width: 80,
+                    formatter: function (lvalue, options, rowobject) {
+                        var html = "其他";
+                        if (rowobject.amercetype == "1") {
+                            html = "事故事件";
+                        }
+                        else if (rowobject.amercetype == "2") {
+                            html = "其他";
+                        } else if (rowobject.amercetype == "3") {
+                            html = "隐患排查治理";
+                        }
+                        else if (rowobject.amercetype == "4") {
+                            html = "日常考核";
+                        }
+                        return html;
+                    }
+                },
+                { label: '考核单编号', name: 'safepunishcode', index: 'safepunishcode', align: 'center', sortable: true, width:250 },
+                //{ label: '惩罚对象', name: 'punishobjectnames', index: 'punishobjectnames', align: 'left', sortable: true },
+                { label: '考核时间', name: 'applytime', index: 'applytime', align: 'center', sortable: true, width: 140 },
+                { label: '考核具体事项', name: 'punishremark', index: 'punishremark', align: 'left',headerAlign:"center", sortable: true ,width: 100 }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rownumWidth: 60,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function() {
+            queryJson = {
+                sTime: $("#sTime").val(),
+                eTime: $("#eTime").val(),
+                flowstate: $("#flowstate").attr('data-value'),
+                pager: $("#Ispager").is(":checked"),
+                amercetype: $("#amercetype").attr('data-value')
+            };
+            $gridTable.jqGrid('setGridParam',
+                {
+                    postData: { queryJson: JSON.stringify(queryJson) },
+                    page: 1
+                }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress',
+            function(event) {
+                if (event.keyCode == "13") {
+                    $('#btn_Search').trigger("click");
+                }
+            });
+    }
+
+    //查看流程图
+    function OpenViewFlow(keyValue) {
+        var title = "惩罚业务流程图";
+        var rqUrl = "/SafePunish/Safepunish/Flow?keyValue=" + keyValue;
+        dialogOpen({
+            id: 'WorkFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() / 2 + 200) + "px",
+            height: ($(top.window).height() / 2 + 300) + "px",
+            btn: null
+        });
+    }
+
+    //新增
+    function btn_add() {
+        top.layer.open({
+            type: 2,
+            id: "Form",
+            title: '惩罚申请',
+            content: top.contentPath + '/SafePunish/Safepunish/Form?action=add',
+            area: [($(top.window).width() - 550) + "px", ($(top.window).height() - 150) + "px"],
+            btn: ["保存", "提交", "关闭"],
+            yes: function (iframeId, idx) {
+                top.Form.AcceptClick();
+            }
+            , btn2: function (idx) {
+                top.Form.CommitApply();
+                return false;
+            }
+        });
+    }
+
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../SafePunish/Safepunish/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function(data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            });
+        } else {
+            dialogMsg('请选择需要删除的安全惩罚！', 0);
+        }
+    }
+
+    //编辑
+    function edit(id) {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            top.layer.open({
+                type: 2,
+                id: "Form",
+                title: '惩罚提交',
+                content: top.contentPath + '/SafePunish/Safepunish/Form?keyValue=' + keyValue,
+                area: [($(top.window).width() - 550) + "px", ($(top.window).height() - 150) + "px"],
+                btn: ["保存", "提交", "关闭"],
+                yes: function(iframeId, idx) {
+                    top.Form.AcceptClick();
+                },
+                btn2: function(idx) {
+                    top.Form.CommitApply();
+                    return false;
+                }
+            });
+        }
+    }
+
+    //导出Excel
+    function exportDataExcel() {
+        window.location.href = "ExportSafePunishExcel?queryJson=" + JSON.stringify(queryJson);
+    }
+
+
+    //查看
+    function show() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            top.layer.open({
+                type: 2,
+                id: "Form",
+                title: '查看',
+                content: top.contentPath + '/SafePunish/Safepunish/Form?action=show&keyValue=' + keyValue,
+                area: [($(top.window).width() - 550) + "px", ($(top.window).height() - 150) + "px"],
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+
+</script>
+<div class="center-Panel">
+    <div class="titlePanel">
+        <div class="title-search">
+            <table>
+                <tr>
+                    <td>查询条件:</td>
+                    <td style="padding-left: 10px;">
+                        <div class="ui-filter" style="width: 350px;">
+                            <div class="ui-filter-text">
+                                请选择过滤条件
+                            </div>
+                            <div class="ui-filter-list" style="width: 350px; ">
+                                <table class="form" id="filter-form">
+                                    <tr>
+                                        <td class="formTitle">时间：</td>
+                                        <td class="formValue">
+                                            <input id="sTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'eTime\')}' })">
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="formTitle">至：</td>
+                                        <td class="formValue">
+                                            <input id="eTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'sTime\')}' })">
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="formTitle">审核状态：</td>
+                                        <td class="formValue">
+                                            <div id="flowstate" type="select" class="ui-select" style="width:200px">
+                                                <ul>
+                                                    <li data-value="0">待审批</li>
+                                                    <li data-value="1">通过</li>
+                                                    <li data-value="2">不通过</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="formTitle">考核类型：</td>
+                                        <td class="formValue">
+                                            <div id="amercetype" type="select" class="ui-select" style="width:200px">
+                                                <ul>
+                                                    <li data-value="3">隐患排查治理</li>
+                                                    <li data-value="4">日常考核</li>
+                                                    <li data-value="1" id="sgsjli">事故事件</li>
+                                                    <li data-value="2" id="qtli">其他</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    @*<tr>
+                                        <td class="formTitle">关键字：</td>
+                                        <td class="formValue">
+                                            <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                        </td>
+                                    </tr>*@
+                                    <tr>
+                                        <td class="formTitle"><span style="white-space:pre-wrap;"></span></td>
+                                        <td class="formValue">
+                                            <input id="Ispager" type="checkbox" />
+                                            我需要处理的数据
+                                        </td>
+                                    </tr>
+                                </table>
+                                <div class="ui-filter-list-bottom">
+                                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+            
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+            </div>
+            <script>$('.toolbar').authorizeButton();</script>
+        </div>
+    </div>
+    
+    <div class="gridPanel">
+        <table id="gridTable"></table>
+        <div id="gridPager"></div>
+    </div>
+</div>

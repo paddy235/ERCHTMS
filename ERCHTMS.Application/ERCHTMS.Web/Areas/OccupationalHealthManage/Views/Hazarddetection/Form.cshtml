@@ -1,0 +1,431 @@
+@{
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script>
+    var keyValue = request('keyValue');
+    var StandardItem;
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+
+        //初始化危险因素标准
+        $.ajax({
+            url: top.contentPath + "/OccupationalHealthManage/Occupationalstaffdetail/GetCmbJson?Code=Standard",
+            type: "post",
+            dataType: "json",
+            async: false,
+            success: function (data) {
+                StandardItem = data;
+            }
+        });
+
+        //加载区域数据
+        $("#AreaId").ComboBox({
+            url: top.contentPath + "/OccupationalHealthManage/Hazardfactors/GetAreaCmbList",
+            id: "itemValue",
+            text: "itemName",
+            height: '100px',
+            description: "==请选择==",
+            allowSearch: true
+        }).bind("change", function () {
+            //先清空之前选择的内容
+            $("#RiskId").attr('data-value', '').attr('data-text', '');
+            $("#RiskId").find("div").html("==请选择==");
+            $("#AreaValue").val($(this).attr('data-text'));
+            //加载职业病危害因素
+            $("#RiskId").ComboBox({
+                url: top.contentPath + "/OccupationalHealthManage/Hazardfactors/GetArRiskCmbList?areaid=" + $(this).attr('data-value'),
+                id: "itemValue",
+                text: "itemName",
+                height: '100px',
+                description: "==请选择==",
+                allowSearch: true
+            }).bind("change", function () {
+                $("#RiskValue").val($(this).attr('data-text'));
+                IsStandTrue($(this).attr('data-text'));
+                if (keyValue == "") {
+                    $.ajax({
+                        url: top.contentPath + "/OccupationalHealthManage/Hazarddetection/GetStandard",
+                        data: { "RiskId": $(this).attr('data-value') },
+                        type: "Get",
+                        dataType: "json",
+                        async: false,
+                        success: function (data) {
+                            if (data.itemName == "true") {
+                                eachDelete();
+                                IniStandard(data.itemValue);
+                                eachRowscheck();
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+
+        //职业病危害因素初始化
+        $("#RiskId").ComboBox({
+            height: '100px',
+            description: "==请选择==",
+            allowSearch: true
+        });
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../OccupationalHealthManage/Hazarddetection/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#AreaId").trigger("change");
+                    $("#RiskId").ComboBoxSetValue(data.RiskId);
+                    $("#RiskId").trigger("change");
+                    //var str = data.Standard;
+                    //var z = str.split(';');
+                    ////先根据测量指标及标准批量添加行数据
+                    //if (z.length > 1) {
+                    //    for (var i = 1; i < z.length; i++) {
+                    //        addRow();
+                    //    }
+                    //}
+                    ////遍历赋值
+                    //SeteachRows(z);
+                    IniStandard(data.Standard);
+                    if (data.IsExcessive == "0") {
+                        document.getElementById("no").checked = true;
+                    } else {
+                        document.getElementById("yes").checked = true;
+                    }
+                }
+
+            })
+        }
+    }
+    var path = "";
+    //获取查看标准的文件路径
+    function IsStandTrue(value) {
+        var flag = false;
+
+        for (var i = 0; i < StandardItem.length; i++) {
+            if (value == StandardItem[i].ItemName) {
+                flag = true;
+                path = StandardItem[i].Description;
+                break;
+            }
+        }
+        if (flag) {//Example(url)
+
+            // $("example").bind("click", url, Example);
+            document.getElementById("example").onclick = Example;
+            document.getElementById("example").style.opacity = "";
+        } else {
+            path = "";
+            document.getElementById("example").onclick = null;
+            document.getElementById("example").style.opacity = 0.2;
+        }
+    }
+
+    //初始化测量指标
+    function IniStandard(Standard) {
+        var str = Standard;
+        var z = str.split(';');
+        //先根据测量指标及标准批量添加行数据
+        if (z.length > 1) {
+            for (var i = 1; i < z.length; i++) {
+                addRow();
+            }
+        }
+        //遍历赋值
+        SeteachRows(z);
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        eachRows();
+        var postData = $("#form1").formSerialize(keyValue);
+        $.SaveForm({
+            url: "../../OccupationalHealthManage/Hazarddetection/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    /// <summary>
+    /// 选择用户
+    /// </summary>
+    ///<param name="deptId">查询条件，根据mode的值查询方式会不同</param>
+    /// <param name="checkMode">单选或多选，0:单选，1:多选</param>
+    /// <param name="mode">查询模式，0:获取机构ID为Ids下所有的部门(即OrganizeId=Ids)，1:获取部门ParentId为Ids下所有部门(即ParentId=Ids)，2:获取部门的parentId在Ids中的部门(即ParentId in(Ids))，3:获取部门Id在Ids中的部门(即DepartmentId in(Ids))</param>
+    ///<param name="winObject">窗体中需要查找domId的对象，一般可写成window.document.body或this.parentNode</param>
+    ///<param name="domId">接收返回值的dom节点的ID，多个用逗号分隔，顺序依次为用户名称,用户账号，用户Id（多选用逗号分隔）</param>
+    ///<param name="userIds">用户页面带过来的用户ids</param>
+    function selectUser(options) {
+        var deptCode = options.deptCode == undefined ? "" : options.deptCode;
+        return dialogOpen({
+            id: "User",
+            title: "选择用户",
+            url: '/BaseManage/User/Select?deptId=' + options.deptId + "&checkMode=" + options.checkMode + "&mode=" + options.mode + "&deptCode=" + deptCode + "&userIds=" + options.userIds,
+            width: ($(top.window).width() - 200) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(options);
+                ChangeTxt();
+            }
+        });
+    }
+
+    var index = 1;
+    //添加行
+    function addRow() {
+        var tab = document.getElementById('tab');
+        var rowindex = tab.rows.length + 1;
+
+
+        //添加一行数据
+        var tr = tab.insertRow();
+        var td1 = tr.insertCell();
+        var td2 = tr.insertCell();
+        var td3 = tr.insertCell();
+        var td4 = tr.insertCell();
+        td1.className = "formTitle";
+        td2.className = "formValue";
+        td3.className = "formTitle";
+        td4.className = "formValue";
+        var tid = "tr" + index;
+        tr.id = tid
+
+        td1.innerHTML = "测量指标<font face=‘宋体’>*</font>";
+        td2.innerHTML = " <input id='Stand" + index + "' type='text' class='form-control' isvalid='yes' checkexpession='NotNull' />";
+        td3.innerHTML = "测量值<font face=‘宋体’>*</font>";
+        td4.innerHTML = " <input id='Stavalue" + index + "' type='text' class='form-control' onblur='eachRowscheck()' isvalid='yes' checkexpession='Num' />";
+
+        index++;
+        //第二行数据
+        var tr2 = tab.insertRow();
+        var td5 = tr2.insertCell();
+        var td6 = tr2.insertCell();
+        var td7 = tr2.insertCell();
+        var td8 = tr2.insertCell();
+        var tid2 = "tr" + index;
+        tr2.id = tid2;
+
+        td5.className = "formTitle";
+        td6.className = "formValue";
+        td7.className = "formTitle";
+        td8.className = "formValue";
+
+        td5.innerHTML = "职业接触限值<font face=‘宋体’>*</font>";
+        td6.innerHTML = " <input id='StaMaxvalue" + index + "' type='text' onblur='eachRowscheck()' class='form-control' isvalid='yes' checkexpession='Num' />";
+        td7.innerHTML = "";
+        td8.innerHTML = " <a id='add' class='btn btn-default' onclick=deleteRow(" + tid + "," + tid2 + ")><i class='fa fa-plus'></i>删除</a>";
+
+        index++;
+    }
+
+    //遍历添加数据
+    function SeteachRows(datas) {
+        var i = true;//遍历两行
+        var index = 0;
+        $("#tab").find("tr").each(function () {
+            var value = datas[index].split(',');
+            if (i) {
+                var tdArr = $(this).children();
+                tdArr.eq(1).find('input').val(value[0]);
+                tdArr.eq(3).find('input').val(value[1]);
+                i = false;
+            } else {
+                var tdArr = $(this).children();
+                tdArr.eq(1).find('input').val(value[2]);
+                i = true;
+                index++;//第几条索引
+            }
+
+        });
+    }
+
+    //遍历删除数据
+    function eachDelete() {
+        var i = true;//遍历两行
+        var index = 0;
+        $("#tab").find("tr").each(function () {
+            if (index > 1) {
+                $(this).remove();
+            }
+            index++;//第几条索引
+
+
+        });
+    }
+
+    //遍历table获取数据
+    function eachRows() {
+        var str = "";
+        var i = true;//遍历两行
+        var index = 0;
+        $("#tab").find("tr").each(function () {
+            if (i) {
+                if (index > 0) {
+                    str += ";";
+                }
+                var tdArr = $(this).children();
+                var Stand = tdArr.eq(1).find('input').val();
+                var Stavalue = tdArr.eq(3).find('input').val();
+                str += Stand + "," + Stavalue;
+                i = false;
+            } else {
+                var tdArr = $(this).children();
+                var StaMaxvalue = tdArr.eq(1).find('input').val();
+                str += "," + StaMaxvalue;
+                i = true;
+                index++;//第几条索引
+            }
+
+        });
+        $("#Standard").val(str);
+    }
+    //遍历table获取数据 看是否超标
+    function eachRowscheck() {
+        var str = "";
+        var i = true;//遍历两行
+        var index = 0;
+        var Stavalue = 0;
+        var StaMaxvalue = 0;
+        var isTrue = false;//遍历所有看是否有超标现象
+        $("#tab").find("tr").each(function () {
+            var tdArr = $(this).children();
+            if (i) {
+                Stavalue = tdArr.eq(3).find('input').val();
+                i = false;
+            } else {
+                StaMaxvalue = tdArr.eq(1).find('input').val();
+                if (Stavalue != "" && StaMaxvalue != "") {
+                    if (parseInt(Stavalue) > parseInt(StaMaxvalue)) {
+                        isTrue = true;
+                    }
+                }
+
+                i = true;
+            }
+
+        });
+        if (isTrue) {
+            document.getElementById("yes").checked = true;
+            $("#IsExcessive").val("1");
+        } else {
+            document.getElementById("no").checked = true;
+            $("#IsExcessive").val("0");
+        }
+    }
+
+    //根据id删除table中的行
+    function deleteRow(tid, tid2) {
+        tid.remove();
+        tid2.remove();
+    }
+
+    //查看标准
+    function Example() {
+        var dlg = dialogOpen({
+            id: 'ExamForm',
+            title: '查看标准',
+            url: '/OccupationalHealthManage/Hazarddetection/Example?url=' + path,
+            width: '650px',
+            height: '350px',
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle" style="width:120px;">区域<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <div id="AreaId" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                <input type="hidden" id="AreaValue" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">职业病危害因素<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <div id="RiskId" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                <input type="hidden" id="RiskValue" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">采样/测量地点<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="Location" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" style="width:120px;">开始监视时间<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="StartTime" type="text" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss', readOnly: true })" readonly="readonly" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" />
+            </td>
+            <td class="formTitle" style="width:120px;">结束监视时间<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="EndTime" type="text" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss', readOnly: true })" readonly="readonly" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" />
+            </td>
+        </tr>
+        <tr>
+            <td colspan="4">
+                <table id="tab" style="width:100%;">
+                    <tr>
+                        <td class="formTitle" style="width:120px;">测量指标<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="Stand" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                            <input type="hidden" id="Standard" />
+                        </td>
+                        <td class="formTitle" style="width:120px;">测量值<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="Stavalue" type="text" class="form-control" onblur="eachRowscheck()" isvalid="yes" checkexpession="Num" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">
+                            职业接触限值<font face="宋体">*</font>
+                        </td>
+                        <td class="formValue">
+                            <input id="StaMaxvalue" type="text" class="form-control" onblur="eachRowscheck()" isvalid="yes" checkexpession="Num" />
+                        </td>
+                        <td class="formTitle">
+                            <a id="example" class="btn btn-default" style="opacity:0.2;"><i class="fa fa-plus"></i>查看标准</a>
+                        </td>
+                        <td class="formValue">
+                            <a id="add" class="btn btn-default" onclick="addRow()"><i class="fa fa-plus"></i>增加</a>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">监测负责人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="DetectionUserName" type="text" readonly="readonly" onclick="selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'DetectionUserName,,DetectionUserId,CHECKDEPARTID,,CHECKDEPARTNAME' });" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                <input id="DetectionUserId" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">是否超标<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input type="radio" value="1" id="yes" name="SICK" disabled="disabled" />&nbsp;<label for="yes">是</label>&nbsp;&nbsp;&nbsp;
+                <input type="radio" value="0" id="no" name="SICK" checked="checked" disabled="disabled" />&nbsp;<label for="no">否</label>
+                <input type="hidden" id="IsExcessive" value="0" />
+            </td>
+        </tr>
+
+    </table>
+</div>

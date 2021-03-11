@@ -1,0 +1,671 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script>
+    ;
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    var belongD = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var belongCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var parentid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().ParentId";
+    var _deptId = "";
+    var _isOrg = "";
+    var mode = request('mode');
+    var dbtype = request('dbtype');//1标识待反馈,2待督办确认
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户ID
+    var queryJson;
+    $(function () {
+        InitialPage();
+        if (mode == "qbyh") {
+            $("#divTree").hide();
+            $("#divTitle").hide();
+            queryJson = {
+                showrange: '1',//查看范围
+                flowstate: dbtype//状态
+            }
+        } else if (mode == "syStat") {
+            $("#supervisedate").val(request('supervisedate'));
+            queryJson = {
+                supervisedate: request('supervisedate'),//督办时间
+                code: request('code'),//统计图部门deptcode
+                flowstate: '-1'//统计图跳转默认-1
+            }
+            GetTree();
+        } else if (mode == "yjzb") {//首页预警指标跳转
+            $("#supervisedate").val("");
+            queryJson = {
+                yjtype: request('yjtype')//0表示即将到期,1表示逾期
+            }
+            GetTree();
+        } else {
+            GetTree();
+            //(当前年度和当前登录人所在部门)厂级用户默认厂级数据
+            if (roleName.includes("厂级") || roleName.includes("公司")) {
+                belongD = orgId;
+                queryJson = {
+                    supervisedate: $("#supervisedate").val()//督办时间
+                }
+            } else {
+                queryJson = {
+                supervisedate: $("#supervisedate").val(),//督办时间
+                code: "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode"//默认当前用户deptcode
+                }
+            }
+        }
+
+        GetGrid();
+
+        var chooseObj = "#itemTree_" + belongD.replace(/-/g, "_");
+        $(chooseObj).toggleClass("bbit-tree-selected");
+    });
+
+    //初始化页面
+    function InitialPage() {
+      
+        if (mode.length == 0) {
+            $(".confirm").remove();
+        }
+        else {
+            if (top.currUserRoleName.indexOf("公司领导") >= 0 && dbtype == "2") {
+                $(".confirm").show();
+            } else {
+                $(".confirm").remove();
+            }    
+        }
+        if (mode == "qbyh") {
+
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize();
+                }
+            });
+           
+        }
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+        $("#btnModal").click(function () {
+            $('#QrCodeModal').hide();
+        });
+        $("#btnQr").click(function () {
+            var StartTime = $("#sTime").val();
+            var EndTime = $("#eTime").val();
+            if (!StartTime) {
+                alert("请选择开始时间！");
+                return;
+            }
+            if (!EndTime) {
+                alert("请选择结束时间！");
+                return;
+            }
+            if (new Date(StartTime.replace("-", "/").replace("-", "/")) > new Date(EndTime.replace("-", "/").replace("-", "/"))) {
+                alert("开始时间不可大于结束时间！");
+                return;
+            }
+            var ecode = $("#DutyDeptCode").val();
+            if (!ecode) {
+                alert("请选择责任部门(单位)！");
+                return;
+            }
+            var queryJson = {
+                sTime: StartTime,
+                eTime: EndTime,
+                DutyDeptCode: $("#DutyDeptCode").val(),
+                DutyDeptName: $("#DutyDeptName").val()
+            }
+            Loading(true, "正在导出……");
+            $.post("../../SafetyWorkSupervise/Safetyworksupervise/Export", { queryJson: JSON.stringify(queryJson) }, function (data) {
+                Loading(false);
+                if (data == "-1") {
+                    alert("导出失败!")
+                } else if (data == "1") {
+
+                } else {
+                    location.href = "../../Utility/DownloadFile?filePath=~/Resource/temp/" + data;
+                }
+            });
+            //location.href = "../../SafetyWorkSupervise/Safetyworksupervise/Export?queryJson=" + JSON.stringify(queryJson);
+            $("#DutyDeptName").val("");
+            $("#DutyDeptCode").val("")
+            $("#DutyDeptId").val("");
+            $('#QrCodeModal').hide();
+        });
+    }
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 0
+            }
+        );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json + "&selectCode=" + belongCode,
+            onnodeclick: function (item) {
+                _deptId = item.Code;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+    function setStatus(chk) {
+        $("#gridTable").find(".chk0").each(function (j, dom) {
+            dom.checked = chk.checked;
+        });
+    }
+    //批量下发
+    function send() {
+        var ids = "";
+        $("#gridTable").find("input:checked").each(function (j, dom) {
+            ids += $(dom).val()+",";
+        });
+        if (ids.length>0) {
+            dialogConfirm("确认下发吗？", function (isSure) {
+                if (isSure) {
+                    $.SaveForm({
+                        url: "../../SafetyWorkSupervise/Safetyworksupervise/MultiSend",
+                        param: {keyValue:ids},
+                        loading: "正在下发...",
+                        success: function () {
+                            $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                        }
+                    })
+                }
+            });
+        } else {
+            dialogAlert("请选择需要下发的记录！",0);
+        }
+       
+    }
+    //批量确认
+    function confirm() {
+        var ids = "";
+        $("#gridTable").find("input:checked").each(function (j, dom) {
+            ids += $(dom).val() + ",";
+        });
+        if (ids.length > 0) {
+            var dlg = dialogOpen({
+                id: "Confirm",
+                title: "批量确认",
+                url: '/SafetyWorkSupervise/Safetyworksupervise/Confirm?superviseIds=' + ids,
+                width: "600px",
+                height: ($(top.window).height() - 200) + "px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+
+            });
+        } else {
+            dialogAlert("请选择需要确认的记录！", 0);
+        }
+
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 147,
+            postData: { queryJson: JSON.stringify(queryJson) },
+            url: "../../SafetyWorkSupervise/Safetyworksupervise/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true }
+                 ,{
+                     label: '<input role="checkbox" id="cb_gridTable" class="cbox" type="checkbox" onclick="setStatus(this)">', name: "chkall", width: 40, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         if (rowObject.flowstate == "0" || (rowObject.flowstate == "2" && dbtype=="2")) {
+                             return  '<input type="checkbox" class="chk0" value="'+rowObject.id+'" />';
+                         } else {
+                             return "";
+                         }
+                     }
+                 }
+                ,{
+                    label: '操作', name: 'oper', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "','0') title='查看' ><i class='fa fa-eye'></i></a>";
+                        if (rowObject.flowstate == "0" && rowObject.createuserid == UserId) {
+                            html += "<a href=javascript:btn_edit('" + rowObject.id + "') title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                        }  else if (rowObject.flowstate == "1" && rowObject.dutypersonid == UserId) {
+                            html += "<a href=javascript:show('" + rowObject.id + "','1') title='办理反馈'><i class='fa fa-check'></i></a>";
+                        } else if (rowObject.flowstate == "2" && rowObject.supervisepersonid == UserId) {
+                            html += "<a href=javascript:show('" + rowObject.id + "','2') title='督办确认'><i class='fa fa-check'></i></a>";
+                        }
+                        if (rowObject.createuserid == UserId || (roleName.indexOf("公司级用户") >= 0 && roleName.indexOf("公司管理员") >= 0)) {
+                            html += "<a href=javascript:btn_delete('" + rowObject.id + "') title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '状态', name: 'flowstate', index: 'flowstate', width: 120, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var html;
+                        switch (rowObject.flowstate) {
+                            case "0":
+                                html = "待下发";
+                                break;
+                            case "1":
+                                //html = "办理反馈中";
+                                html = "<a  href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>办理反馈中</a>";
+                                break;
+                            case "2":
+                                //html = "督办确认中";
+                                html = "<a  href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>督办确认中</a>";
+                                break;
+                            case "3":
+                                //html = "已结束";
+                                html = "<a  href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;color:blue'  title='流程'>已结束</a>";
+                                break;
+                            default:
+                        }
+
+                        return html;
+                    } },
+                {
+                    label: '督办时间', name: 'supervisedate', index: 'supervisedate', width: 130, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy年MM月');
+                    }
+                },
+                {
+                    label: '重点工作任务', name: 'worktask', index: 'worktask', align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<div style='white-space:normal;text-align:center;line-height:1.5;'>" + rowObject.worktask + "</div>";
+
+                        return html;
+                    } },
+                {
+                    label: '责任部门(单位)', name: 'dutydeptname', index: 'dutydeptname', width: 150, align: 'center', sortable: true },
+                { label: '责任人', name: 'dutyperson', index: 'dutyperson', width: 80, align: 'center', sortable: true },
+                {
+                    label: '督办人', name: 'superviseperson', index: 'superviseperson', width: 80,align: 'center', sortable: false
+                }
+                , {
+                    label: '完成时间', name: 'finishdate', index: 'finishdate', align: 'center', width: 120, sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                }
+                , {
+                    label: '备注', name: 'remark', index: 'remark', align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.remark) {
+                            var html = "<div style='white-space:normal;text-align:center;line-height:1.5;'>" + rowObject.remark + "</div>";
+                            return html;
+                        } else {
+                            return "";
+                        }
+
+                    }
+                }
+                , {
+                    label: '完成情况', name: 'finishinfo', index: 'finishinfo', align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.finishinfo) {
+                            var html = "<div style='white-space:normal;text-align:center;line-height:1.5;'>" + rowObject.finishinfo + "</div>";
+                            return html;
+                        } else {
+                            return "";
+                        }
+                    }
+                }
+                , {
+                    label: '部门(单位)确认签字', name: 'signurl', index: 'signurl', align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (rowObject.signurl) {
+                            html = "<img style='width: 100px; height: 40px;' src='../.." + rowObject.signurl + "'>";
+                        }
+                        return html;
+                    }
+                }
+                , {
+                    label: '党组织成员签字', name: 'signurlt', index: 'signurlt', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (rowObject.flowstate == 1 && rowObject.btgnum != '0') {
+                            html = "不通过";
+                        } else {
+                            if (rowObject.signurlt) {
+                                html = "<img style='width: 100px; height: 40px;' src='../.." + rowObject.signurlt + "'>";
+                            }
+                        }
+
+                        return html;
+                    }
+                }
+            ],
+            //multiboxonly: false,
+            //multiselect: true,
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 't.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            //onSelectRow: function (id, status) {
+            //        var rowData = $gridTable.getRowData(id);
+            //        var flowstate = rowData.flowstate;
+            //        alert(flowstate);
+            //        if (flowstate.indexOf("待下发") < 0) {
+            //            $('#' + id).removeAttr("ui-state-highlight");
+            //        }
+            //},
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                var ids = $("#gridTable").getDataIDs();
+                for (var i = 0; i < ids.length; i++) {
+                    var rowData = $("#gridTable").getRowData(ids[i]);
+                    var flowstate = rowData.flowstate;
+                    if (flowstate.indexOf("办理反馈中")>0) {
+                        var nexttime = rowData.finishdate;
+                        var now = new Date();
+                        var nowday = now.getFullYear() + "-" + (now.getMonth() + 1) + "-" + now.getDate();
+                        var day = dattdifference(nowday, nexttime);
+                        if (day < 0) {
+                            $('#' + ids[i]).find("td").eq(4).css("background-color", "red");
+                        } else if (day <= 2 && day >= 0) {
+                            $('#' + ids[i]).find("td").eq(4).css("background-color", "orange");
+                        }
+                        $('#' + ids[i]).find("td").eq(1).find("input").remove();
+                    }
+                    if (flowstate.indexOf("待下发")<0) {
+                        $('#' + ids[i]).removeAttr("ui-state-highlight");
+                    }
+
+                }
+                $("#jqgh_gridTable_chkall").removeClass("ui-jqgrid-sortable");
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                showrange: $("#showrange").val(),//查看范围
+                supervisedate: $("#supervisedate").val(),//督办时间
+                flowstate: $("#flowstate").val(),//状态
+                keyword: $("#txt_Keyword").val(),//任务名称
+                code: _deptId//树节点code
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+    }
+    //查看
+    function show(id, type) {//0查看1反馈2督办确认
+        var title = "查看督办工作详情";
+        var action = "view";
+        if (type == "1") {
+            title = "工作办理反馈";
+            action = "feedback";
+        } else if (type == "2") {
+            title = "工作督办确认";
+            action = "confirmation";
+        }
+
+        if (id) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: title,
+                url: '/SafetyWorkSupervise/Safetyworksupervise/FeedbackDetail?superviseid=' + id + '&action=' + action,
+                width: "800px",
+                height: ($(top.window).height() - 150) + "px",
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                },
+                btn: false
+            });
+        } else {
+            dialogMsg('请选择数据！', 0);
+        }
+    }
+    //新增
+    function btn_add() {
+        dialogOpen({
+            id: 'Form',
+            title: '新增督办工作',
+            url: '/SafetyWorkSupervise/Safetyworksupervise/Form?action=add',
+            width: '1000px',
+            height: ($(top.window).height() - 80) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            },
+            btn: null
+        });
+    }
+    //编辑
+    function btn_edit(id) {
+        //var keyValue = $('#gridTable').jqGridRowValue('Id');
+        if (id) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑安全重点工作督办',
+                url: '/SafetyWorkSupervise/Safetyworksupervise/SuperviseDetail?keyValue=' + id,
+                width: "777px",
+                height: "560px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                },
+                btn: false
+            })
+        } else {
+            dialogMsg('请选择需要编辑的安全重点工作督办！', 0);
+        }
+    }
+    //删除
+    function btn_delete(id) {
+        //var keyValue = $('#gridTable').jqGridRowValue('Id');
+        if (id) {
+            $.RemoveForm({
+                url: '../../SafetyWorkSupervise/Safetyworksupervise/RemoveForm',
+                param: { keyValue: id },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的安全重点工作督办！', 0);
+        }
+    }
+    //查看流程图
+    function OpenViewFlow(keyValue) {
+        var title = "安全重点工作督办流程图";
+        var rqUrl = "/SafetyWorkSupervise/Safetyworksupervise/Flow?keyValue=" + keyValue;
+        dialogOpen({
+            id: 'WorkFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null
+        });
+    }
+    var isImport = false;
+    function importData() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入',
+            url: '/SafetyWorkSupervise/Safetyworksupervise/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    $('#btn_Search').trigger("click");
+                    top.refreshWork();
+                }
+            }
+        });
+    }
+    //计算两个时间中的差值
+    function dattdifference(sDate1, sDate2) {
+        var dateSpan, tempDate, iDays;
+        sDate1 = Date.parse(sDate1);
+        sDate2 = Date.parse(sDate2);
+        dateSpan = sDate2 - sDate1;
+        //dateSpan = Math.abs(dateSpan);
+        iDays = Math.floor(dateSpan / (24 * 3600 * 1000));
+        return iDays;
+    }
+    //导出
+    function exportData() {
+        $("#QrCodeModal").show();
+    }
+    function seletD() {
+        selectDept('', 1, 2, '责任部门(单位)', document.body, 'DutyDeptName,DutyDeptCode,DutyDeptId', '', '','');
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west" id="divTree">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="titlePanel" id="divTitle">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="padding-left: 10px;">
+                                查看范围：
+                            </td>
+                            <td>
+                                <select id="showrange" class=" show-menu-arrow form-control" style="width:80px;">
+                                    <option value="" selected="selected">全部</option>
+                                    <option value="1">待本人处理</option>
+                                    <option value="2">本人创建的</option>
+                                </select>
+                            </td>
+                            <td style="padding-left: 10px;">
+                                督办时间：
+                            </td>
+                            <td>
+                                <input id="supervisedate" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM' })" />
+                            </td>
+                            <td style="padding-left: 10px;">
+                                状态：
+                            </td>
+                            <td>
+                                <select id="flowstate" class=" show-menu-arrow form-control" style="width:80px;">
+                                    <option value="" selected="selected">全部</option>
+                                    <option value="0">待下发</option>
+                                    <option value="1">办理反馈中</option>
+                                    <option value="2">督办确认中</option>
+                                    <option value="3">已结束</option>
+                                </select>
+                            </td>
+                            <td style="padding-left: 10px;">
+                                任务名称：
+                            </td>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入任务名称" style="width: 139px;" />
+                            </td>
+                            <td style="padding-left: 10px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                            <td style="padding-left: 10px">
+                                <div class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li style="width: 220px;">
+                                            <a style="float: left">逾期未办理</a>
+                                            <div style="float: left; background-color: red; height: 22px; width: 80px; margin-left: 12px;"></div>
+                                        </li>
+                                        <li style="width: 220px;">
+                                            <a style="float: left">即将到期未办理</a>
+                                            <div style="float: left; background-color: orange; height: 22px; width: 80px;"></div>
+                                        </li>
+
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                        <a id="import" class="btn btn-default" onclick="importData()"><i class="fa fa-file-excel-o"></i>&nbsp;导入</a>
+                        <a id="export" class="btn btn-default" onclick="exportData()"><i class="fa fa-download"></i>&nbsp;导出</a>
+                      
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div id="confirm" class="text-right" style="padding:10px;">
+                <a class="btn btn-default confirm" onclick="confirm()" style="display:none;"> <i class="fa fa-share"></i> &nbsp;批量确认</a>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal" id="QrCodeModal">
+    <div class="modal-dialog" style="width:377px;height:600px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header" style="text-align:left;background-color:#2e99d4;color:#fff;">
+                <h5>导出</h5>
+            </div>
+            <div class="modal-body" id="modalBody" style="height:110px;">
+                <table class="form" >
+                    <tr>
+                        <td class="formTitle">督办时间：<font face="宋体">*</font></td>
+                        <td>
+                            <input id="sTime" type="text" isvalid="yes" style="width:90px;" checkexpession="NotNull" value="@DateTime.Now.ToString("yyyy-MM ")" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM' })" />
+                        </td>
+                        <td style="width:20px;">~</td>
+                        <td>
+                            <input id="eTime" type="text" style="width:90px;" isvalid="yes" checkexpession="NotNull" value="@DateTime.Now.ToString("yyyy-MM ")" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM' })" />
+                        </td>
+                    </tr>
+                    <tr style="height:19px;">
+
+                    </tr>
+                    <tr>
+                        <td class="formTitle">责任部门(单位)：<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <input id="DutyDeptName" type="text" class="form-control" readonly onclick="seletD()" isvalid="yes" checkexpession="NotNull" />
+                            <input id="DutyDeptId" type="hidden" />
+                            <input id="DutyDeptCode" type="hidden" />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="modal-footer" style="padding:5px;">
+                <button id="btnQr" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal">确认</button>
+                <button id="btnModal" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal">取消</button>
+            </div>
+        </div>
+    </div>
+</div>

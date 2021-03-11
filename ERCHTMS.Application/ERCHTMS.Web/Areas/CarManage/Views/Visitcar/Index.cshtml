@@ -1,0 +1,837 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_KMIndex.cshtml";
+}
+<!--即时通信start-->
+<script src="~/Content/scripts/plugins/signalr/jquery.signalR-2.2.0.min.js"></script>
+<script src="@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("SignalRUrl", "MQConfig"))/hubs"></script>
+<style>
+    .btn-group1 a {
+        display: inline-block;
+        width: 60px;
+        margin-right: 10px;
+        height: 24px;
+        line-height: 24px;
+        background: #5cb85c;
+        color: #fff;
+        text-align: center;
+        border-radius: 2px;
+        margin-top: 10px;
+        float: right;
+        text-decoration: none;
+    }
+
+    .btn-group1 {
+        margin-bottom: 20px;
+        margin-top: 200px;
+    }
+</style>
+
+<script>
+    $.ajaxSetup({ async: false }); //取消ajax异步
+    var time;//计时器
+    var listobj;//设备集
+
+    $(function () {
+        GetList();
+        setInterval("GetList()", 1000 * 15);
+    });
+
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 108.5);
+            },
+                200);
+            e.stopPropagation();
+        });
+    }
+
+    //定时执行任务
+    function refreshData() {
+        var taskIds = "";
+        for (var i = 0; i < listobj.length; i++) {
+            if (i == 0) {
+                taskIds += listobj[i].taskId
+            }
+            else {
+                taskIds += ',' + listobj[i].taskId
+            }
+        }
+        $.ajax({//先查询添加或删除任务进度是否完成
+            url: '../../PersonManage/PersonMg/QuerySpeedofprogress?taskIds=' + taskIds,
+            type: "POST",
+            async: true,
+            dataType: "Json",
+            success: function (result) {
+                if (result == "1") {
+                    window.clearInterval(time);
+                    $.SaveForm({//将人脸信息下载到指定设备中
+                        url: "../../PersonManage/PersonMg/DownloadToEquipment",
+                        param: { list: listobj },
+                        close: true,
+                        success: function (data) {
+                            GetList();
+                        }
+                    });
+                }
+            }
+        })
+    };
+
+
+    //加载表格
+    function GetList() {
+        var html = "";
+        //$.ajax({
+        //    url: '../../CarManage/Visitcar/GetLogNum',
+        //    type: "GET",
+        //    async: false,
+        //    dataType: "text",
+        //    success: function (result) {
+        //        html += "<h4 class=\"mainContentTit\">厂内现有车辆 <span class=\"carNum\">" + result + "辆</span> </h4>";
+        //    }
+        //});
+        $.ajax({
+            url: '../../CarManage/Visitcar/GetDoorList',
+            type: "GET",
+            async: false,
+            dataType: "Json",
+            success: function (result) {
+                var visitPersonCount = 0;
+                var visitCarCount = 0;
+                jQuery.each(result, function (index, item) {
+                    visitPersonCount += 1 + item.anumber;
+                    if (item.type == 0 || item.type == 1 || item.type == 2)
+                        visitCarCount += 1;
+                });
+                html = "<h4 class=\"mainContentTit\">厂内现有访客<span class=\"carNum\">" + visitPersonCount + "人</span>，车辆 <span class=\"carNum\">" + visitCarCount + "辆</span> </h4>";
+
+                for (var i = 0; i < result.length; i++) {
+                    if (result[i].type == 3) { // 0车辆拜访（有车）、1物料车、2危化品、3人员拜访（无车）
+                        html += " <div class=\"row content-item\">";
+                        html += " <div class=\"col-md-8\">";
+                        html += " <div class=\"row\">";
+                        html += " <div class=\"col-md-6\">";
+                        html += " <table class=\"cartable\">";
+                        html += " <tr>";
+                        html += " <th width=\"110\" class=\"formTitle\">申请人</th>";
+                        html += " <th class=\"formValue\">";
+                        if (result[i].carno != null) {
+                            html += result[i].dirver;
+                        }
+                        html += "</th>";
+                        if (result[i].appstatue == 0) {
+                            html += "<th class='btnth'><div class='frombtn'>审核中</div></th>"
+                        }
+                        html += " </tr>";
+                        html += " <tr>";
+                        html += " <td class=\"formTitle\">进厂目的</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].purpose != null) {
+                            html += result[i].purpose;
+                        }
+                        html += " </td>";
+                        html += " </tr>";
+                        html += " <tr>";
+                        html += " <td class=\"formTitle\">单位</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].dirver != null) {
+                            html += result[i].carno;
+                        }
+                        html += "  </td>";
+                        html += "</tr>";
+                        html += " <tr>";
+                        html += "  <td class=\"formTitle\">拜访对象</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].phone != null) {
+                            html += result[i].note;
+                        }
+                        html += " </td>";
+                        html += "  </tr>";
+
+                        html += " <tr>";
+                        html += "  <td class=\"formTitle\">拜访对象电话</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].phone != null) {
+                            html += result[i].driverlicenseurl;
+                        }
+                        html += " </td>";
+                        html += "  </tr>";
+
+                        html += " <tr>";
+                        html += "  <td class=\"formTitle\">随行人员</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].cyname != null) {
+                            html += result[i].cyname;
+                        }
+                        html += " </td>";
+                        html += "  </tr>";
+
+
+                        html += " <tr>";
+                        html += " <td class=\"formTitle\">时间</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].createdate != null) {
+                            html += result[i].createdate;
+                        }
+                        html += " </td>";
+                        html += " </tr>";
+                        html += " <tr>";
+                        html += " <td class=\"formValue\">";
+                        html += " </td>";
+                        html += " </tr>";
+                        html += " </table>";
+                        html += " </div>";
+                        html += " <div class=\"col-md-6\">";
+                        html += " </div>";
+                        html += " </div>";
+
+                        html += " <div class=\"row\">";
+                        html += " <div class=\"col-md-12 issueBox\">";
+                        if (result[i].state < 3 && result[i].appstatue == 1) {
+                            if (result[i].type == 3 ) { //人员拜访
+                                html += "    <a id=\"Issue\" class=\"btn btn-default\" onclick=\"UserfaceImg('" +
+                                    result[i].id +
+                                    "'," +
+                                    result[i].type +
+                                    ")\">人脸信息录入</a>";
+                                    html += "    <a id=\"Issue\" class=\"btn btn-default\" onclick=\"RyIssue('" +
+                                        result[i].id +
+                                        "'," +
+                                        result[i].type +
+                                        "," +
+                                        result[i].appstatue +
+                                        ")\">发放定位终端</a>";
+                            }
+                                html += "    <a id=\"Admission\" class=\"btn btn-default\" onclick=\"Admission('" +
+                                    result[i].id +
+                                    "'," +
+                                    result[i].type +
+                                    "," +
+                                    result[i].state +
+                                    ")\">确认无误，准予入厂</a>";
+                                html += "    <a id=\"jj\" class=\"btn btn-default\" onclick=\"Refuse('" +
+                                    result[i].id +
+                                    "'," +
+                                    result[i].type +
+                                    ")\">信息有误，拒绝入厂</a>";
+                        } else {
+                            if (result[i].appstatue == 1) {
+                                html += "    <a  class=\"btn btn-default\" onclick=\"Out('" +
+                                    result[i].id +
+                                    "'," +
+                                    result[i].type +
+                                    ")\">准许出厂</a>";
+                            }
+                        }
+
+                        html += " </div>";
+                        html += " </div>";
+
+                        html += " </div>";
+                        html += "<div class=\"imgsWrap col-md-4\">";
+                        html += " <div class=\"row\">";
+                        html += " <div class=\"col-md-6\">";
+                        html += " <div class=\"col-md-6\">";
+                        html += " <div class=\"imgsTit\">身份证照片</div>";
+                        if (result[i].drivinglicenseurl != null && result[i].drivinglicenseurl != "") {
+                            html += " <div><img style=\"width: 230px; height: 122px;\" onclick=\"ShowImg('" +
+                                top.contentPath +
+                                result[i].drivinglicenseurl +
+                                "')\" src=\"" +
+                                top.contentPath +
+                                result[i].drivinglicenseurl +
+                                "\" /></div>";
+                        } else {
+                            html += " <div><img style=\"width: 230px; height: 122px;\" src=\"" +
+                                top.contentPath +
+                                "/Content/images/no.png\" /></div>";
+                        }
+                        html += "  </div>";
+                        html += " </div>";
+                        html += " </div>";
+                        html += "  </div>";
+
+                    } else { //车辆拜访
+                        html += " <div class=\"row content-item\">";
+                        html += " <div class=\"col-md-8\">";
+                        html += " <div class=\"row\">";
+                        html += " <div class=\"col-md-6\">";
+                        html += " <table class=\"cartable\">";
+                        html += " <tr>";
+                        html += " <th width=\"110\" class=\"formTitle\">车牌号</th>";
+                        html += " <th class=\"formValue\">";
+                        if (result[i].carno != null) {
+                            html += result[i].carno;
+                        }
+                        if (result[i].type == 0 && result[i].appstatue == 0) {
+                            html += "<th class='btnth'><div class='frombtn'>审核中</div></th>"
+                        }
+                        html += " </th>";
+                        html += " </tr>";
+                        html += " <tr>";
+                        html += " <td class=\"formTitle\">进厂目的</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].purpose != null) {
+                            html += result[i].purpose;
+                        }
+                        html += " </td>";
+                        html += " </tr>";
+                        html += " <tr>";
+                        html += " <td class=\"formTitle\">驾驶人</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].dirver != null) {
+                            html += result[i].dirver;
+                        }
+                        html += "  </td>";
+                        html += "</tr>";
+                        html += " <tr>";
+                        html += "  <td class=\"formTitle\">驾驶人电话</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].phone != null) {
+                            html += result[i].phone;
+                        }
+                        html += " </td>";
+                        html += "  </tr>";
+                        html += " <tr>";
+                        html += " <td class=\"formTitle\">时间</td>";
+                        html += " <td class=\"formValue\">";
+                        if (result[i].createdate != null) {
+                            html += result[i].createdate;
+                        }
+                        html += " </td>";
+                        html += " </tr>";
+                        html += " <tr>";
+                        if (result[i].type == 0 || result[i].type == 2) {
+                            html += "<td class=\"formTitle\">随行人员</td>";
+                        } else if (result[i].type == 1) {
+                            html += "<td class=\"formTitle\">提货单位</td>";
+                        }
+                        html += " <td class=\"formValue\">";
+                        if (result[i].type == 0 || result[i].type == 2) {
+                            html += result[i].anumber + "人";
+                        } else if (result[i].type == 1) {
+                            html += result[i].note;
+                        }
+                        html += " </td>";
+                        html += " </tr>";
+                        html += " </table>";
+                        html += " </div>";
+                        html += " <div class=\"col-md-6\">";
+                        html += " </div>";
+                        html += " </div>";
+
+                        html += " <div class=\"row\">";
+                        html += " <div class=\"col-md-12 issueBox\">";
+                        if (result[i].state < 3 && result[i].appstatue == 1 ) {
+                            //如果是拜访车辆多一个选择路线的按钮
+                            if (result[i].type == 0) {
+                                html += "    <a id=\"Line\" class=\"btn btn-default\" onclick=\"SelectLine('" +
+                                    result[i].id +
+                                    "')\">路线选择</a>";
+                            }
+                            if (result[i].type == 0 || result[i].type == 2) {
+                                html += "    <a id=\"Issue\" class=\"btn btn-default\" onclick=\"UserfaceImg('" +
+                                    result[i].id +
+                                    "'," +
+                                    result[i].type +
+                                    ")\">人脸信息录入</a>";
+                                    html += "    <a id=\"Issue\" class=\"btn btn-default\" onclick=\"Issue('" +
+                                        result[i].id +
+                                        "'," +
+                                        result[i].type +
+                                        "," +
+                                        result[i].appstatue +
+                                        ")\">发放定位终端</a>";
+                            } else {
+                                    html += "    <a id=\"Issue\" class=\"btn btn-default\" onclick=\"WlIssue('" +
+                                        result[i].id +
+                                        "')\">发放定位终端</a>";
+                            }
+
+                            html += "    <a id=\"Admission\" class=\"btn btn-default\" onclick=\"Admission('" +
+                                result[i].id +
+                                "'," +
+                                result[i].type +
+                                "," +
+                                result[i].state +
+                                ")\">确认无误，准予入厂</a>";
+                            html += "    <a id=\"jj\" class=\"btn btn-default\" onclick=\"Refuse('" +
+                                result[i].id +
+                                "'," +
+                                result[i].type +
+                                    ")\">信息有误，拒绝入厂</a>";
+
+                        } else {
+                            if (result[i].appstatue == 1 && (result[i].type==0|| result[i].type==2)) {
+                                 html += "    <a  class=\"btn btn-default\" onclick=\"Out('" +
+                                result[i].id +
+                                "'," +
+                                result[i].type +
+                                ")\">准许出厂</a>";
+                            }
+                        }
+
+                        html += " </div>";
+                        html += " </div>";
+
+                        html += " </div>";
+                        html += "<div class=\"imgsWrap col-md-4\">";
+                        html += " <div class=\"row\">";
+                        html += " <div class=\"col-md-6\">";
+                        html += " <div class=\"imgsTit\">驾驶证图片</div>";
+                        if (result[i].driverlicenseurl != null && result[i].driverlicenseurl != "") {
+                            html += " <div><img style=\"width: 230px; height: 122px;\" onclick=\"ShowImg('" +
+                                top.contentPath +
+                                result[i].driverlicenseurl +
+                                "')\" src=\"" +
+                                top.contentPath +
+                                result[i].driverlicenseurl +
+                                "\" /></div>";
+                        } else {
+                            html += " <div><img style=\"width: 230px; height: 122px;\"  src=\"" +
+                                top.contentPath +
+                                "/Content/images/no.png\" /></div>";
+                        }
+                        html += " </div>";
+                        html += " <div class=\"col-md-6\">";
+                        html += " <div class=\"imgsTit\">行驶证图片</div>";
+                        if (result[i].drivinglicenseurl != null && result[i].drivinglicenseurl != "") {
+                            html += " <div><img style=\"width: 230px; height: 122px;\" onclick=\"ShowImg('" +
+                                top.contentPath +
+                                result[i].drivinglicenseurl +
+                                "')\" src=\"" +
+                                top.contentPath +
+                                result[i].drivinglicenseurl +
+                                "\" /></div>";
+                        } else {
+                            html += " <div><img style=\"width: 230px; height: 122px;\" src=\"" +
+                                top.contentPath +
+                                "/Content/images/no.png\" /></div>";
+                        }
+                        html += "  </div>";
+                        html += " </div>";
+                        if (result[i].state == 3) {
+                            if (result[i].type == 0 || result[i].type == 2) {
+                                html += "<div class=\"imgsMsg\">";
+                                html += "<span class=\"carfix\">车辆定位：1个</span>";
+                                html += "<span>人员定位：" + result[i].anumber + "个</span>";
+                                html += " </div>";
+                            } else {
+                                html += "<div class=\"imgsMsg\">";
+                                html += "<span class=\"carfix\">车辆定位：1个</span>";
+                                html += "<span>人员定位：0个</span>";
+                                html += " </div>";
+                            }
+                        }
+                        html += " </div>";
+                        html += "  </div>";
+                    }
+                }
+                $("#main").html(html);
+            }
+        });
+    }
+
+    //拜访车辆选择路线
+    function SelectLine(id) {
+        dialogOpen({
+            id: 'Form',
+            title: '路线选择',
+            url: '/CarManage/Routeconfig/SelectLine?keyValue=' + id,
+            width: '400px',
+            height: '500px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //查看图片
+    function ShowImg(url) {
+        var w = 1000;
+        var h = 700;
+        dialogOpen({
+            id: "ImgShow",
+            title: "查看图片",
+            url: '/CarManage/Visitcar/ImgShow?KeyValue=' + url,
+            shade: 0.5,
+            btn: null,
+            width: w + "px",
+            height: h + "px",
+            callBack: function (iframeId) {
+
+            }
+        });
+
+    }
+
+    //发放定位终端
+    function Issue(id, type, appstute) {
+        //手机端是否通过
+        $.ajax({
+            url: '../../CarManage/Visitcar/ApprovalIsAdopt?keyValue=' + id + '&type=' + type,
+            type: "GET",
+            async: false,
+            dataType: "Json",
+            success: function (result) {
+                if (type == 0 && result != 1) {
+                    dialogMsg('请联系拜访人员进行审核！', 0);
+                } else {
+                    dialogOpen({
+                        id: 'Form',
+                        title: '发放定位终端',
+                        url: '/CarManage/Visitcar/IssueGps?keyValue=' + id + '&type=' + type,
+                        width: '400px',
+                        height: '500px',
+                        callBack: function (iframeId) {
+                            top.frames[iframeId].AcceptClick();
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    //发放定位终端
+    function WlIssue(id) {
+        dialogOpen({
+            id: 'Form',
+            title: '发放定位终端',
+            url: '/CarManage/Visitcar/WlIssueGps?keyValue=' + id,
+            width: '400px',
+            height: '350px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //人员拜访发放定位终端
+    function RyIssue(id, type, appstatue) {
+        //手机端是否通过
+        $.ajax({
+            url: '../../CarManage/Visitcar/ApprovalIsAdopt?keyValue=' + id + '&type=' + type,
+            type: "GET",
+            async: false,
+            dataType: "Json",
+            success: function (result) {
+                if (result == 1) {
+                    dialogOpen({
+                        id: 'Form',
+                        title: '发放定位终端',
+                        url: '/CarManage/Visitcar/RyIssueGps?keyValue=' + id + '&type=' + type,
+                        width: '400px',
+                        height: '500px',
+                        callBack: function (iframeId) {
+                            top.frames[iframeId].AcceptClick();
+                        }
+                    });
+                } else {
+                    dialogMsg('请联系拜访人员进行审核！', 0);
+                }
+            }
+        });
+    }
+
+
+    //允许入厂
+    function Admission(id, type, state) {
+        //if (state == 2) {
+            var flag = true;
+            if (type == 0) {
+                //如果是拜访车辆先检测是否绑定路线
+                $.SetForm({
+                    url: "../../CarManage/Visitcar/GetFormJson",
+                    param: { keyValue: id },
+                    success: function (data) {
+                        if (data.LineID == null || data.LineID == "") {
+                            flag = false;
+                        }
+                    }
+                });
+            }
+            //if (flag) {
+                var dlg = dialogConfirm("确定审核通过吗？", function (isSure) {
+                    if (isSure) {
+                        if (state != 2)
+                            state = 2;
+                        var url = '../../CarManage/Visitcar/ChangeState';
+                        $.post(url, { keyValue: id, type: type, state: state }, function (data) {
+                            debugger;
+                            if (type != 1) {
+                                var list = eval('(' + data + ')')
+                                Loading(true, "请稍候,正在下发数据……");
+                                listobj = list;
+                                time = window.setInterval("refreshData()", 3000);
+                            }
+                            else {//物料车无需下发人员出入权限
+                                GetList();
+                            }
+                        });
+                        top.layer.close(dlg);
+                    }
+                });
+            //} else {
+            //    dialogMsg('请先绑定拜访路线！', 0);
+            //}
+        //} else {
+        //    dialogMsg('请先绑定Gps信息！', 0);
+        //}
+    }
+
+    //拒绝入场 0车辆拜访（有车）、1物料车、2危化品、3人员拜访（无车）
+    function Refuse(id, type) {
+        if (type == 0 || type == 3) {
+            $.ajax({
+                url: '../../CarManage/Visitcar/ApprovalIsAdopt?keyValue=' + id + '&type=' + type,
+                type: "GET",
+                async: true,
+                dataType: "Json",
+                success: function (result) {
+                    if (result == 0) {
+                        dialogMsg('拜访人正在审批中，不能进行该操作！', 0);
+                        return false;
+                    }
+                    Resolution(id, type);
+                }
+            });
+        }
+        else {
+            Resolution(id, type);
+        }
+    }
+
+    function Resolution(id, type) {
+        $.RemoveForm({
+            url: '../../CarManage/Visitcar/Refuse',
+            msg: '确定拒绝入场吗?',
+            loading: "正在处理数据...",
+            param: { keyValue: id, type: type },
+            success: function (data) {
+                GetList();
+            }
+        })
+    }
+
+    //准许出厂
+    function Out(id, type) {
+        var url = "";
+        if (type == 3) {
+            url = '/CarManage/Visitcar/OutUserForm?keyValue=' + id + "&Type=" + type;
+        }
+        else {
+            url = '/CarManage/Visitcar/OutForm?keyValue=' + id + "&Type=" + type;
+        }
+        dialogOpen({
+            id: 'Form',
+            title: '准许出厂',
+            url: url,
+            width: '600px',
+            height: '800px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    //人员拜访人脸录入
+    function UserfaceImg(id, type) {
+        dialogOpen({
+            id: 'Form',
+            title: '人脸录入人员选择',
+            url: '/CarManage/Visitcar/CheckUserFace?keyValue=' + id + "&Type=" + type,
+            width: '400px',
+            height: '500px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+
+     //根据推送接收推送信息
+    var signalRUrl = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("SignalRUrl", "MQConfig"))";
+    var userid = "menwei";
+    var tareWeight = -1;
+    if (signalRUrl.length > 0 ) {
+        var status = false;
+        var st = null;
+        var defaults = {
+            url: signalRUrl //服务地址
+        };
+        var options = {};
+        var options = $.extend(defaults, options);
+        //Set the hubs URL for the connection
+        $.connection.hub.url = options.url;
+        $.connection.hub.qs = { "userId": userid };//传递参数(做为客户端接收标识)
+        // Declare a proxy to reference the hub.
+        var chat = $.connection.ChatsHub;
+        //定义客户端方法供服务端调用。服务端向客户端推送消息
+        try {
+            chat.client.revMessage = function (str, msg, EqId) {
+                if (msg) {
+                var result = JSON.parse(msg);
+                   GetList();
+                }
+            };
+        } catch (ex) {
+
+        }
+
+        // 连接成功后注册服务器方法
+        $.connection.hub.start().done(function () {
+            chat.server.createGroup(userid);
+            chat.server.sendMsgKm(userid, "");
+            chat.server.printMsg(userid + "(" + userid + ")访客系统成功连接到SignalR服务器");
+        });
+
+        //断开连接后
+        $.connection.hub.disconnected(function (s) {
+           // console.error("SignalR服务器断开"+s);
+        });
+        //重连服务器
+        $.connection.hub.reconnecting(function () {
+
+           // console.info("SignalR服务器重新连接");
+        });
+        //连接错误
+        $.connection.hub.error(function () {
+           // console.error("SignalR服务器连接错误");
+        });
+
+    }
+
+
+</script>
+<div id="main" class="mainContent" style="width: 100%; height: 100%;">
+</div>
+
+<input type="hidden" id="btnreload" onclick="GetList()" />
+
+<style>
+    ul, li, body, p {
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-size: 16px;
+        font-family: 微软雅黑,宋体,Arial,Helvetica,Verdana,sans-serif;
+    }
+
+    li {
+        list-style: none;
+    }
+
+    .clear:after {
+        content: "";
+        display: block;
+        height: 0;
+        overflow: hidden;
+        clear: both;
+    }
+
+    .clear {
+        zoom: 1;
+    }
+
+    .mt10 {
+        margin-top: 10px;
+    }
+
+    .mainContent {
+        padding: 0 20px;
+        background: #f8f8f8;
+    }
+
+    .mainContentTit {
+        height: 45px;
+        line-height: 45px;
+        color: #545454;
+        font-size: 16px;
+    }
+
+        .mainContentTit .carNum {
+            font-size: 16px;
+        }
+
+    .content-item {
+        background: #fff;
+        padding-top: 20px;
+        padding-bottom: 28px;
+        margin-bottom: 10px;
+    }
+
+        .content-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .content-item .issueBox {
+            margin-top: 5px;
+        }
+
+    .cartable tr {
+        height: 35px;
+        line-height: 35px;
+    }
+
+        .cartable tr td:nth-of-type(1) {
+            color: #9dacc1;
+        }
+
+    .cartable th, .cartable td {
+        text-align: left;
+        font-size: 16px;
+    }
+
+    .issueBox a {
+        font-size: 16px;
+        margin-right: 12px;
+        padding: 6px 18px;
+    }
+
+    .imgsWrap {
+        /*margin-right: 15px;*/
+    }
+
+    .imgsTit {
+        font-size: 16px;
+        height: 36px;
+        line-height: 36px;
+        color: #555;
+    }
+
+    .imgsMsg {
+        margin-top: 12px;
+        margin-left: 20px;
+    }
+
+        .imgsMsg span {
+            font-size: 16px;
+            color: #555;
+        }
+
+        .imgsMsg .carfix {
+            margin-right: 10px;
+        }
+
+    .btnth {
+        width: 29%;
+        text-align: right;
+    }
+
+    .frombtn {
+        height: 30px;
+        width: 100px;
+        border: 1px solid blue;
+        text-align: center;
+        line-height: 30px;
+        color: red;
+        float: right;
+    }
+</style>

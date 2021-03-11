@@ -1,0 +1,219 @@
+﻿@{
+    ViewBag.Title = "作业安全分析";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script type="text/javascript">
+
+    var worktypevale = request('worktypevale');
+    var highrisktype = request('highrisktype');
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+
+    //查看风险评估
+    function show(id) {
+        id = id == undefined ? $("#gridTable").jqGridRowValue("id") : id;
+        var idx = dialogOpen({
+            id: "win0",
+            title: "查看风险辨识评估详情",
+            url: '/RiskDatabase/RiskAssess/Show?keyValue=' + id,
+            width: ($(top.window).width() - 80) + "px",
+            height: ($(top.window).height() - 20) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/Risktrainlib/GetPageJson",
+            postData: { queryJson: getQueryJson() },
+            datatype: "json",
+            height: $(window).height() - 150,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                { label: '工作任务', name: 'worktask', width: 100, align: 'center' },
+                { label: '风险等级', name: 'risklevelval', index: 'risklevelval', hidden: true }
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rownumWidth: 50,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            rownumbers: true,
+            sortname: 'createdate',
+            sortorder: 'desc',
+            shrinkToFit: false,
+            multiselect: true,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                var rows = $gridTable.jqGrid("getRowData");//获取当前页记录行数据
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txtKeyword").val("");
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //得到查询条件
+    function getQueryJson() {
+        var query = {
+            keyWord: $("#txtKeyword").val(),
+            WorkType: worktypevale
+        }
+        return JSON.stringify(query);
+    }
+
+    //function AcceptClick(winObject) {
+    //    var ids = $("#gridTable").jqGridRowValue("id");
+    //    if (!!ids) {
+    //        var riskData = $('#gridTable').jqGrid('getRowData');
+    //        for (var i = 0; i < riskData.length; i++) {
+    //            if (ids.indexOf(riskData[i].id) >= 0) {
+    //                $.ajax({
+    //                    url: '../../RiskDatabase/Risktrainlibdetail/GetTrainLibDetail',
+    //                    data: { workId: ids },
+    //                    dataType: "JSON",
+    //                    async: false,
+    //                    success: function (data) {
+    //                        var d = eval(data);
+    //                        var risklevel = 4;
+    //                        var change = false;
+    //                        for (var j = 0; j < d.length; j++) {
+    //                            var rowId = $(winObject).find("#gridAnalyse").jqGrid('getRowData').length + 1;
+    //                            $(winObject).find("#gridAnalyse").addRowData(rowId, { ID: newGuid(), WorkTask: riskData[i].worktask, WorkProcess: d[j].WorkProcess, AtRisk: d[j].AtRisk, Controls: d[j].Controls }, "first");
+    //                            if (riskData[i].risklevelval) {
+    //                                if (riskData[i].risklevelval < risklevel) {
+    //                                    risklevel = riskData[i].risklevelval;
+    //                                    change = true;
+    //                                }
+    //                            }
+    //                        }
+    //                        var risktype = $(winObject).find("#RiskType").attr("data-value");
+    //                        if (change && highrisktype && risktype == undefined) {
+    //                            $(winObject).find("#RiskType").ComboBoxSetValue(risklevel - 1);
+    //                        }
+    //                    }
+    //                });
+
+    //            }
+    //        }
+    //        dialogClose();
+    //    }
+    //    else {
+    //        dialogAlert("请选择工作任务！", 2);
+    //        return;
+    //    }
+    //}
+
+    function AcceptClick(winObject) {
+        var ids = $("#gridTable").jqGridRowValue("id");
+        if (!!ids) {
+            var riskData = $('#gridTable').jqGrid('getRowData');
+            for (var i = 0; i < riskData.length; i++) {
+                if (ids.indexOf(riskData[i].id) >= 0) {
+                    $.ajax({
+                        url: '../../RiskDatabase/Risktrainlibdetail/GetTrainLibDetail',
+                        data: { workId: riskData[i].id, worktask: riskData[i].worktask },
+                        dataType: "JSON",
+                        async: false,
+                        success: function (data) {
+                            var d = eval(data);
+                            var risklevel = 4;
+                            var change = false;
+                            if (riskData[i].risklevelval) {
+                                if (riskData[i].risklevelval < risklevel) {
+                                    risklevel = riskData[i].risklevelval;
+                                    change = true;
+                                }
+                            }
+                            var gridAnalyse = $(winObject).find("#gridAnalyse");
+                            var analyseData = gridAnalyse.jqGrid('getRowData');
+                            //从选择的工作任务中过滤已添加的工作任务
+                            let add = d.filter(item => !analyseData.some(x => x.WorkTask.indexOf(item.WorkTask)>=0 && x.WorkProcess.indexOf(item.WorkProcess)>=0));
+                            if (add.length > 0) {
+                                gridAnalyse.jqGrid('addRowData', 'id', add, "first");
+                                var risktype = $(winObject).find("#RiskType").attr("data-value");
+                                if (change && highrisktype && risktype == undefined) {
+                                    $(winObject).find("#RiskType").ComboBoxSetValue(risklevel - 1);
+                                }
+                            }
+                        }
+                    });
+
+                }
+            }
+            dialogClose();
+        }
+        else {
+            dialogAlert("请选择工作任务！", 2);
+            return;
+        }
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td width="10"></td>
+                            <td>
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入工作任务" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

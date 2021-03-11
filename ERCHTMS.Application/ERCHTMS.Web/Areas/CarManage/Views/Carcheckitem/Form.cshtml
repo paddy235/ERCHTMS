@@ -1,0 +1,278 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+<!--webUploader文件上传组件-->
+
+
+
+
+<style>
+    .XhTab {
+        width: 95%;
+        min-height: 25px;
+        line-height: 25px;
+        text-align: center;
+        border-collapse: collapse;
+        margin-left: 30px;
+    }
+
+        /*.XhTab table {
+            border: 1px solid #000000;
+        }*/
+        .XhTab tr th {
+            border: 1px solid #000000;
+            text-align: center;
+        }
+
+        .XhTab tr td {
+            border: 1px solid #000000;
+            text-align: center;
+        }
+
+    .formTitle {
+        width: 35%;
+    }
+
+    .formValue {
+        width: 65%;
+    }
+</style>
+<script>
+    var keyValue = request('keyValue');
+    var Action = request('Action');
+    var Num = 1;
+    $(function () {
+        IntiHazardous();
+        initControl();
+    });
+
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../CarManage/Carcheckitem/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    
+                    //获取项目数量列表
+                    $.ajax({
+                        url: '../../CarManage/Carcheckitemmodel/GetList',
+                        data: { Cid: keyValue },
+                        type: "Get",
+                        async: false,
+                        dataType: "Json",
+                        success: function(result) {
+
+                            for (var i = 0; i < result.length; i++) {
+                                if (i > 0) {
+                                    Increase();
+                                }
+                                $("#Item" + Num).val(result[i].CheckItem);
+                            }
+                        }
+                    });
+
+                    if (Action != null && Action == "Copy") {
+                        keyValue = "";
+                    }
+                    //获取选中的危化品多选框
+                    $.ajax({
+                        url: '../../CarManage/Carcheckitemhazardous/GetList',
+                        data: { Cid: keyValue },
+                        type: "Get",
+                        async: false,
+                        dataType: "Json",
+                        success: function (result) {
+                            //职务赋值
+                            if (result != null && result.length > 0) {
+                                var HazardousName = "";
+                                for (var i = 0; i < result.length; i++) {
+                                    if (i == 0) {
+                                        HazardousName = result[i].HazardousName;
+                                    } else {
+                                        HazardousName += "," + result[i].HazardousName;
+                                    }
+
+                                }
+                                $("#Hazardous").val(HazardousName);
+                                for (var i = 0; i < result.length; i++) {
+
+                                    $("#Hazardous").find("option").each(function (j, dom) {
+                                        if (result[i].HazardousId == dom.value && dom.value.length > 0) {
+                                            $(dom).attr("selected", "selected");
+
+                                        }
+
+                                    });
+
+                                }
+                                //$("#Hazardous").val(HazardousName);
+                                //$("#Hazardous").selectpicker('refresh');
+                            }
+                        }
+                    })
+                }
+            })
+        }
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        //var postData = $("#form1").formSerialize(keyValue);
+
+
+        var HazardousArray = [];
+        var postids = $("#Hazardous").selectpicker('val');
+        var Hazardous = $("button[data-id='Hazardous']").attr("title").replace(/\s+/, "");
+        var num = Hazardous.split(',');
+        if (postids != null && postids != "") {
+
+            for (var i = 0; i < postids.length; i++) {
+                HazardousArray.push({ HazardousName: num[i], HazardousId: postids[i] });
+
+            }
+
+
+
+        }
+
+
+        var ItemArray = [];
+        var index = 0;
+        $("#Tab").find("tr").each(function () {
+            if (index > 0) {
+                var tdArr = $(this).children();
+                var Stavalue = tdArr.eq(1).find('input').val();
+                ItemArray.push({ Sort: index, CheckItem: Stavalue });
+            }
+            index++;
+        });
+
+        var CheckItemName = $("#CheckItemName").val();
+
+        $.SaveForm({
+            url: "../../CarManage/Carcheckitem/SaveForm?keyValue=" + keyValue,
+            param: { CheckItemName: CheckItemName, HazardousArray: HazardousArray, ItemArray: ItemArray },
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    //绑定危化品方法
+    function IntiHazardous() {
+        var id = "";
+        if (Action != null && Action == "Copy") {
+            id = "";
+        } else {
+            id = keyValue;
+        }
+
+        $.ajax({
+            url: '../../CarManage/Carcheckitem/GetHazardousList',
+            data: { KeyValue: id },
+            type: "Get",
+            async: false,
+            dataType: "Json",
+            success: function (result) {
+                $("#Hazardous").html("");
+                BaseId = result;
+                var html = "";
+                for (var i = 0; i < result.length; i++) {
+                    html += "<option value=\"" + result[i].ItemDetailId + "\">" + result[i].ItemName + "</option>";
+                }
+                $("#Hazardous").append(html);
+                // $("#Hazardous").selectpicker('refresh');
+            }
+        })
+
+    }
+
+    function CutBack() {
+        if (Num > 1) {
+            Num--;
+            $("#TabNum").html(Num);
+            deleteRow();
+        }
+    }
+
+    function Increase() {
+        Num++;
+        $("#TabNum").html(Num);
+        addRow();
+    }
+
+    //根据id删除table中的行
+    function deleteRow() {
+        $("#tr" + (Num + 1)).remove();
+    }
+
+    //添加行
+    function addRow() {
+        var tab = document.getElementById('Tab');
+        var rowindex = tab.rows.length + 1;
+
+
+        //添加一行数据
+        var tr = tab.insertRow();
+        var td1 = tr.insertCell();
+        var td2 = tr.insertCell();
+        var tid = "tr" + Num;
+        tr.id = tid;
+
+        td1.innerHTML = Num;
+        td2.innerHTML = "<input id='Item" + Num + "' type='text' class='form-control' maxlength='250' isvalid='yes' checkexpession='NotNull' />";
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">检查项目名称<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="CheckItemName" type="text" class="form-control" isvalid='yes' checkexpession='NotNull' />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">适用于危化品类型<font face="宋体">*</font></td>
+            <td class="formValue">
+                <select id="Hazardous" class="show-menu-arrow selectpicker form-control" multiple placeholder="请选择危化品类型" isvalid='yes' checkexpession='NotNull'></select>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">检查项目数量</td>
+            <td class="formValue">
+                <a id="CutBack" onclick="CutBack()" title="减少"> <i class="fa fa-minus-square"></i></a>
+                <label id="TabNum">1</label>
+                <a id="Increase" onclick="Increase()" title="增加"> <i class="fa fa-plus-square"></i></a>
+
+
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <table id="Tab" class="XhTab">
+                    <tr>
+                        <td>序号</td>
+                        <td>检查项目</td>
+                    </tr>
+                    <tr>
+                        <td>1</td>
+                        <td><input id="Item1" type='text' class='form-control' maxlength="250" isvalid='yes' checkexpession='NotNull' /></td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</div>

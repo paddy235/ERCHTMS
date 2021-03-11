@@ -1,0 +1,142 @@
+﻿@{
+    ViewBag.Title = "Select";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script type="text/javascript">
+    var selectedRowIndex = -1;
+    var checktype = request('checkType');//-1:搭设,-2:拆除
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 136.5);
+
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            checktype: checktype
+        }
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1,
+            autowidth: true,
+            height: $(window).height() - 142,
+            url: "../../HighRiskWork/SuperviseTask/GetSelectScaffoldWorkJson",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'workid', width: 10, align: 'left', sortable: false, hidden: true },
+                { label: '作业单位类别', name: 'setupcompanytypename', width: 150, align: 'center', sortable: false },
+                {
+                    label: '脚手架用途/拆除原因', name: 'purpose', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (checktype == "-1") {
+                            return cellvalue;
+                        }
+                        else if (checktype == "-2") {
+                            return rowObject.dismentlereason;
+                        }
+                    }
+                },
+                { label: '搭设单位/拆除单位', name: 'setupcompanyname', width: 150, align: 'center', sortable: false },
+                { label: '单位id', name: 'setupcompanyid', width: 10, align: 'left', sortable: false, hidden: true },
+                { label: '单位code', name: 'setupcompanycode', width: 10, align: 'left', sortable: false, hidden: true },
+                {
+                    label: '搭设/拆除开始时间', name: 'setupstartdate', width: 10, hidden: true, formatter: function (cellvalue, options, rowObject) {
+                        if (checktype == "-1") {
+                            return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                        }
+                        else if (checktype == "-2") {
+                            return formatDate(rowObject.dismentlestartdate, 'yyyy-MM-dd hh:mm');
+                        }
+                    }
+                },
+                {
+                    label: '搭设/拆除结束时间', name: 'setupenddate', width: 10, hidden: true, formatter: function (cellvalue, options, rowObject) {
+                        if (checktype == "-1") {
+                            return formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                        }
+                        else if (checktype == "-2") {
+                            return formatDate(rowObject.dismentleenddate, 'yyyy-MM-dd hh:mm');
+                        }
+                    }
+                },
+                {
+                    label: '时间', name: 'setupstartdate', width: 300, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (checktype == "-1") {
+                            return formatDate(cellvalue, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.setupenddate, 'yyyy-MM-dd hh:mm');
+                        }
+                        else if (checktype == "-2") {
+                            return formatDate(rowObject.dismentlestartdate, 'yyyy-MM-dd hh:mm') + " - " + formatDate(rowObject.dismentleenddate, 'yyyy-MM-dd hh:mm');
+                        }
+
+                    }
+                }, { label: '搭设地点', name: 'setupaddress', width: 200, align: 'center', sortable: false },
+                  { label: '作业单位类别值', name: 'setupcompanytype', width: 10, align: 'center', sortable: false, hidden: true },
+                  { label: '工程名称', name: 'outprojectname', width: 10, align: 'center', sortable: false, hidden: true }
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            rowList: [10, 15, 20],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+
+    //返回选择后的结果并赋值到dom控件
+    //winObject:窗体中需要查找domId的对象，一般可写成window.document.body
+    //domId：接收返回值的dom节点的ID，多个用逗号分隔
+    function AcceptClick(winObject, domId,callback) {
+        if (selectedRowIndex <= 0) {
+            dialogAlert("请选择作业信息!", 2);
+            return;
+        }
+        else {
+            var workcontent = $("#gridTable tr:eq(" + selectedRowIndex + ") td:eq(3)").attr("title");
+            var applydeptname = $("#gridTable tr:eq(" + selectedRowIndex + ") td:eq(4)").attr("title");
+            var applydeptid = $("#gridTable tr:eq(" + selectedRowIndex + ") td:eq(5)").attr("title");
+            var applydeptcode = $("#gridTable tr:eq(" + selectedRowIndex + ") td:eq(6)").attr("title");
+            var workplace = $("#gridTable tr:eq(" + selectedRowIndex + ") td:eq(10)").attr("title");
+            var workdepttype = $("#gridTable tr:eq(" + selectedRowIndex + ") td:eq(11)").attr("title");
+            var outprojectname = $("#gridTable tr:eq(" + selectedRowIndex + ") td:eq(12)").attr("title");
+
+            var arr = domId.split(',');
+            $(winObject).find("#" + arr[0]).val(workcontent);
+            $(winObject).find("#" + arr[1]).val(applydeptname);
+            $(winObject).find("#" + arr[2]).val(applydeptid);
+            $(winObject).find("#" + arr[3]).val(applydeptcode);
+            $(winObject).find("#" + arr[4]).val(workplace);
+            $(winObject).find("#" + arr[5]).val(workdepttype);
+            $(winObject).find("#" + arr[6]).val(outprojectname);
+        }
+        if (callback) {
+            callback();
+        }
+        dialogClose();
+    }
+</script>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

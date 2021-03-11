@@ -1,0 +1,179 @@
+﻿
+@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+    string Hkappkey = new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("Hikappkey").Split('|')[0];
+    string Hksecret = new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("Hikappkey").Split('|')[1];
+    if (new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("CustomerName") == "京泰电厂")
+    {
+        //专属于京泰内网办公环境的 视频预览功能
+        Hkappkey = "22042476";
+        Hksecret = "hyhpFKjk6H3VMafq5jIA";
+    }
+
+}
+
+<script>
+    var Hkappkey = "@(Hkappkey)";
+    var Hksecret = "@(Hksecret)";
+    var HikIp = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("HikHttpsIP"))";
+    var HikPort = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("HikPort"))";//海康平台端口号
+    var RecordLocation = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("RecordLocation"))";//录像存储位置：0-中心存储，1-设备存储
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 114.5);
+            }, 200);
+            e.stopPropagation();
+        });
+        }
+        var selectedRowIndex = -1;
+
+    //加载表格
+    function GetGrid() {
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "@Url.Action("GetALL")",
+            datatype: "json",
+            height: $(window).height() - 114.5,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'ID', hidden: true },
+                {
+                    label: '操作', name: 'CameraId', index: 'CameraId', width: 200, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = '<a class="" onclick="preview(\'' + rowObject.CameraId + '\');" title="实时预览" style="cursor:pointer;"><i class="fa fa-video-camera"></i></a>'
+                        if (rowObject.CameraType == "球机") {
+                            html += '&nbsp;&nbsp;<a class="" onclick="repalyView(\'' + rowObject.CameraId + '\');" title="录像回放" style="cursor:pointer;"><i class="fa fa-history"></i></a>'
+                        }
+                        return html;
+                    }
+                },
+                { label: '摄像头名称', name: 'CameraName', index: 'CameraName', width: 400, align: 'center' },
+                { label: '摄像头唯一编码', name: 'CameraId', index: 'CameraId', width: 400, align: 'center' },
+                {
+                    label: "所在区域", name: "AreaName", index: "AreaName", width: 200, align: "center"
+                },
+                {
+                    label: "设备类别", name: "CameraType", index: "CameraType", width: 200, align: "center"
+                }
+            ],
+            rownumbers: false,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { keyword: $("#txt_Keyword").val() },
+            }).trigger('reloadGrid');
+        });
+    }
+    //新增
+        function add() {
+        dialogOpen({
+            id: "Form",
+            title: '添加摄像头',
+            url: '/..@Url.Action("Form")',
+            width: "500px",
+            height: "400px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    };
+    //编辑
+        function edit() {
+            var keyValue = $("#gridTable").jqGridRowValue("ID");
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: "Form",
+                title: '编辑分类',
+                url: '/..@Url.Action("Form")?keyValue=' + keyValue,
+                width: "500px",
+                height: "400px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+        }
+    }
+    //删除
+    function del() {
+          var keyValue = $("#gridTable").jqGridRowValue("ID");
+        if (keyValue) {
+            $.RemoveForm({
+                url: "@Url.Action("Remove")",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#gridTable").resetSelection();
+                    $("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的分类！', 0);
+        }
+    }
+    /**
+     * 监控预览
+     * @@param {string} cameraId 设备唯一ID
+     */
+    var preview = (cameraId) => {
+        window.open(top.contentPath + "/Content/jnjtIndex/html/PreView.html?keyValue=" + cameraId + "&Hkappkey=" + Hkappkey + "&Hksecret=" + Hksecret + "&HikIp=" + HikIp + "&HikPort=" + HikPort);
+
+    }
+        /**
+     * 监控回放
+     * @@param {string} cameraId 设备唯一ID
+     */
+        var repalyView = (cameraId) => {
+            window.open(top.contentPath + "/Content/jnjtIndex/html/ReplayView.html?keyValue=" + cameraId + "&Hkappkey=" + Hkappkey + "&Hksecret=" + Hksecret + "&HikIp=" + HikIp + "&HikPort=" + HikPort + "&  =" + RecordLocation);
+        //    debugger;
+        //dialogOpen({
+        //    id: "view",
+        //    title: '监控回放',
+        //    url: '/KbsDeviceManage/Kbscameramanage/ReplayVideo?keyValue=' + cameraId,
+        //    width: ($(top.window).width() - 300) + "px",
+        //    height: ($(top.window).height() - 150) + "px",
+        //    callBack: function (iframeId) {
+        //        top.document.getElementById(iframeId).contentWindow.AcceptClick();
+        //    }
+        //});
+    }
+</script>
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            @*<tr>
+                <td>
+                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                </td>
+                <td style="padding-left: 5px;">
+                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                </td>
+            </tr>*@
+        </table>
+    </div>
+    <div class="toolbar">
+        <div class="btn-group">
+            <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+            <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+            <a id="edit" class="btn btn-default" onclick="edit()"><i class="fa fa-pencil-square-o"></i>&nbsp;编辑</a>
+            <a id="delete" class="btn btn-default" onclick="del()"><i class="fa fa-trash-o"></i>&nbsp;删除</a>
+        </div>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+</div>

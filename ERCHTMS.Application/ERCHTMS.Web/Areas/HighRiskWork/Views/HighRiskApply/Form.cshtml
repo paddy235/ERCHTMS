@@ -1,0 +1,339 @@
+@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var mode = request('mode');
+    var deptname = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var deptid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var deptcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var userid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var username = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    //作业许可文件
+    var WorkFiles = request('WorkFiles');
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        WorkFiles = WorkFiles.length == 0 ? "@Guid.NewGuid().ToString()" : WorkFiles;
+        file_upload.init({
+            keyValue: WorkFiles, extensions: 'xls,xlsx,pdf,doc,docx', fileNumLimit: 1, isImage: false
+        });
+
+        $("#ApplyDeptName").val(deptname);
+        $("#ApplyDeptId").val(deptid);
+        $("#ApplyDeptCode").val(deptcode);
+        $("#ApplyUserId").val(userid);
+        $("#ApplyUserName").val(username);
+        $("#CreateDate").val("@DateTime.Now.ToString("yyyy-MM-dd hh:mm")");
+
+        //作业类型
+        $("#WorkType").ComboBox({
+            param: { EnCode: "WorkType" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "==请选择==",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+
+        //保存
+        $("#btn_Save").click(function () {
+            $("#ApplyState").val("1");
+            AcceptClick();
+        });
+
+        //提交
+        $("#btn_Submit").click(function () {
+            $("#ApplyState").val("2");
+            AcceptClick();
+        });
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../HighRiskWork/HighRiskApply/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    //模板下载
+                    if (mode != "view") {
+                        changeDownload();
+                    }
+                    if (mode == "view" && $("#ApplyState").val() != "1") {
+                        //根据申请id获取审核信息[不包括没审的]
+                        $.ajax({
+                            url: '../../HighRiskWork/HighRiskCheck/GetCheckListInfo',
+                            data: { applyid: $("#Id").val() },
+                            dataType: "JSON",
+                            async: false,
+                            success: function (result) {
+                                var html = ""
+                                if (result != "") {
+                                    for (var i = 0; i < result.length; i++) {
+                                        html += '<tr><td class="formTitle" style="color:blue">审核人<font face="宋体">*</font></td><td class="formValue"> <input type="text" class="form-control" isvalid="yes" checkexpession="NotNull" value="' + result[i].ApprovePersonName + '" readonly /></td><td class="formTitle">审核单位<font face="宋体">*</font></td><td class="formValue"><input type="text" class="form-control" isvalid="yes" checkexpession="NotNull" value="' + result[i].ADeptName + '" readonly /></td></tr><tr><td class="formTitle">审核意见<font face="宋体">*</font></td><td class="formValue" colspan="3"><textarea  class="form-control" isvalid="yes" checkexpession="NotNull" style="min-height: 50px;" maxlength="800"  readonly>' + result[i].ApproveReason + '</textarea></td></tr><tr><td class="formTitle">审核结果<font face="宋体">*</font></td><td class="formValue">'
+                                        if (result[i].ApproveState == "1") {
+                                            html += '<div class="radio-inline"><label><input type="radio" name="UnitType_' + i + '" value="1" checked="checked" disabled="disabled"/>同意</label></div><div class="radio-inline"><label><input type="radio" name="UnitType_' + i + '"  value="2"  disabled="disabled" />不同意</label></div></td>'
+                                        }
+                                        else {
+                                            html += '<div class="radio-inline"><label><input type="radio" name="UnitType_' + i + '" value="1" disabled="disabled"/>同意</label></div><div class="radio-inline"><label><input type="radio" name="UnitType_' + i + '"  value="2" checked="checked" disabled="disabled" />不同意</label></div></td>'
+                                        }
+                                        html += '<td class="formTitle">审核时间<font face="宋体">*</font></td><td class="formValue"><input style="width: 150px;" type="text" isvalid="yes" checkexpession="NotNull" class="form-control" value="' + result[i].ModifyDate + '"  readonly></td></tr>'
+                                    }
+                                }
+                                $("#table1").html(html);
+                            }
+                        });
+                        //根据申请id获取审批信息[不包括没审的]
+                        $.ajax({
+                            url: '../../HighRiskWork/HighRiskCheck/GetApproveInfo',
+                            data: { applyid: $("#Id").val() },
+                            dataType: "JSON",
+                            async: false,
+                            success: function (result) {
+                                var html = ""
+                                //已审批
+                                if (result != "" && result != null) {
+                                    html += '<tr><td class="formTitle" style="color:blue">审批人<font face="宋体">*</font></td><td class="formValue"> <input type="text" class="form-control" isvalid="yes" checkexpession="NotNull" value="' + result.ApprovePersonName + '" readonly /></td><td class="formTitle">审批单位<font face="宋体">*</font></td><td class="formValue"><input type="text" class="form-control" isvalid="yes" checkexpession="NotNull" value="' + result.ADeptName + '" readonly /></td></tr><tr><td class="formTitle">审批意见<font face="宋体">*</font></td><td class="formValue" colspan="3"><textarea  class="form-control" isvalid="yes" checkexpession="NotNull" style="min-height: 50px;" maxlength="800"  readonly>' + result.ApproveReason + '</textarea></td></tr><tr><td class="formTitle">审批结果<font face="宋体">*</font></td><td class="formValue">'
+                                    if (result.ApproveState == "1") {
+                                        html += '<div class="radio-inline"><label><input type="radio" name="UnitType_a1" value="1" checked="checked" disabled="disabled"/>同意</label></div><div class="radio-inline"><label><input type="radio" name="UnitType_a1"  value="2"  disabled="disabled" />不同意</label></div></td>'
+                                    }
+                                    else {
+                                        html += '<div class="radio-inline"><label><input type="radio" name="UnitType_a1"  value="1" disabled="disabled"/>同意</label></div><div class="radio-inline"><label><input type="radio" name="UnitType_a1"  value="2" checked="checked" disabled="disabled" />不同意</label></div></td>'
+                                    }
+                                    html += '<td class="formTitle">审批时间<font face="宋体">*</font></td><td class="formValue"><input style="width: 150px;" type="text" isvalid="yes" checkexpession="NotNull" class="form-control" value="' + result.ModifyDate + '"  readonly></td></tr>'
+                                }
+                                $("#table2").html(html);
+                            }
+                        });
+                    }
+                }
+            })
+        }
+
+        if (mode == "view") {
+            $("#btn_Save,#btn_Submit").attr("style", "display:none");
+            if ($("#ApplyState").val() != "1") {
+                $("#div1").attr("style", "display:block");
+            }
+        }
+
+        var status = mode == "view" ? false : true;
+        file_upload.bindFiles(status, false, WorkFiles, "uploader", status);
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        else {
+            flag = true;
+            //控制文件必传
+            $.ajax({
+                url: '../../SaftProductTargetManage/SafeProductDutyBook/GetFiles',
+                data: { fileId: WorkFiles },
+                dataType: "JSON",
+                async: false,
+                success: function (result) {
+                    if (result == "") {
+                        flag = false;
+                    }
+                }
+            });
+            if (!flag) {
+                dialogMsg('请上传作业许可证文件！', 2);
+                return false;
+            }
+
+            var start = $("#WorkStartTime").val();
+            var end = $("#WorkEndTime").val();
+            if (start > end && start != "" && end != "") {
+                dialogMsg('作业开始时间不能大于作业结束时间！', 2);
+                return false;
+            }
+
+            //审核人的人数限制
+            var userids = $("#VerifyUserIds").val();
+            var arr = userids.split(",");
+            if (arr.length > 5) {
+                dialogMsg('审核人数已超过了限制,请重新选择！', 2);
+                return false;
+            }
+
+        }
+        $("#WorkFiles").val(WorkFiles);
+        var postData = $("#form1").formSerialize(keyValue);
+        $.SaveForm({
+            url: "../../HighRiskWork/HighRiskApply/SaveForm?keyValue=" + keyValue + "&verifyids=" + $("#VerifyUserIds").val() + "&approveids=" + $("#ApproveUserId").val(),
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    //切换作业类型,下载不同的模板
+    function changeDownload() {
+        var worktype = $("#WorkType").attr("data-value");
+        var html = "";
+        var mark = '<a id="a1" style="color:blue; text-decoration:underline;padding-left:0px;" target="_blank"';
+        var mark1 = '>模板下载</a>';
+        switch (worktype) {
+            case "1":
+                html = 'href="../../Resource/ExcelTemplate/高处安全作业证.docx"';
+                break;
+            case "2":
+                html = 'href="../../Resource/ExcelTemplate/动火安全作业证.docx"';
+                break;
+            case "3":
+                html = 'href="../../Resource/ExcelTemplate/受限空间安全作业证.docx"';
+                break;
+            case "4":
+                html = 'href="../../Resource/ExcelTemplate/起重吊装安全作业证.docx"';
+                break;
+            case "5":
+                html = 'href="../../Resource/ExcelTemplate/临时用电安全作业证.docx"';
+                break;
+            case "6":
+                html = 'href="../../Resource/ExcelTemplate/临近带电体作业许可证.docx"';
+                break;
+            case "7":
+                html = 'href="../../Resource/ExcelTemplate/交叉作业许可证.docx"';
+                break;
+            default:
+                mark = "";
+                mark1 = "";
+                break;
+        }
+        html = mark + html + mark1;
+        $("#span1").html(html)
+    }
+
+    //清除审核人
+    function cal() {
+        $("#VerifyUserNames,#VerifyUserIds").val("");
+    }
+</script>
+<div style="margin: 0px; margin-top: 40px; background-color: white;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">申请单位<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="ApplyDeptName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                <input type="hidden" id="ApplyDeptId" value="" /><input type="hidden" id="ApplyDeptCode" value="" />
+                <input type="hidden" id="ApplyState" value="" />
+                <input type="hidden" id="Id" value="@Guid.NewGuid().ToString()" />
+            </td>
+            <td class="formTitle">申请人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="ApplyUserName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                <input type="hidden" id="ApplyUserId" value="" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">申请时间<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="CreateDate" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly/>
+
+            </td>
+            <td class="formTitle">作业类型<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <div id="WorkType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" onchange="changeDownload()"></div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业开始时间<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="WorkStartTime" style="width: 150px;" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm'})">
+            </td>
+            <td class="formTitle">作业结束时间<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="WorkEndTime" style="width: 150px;" type="text" isvalid="yes" checkexpession="NotNull" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm'})">
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业地点<font face="宋体">*</font></td>
+            <td class="formValue" colspan="5">
+                <textarea id="WorkPlace" class="form-control" isvalid="yes" checkexpession="NotNull" style="min-height: 50px;" maxlength="100"></textarea>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业项目(内容)<font face="宋体">*</font></td>
+            <td class="formValue" colspan="5">
+                <textarea id="WorkContent" class="form-control" isvalid="yes" checkexpession="NotNull" style="min-height: 80px;" maxlength="800"></textarea>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">作业许可证文件<font face="宋体">*</font></td>
+            <td class="formValue" colspan="4">
+                <input id="WorkFiles" type="text" hidden="hidden" />
+                <div id="uploader" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 50px; margin-bottom: 10px;">
+                    <div class="queueList">
+                        <div id="dndArea" class="placeholder">
+                            <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display: none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+            </td>
+            <td><span id="span1"></span></td>
+        </tr>
+        <tr>
+            <td class="formTitle" style="color: blue">审核人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="4">
+                @*审核人不能和申请人和审批人一样*@
+                <input style="float: left" id="VerifyUserNames" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="selectUser({ deptId: '', userIds: $('#VerifyUserIds').val(), checkMode: 1, mode: 2, winObject: window.document.body, domId: 'VerifyUserNames,,VerifyUserIds', eliminateUserIds: $('#ApproveUserId').val() == '' ? '' + $('#ApplyUserId').val() : $('#ApproveUserId').val() + ',' + $('#ApplyUserId').val() });" />
+                <input type="hidden" id="VerifyUserIds" value="" />
+            </td>
+            <td>
+                <a id="btn_Cal" class="btn btn-primary" href="javascript:cal();"><i class="fa fa-check"></i>&nbsp;清&nbsp;&nbsp;除</a>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" style="color: blue">审批人<font face="宋体">*</font></td>
+            <td class="formValue" colspan="2">
+                <input id="ApproveUserName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="selectUser({ deptId: '', checkMode: 0, mode: 2, winObject: window.document.body, domId: 'ApproveUserName,,ApproveUserId', eliminateUserIds: $('#VerifyUserIds').val() == '' ? '' + $('#ApplyUserId').val() : $('#VerifyUserIds').val() + ',' + $('#ApplyUserId').val() });" />
+                <input type="hidden" id="ApproveUserId" value="" />
+            </td>
+        </tr>
+    </table>
+    <div id="div1" style="display: none">
+        <div class="panel panel-default" style="margin-top: 20px;">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;审核信息&nbsp;&nbsp;</strong>
+            </div>
+        </div>
+        <table class="form" id="table1">
+        </table>
+        <div class="panel panel-default" style="margin-top: 20px;">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;审批信息&nbsp;&nbsp;</strong>
+            </div>
+        </div>
+        <table class="form" id="table2">
+        </table>
+    </div>
+</div>
+<div class="form-button" style="top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float: left;">
+        <a id="btn_Save" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+    </div>
+</div>

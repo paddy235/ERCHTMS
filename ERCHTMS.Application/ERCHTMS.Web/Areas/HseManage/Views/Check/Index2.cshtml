@@ -1,0 +1,225 @@
+﻿
+@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<style>
+    .form-group {
+        padding-right: 10px;
+    }
+
+        .form-group label {
+            margin-left: 5px;
+            margin-right: 5px;
+        }
+</style>
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+<script>
+    var grid, selectedRowIndex, deptid;
+    jQuery(function () {
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+                $("#gridTable").setGridHeight($(window).height() - 206);
+                $("#gridTable").setGridHeight($(window).height() - 138);
+            }, 200);
+            e.stopPropagation();
+        });
+        $("#itemTree").setTreeHeight($(window).height() - 50);
+
+        initTree();
+
+        grid = jQuery('#gridTable');
+        grid.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 138,
+            url: "/../@Url.Action("GetList")",
+            datatype: "json",
+            postData: { deptid: deptid },
+            colModel: [
+                { label: '主键', name: 'CheckRecordId', hidden: true, key: true },
+                { label: '操作', name: 'Oper', index: 'Oper', width: 150, align: 'center' },
+                { label: '类别', name: 'Category', index: 'Category', width: 200, align: 'center' },
+                { label: '名称', name: 'CardName', index: 'CardName', width: 800, align: 'center' },
+                { label: '检查人', name: 'CheckUser', index: 'CheckUser', width: 200, align: 'center' },
+                { label: '检查时间', name: 'CheckTime', index: 'CheckTime', width: 300, align: 'center', formatter: 'date', formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } },
+                { label: '检查地点', name: 'CheckPlace', index: 'CheckPlace', width: 200, align: 'center' },
+                { label: '安全数量', name: 'Num1', index: 'Num1', width: 200, align: 'center' },
+                { label: '风险/紧急风险数量', name: 'Num2', index: 'Num2', width: 200, align: 'center' },
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = grid.jqGrid('getGridParam', 'selrow');
+            },
+            gridComplete: function () {
+                gridqx(grid);
+            },
+            viewrecords: true,
+            rowNum: 10,
+            pager: "#gridPager",
+            rownumbers: true,
+        });
+    });
+
+    function initTree() {
+        var json = JSON.stringify(
+      {
+          SelectMode: 0,
+          Mode: 3
+      }
+      );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                deptid = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        var treeData = $("#itemTree").getData();
+        if (treeData.length > 0) {
+            deptid = treeData[0].id;
+        }
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+    function reload() {
+        grid.jqGrid('setGridParam', {
+            postData: { deptid: deptid, checkuser: jQuery('#checkuser').val(), from: jQuery('#from').val(), to: jQuery('#to').val(), key: jQuery('#key').val() }, page: 1
+        }).trigger('reloadGrid');
+    }
+
+    function add() {
+        dialogOpen({
+            id: 'Edit',
+            title: '新增',
+            url: '/../@Url.Action("Edit")',
+            width: '800px',
+            height: '600px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+
+    function view() {
+        if (selectedRowIndex) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看',
+                url: '/../@Url.Action("Edit2")/' + selectedRowIndex,
+                width: '800px',
+                height: '600px',
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除预警指标卡！', 0);
+        }
+    }
+
+    function del() {
+        if (selectedRowIndex) {
+            $.RemoveForm({
+                url: '/../@Url.Action("Delete")/' + selectedRowIndex,
+                param: { CardId: selectedRowIndex },
+                success: function (data) {
+                    grid.trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除预警指标卡！', 0);
+        }
+    }
+
+    function edit() {
+        if (selectedRowIndex) {
+            dialogOpen({
+                id: 'Form',
+                title: '修改',
+                url: '/../@Url.Action("Edit")/' + selectedRowIndex,
+                width: '800px',
+                height: '600px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除预警指标卡！', 0);
+        }
+    }
+
+    function fn$all() {
+        jQuery('.title-search').find('input').val('');
+        reload();
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right: 8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor: pointer;" title="展开/收起"></i>
+                </div>
+                <a onclick=''></a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-right:10px">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label for="checkuser">检查人</label>
+                            <input type="text" class="form-control" id="checkuser">
+                        </div>
+                        <div class="form-group">
+                            <label for="from">检查时间</label>
+                            <input type="text" class="form-control" id="from" onfocus="WdatePicker();" readonly="readonly">
+                            - <input type="text" class="form-control" id="to" onfocus="WdatePicker();" readonly="readonly">
+                        </div>
+                        <div class="form-group">
+                            <label for="team">关键字</label>
+                            <input type="text" class="form-control" id="key">
+                        </div>
+                        <div class="form-group">
+                            <a id="btn_Search" class="btn btn-primary" onclick="reload()"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            <a id="btn_SearchAll" class="btn btn-primary" onclick="fn$all();">&nbsp;重置</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+

@@ -1,0 +1,198 @@
+﻿@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+
+<script>
+    var keyValue = request('keyValue');
+    var copy = request('copy');
+    var action = request('action');
+    var FILEPS = "@Guid.NewGuid().ToString()";
+    var FILES = "@Guid.NewGuid().ToString()";
+    var win = top.Form.window;
+    var b = false;
+    $(function () {
+        initControl();
+    });
+
+    //初始化控件
+    function initControl() {
+        $("#btn_Submit").hide();
+        //获取表单
+        if (!!keyValue && keyValue != "-1") {
+            b = true;
+            $("#btn_Submit").show();//修改时进入页面时保存
+            $.SetForm({
+                url: "../../SafetyWorkSupervise/Safetyworksupervise/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+        if (win.DutyDeptName.length > 0) {
+            $("#WorkTask").val(win.WorkTask);
+            $("#DutyDeptName").val(win.DutyDeptName);
+            $("#DutyDeptId").val(win.DutyDeptId);
+            $("#DutyDeptCode").val(win.DutyDeptCode);
+            $("#DutyPerson").val(win.DutyPerson);
+            $("#DutyPersonId").val(win.DutyPersonId);
+            $("#SupervisePerson").val(win.SupervisePerson);
+            $("#SupervisePersonId").val(win.SupervisePersonId);
+            $("#FinishDate").val(win.FinishDate);
+            $("#Remark").val(win.Remark);
+            $("#SuperviseDeptName").val(win.SuperviseDeptName);
+            $("#SuperviseDeptId").val(win.SuperviseDeptId);
+            $("#SuperviseDeptCode").val(win.SuperviseDeptCode);
+        }
+        //保存
+        $("#btn_Save").click(function () {
+            AcceptClick("0");
+        });
+        //发送
+        $("#btn_Submit").click(function () {
+            AcceptClick("1");
+        });
+    }
+    //保存表单;
+    function AcceptClick(type) {
+
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if (b) {
+            if (type == "1") {
+                postData["FlowState"] = "1";
+            }
+            $.SaveForm({
+                url: "../../SafetyWorkSupervise/Safetyworksupervise/SaveForm?keyValue=" + keyValue,
+                param: postData,
+                loading: "正在保存数据...",
+                success: function () {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            var jqGridTable = top.Form.window.$("#gridTable");
+            //win.$("#gbox_gridTable").find(".unwritten").hide();
+            //修改
+            if (win.DutyDeptName.length > 0 && copy == "0") {
+                rowId = win.selectedRowIndex;
+                jqGridTable.delRowData(rowId);
+                jqGridTable.addRowData(rowId, postData, 'first');
+            }
+            //新增
+            else {
+                rowId = jqGridTable.jqGrid('getRowData').length + 1;
+                //新添加的数据放到最上面
+                jqGridTable.addRowData(rowId, postData, 'first');
+            }
+            dialogClose();
+        }
+        
+       
+    }
+    //选择责任人
+    function selectDutyUser(type) {
+        if (type == "0") {
+            if ($('#DutyDeptId').val().length > 0) {
+                var options = { deptId: $('#DutyDeptId').val(), checkMode: 0, mode: 19, istree: 1, winObject: window.document.body, domId: 'DutyPerson,,DutyPersonId' };
+                var url = '/BaseManage/User/Select?deptId=' + $('#DutyDeptId').val() + "&checkMode=" + 0 + "&mode=" + 19 + "&istree=" + 0 + "&pfrom=" + 1;
+                dialogOpen({
+                    id: "User",
+                    title: "选择用户",
+                    url: url,
+                    width: ($(top.window).width() - 10) + "px",
+                    height: ($(top.window).height()) + "px",
+                    callBack: function (iframeId) {
+                        top.document.getElementById(iframeId).contentWindow.AcceptClick(options);
+                    }
+                });
+                //selectUser({ deptId: $('#DutyDeptId').val(), checkMode: 0, mode: 19, istree:1, winObject: window.document.body, domId: 'DutyPerson,,DutyPersonId' });
+            } else {
+                dialogMsg('请先选择责任部门(单位)！', 0);
+            }
+        } else {
+            selectUser({ deptId: '', checkMode: 0, mode: 0, winObject: window.document.body, domId: 'SupervisePerson,,SupervisePersonId,SuperviseDeptId,SuperviseDeptCode,SuperviseDeptName' });
+        }
+        
+    }
+    function seletD() {
+        selectDept('', 0, 2, '责任部门(单位)', document.body, 'DutyDeptName,DutyDeptCode,DutyDeptId');
+        $("#DutyPerson").val("");
+        $("#DutyPersonId").val("");
+    }
+</script>
+<div style="margin-left: 10px; margin-right: 10px;">
+
+    <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px;padding-top:40px;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;基本信息</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body" style="height:424px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle" style="width:100px;">重点工作任务<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="2">
+                            <textarea id="WorkTask" class="form-control" style="height: 120px;" isvalid="yes" checkexpession="NotNull"></textarea>
+                        </td>
+                    </tr>
+                    <tr id="HandleTr">
+                        <td class="formTitle">责任部门(单位)<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DutyDeptName" type="text" class="form-control" readonly onclick="seletD()" isvalid="yes" checkexpession="NotNull" />
+                            <input id="DutyDeptId" type="hidden" />
+                            <input id="DutyDeptCode" type="hidden" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">责任人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DutyPersonId" type="hidden" />
+                            <input id="DutyPerson" type="text" class="form-control" readonly onclick="selectDutyUser(0)" isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">督办人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SupervisePersonId" type="hidden" />
+                            <input id="SupervisePerson" type="text" class="form-control" readonly onclick="selectDutyUser(1)" isvalid="yes" checkexpession="NotNull" />
+                            <input id="SuperviseDeptId" type="hidden" />
+                            <input id="SuperviseDeptCode" type="hidden" />
+                            <input id="SuperviseDeptName" type="hidden" />
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="formTitle">完成时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="FinishDate" type="text" isvalid="yes" checkexpession="NotNull" value="@DateTime.Now.ToString("yyyy-MM-dd ")" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">备注</td>
+                        <td class="formValue" colspan="2">
+                            <textarea id="Remark" class="form-control" style="height: 120px;" checkexpession="NotNull"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+    </div>
+</div>

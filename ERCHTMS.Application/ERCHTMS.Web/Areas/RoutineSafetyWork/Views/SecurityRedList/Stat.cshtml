@@ -1,0 +1,279 @@
+﻿@{
+    ViewBag.Title = "Stat";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+<script src="~/content/scripts/plugins/highcharts/highcharts.js"></script>
+<style type="text/css">
+    .tab1 {
+        width: 100%;
+        border: 1px solid #ccc;
+        text-align:center;
+    }
+
+        .tab1 td {
+            background-color: white;
+            height: 30px;
+            border: 1px solid #ccc;
+        }
+</style>
+
+<script src="~/content/scripts/plugins/highcharts/modules/no-data-to-display.js"></script>
+<script type="text/javascript">
+    var _parentId = "";
+    var _isOrg = "";
+    var _deptId = "";
+    var curUserRole = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    $(function () {
+        GetTree();
+        var $_html = $('<ul></ul>');
+        $_html.append('<li data-value=全部>全部</li>');
+        var year = new Date().getFullYear();
+        for (var i = 0; i < 5; i++) {
+            var y = parseInt(year) - parseInt(i);
+            $_html.append('<li data-value=' + y + '>' + y + '</li>');
+        }
+        $("#YearStat").html($_html);
+        $("#YearStat").ComboBox({
+            description: "==请选择==",
+        });
+        $("#YearStat").ComboBoxSetValue("全部");
+        $("#YearStat").attr("data-text", "全部");
+        $("#YearStat").attr("data-value", "全部");
+        //获取统计图
+        var queryJson = {
+            year: $("#YearStat").attr("data-value")
+        }
+        $.ajax({
+            url: "../../RoutineSafetyWork/SecurityRedList/GetSecurityRedListStat",
+            data: { queryJson: JSON.stringify(queryJson) },
+            success: function (data) {
+                if (!!data) {
+                    GetBangTable1(data);
+                }
+            }
+        });
+
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                year: $("#YearStat").attr("data-value"),
+                code: _parentId,
+                isOrg: _isOrg
+            }
+            //获取统计图
+            $.ajax({
+                url: "../../RoutineSafetyWork/SecurityRedList/GetSecurityRedListStat",
+                data: { queryJson: JSON.stringify(queryJson) },
+                success: function (data) {
+                    if (!!data) {
+                        GetBangTable1(data);
+                    }
+                }
+            });
+        });
+    })
+    function GetBangTable1(data) {
+        var ndata = eval("(" + data + ")");
+        var y = eval(ndata.y);
+        var red = eval(ndata.red);
+        var black = eval(ndata.black);
+        //统计图
+        LoadContainer(red,black);
+        //统计表格
+        GetGridTable(y,red, black);
+    }
+    //加载统计图
+    function LoadContainer(red,black) {
+        //柱形图
+        $('#container').highcharts({
+            chart: {
+                type: 'column'
+            },
+            title: {
+                text: '安全红黑榜统计分析'
+            },
+            subtitle: {
+                text: ''
+            },
+            xAxis: {
+                categories: [
+                    '1月份',
+                    '2月份',
+                    '3月份',
+                    '4月份',
+                    '5月份',
+                    '6月份',
+                    '7月份',
+                    '8月份',
+                    '9月份',
+                    '10月份',
+                    '11月份',
+                    '12月份'
+                ],
+                crosshair: true
+            },
+            yAxis: {
+                min: 0,
+                title: {
+                    text: ''
+                }, tickInterval: 1
+            },
+            tooltip: {
+                headerFormat: '<span style="font-size:10px">{point.key}</span><table>',
+                pointFormat: '<tr><td style="color:{series.color};padding:0">{series.name}: </td>' +
+                    '<td style="padding:0"><b>{point.y} </b></td></tr>',
+                footerFormat: '</table>',
+                shared: true,
+                useHTML: true
+            },
+            plotOptions: {
+                column: {
+                    pointPadding: 0.2,
+                    borderWidth: 0
+                }
+            },
+            series: [{
+                name: '安全红榜数量',
+                data: red
+
+            }, {
+                name: '安全黑榜数量',
+                data: black
+
+            }]
+        });
+    }
+
+    //加载表格2
+    function GetGridTable(y,red, black) {
+        var b = false;
+        var title = "月份";
+        if (y.length < 12) {
+            b = true;
+            $("#YearStat").html("");
+            var $_html = $('<ul></ul>');
+            title = "年份";
+        }
+        $("#gridTable").html("");
+        var str = "<tr style='font-weight: bold;'><td>" + title + "</td><td>安全红榜数量</td><td>安全黑榜数量</td><td>共计</td></tr>";
+        var Sum = 0;
+        for (var i = 0; i < y.length; i++) {
+            if (b) {
+                $_html.append('<li data-value=' + y[i] + '>' + y[i] + '</li>');
+            }
+            Sum = parseInt(red[i]) + parseInt(black[i]);
+            str += "<tr><td>" + y[i] + "</td><td>" + red[i] + "</td><td>" + black[i] + "</td><td>" + Sum + "</td></tr>";
+        }
+        if (b) {
+            $("#YearStat").html($_html);
+            $("#YearStat").ComboBox({
+                description: "==请选择==",
+            });
+            $("#YearStat").ComboBoxSetValue("" + new Date().getFullYear() + "");
+            $("#YearStat").attr("data-text", "" + new Date().getFullYear() + "");
+            $("#YearStat").attr("data-value", "" + new Date().getFullYear() + "");
+        }
+
+        $("#gridTable").append(str);
+    }
+    //加载组织机构树
+    function GetTree() {
+        var json = "";
+        var url = ""; //"../../BaseManage/User/GetDepartTreeJson";
+        if (curUserRole.indexOf("省级用户") >= 0) {
+            json = JSON.stringify({ SelectMode: 0, Mode: 9 });
+            url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+        }
+        else {
+            json = JSON.stringify({ SelectMode: 0, Mode: 0 });
+            url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+        }
+        var item = {
+            height: $(window).height() - 50,
+            url: url,
+            onnodeclick: function (item) {
+                _parentId = item.Code;
+                _isOrg = item.Sort;
+                _deptId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center" style="overflow-y:scroll;">
+        <div class="center-Panel" style="border:0px;">
+            <div class="panel-Title">安全红黑榜统计信息</div>
+            <div class="titlePanel">
+                <div class="title-search" id="search">
+                    <table class="queryform" id="searchTab">
+                        <tr>
+                            <th style="padding-left: 10px;">年度：</th>
+                            <td style="padding-left: 15px;">
+                                <div id="YearStat" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width:90px"></div>
+                            </td>
+                            <td style="padding-left: 20px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="west-Panel">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计图</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="container" style="width:100%;float:left;"></div>
+                    </div>
+                </div>
+                <div class="panel panel-default" id="statisticsList">
+                    <div class="panel-heading">
+                        <strong>&nbsp;&nbsp;统计列表</strong>
+                        <span class="tools pull-right">
+                            <a class="fa fa-chevron-down" title="展开/收起"></a>
+                        </span>
+                    </div>
+                    <div class="panel-body">
+                        <table id="gridTable" cellpadding="0" cellspacing="0" class="tab1" border="1" style="width:100%;"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+

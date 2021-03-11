@@ -1,0 +1,408 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>;
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户id
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var orgid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";  //部门信息
+    var state = 0;
+    var qtype = request('qtype');//首页代办
+    var examinetodeptid = "";
+    var fivetype = request('fivetype'); // 检查类型
+    var istopcheck = request('istopcheck'); // 0:上级公司检查 1：公司安全检查
+    $(function () {
+        //qtype = '1'; //测试代办
+        GetContent();
+        InitialPage();
+        GetGrid();
+        GetTree();
+    });
+    function GetContent() {
+        $.ajax({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson?EnCode=" + (istopcheck == 0 ? 'fivetopcheck' : 'fivegscheck'),
+            type: "GET",
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                $(data).each(function (i,vel) {
+                    if (vel.ItemValue == fivetype) {
+                        $('#schemeTitle').html(vel.ItemName);
+                    }
+                });
+
+            }
+        })
+    }
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+           applyDemoStyles: false,
+            onresize: function () {
+               $(window).resize();
+             }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                //$('#gridTable').setGridWidth(($('.gridPanel').width()));
+                //$('#gridTable').setGridHeight($(window).height() - 170);
+
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //流程图
+    function btn_viewflow(id, urltype) {
+        if (id) {
+            var title = "安全考核流程图";
+            var rqUrl = "/HiddenTroubleManage/Fivesafetycheck/FlowForm?keyValue=" + id + "&urltype=" + urltype;
+            dialogOpen({
+                id: 'FlowForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 50) + "px",
+                btn: null
+            });
+        } else {
+            dialogMsg('请选择查看行！', 0);
+        }
+    }
+
+    function showItems(id, status) {
+        var idx0 = dialogOpen({
+            id: "ListForm",
+            title: "查看检查发现问题及整改情况",
+            url: '/HiddenTroubleManage/Fivesafetycheck/List?keyValue=' + id + '&status=' + status,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 80) + "px",
+            btn: ['关闭'],
+            callBack: function (iframeId) {
+                top.layer.close(idx0);
+            }
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            qtype: qtype,
+            fivetype: fivetype
+        };
+        var isFirst = true;
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 200,
+            url: "../../HiddenTroubleManage/Fivesafetycheck/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "','" + rowObject.issaved + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                        //当issaved为0,则为登记状态，可以编辑，反之则无法编辑
+                        if (UserId == rowObject.createuserid && rowObject.issaved == "0") {// 驳回后可以修改和删除
+                            html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>&nbsp;";
+                            //html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>&nbsp;";
+                        }
+                        if (rowObject.isover == "0" && rowObject.issaved == "1") {
+                            if (parseStrEmpty(rowObject.approveuserids).indexOf(UserId + ',') >= 0) {
+                                html += "<a href=javascript:btn_apply('" + rowObject.id + "')  title='审批'><i class='fa fa-check'></i></a>&nbsp;";
+                            }
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '流程状态', name: 'auditresult', index: 'auditresult', align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var content = "";
+                        if (rowObject.issaved == "0") {
+                            content = "填报中";
+                            return '<a style=""  href="javascript:void(0)">' + content + '</a>';
+                        } else {
+                            if (rowObject.isover == 0) {
+                                content = "审核中";
+                            } else if (rowObject.isover == 1) {
+                                content = "整改中";
+                            } else if (rowObject.isover == 2) {
+                                content = "验收中";
+                            } else if(rowObject.isover == 3){
+                                content = "已验收";
+                            }
+                            return '<a style="text-decoration:underline;color:blue"  href="javascript:btn_viewflow(\'' + rowObject.id + '\',\'1\')">' + content + '</a>';
+                        }
+
+
+                    }
+                },
+                { label: '检查名称', name: 'checkname', index: 'checkname', width: 250, align: 'center', sortable: true },
+
+                { label: '检查类型', name: 'checktype', index: 'checktype', width: 150, align: 'center' },
+                {
+                    label: '检查时间', name: 'checkbegindate', index: 'checkbegindate', width: 300, align: 'center', headerAlign: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var content = rowObject.checkbegindate + ' - ' + rowObject.checkenddate;
+
+                        return content;
+
+                    }
+                },
+                {
+                    label: '检查项数', name: 'checkbnum', index: 'checkbnum', width: 300, align: 'center', headerAlign: 'center', formatter: function (cellvalue, options, rowObject) {
+                        return '<a style="cursor:pointer;text-decoration:underline;color:blue;" onclick=\"showItems(\'' + rowObject.id + '\',\'0\')\">' + cellvalue + '</a>';
+
+                    }
+                },
+
+                {
+                    label: '整改项数', name: 'actionnum', index: 'actionnum', width: 300, align: 'center', headerAlign: 'center', formatter: function (cellvalue, options, rowObject) {
+                        return '<a style="cursor:pointer;text-decoration:underline;color:blue;" onclick=\"showItems(\'' + rowObject.id + '\',\'1\')\">' + cellvalue + '</a>';
+
+                    }
+                },
+                {
+                    label: '逾期未整改项数', name: 'cqactionnum', index: 'cqactionnum', width: 150, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        return '<a style="cursor:pointer;text-decoration:underline;color:blue;" onclick=\"showItems(\'' + rowObject.id + '\',\'2\')\">' + cellvalue + '</a>';
+
+                    }
+                },
+                {
+                    label: '整改率', name: 'zgl', index: 'zgl', width: 150, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var content = '';
+                        if (rowObject.checkbnum != 0) {
+                            content = (((rowObject.actionnum / rowObject.checkbnum)*100).toFixed(2)) + '%';
+                        }
+
+                        return content;
+
+                    }
+                },
+
+                { label: '流程部门编码/ID', name: 'flowdept', hidden: true },
+                { label: '流程角色名称', name: 'flowrolename', hidden: true },
+                { label: '创建人所属部门Code', name: 'createuserdeptcode', hidden: true },
+                { label: '创建人所属机构Code', name: 'createuserorgcode', hidden: true },
+                { label: '创建人用户ID', name: 'createuserid', hidden: true },
+                { label: '是否保存', name: 'issaved', hidden: true },
+                { label: '是否流程完成', name: 'isover', hidden: true }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                //$('#' + this.id).setSelection(selectedRowIndex, false);
+                if (isFirst) {
+                    //var groupHeaders = new Array();
+                    //groupHeaders.push(
+                    //    {
+                    //        startColumnName: "checkbnum",
+                    //        numberOfColumns: 4,
+                    //        titleText: "<b>整改情况</b>"
+                    //    }
+                    //);
+                    //$('#gridTable').jqGrid("setGroupHeaders", {
+                    //    useColSpanStyle: true,
+                    //    groupHeaders: groupHeaders
+                    //});
+                }
+            },
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true
+        });
+        var groupHeaders = new Array();
+        groupHeaders.push(
+            {
+                startColumnName: "checkbnum",
+                numberOfColumns: 4,
+                titleText: "<b>整改情况</b>"
+            }
+        );
+        $('#gridTable').jqGrid("setGroupHeaders", {
+            useColSpanStyle: true,
+            groupHeaders: groupHeaders
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                keyword: $("#txt_Keyword").val(),
+                examinetodeptid: examinetodeptid,
+                qtype: qtype,
+                fivetype: fivetype
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 1,
+                Ids: orgid
+            }
+        );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                console.log(item);
+                examinetodeptid = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        //window.setTimeout(function () {
+        //    $('#gridTable').setGridHeight($('.west-Panel').height() - $('.titlePanel').height() - $('.toolbar').height() - 70.5);
+
+        //}, 500);
+    }
+
+    function show(id, issaved) {
+        var keyValue = id;
+        var title = "查看检查信息";
+        var url = '/HiddenTroubleManage/Fivesafetycheck/Form?action=view&fivetype=' + fivetype + '&istopcheck=' + istopcheck +'&recid='+id;
+        if (checkedRow(id)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: title,
+                url: url,
+                width: 'px',
+                height: 'px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加检查信息',
+            url: '/HiddenTroubleManage/Fivesafetycheck/Form?action=add&fivetype=' + fivetype + '&istopcheck=' + istopcheck,
+            width: 'px',
+            height: 'px',
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_edit(id) {
+        var keyValue = $('#gridTable').jqGridRowValue('ID');
+        if (checkedRow(id)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑检查信息',
+                url: '/HiddenTroubleManage/Fivesafetycheck/Form?action=edit&fivetype=' + fivetype + '&istopcheck=' + istopcheck +'&recid='+id,
+                width: 'px',
+                height: 'px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+
+    //编辑
+    function btn_apply(id) {
+        if (checkedRow(id)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑检查信息',
+                url: '/HiddenTroubleManage/Fivesafetycheck/Form?action=apply&fivetype=' + fivetype + '&istopcheck=' + istopcheck + '&recid=' + id,
+                width: 'px',
+                height: 'px',
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_delete(id) {
+        if (id) {
+            $.RemoveForm({
+                url: '../../HiddenTroubleManage/Fivesafetycheck/RemoveForm',
+                param: { keyValue: id },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的检查信息！', 0);
+        }
+    }
+    // 组织机构查询所有
+    function selectAll() {
+        examinetodeptid = "";
+        $('#btn_Search').trigger("click");
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a href="javascript:void(0);" onclick="selectAll();">组织机构树</a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" >
+            <div class="panel-Title" id="schemeTitle">安评检查</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar" style="margin-left:10px; margin-bottom:5px;">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

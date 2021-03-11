@@ -1,0 +1,96 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+    ERCHTMS.Busines.SystemManage.DataItemDetailBLL di = new ERCHTMS.Busines.SystemManage.DataItemDetailBLL();
+}
+<script type="text/javascript" src="~/content/scripts/business/common.js" ></script>
+<script type="text/javascript">
+    var keyValue = request('keyValue');
+    var userId = request('userId');
+    var apiUrl = "@di.GetItemValue("WebApiUrl", "AppSettings")";
+    var isGxhs = "@di.GetItemValue("广西华昇版本")";
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../PersonManage/blacklist/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#UserName").val($.currentIframe().window.$('#gridTable').jqGridRowValue('realname'));
+                    $("#UserId").val($.currentIframe().window.$('#gridTable').jqGridRowValue('userid'));
+                }
+            })
+        } else {
+            var $jgrid = $.currentIframe().window.$("#gridTable");
+            var names = "";
+            var ids = "";
+            var selectedRowIds = $jgrid.jqGrid("getGridParam", "selarrrow");
+            $(selectedRowIds).each(function (i, item) {
+                var rowData = $jgrid.jqGrid('getRowData', selectedRowIds[i]);
+                if (rowData.isblack == 0) {
+                    names += rowData.username + ",";
+                    ids += rowData.userid + ",";
+                }
+            });
+            if (names.length>0) {
+                $("#UserId").val(ids.substring(0,ids.length-1));
+                $("#UserName").val(names.substring(0, names.length - 1));
+            }
+             
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        dialogConfirm("确认加入黑名单吗？", function (isSure) {
+            var postData = $("#form1").formSerialize(keyValue);
+            if (isSure) {
+                $.SaveForm({
+                    url: "../../PersonManage/blacklist/SaveForm",
+                    //param: { userIds: $("#UserId").val(), content: $("#Reason").val() },
+                    param:postData,
+                    loading: "正在保存数据...",
+                    success: function () {
+                        if (isGxhs.length > 0) {
+                            $.post(apiUrl + "/synctrain/DeleteUsers", { userIds: $("#UserId").val() }, function (data) {
+                                console.log(data.message);
+                            });
+                        }
+                        $.currentIframe().window.$("#gridTable").trigger("reloadGrid");
+                    }
+                })
+            }
+
+        });
+       
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 10px;">
+    <div class="row">
+        <div class="col-sm-4 control-label">黑名单人员<font face="宋体" style="color:red;">*</font>：</div>
+        <div class="col-sm-8" id="form1">
+            <div class="input-group">
+                <input type="hidden" id="UserId" />
+                <textarea id="UserName" class="form-control" isvalid="yes" checkexpession="NotNull" rows="2" readonly="readonly"></textarea>
+                <span class="input-group-addon" onclick="selectUser({ deptId: '', deptCode:'', checkMode: 1, mode: 2, winObject: this.parentNode, domId: 'UserName,UserId' })" title="选择用户">...</span>
+            </div>
+           
+        </div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+        <div class="col-sm-4 control-label">加入黑名单原因<font face="宋体" style="color:red;">*</font>：</div>
+        <div class="col-sm-8" id="form1">
+            <textarea id="Reason" class="form-control" isvalid="yes" checkexpession="NotNull" rows="5"></textarea>
+           
+        </div>
+    </div>
+</div>
+

@@ -1,0 +1,764 @@
+﻿@{
+    ViewBag.Title = "部门管理";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+
+    var keyValue = request('keyValue');
+    var organizeId = request('organizeId');
+    var departmentId = request('departmentId');
+    var parentId = request('parentId');
+    var action = request('action');
+    var typeArg = request('typeArg');
+    var currUserId = top.currUserId;
+    var deptType = request('deptType');
+    var currRoleName = top.currUserRoleName;
+    var a = null;
+    var pId = "";
+    $.ajaxSetup({async:false});
+    $(function () {
+        $("#showSend").hide();
+        initControl();
+        if (!!action) {
+            $("#actionValue").val(action);
+        }
+        GetGrid();
+      
+    })
+    function setDeptNature(item) {
+      
+        if (item.Description == "外包工程承包商") {
+            $("#Nature-option").find("li").hide();
+            $("#Nature-option").find("li").eq(6).show();
+            $("#DeptType").val(item.DeptType);
+           
+        }
+        else if (item.Description == "区域子公司") {
+            $("#dtype").hide();
+            $("#Nature-option").find("li").hide();
+            $("#Nature-option").find("li").eq(1).show();
+        }
+        else if (item.Description == "各电厂") {
+            $("#dtype").hide();
+            $("#Nature-option").find("li").hide();
+            $("#Nature-option").find("li").eq(2).show();
+        }
+        else {
+            if (item.Nature == "集团" || item.Nature == "省级" || item.Nature == "厂级") {
+                $("#dtype").hide();
+                $("#Nature-option").find("li").hide();
+                $("#Nature-option").find("li").eq(3).show();
+            }
+            if (item.Nature == "部门") {
+                $("#dtype").hide();
+                $("#Nature-option").find("li").hide();
+                $("#Nature-option").find("li").eq(4).show(); $("#Nature-option").find("li").eq(5).show();
+
+            }
+            if (item.Nature == "专业") {
+                $("#dtype").hide();
+                $("#Nature-option").find("li").hide();
+                $("#Nature-option").find("li").eq(5).show();
+            }
+            if (item.Nature == "承包商") {
+                $("#DeptType").val(item.DeptType);
+                $("#dtype,#showSend").show();
+                $("#Nature-option").find("li").hide();
+                $("#Nature-option").find("li").eq(6).show();
+                $("#Nature-option").find("li").eq(7).show();
+                
+            }
+            //setDeptType(item.Nature);
+        }
+        if (deptType!=null) {
+            if (deptType.length > 0) {
+                $("#DeptType").val(deptType);
+            }
+            if (item.Description == "外包工程承包商" && item.Nature == "部门" && item.Fax == "1") {
+                $("#showSend").show();
+            }
+        }
+        
+    }
+    //初始化控件
+    function initControl() {
+        if (IsAdmin()) {
+            $(".con100").show();
+        } else {
+            $(".con100").hide();
+        }
+        //上级部门
+        $("#OrganizeTree").ComboBoxTree({
+            url: "../../BaseManage/Department/GetOrganizeTreeJson?mode=1&deptId=" + departmentId,
+            description: "",
+            height: "250px",
+            allowSearch: true,
+            click: function (item) {
+                setDeptNature(item);
+                if (item.OrganizeId != undefined) {
+                    organizeId = item.OrganizeId;
+                }
+                parentId = item.id;
+            }
+        }).bind("change", function () {
+            $("#Nature").removeAttr("data-value"); $("#Nature").removeAttr("data-text");
+            $("#Nature").find(".ui-select-text").text("");
+            var value = $(this).attr('data-value');
+            $.get("GetFormJson", { keyValue: value, mode: 0 }, function (data) {
+                if (data.length > 2) {
+                    var json = eval("(" + data + ")");
+                    var nature = json.Nature;
+                  
+                    if (nature != null && nature != undefined) {
+                        if (nature == "班组") {
+                            $("#Nature").removeAttr("data-value"); $("#Nature").removeAttr("data-text");
+                            $("#Nature").find(".ui-select-text").text("请选择");
+                            $("#Nature-option").find("li").hide();
+                        }
+                        if (nature == "承包商") {
+                            $("#dtype").show();
+                            $("#showSend").show();
+                            $("#Nature").removeAttr("data-value"); $("#Nature").removeAttr("data-text");
+                            $("#Nature").find(".ui-select-text").text("请选择");
+                            $("#Nature-option").find("li").hide();
+                            $("#Nature-option").find("li[data-value='承包商']").show();
+                        }
+                            if ((nature == "承包商" || nature == "分包商") && json.Fax == "1") {
+                                $("#dtype").show();
+                                $("#showSend").show();
+                            } else {
+                                $("#showSend").hide();
+                            }
+                            setDeptType(nature);
+                    }
+                }
+            });
+        });
+        //部门性质
+        $("#Nature").ComboBox({
+            url: "../../BaseManage/Department/GetDeptName",
+            param: { EnCode: "'DepartmentNature'" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "",
+            height: "200px"
+        }).bind("change", function () {
+           
+            loadSendDept(organizeId);
+            var value = $(this).attr('data-value');
+            if (value == "集团" || value == "省级" || value == "厂级") {
+                $("#trAddr").show();
+            }
+            if (value == "班组") {
+                $(".con101").show();
+            }
+            else {
+                $(".con101").hide();
+            }
+            if (value == "部门") {
+                $("#trArea").show();
+                $("#ShowOrg").show();
+            }
+            if (value == "部门") {
+                $("#trArea").show();
+                $("#ShowOrg").show();
+            } else {
+                $("#ShowOrg").hide();
+            }
+            if (value == "承包商" || value == "分包商") {
+                $.get("GetFormJson", { keyValue: $("#OrganizeTree").attr("data-value"), mode: 0 }, function (data) {
+                    if (data.length > 2) {
+                        var json = eval("(" + data + ")");
+                            if ((value == "承包商" || value == "分包商") && json.Fax == "1") {
+                                $("#showSend").show();
+                            } else {
+                                $("#showSend").hide();
+                            }
+                            if (json.DeptType!=null) {
+                                deptType = json.DeptType;
+                            }
+                          
+                       
+                    }
+                });
+            }
+            else {
+                $("#showSend").hide();
+            }
+            setDeptType(value);
+        });
+        //行业
+        $("#Industry").ComboBox({
+            url: "../../BaseManage/Department/GetDeptName",
+            param: { EnCode: "'Industry'" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "请选择",
+            height: "200px"
+        });
+        //班组类别
+        $("#TeamType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "TeamType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "请选择",
+            height: "200px"
+        });
+        //专业类别
+        $("#SpecialtyType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "SpecialtyType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "请选择",
+            height: "200px"
+        });
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../BaseManage/Department/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    deptType = data.DeptType;
+                    GetNames(data.DepartmentId);
+                    Loaddata(data.ParentId);
+                    loadSendDept(data.OrganizeId);
+                    setDeptType(data.Nature);
+                    $("#form1").formDeserialize(data);
+                    $("#SendDeptID").ComboBoxSetValue(data.SendDeptID);
+                    $("#Nature").attr("data-text", data.Nature);
+                    $("#Nature").children().eq(0).text(data.Nature);
+                    $("#Nature").attr("readonly", "readonly");
+
+                    if (data.ParentId == 0) {
+                        $("#OrganizeTree").ComboBoxTreeSetValue(data.OrganizeId);
+                    } else {
+                        $("#OrganizeTree").ComboBoxTreeSetValue(data.ParentId);
+                    }
+                    if ($("#Nature").attr('data-value') == "部门") {
+                        $("#ShowOrg").show();
+                        $("#IsOrg").checked = true;
+                    }
+                    if (data.Nature == "班组") {
+                        $(".con101").show();
+                        
+                    } else {
+                        $(".con101").hide();
+                    }
+                    
+                  
+                    if ((data.Nature || data.Nature == "分包商") && data.Fax == "1") {
+                       
+                        $("#showSend").show();
+                    } else {
+                        $("#showSend").hide();
+                    }
+                    parentId = data.ParentId;
+                    organizeId = data.OrganizeId;
+
+                    if (!IsAdmin()) {
+                        $("#OrganizeTree").attr("readonly", "readonly");
+                    }
+                    if (data.Nature == "集团" || data.Nature == "省级" || data.Nature == "厂级") {
+                        $("#trAddr").show();
+                    }
+                    if (data.DeptType!=null) {
+                        $("#DeptType").val(data.DeptType);
+                        if (deptType.length > 0) {
+                            $("#DeptType").val(deptType);
+                        }
+                    }
+                   
+                }
+            });
+        } else {
+            keyValue = keyValue.length == 0 ?newGuid() : keyValue;
+            $("#OrganizeTree").ComboBoxTreeSetValue(departmentId);
+            Loaddata(departmentId);
+            loadSendDept(organizeId);
+        }
+
+        if (typeArg == "1")//外包工程节点
+        {
+            $("#Manager,#OuterPhone,#InnerPhone,#DepartDuty").attr("disabled", "disabled");
+            $("#ChargeDept").prop("disabled", "disabled");
+        }
+    }
+    function GetNames(deptid) {
+        //设置管控区域
+        $.ajax({
+            url: '../../BaseManage/District/GetDeptNames',
+            data: { deptId: deptid },
+            dataType: "JSON",
+            success: function (vr) {
+                if (vr.length > 0) {
+                    var vd = "";
+                    $(vr).each(function (m, dom) {
+                        vd += dom.districtname + ",";
+                    })
+                    //管控部门
+                    $("#ChargeDept").val(vd.substr(0, vd.length - 1));
+                }
+            }
+        });
+    }
+    //部门性质
+    function Loaddata(deptId) {
+        if (!!deptId) {
+            $.get("GetFormJson", { keyValue: deptId }, function (data) {
+               
+                if (data.length > 2) {
+                    
+                    var json = eval("(" + data + ")");
+                    if (json.Description == null) {
+                        json.Description = "";
+                    }
+                    organizeId = json.OrganizeId;
+ 
+                    setDeptNature(json);
+                }
+               
+            });
+        }
+    }
+
+    //发包单位
+    function loadSendDept(orgid) {
+
+        $("#SendDeptID").ComboBox({
+            url: "../../BaseManage/Department/GetDeptListJson",
+            param: { orgid: orgid },
+            id: "DepartmentId",
+            text: "FullName",
+            description: "",
+            height: "200px"
+        });
+    }
+
+
+    //保存表单
+    function AcceptClick() {
+
+        var style = $("#showSend").attr("style");
+        if (style != "") {
+            $("#SendDeptID").attr("isvalid", "");
+        }
+        else {
+            $("#SendDeptID").attr("isvalid", "yes");
+        }
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if (document.getElementById("IsTools").checked) {
+            if ($.trim($("#ToolsKey").val()).length == 0) {
+                dialogMsg("请填写工具箱部门信息！", 0);
+                return false;
+            } else {
+                var arr = $("#ToolsKey").val().split('|');
+                if (arr.length < 2) {
+                    dialogMsg("工具箱部门的ID和Code必须填写！", 0);
+                    return false;
+                }
+            }
+        }
+        if($("#Nature").attr("data-value")=="承包商" && $("#DeptType").val().length==0){
+            dialogMsg("请选择部门类型！", 0);
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["OrganizeId"] = organizeId;
+        postData["ParentId"] = parentId;
+        if ($("#IsOrg").is(":checked") == true) {
+            postData["IsOrg"] = 1;
+        } else postData["IsOrg"] = 0;
+        departmentId = $("#OrganizeTree").attr("data-value");
+        postData["SendDeptName"] = $("#SendDeptID").attr('data-text');
+        $.SaveForm({
+            url: "../../BaseManage/Department/SaveForm?keyValue=" + keyValue + "&deptId=" + departmentId,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").resetSelection();
+                $.currentIframe().$("#gridTable").jqGrid('setGridParam', {
+                    postData: {
+                        condition: $.currentIframe().$("#queryCondition").find('.dropdown-text').attr('data-value'),
+                        keyword: $.currentIframe().$("#txt_Keyword").val(),
+                        nodeId: parentId
+                    }
+                }).trigger('reloadGrid');
+            }
+        })
+    }
+    function setValue() {
+        if (!!$('#actionValue').val() == false) {
+            selectUser({ deptId: "", checkMode: 0, mode: 2, winObject: document.body, domId: 'Manager,ManagerId' });
+
+        }
+        else { dialogMsg('请先保存部门再进行人员选择！', 0); }
+    }
+    function selDept() {
+        var keys = $("#ToolsKey").val();
+        if (keys.length > 0) {
+            var arr = keys.split('|');
+            if (arr.length == 3) {
+                if (arr[2].length == 0) {
+                    dialogMsg("请填写部门Key！", 0);
+                } else {
+                    return dialogOpen({
+                        id: "ToolsDept",
+                        title: "选择工具箱的单位",
+                        url: "/BaseManage/Department/SelectToolsDept?key=" + arr[2],
+                        width: ($(top.window).width() - 200) + "px",
+                        height: "600px",
+                        callBack: function (iframeId) {
+                            top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                        }
+                    });
+                }
+
+            } else {
+                dialogMsg("部门信息配置不正确！", 0);
+
+            }
+        } else {
+            dialogMsg("请配置部门信息！", 0);
+        }
+
+    }
+
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            OutProjectId: keyValue
+        }
+        $gridTable.jqGrid({
+            width: $(window).width()-100,
+            height:200,
+            url: "../../OutsourcingProject/Outsouringengineer/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: 'ID', name: 'id', index: 'ID', width: 100, align: 'center', sortable: false, hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:showProject('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (rowObject.createuserid == currUserId || currRoleName.indexOf("厂级部门") >= 0 || currRoleName.indexOf("公司级") >= 0) {
+                            html += "<a href=javascript:editProject('" + rowObject.id + "','" + rowObject.engineerstate + "','" + rowObject.isdeptadd + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            //外包管控模块添加的数据不能删除
+                            if (rowObject.isdeptadd == 0) {
+                                html += "<a href=javascript:delProject('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                            }
+                        }
+                        return html;
+                    }
+                },
+                { label: '外包工程名称', name: 'engineername', index: 'engineername', width: 250, align: 'center', sortable: true },
+                { label: '责任部门', name: 'engineerletdept', index: 'engineerletdept', width: 150, align: 'center', sortable: true },
+                { label: '工程状态', name: 'engineerstate', index: 'engineerstate', align: 'center', sortable: true }
+            ],
+
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                if($("#Nature").attr("data-value")=="承包商"){
+                    $("#showSend").show();
+                }
+            }
+        });
+    }
+    function addpro() {
+        var dlg = dialogOpen({
+            id: 'addProForm',
+            title: '新增外包工程',
+            url: '/BaseManage/Department/AddProjectForm?mode=Add&OutProjectId='+keyValue,
+            width: "600px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+    function showProject(id) {
+        var dlg = dialogOpen({
+            id: 'showProForm',
+            title: '查看外包工程',
+            url: '/BaseManage/Department/AddProjectForm?mode=show&OutProjectId=' + keyValue + '&keyValue=' + id,
+            width: "600px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        })
+    }
+    function editProject(id, engineerstate, isdeptadd) {
+        var dlg = dialogOpen({
+            id: 'editProForm',
+            title: '查看外包工程',
+            url: '/BaseManage/Department/AddProjectForm?mode=edit&OutProjectId=' + keyValue + '&engineerstate=' + engineerstate + '&keyValue=' + id + '&isdeptadd=' + isdeptadd,
+            width: "600px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+    function delProject(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../OutsourcingProject/Outsouringengineer/DelProjectByDeptAdd',
+                param: { projectId: id },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的资质审查基础信息表！', 0);
+        }
+    }
+    function selTrainDept() {
+        return dialogOpen({
+            id: "Dept",
+            title: "选择单位",
+            url: "/BaseManage/Department/SelectTrainDepts?deptId="+keyValue,
+            width: ($(top.window).width() - 200) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    function setDeptType(nature) {
+        
+        if (nature == "部门" || nature == "承包商") {
+            $("#dtype").show();
+            var html = '<option value=""></option><option value="长协">长协</option><option value="临时">临时</option>';
+            if (nature == "部门") {
+                html = '<option value=""></option><option value="生产部门">生产部门</option><option value="生产辅助部门">生产辅助部门</option><option value="职能部门">职能部门</option>';
+            } else {
+                html = '<option value=""></option><option value="长协">长协</option><option value="临时">临时</option>';
+            }
+            $("#DeptType").html(html);
+        } else {
+            $("#dtype").hide();
+        }
+        if (deptType!=null) {
+            if (deptType.length > 0) {
+                $("#DeptType").val(deptType);
+            }
+        }
+        
+    }
+</script>
+<div style="margin-left: 10px; margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <th class='formTitle'>上级单位/部门<font face="宋体">*</font></th>
+            <td class='formValue'>
+                @{
+                    if (ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem)
+                    {
+                        @Html.Raw("<div id='OrganizeTree' type='selectTree' class='ui-select'></div>");
+                    }
+                    else
+                    {
+                        @Html.Raw("<div id='OrganizeTree' type='selectTree' class='ui-select'  isvalid='yes' checkexpession='NotNull'></div>");
+                    }
+                }
+            </td>
+            <th class="formTitle">负责人</th>
+            <td class="formValue">
+                <input id="Manager" type="text" class="form-control" placeholder="请选择负责人" readonly onclick="setValue()" />
+                <input id="ManagerId" type="hidden" /><input id="DeptId" type="hidden" /><input id="actionValue" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <th class="formTitle">单位名称<font face="宋体">*</font></th>
+            <td class="formValue">
+                <input id="FullName" type="text" onblur="$.ExistField(this.id,'../../BaseManage/Department/ExistEnCode')" class="form-control" isvalid="yes" checkexpession="NotNull" />
+            </td>
+            <th class="formTitle">单位编码</th>
+            <td class="formValue">
+                @{
+                    if (ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem)
+                    {
+                        @Html.Raw("<input id='DeptCode' type='text' class='form-control' placeholder='自动生成' readonly='readonly'  />");
+                    }
+                    else
+                    {
+                        @Html.Raw("<input id='DeptCode' type='text' class='form-control' placeholder='自动生成' readonly='readonly' />");
+                    }
+                }
+                <input id="EnCode" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <th class="formTitle">单位简称</th>
+            <td class="formValue">
+                <input id="ShortName" type="text" class="form-control" />
+            </td>
+            <th class="formTitle">单位(部门)性质<font face="宋体">*</font></th>
+            <td class="formValue">
+                <div id="Nature" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+        </tr>
+        <tr id="dtype" style="display:none;">
+            <th class="formTitle">单位(部门)类型</th>
+            <td class="formValue" colspan="3">
+                <select class="form-control" id="DeptType">
+                   <option value=""></option>
+                   <option value="长协">长协</option>
+                   <option value="临时">临时</option>
+                </select>
+            </td>
+        </tr>
+        <tr id="ShowOrg" style="display: none;">
+            <th class="formTitle">是否厂级部门</th>
+            <td style="width: 100px; color: red;">
+                &nbsp;&nbsp;&nbsp;
+                <input id="IsOrg" type="checkbox" />（注：可查看或可管理全厂数据的部门）
+            </td>
+        </tr>
+        <tr>
+            <th class="formTitle">电话</th>
+            <td class="formValue">
+                <input id="OuterPhone" type="text" class="form-control" />
+            </td>
+            <th class="formTitle" style="padding-top: 4px; width: 120px;">
+                顺序号
+            </th>
+            <td class="formValue">
+                <input id="SortCode" type="text" class="form-control" isvalid="yes" checkexpession="NumOrNull" value="0" />
+            </td>
+        </tr>
+        <tr style="display: none;">
+            <th class="formTitle">邮箱</th>
+            <td class="formValue">
+                <input id="Email" type="text" class="form-control" />
+            </td>
+            <th class="formTitle">传真</th>
+            <td class="formValue">
+                <input id="Fax" type="text" class="form-control" />
+            </td>
+        </tr>
+        <tr style="display:none;" id="trArea">
+            <th class="formTitle" valign="top" style="padding-top: 4px; width: 120px;">
+                管控区域
+            </th>
+            <td class="formValue" colspan="3">
+                <input id="ChargeDept" type="text" class="form-control" readonly="readonly" />
+            </td>
+        </tr>
+        <tr style="display:none;" id="trhy" class="con100">
+            <td class="formTitle" style="width: 120px;">
+                行业
+            </td>
+            <td class="formValue" colspan="3">
+                <div id="Industry" type="select" class="ui-select"></div>
+            </td>
+        </tr>
+        <tr style="display:none;" class="con101">
+            <td class="formTitle" style="width: 120px;">
+                班组类别
+            </td>
+            <td class="formValue" colspan="3">
+                <div id="TeamType" type="select" class="ui-select"></div>
+            </td>
+        </tr>
+        <tr style="display:none;" class="con101">
+            <td class="formTitle" style="width: 120px;">
+                专业类别
+            </td>
+            <td class="formValue" colspan="3">
+                <div id="SpecialtyType" type="select" class="ui-select"></div>
+            </td>
+        </tr>
+        
+        @*<tr id="showSend" style="display: none">
+            <th class="formTitle">发包单位<font face="宋体">*</font></th>
+            <td class="formValue">
+                <div id="SendDeptID" type="select" class="ui-select" checkexpession="NotNull">
+                </div>
+            </td>
+        </tr>*@
+        <tr class="con100" style="display:none;">
+            <th class="formTitle">是否对接培训平台</th>
+            <td style="width: 100px; padding-left:30px;">
+                <input id="IsTrain" type="checkbox" />
+            </td>
+            <th class="formTitle">培训平台单位ID</th>
+            <td class="formValue">
+                <input id="InnerPhone" type="text" class="form-control" placeholder="此值为培训平台的单位ID,只需针对机构配置即可" />
+            </td>
+        </tr>
+        <tr class="con100" style="display:none;">
+            <th class="formTitle" style="padding-top: 4px; width: 120px;">
+                关联部门信息
+            </th>
+            <td class="formValue" colspan="3">
+                <div class="input-group">
+                    <input id="DeptKey" type="text" class="form-control" placeholder="关联培训平台部门,填写格式如：Id|Code" style="width:500px" />
+                    <span class="input-group-addon" onclick="selTrainDept()" title="选择部门">...</span>
+                </div>
+           </td>
+        </tr>
+        <tr class="con100" style="display:none;">
+            <th class="formTitle">是否对接工具箱</th>
+            <td style="width: 100px; padding-left:30px; " colspan="3">
+                <input id="IsTools" type="checkbox" />
+            </td>
+        </tr>
+        <tr class="con100" style="display:none;">
+            <th class="formTitle" style="padding-top: 4px; width: 120px;">
+                关联部门信息
+            </th>
+            <td class="formValue" colspan="3">
+                <div class="input-group">
+                    <input id="ToolsKey" type="text" class="form-control" placeholder="关联工具箱部门,填写格式如：Id|Code|Key" style="width:500px" />
+                    <span class="input-group-addon" onclick="selDept()" title="选择部门">...</span>
+                    <input type="hidden" id="Fax" />
+                </div>
+            </td>
+        </tr>
+        <tr style="display:none;" id="trAddr">
+            <th class="formTitle" valign="top" style="padding-top: 4px">
+                地址
+            </th>
+            <td class="formValue" colspan="3">
+                <textarea id="DepartDuty" class="form-control" style="height: 50px;"></textarea>
+                <font color="red">地址信息用于首页地图定位,请尽量填写详细地址,否则将无法定位或定位不准确</font>
+            </td>
+        </tr>
+    </table>
+    <div id="showSend" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;工程信息</strong>
+            <span class="tools pull-right">
+                <a id="addProject" href="javascript:addpro()" class="btn btn-primary btn-xs">新 增</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,783 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+ 
+    var keyValue = request('keyValue');
+
+    var startMeetingId = request('startMeetingId');
+    keyValue = keyValue.length == 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+
+    var currUserAccout = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var mode = request('mode');
+    var EditFlag = false;
+    var getId = keyValue;
+    if (mode == "AddAccpet") {
+        getId = startMeetingId;
+    }
+
+    if (mode == "Edit" || mode == "Add" || mode == "AddAccpet")
+        EditFlag = true;
+    $(function () {
+        LoadUpdateList();
+        initControl();
+        GetWorkContentGrid();
+        $("#MEETINGTYPE").attr("disabled", "disabled");
+        if (mode == "Edit" || mode == "Add" || mode == "AddAccpet") {
+            $("#btngroup").show();
+        }
+        else {
+            $("#btngroup").hide();
+        }
+        if (mode == "AddAccpet" || mode == "AccpetShow") {
+            $("#ENGINEERID").attr("disabled", "disabled");
+            $("#MEETINGDATE").val("@DateTime.Now.ToString("yyyy-MM-dd HH:mm")")
+            $("#MEETINGTYPE").ComboBoxSetValue("收工会");
+            changeMeetingType();
+            $("#btnSave").hide();
+        }
+        if (mode == "Show" || mode == "AccpetShow") {
+            $("#AddMeasures").attr("disabled", "disabled");
+        }
+    });
+    //初始化上传控件
+    function LoadUpdateList() {
+    
+        file_upload.init({
+            keyValue: keyValue,
+            extensions: '',
+            isImage: false,
+            el: '#uploader1',
+            fileDir: 'WorkMeeting'
+        });
+        file_upload.init({
+            keyValue: keyValue + "atta",
+            extensions: '',
+            isImage: false,
+            el: '#uploader2',
+            fileDir: 'WorkMeeting'
+        });
+    }
+    function changeProject(id) {
+        //var id = $("#ENGINEERID").val();
+        $.SetForm({
+            url: "../../OutsourcingProject/Outsouringengineer/GetFormJson",
+            param: { keyValue: id },
+            success: function (data) {
+                var pro = data.data;
+                if (pro) {
+                    $("#ENGINEERCODE").val(pro.ENGINEERCODE);
+                    $("#ENGINEERTYPE").val(pro.ENGINEERTYPENAME);
+                    $("#ENGINEERAREA").val(pro.EngAreaName);
+                    $("#ENGINEERLEVEL").val(pro.ENGINEERLEVELNAME);
+                    $("#ENGINEERLETDEPT").val(pro.ENGINEERLETDEPT);
+                    $("#ENGINEERCONTENT").val(pro.ENGINEERCONTENT);
+                    var now = new Date();
+                    var month = padLeft(now.getMonth() + 1, '0');
+                    var day = padLeft(now.getDate(), '0');
+                    var hh = padLeft(now.getHours(), '0');
+                    var mi = padLeft(now.getMinutes(), '0');
+                    var meetingName = pro.ENGINEERNAME + $("#MEETINGTYPE").attr("data-value") + now.getFullYear().toString() + month + day + hh + mi;
+                    $("#MEETINGNAME").val(meetingName);
+                }
+                var proData = data.proData;
+                if (proData) {
+                    $("#OUTPROJECTNAME").val(proData.OUTSOURCINGNAME);
+                }
+            }
+        })
+    }    
+    function padLeft(num, cha) {
+        if (num < 10) {
+            return cha + num;
+        }
+        else
+            return num;
+    }
+    //初始化控件
+    function initControl() {
+        var queryJson = {
+            orgCode: '@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode',
+            IsDeptAdd: 1,//默认查询从外包模块新增的数据
+            engineerstate: "002"//在建工程
+        };
+        $.SetForm({
+            url: "../../OutsourcingProject/Outsouringengineer/GetPageListJson",
+            param: { queryJson: JSON.stringify(queryJson), _search: false, rnd: Math.random() * 100000, rows: 1000, page: 1, sidx: 'createdate', sord: 'desc' },
+            success: function (data) {
+                //外包工程
+                $("#ENGINEERID").ComboBox({
+                    id: "id",
+                    text: "engineername",
+                    description: "==选择==",
+                    allowSearch: false,
+                    data: data.rows,
+                    height: "300px"
+                }).bind("change", function () {
+                    var sel = $(this).attr('data-value');
+                    var engName = $(this).attr("data-text");
+                    if (!!sel) {
+                        $("#ENGINEERNAME").val(engName);
+                        changeProject(sel);
+                    }
+                });;
+            }
+        });
+
+        //$(".formTitle").css("width", "145px");
+        //模块名称
+        var data = [
+            { value: "开工会", name: "开工会" },
+             { value: "收工会", name: "收工会" }
+        ];
+        $("#MEETINGTYPE").ComboBox({
+            id: "value",
+            text: "name",
+            description: "",
+            allowSearch: false,
+            data: data            
+        });
+        var meetingtype = $("#MEETINGTYPE-option li:eq(0)").attr("data-value");
+        $("#MEETINGTYPE").ComboBoxSetValue(meetingtype);
+        $("#MEETINGTYPE").attr("data-text", meetingtype);
+        $("#MEETINGTYPE").attr("data-value", meetingtype);
+        //获取表单
+        if (!!keyValue) {
+           
+            $.SetForm({
+                url: "../../OutsourcingProject/WorkMeeting/GetFormJson",
+                param: { keyValue: getId },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.ENGINEERID != "") {
+                        $("#ENGINEERID").ComboBoxSetValue(data.ENGINEERID);
+                        $("#ENGINEERID").trigger("change");
+                    }
+                    var now = new Date(data.MEETINGDATE);
+                    var month = padLeft(now.getMonth() + 1, '0');
+                    var day = padLeft(now.getDate(), '0');
+                    var hh = padLeft(now.getHours(), '0');
+                    var mi = padLeft(now.getMinutes(), '0');
+                    var mtDate = now.getFullYear() + "-" + month + "-" + day + " " + hh + ":" + mi;                
+                    $("#MEETINGDATE").val(mtDate);
+                    
+                    file_upload.bindFiles(EditFlag, false, keyValue, 'uploader1', EditFlag);
+                    file_upload.bindFiles(EditFlag, false, keyValue + 'atta', 'uploader2', EditFlag);
+                    file_upload.bindFiles(EditFlag, false, keyValue + 'c1', 'uploader2', EditFlag, true);
+                    file_upload.bindFiles(EditFlag, false, keyValue + 'c2', 'uploader2', EditFlag, true);
+                    file_upload.bindFiles(EditFlag, false, keyValue + 'c3', 'uploader2', EditFlag, true);
+                    changeMeetingType();
+                }
+            })
+        }
+        
+    }
+    //保存表单;
+    function AcceptClick(iscommit) {
+        if (iscommit == "0") {
+            if ($("#ENGINEERID").attr("data-value") == "" || $("#ENGINEERID").attr("data-value") == undefined) {
+                dialogMsg('请选择外包工程！', 0);
+                return false
+            }
+        } else {
+            if (!$('#form1').Validform()) {
+                return false;
+            }
+        }
+        
+        var postData = $("#form1").formSerialize(getId);
+
+        var measures = $("#gridTable").jqGrid('getRowData');
+        if (measures.length > 0) {
+            var arr = [];
+            var flag = false;
+            for (var i = 0; i < measures.length; i++) {
+                var dom = measures[i];
+                if ($("#gridTable").find("textarea[name='worktask']").eq(i).length > 0) {
+                    if (($.trim($("#gridTable").find("textarea[name='worktask']").eq(i).val()).length == 0 ||
+                            $.trim($("#gridTable").find("textarea[name='measures']").eq(i).val()).length == 0 ||
+                             $.trim($("#gridTable").find("textarea[name='dangerpoint']").eq(i).val()).length == 0) && !flag) {
+                            flag = true;
+                        } else {
+                        var status = 0;
+                        var remark = "";
+                            if (mode == "AddAccpet") {
+                                status = $("#gridTable").find("input:checkbox").eq(i).get(0).checked ? 1 : 0;
+                                remark = $("#gridTable").find("textarea[name='remark']").eq(i).val();
+                            }
+                            arr.push({
+                                WorkTask: $("#gridTable").find("textarea[name='worktask']").eq(i).val(),
+                                Remark1: $("#gridTable").find("textarea[name='workaddress']").eq(i).val(),
+                                Measures: $("#gridTable").find("textarea[name='measures']").eq(i).val(),
+                                DangerPoint: $("#gridTable").find("textarea[name='dangerpoint']").eq(i).val(),
+                                WorkMeetingId: getId,
+                                Id: newGuid(),
+                                IsOver: status,
+                                Remark: remark
+                            });
+                        }
+                    } else {
+                        flag = true;
+                    }
+            }
+            if (flag) {
+                dialogMsg("工作任务、危险点分析和预控措施都不能为空！", 2);
+                return false;
+            }
+            json = JSON.stringify(arr);
+            postData["measuresJson"] = json;
+        }
+        else {
+            var arr = [];
+            json = JSON.stringify(arr);
+            postData["measuresJson"] = json;
+            //dialogMsg("工作任务、危险点分析和预控措施都不能为空！", 2);
+            //return false;
+        }
+
+        postData.ID = keyValue;
+        postData.OUTPROJECTNAME = null;
+        postData["ISCOMMIT"] = iscommit;
+        postData["RiskLevel"] = $("#RiskLevel").val();
+        var url = "../../OutsourcingProject/WorkMeeting/SaveWorkMeetingForm?keyValue=" + keyValue + '&ids=' + ids;
+        if (mode == "AddAccpet") {
+            postData["StartMeetingid"] = getId;
+            url = "../../OutsourcingProject/WorkMeeting/SaveWorkMeetingForm?keyValue=" + keyValue + '&ids=' + ids;
+        }
+        $.SaveForm({
+            url: url,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+    //选择工程
+    function selectEngineer() {
+        //selectProject(window.document.body, 'ENGINEERNAME,ENGINEERID');
+        var winObject = window.document.body;
+        var domId = "ENGINEERNAME,ENGINEERID";
+        return dialogOpen({
+            id: "Project",
+            title: "选择工程项目",
+            url: '/BaseManage/Project/Select',
+            width: ($(top.window).width() - 200) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(winObject, domId);
+                changeProject();
+            }
+        });
+    }
+    function selectSignPersons() {
+        var options={ mode: 2, userIds: $("#SIGNPERSONSID").val(), checkMode: 1, winObject: window.document.body, domId: "SIGNPERSONS,,SIGNPERSONSID" };
+        var deptCode = options.deptCode == undefined ? "" : options.deptCode;
+        var url = '/BaseManage/User/Select?deptId=' + options.deptId + "&checkMode=" + options.checkMode + "&mode=" + options.mode + "&deptCode=" + deptCode + "&userIds=" + options.userIds;
+        url = options.userKind == undefined ? url : url + "&userKind=" + options.userKind;//userKind：人员类别，1：特种作业人员，2：特种设备操作人员
+        url = options.eliminateUserIds == undefined ? url : url + "&eliminateUserIds=" + options.eliminateUserIds;//eliminateUserIds:排除不能选择的人员
+        return dialogOpen({
+            id: "User",
+            title: "选择用户",
+            url: url,
+            width: ($(top.window).width() - 200) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(options);
+                updateRealPerNum();
+            }
+        });
+    }
+    function updateShouldPerNum() {
+        var mType = $("#MEETINGTYPE").attr("data-value");
+        var shldNum = $("#SHOUDPERNUM").val();
+        if (mType=="开工会") {
+            var sum = 0;
+            var lnum = $("#LNUM").val();
+            if (lnum && !isNaN(lnum))
+                sum += parseInt(lnum);
+            var eNum = $("#ENUM").val();
+            if (eNum && !isNaN(eNum))
+                sum += parseInt(eNum);
+            var gnum = $("#GNUM").val();
+            if (gnum && !isNaN(gnum))
+                sum += parseInt(gnum);
+            var jnum = $("#JNUM").val();
+            if (jnum && !isNaN(jnum))
+                sum += parseInt(jnum);
+            var onum = $("#ONUM").val();
+            if (onum && !isNaN(onum))
+                sum += parseInt(onum);
+            //if(parseInt(shldNum)<sum)
+            $("#SHOUDPERNUM").val(sum);
+        }
+    }
+    function updateRealPerNum() {
+        var len = $("#SIGNPERSONSID").val().length;
+        if (len > 2000) {
+            dialogMsg('人员选择过多,请重新选择', 0);
+            $("#SIGNPERSONSID").val("");
+            $("#SIGNPERSONS").val("");
+            return;
+        }
+        var pers = $("#SIGNPERSONS").val();
+        $("#REALPERNUM").val(pers.split(',').length);
+    }
+    function changeMeetingType() {
+        var mName = $("#MEETINGNAME");
+        var title = mName.val();
+        var mType = $("#MEETINGTYPE").attr("data-value");        
+        if (mType == "开工会") {
+            $("#trBeforeSure").css("display", "");                       
+            $("#trContentOther").css("display", "none");
+            //$("#tdContent1").text("交待当天的工作任务、内容、进度及要求");
+            //$("#tdContent2").text("作业过程中可能存在的安全风险");
+            //$("#tdContent3").text("针对作业过程存在安全风险的防范措施");
+            //$("#CONTENT2").attr("placeholder", "交待使用的机械设备和工器具的性能和操作要求");
+            //$("#CONTENT3").attr("placeholder", "交待应采取的安全措施、重点注意部位和安全注意事项现场安全风险分析（危险环节、部位及应采取的措施）");
+            mName.val(title.replace("收工会", mType));
+           // updateShouldPerNum();
+        }
+        else if (mType == "收工会") {
+            $("#trBeforeSure").css("display", "none");            
+            $("#trContentOther").css("display", "");
+            $("#trContent1").css("display", "none");
+            //$("#tdContent1").text("总结当天完成的工作任务和安全施工情况");
+            //$("#tdContent2").text("通报工作中的不安全行为及违章情况");           
+            //$("#tdContent3").text("通报管理人员现场安全检查、考核情况");
+            //$("#CONTENT2").attr("placeholder", "对工作中发生的不安全情况进行总结分析，提出防范措施，指出本日作业违章现象，对责任人进行批评教育");
+            //$("#CONTENT3").attr("placeholder", "管理人员（上级、业主、监理、施工单位负责人）现场安全检查纠正违章及考核情况通报，对违章者提出批评教育");
+            mName.val(title.replace("开工会", mType));
+        }
+    }
+
+    function GetWorkContentGrid() {
+        var queryJson = {
+            recid: getId
+        }
+        var $gridTable = $("#gridTable");
+        colArray = [
+                { label: '主键', name: 'id', hidden: true },
+                 { label: '是否可编辑', name: 'IsEdit', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if ((mode == "Add") ||mode == "Edit"|| rowObject.IsEdit == 1) {
+                            html += "&nbsp;&nbsp;<a href=javascript:delMeasures('" + rowObject.Id + "',this)  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        } else {
+                            html += "";
+                        }
+                        return html;
+                    }
+                },
+                 {
+                     label: '工作任务', name: 'worktask', width: 200, align: 'center', sortable: false, headerAlign: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<textarea type='text'  name='worktask'  style='width: 100%;height:50px;'   class='form-control' ";
+                        if (mode == "Show" || mode == "AccpetShow" || (rowObject.IsEdit != 1 && mode == "AddAccpet")) {
+                            html += 'readonly="readonly"';
+                        }
+                        html += ">" + (cellvalue==null?"":cellvalue) + "</textarea>";
+                        return html;
+                    }
+                 },
+                 {
+                     label: '作业地点', name: 'remark1', width: 200, align: 'center', sortable: false, headerAlign: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<textarea type='text'  name='workaddress'  style='width: 100%;height:50px;' maxlength=30   class='form-control' ";
+                        if (mode == "Show" || mode == "AccpetShow" || (rowObject.IsEdit != 1 && mode == "AddAccpet")) {
+                            html += 'readonly="readonly"';
+                        }
+                        html += ">" + (cellvalue == null ? "" : cellvalue) + "</textarea>";
+                        return html;
+                    }
+                 },
+                {
+                    label: '危险点分析', name: 'dangerpoint', width: 200, align: 'center', sortable: false, headerAlign: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var html = "<textarea type='text'  name='dangerpoint' maxlength='2000' style='width: 100%;height:50px;'   placeholder='请输入或双击选择危险点'  class='form-control' ";
+                        if (mode == "Show" || mode == "AccpetShow" || (rowObject.IsEdit != 1 && mode == "AddAccpet")) {
+                            html += 'readonly="readonly"';
+                        } else {
+                            html += " ondblclick = 'dbSelectDangerData(this)' ";
+                        }
+                        html += ">" + (cellvalue == null ? "" : cellvalue) + "</textarea>";
+                        return html;
+
+                    }
+                },
+                 {
+                     label: '预控措施', name: 'measures', align: 'center', sortable: false, headerAlign: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<textarea type='text'  name='measures' maxlength='2000'   style='width: 100%;height:50px;'  class='form-control' ";
+                         if (mode == "Show" || mode == "AccpetShow" || (rowObject.IsEdit != 1 && mode == "AddAccpet")) {
+                             html += 'readonly="readonly"';
+                         }
+                         html += ">" + (cellvalue == null ? "" : cellvalue) + "</textarea>";
+                         return html;
+                     }
+                 }];
+        if (mode == "AddAccpet"||mode == "AccpetShow") {
+            colArray.push({
+                label: '完成情况', name: 'isover', align: 'center', sortable: false, headerAlign: 'center',
+                formatter: function (cellvalue, options, rowObject) {
+                    var html = "";
+                    if (cellvalue == 1) {
+                        html = "<div ><input type=\"checkbox\" checked=\"true\" value=\"1\" ></div>";
+                    } else {
+                        html = "<div ><input type=\"checkbox\"  value=\"0\" ></div>";
+                    }
+                    return html;
+                }
+            },
+            {
+                label: '备注', name: 'remark', align: 'center', sortable: false, headerAlign: 'center',
+                formatter: function (cellvalue, options, rowObject) {
+                    var html = "<textarea type='text'  name='remark'  style='width: 100%;height:50px;'  class='form-control' ";
+                    if (mode == "Show" || mode == "AccpetShow") {
+                        html += 'readonly="readonly"';
+                    }
+                    html += ">" + (cellvalue==null?"":cellvalue) + "</textarea>";
+                    return html;
+                }
+            }
+            )
+        }
+        $gridTable.jqGrid({
+            url: "../../OutsourcingProject/WorkMeeting/GetMeasuresPageList",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            height: "300px",
+            autowidth: true,    
+            //pager: "#gridPager",
+            colModel: colArray,
+            viewrecords: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            }
+        });
+    }
+    var node = null;
+    var ids = "";//用于更新危险点数据库的使用次数
+    function dbSelectDangerData(obj) {
+        node = obj;
+        dialogOpen({
+            id: 'SelectMeasures',
+            title: '选择危险点',
+            url: '/OutsourcingProject/Dangerdata/SelectForm',
+            width: ($(top.window).width() - 250) + 'px',
+            height: ($(top.window).height() - 50) + 'px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        })
+    }
+    function delMeasures() {
+        var jqTable = $("#gridTable");
+        var idx = dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                jqTable.delRowData(jqTable.getGridParam('selrow'));
+                top.layer.close(idx);
+            } else {
+                top.layer.close(idx);
+            }
+        });
+    }
+    function AddMeasures() {
+        var rowId = $("#gridTable").jqGrid('getRowData').length;
+        if (mode == "AddAccpet") {
+            $("#gridTable").addRowData(rowId, { ID: newGuid(), worktask: "", remark1: "", dangerpoint: "", measures: "", IsEdit: 1, remark: "" });
+        } else {
+            $("#gridTable").addRowData(rowId, { ID: newGuid(), worktask: "", remark1: "", dangerpoint: "", measures: "" });
+        }
+    }
+</script>
+<style type="text/css">
+    /*.ui-select {
+        width: 200px;
+    }*/
+</style>
+<div class="center-Panel" style="margin-left:3px;">
+    <div class="west-Panel">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;工程信息</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">工程名称<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            @*<input id="ENGINEERNAME" type="text" class="form-control" readonly onclick="selectEngineer()" onchange="changeProject()" isvalid="yes" errormsg="工程名称" checkexpession="NotNull" />*@
+                            <div id="ENGINEERID" type="select" errormsg="工程名称" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                            <input id="ENGINEERNAME" type="hidden" />
+                            <input id="StartMeetingid" type="hidden" />
+                        </td>
+                        <td class="formTitle">工程编号</td>
+                        <td class="formValue">
+                            <input id="ENGINEERCODE" type="text" readonly class="form-control"  />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工程类型</td>
+                        <td class="formValue">
+                            <input id="ENGINEERTYPE" type="text" readonly class="form-control" />
+                        </td>
+                        <td class="formTitle">所属区域</td>
+                        <td class="formValue">
+                            <input id="ENGINEERAREA" type="text" readonly class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工程风险等级</td>
+                        <td class="formValue">
+                            <input id="ENGINEERLEVEL" type="text" readonly class="form-control" />
+                        </td>
+                        <td class="formTitle">责任部门</td>
+                        <td class="formValue">
+                            <input id="ENGINEERLETDEPT" type="text" readonly class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工程内容</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="ENGINEERCONTENT" readonly type="text" isvalid="yes" checkexpession="LenStrOrNull" length="2000" errormsg="工程内容" class="form-control" style="min-height: 80px;"></textarea>
+                        </td>
+                    </tr>
+                </table>   
+            </div>
+        </div>
+        <div class="panel panel-default" id="statisticsList">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;会议信息</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">会议名称<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="MEETINGNAME" type="text" class="form-control" isvalid="yes" errormsg="会议名称"  checkexpession="NotNull" />
+                        </td>
+                        <td class="formTitle">会议日期<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="MEETINGDATE" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt:'yyyy-MM-dd HH:mm'})" isvalid="yes" checkexpession="NotNull" errormsg="会议日期" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">会议类型</td>
+                        <td class="formValue">
+                            <div id="MEETINGTYPE" onchange="changeMeetingType()" type="select" errormsg="会议类型" class="ui-select"  isvalid="yes" checkexpession="NotNull"></div>
+                        </td>
+                        <td class="formTitle">外包单位<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="OUTPROJECTNAME" type="text" readonly class="form-control" /></span>
+                        </td>
+                    </tr>  
+                    <tr>
+                        @*<td class="formTitle">作业地点<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ADDRESS" type="text" class="form-control" isvalid="yes" checkexpession="LenStr" length="100" errormsg="会议地点不能为空，" />
+                        </td>*@
+                        <td class="formTitle">风险等级<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <select id="RiskLevel" isvalid="yes" checkexpession="NotNull" errormsg="风险等级不能为空，" class="selectpicker show-menu-arrow form-control">
+                                <option value="">请选择</option>
+                                <option value="一级风险">一级风险</option>
+                                <option value="二级风险">二级风险</option>
+                                <option value="三级风险">三级风险</option>
+                                <option value="四级风险">四级风险</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工作班成员签名</td>
+                        <td class="formValue" colspan="3">
+                            <input id="SIGNPERSONS" type="text" class="form-control" isvalid="yes" errormsg="工作班成员签名" readonly  
+                                   onclick="selectSignPersons()" checkexpession="LenStrOrNull" length="400" />
+                            <input type="hidden" id="SIGNPERSONSID" />
+                        </td>                        
+                    </tr>
+                    <tr id="trBeforeSure">
+                        <td class="formTitle">开工前确认事项</td>
+                        <td class="formValue" colspan="3">
+                            <table style="border:solid 1px #CCCCCC;border-radius:5px;width:100%">
+                                <tr>
+                                    <td class="formValue" colspan="2" >
+                                        <input type="checkbox" style="margin-left:50px;" id="HEALTHSTA" value="1" /><label for="HEALTHSTA">人员身体健康、精神状态良好</label>
+                                    </td>
+                                    <td class="formValue" colspan="2" >
+                                        <input type="checkbox" style="margin-left:50px;" id="CLOTHESTA" value="1" /><label for="CLOTHESTA">着装符合规定</label>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="formValue" colspan="2" >
+                                        <input type="checkbox" style="margin-left:50px;" id="SAFEGOODSSTA" value="1" /><label for="SAFEGOODSSTA">劳动防护用品（安全帽/安全带/护目镜/口罩/工作鞋等）配备齐全、完整</label>
+                                    </td>
+                                    <td class="formValue" colspan="2" >
+                                        <input type="checkbox" style="margin-left:50px;" id="CERTSTA" value="1" /><label for="CERTSTA">已配带有关证件</label>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="formTitle" >焊工人数</td>
+                                    <td class="formValue" style="width:40%;">
+                                        <input id="LNUM" type="text" onblur="updateShouldPerNum()" class="form-control" isvalid="yes" maxlength="8" checkexpession="PositiveNumOrNull" />
+                                    </td>
+                                    <td class="formTitle" >电工人数</td>
+                                    <td class="formValue">
+                                        <input id="ENUM" type="text" onblur="updateShouldPerNum()" class="form-control" isvalid="yes" maxlength="8" checkexpession="PositiveNumOrNull" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="formTitle">起重工人数</td>
+                                    <td class="formValue">
+                                        <input id="GNUM" type="text" onblur="updateShouldPerNum()" class="form-control" isvalid="yes" maxlength="8" checkexpession="PositiveNumOrNull" />
+                                    </td>
+                                    <td class="formTitle">架子工人数</td>
+                                    <td class="formValue">
+                                        <input id="JNUM" type="text" onblur="updateShouldPerNum()"  class="form-control" isvalid="yes" maxlength="8" checkexpession="PositiveNumOrNull" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="formTitle">其他人数</td>
+                                    <td class="formValue">
+                                        <input id="ONUM" type="text" onblur="updateShouldPerNum()" class="form-control" isvalid="yes" maxlength="8" checkexpession="PositiveNumOrNull" />
+                                    </td>
+                                    <td class="formTitle"></td>
+                                    <td class="formValue"></td>
+                                </tr>
+                                <tr>
+                                    <td class="formTitle">备注</td>
+                                    <td class="formValue" colspan="3">
+                                        <textarea id="REMARK" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000" style="min-height: 50px;"></textarea>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">应到人数<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SHOUDPERNUM" type="text" class="form-control"  onfocus="updateShouldPerNum()" isvalid="yes" maxlength="8" errormsg="应到人数" checkexpession="PositiveNum" />
+                        </td>
+                        <td class="formTitle">实到人数<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="REALPERNUM" type="text" class="form-control"  isvalid="yes" maxlength="8" errormsg="实到人数" checkexpession="PositiveNum" />
+                        </td>
+                    </tr> 
+                    <tr id="trContent1">
+                        <td id="tdContent1" class="formTitle" style="white-space:normal;text-align:right;">其它事项</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="CONTENT1" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000" style="min-height: 150px;"></textarea>
+                        </td>
+                    </tr>
+                    <tr id="trContentOther" style="display:none;">
+                        <td class="formTitle">工作总结事项</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="CONTENTOTHER" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000" style="min-height: 150px;"></textarea>
+                        </td>
+                    </tr>
+                    </table>
+                <div class="ibox">
+                    <div class="ibox-title">
+                        <h5>工作内容</h5>
+                        <div class="ibox-tools">
+                            <a id="AddMeasures" href="javascript:AddMeasures(this)" class="btn btn-primary btn-xs">新 增</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                        </div>
+                    </div>
+                    <div class="ibox-content">
+                        <div class="gridPanel">
+                            <table id="gridTable"></table>
+                            <div id="gridPager"></div>
+                        </div>
+                      
+                    </div>
+                </div>
+                
+                    @*<tr id="trContent1" >
+                        <td id="tdContent1" class="formTitle" style="white-space:normal;text-align:right;">交待当天的工作任务、内容、进度及要求</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="CONTENT1" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000" style="min-height: 150px;"></textarea>
+                        </td>
+                    </tr>
+                    <tr id="trContent2" >
+                        <td id="tdContent2" class="formTitle" style="white-space:normal;text-align:right;">作业过程中可能存在的安全风险</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="CONTENT2" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000" style="min-height: 150px;"></textarea>
+                        </td>
+                    </tr>
+                    <tr  id="trContent3" >
+                        <td id="tdContent3" class="formTitle" style="white-space:normal;text-align:right;">针对作业过程存在安全风险的防范措施</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="CONTENT3" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000"style="min-height: 150px;"></textarea>
+                        </td>
+                    </tr>
+                    <tr id="trContentOther" style="display:none;">
+                        <td class="formTitle">其他：</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="CONTENTOTHER" class="form-control" isvalid="yes" checkexpession="LenStrOrNull" length="2000" style="min-height: 150px;"></textarea>
+                        </td>
+                    </tr>*@
+                <table style="width:100%">
+                    <tr>
+                        <td class="formTitle">签名附件</td>
+                        <td class="formValue" colspan="3">
+                            <div id="uploader1" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:80px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="File1" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>        
+                    <tr>
+                        <td class="formTitle">会议附件</td>
+                        <td class="formValue" colspan="3">
+                            <div id="uploader2" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:80px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="File2" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>        
+                </table>                
+            </div>
+        </div>
+    </div>
+    <div id="btngroup" class="form-button" style=" top:40px;  text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+        <a id="btnSave" onclick="AcceptClick('0')" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+        &nbsp;&nbsp;
+        <a id="btnCommit" onclick="AcceptClick('1')" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp;&nbsp;
+    </div>
+</div>

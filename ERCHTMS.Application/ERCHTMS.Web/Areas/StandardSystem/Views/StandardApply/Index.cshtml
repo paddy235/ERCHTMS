@@ -1,0 +1,403 @@
+@{
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var indextype = request("indextype");//首页待办事项参数(1：重新申请、2：待审核（批）、3：待分配)
+    //页面代理
+    var lagc = null;
+    //
+    //页面加载完成
+    //
+    $(function () {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 136);
+            }, 200);
+            e.stopPropagation();
+        });
+        var winHeight = $(window).height();
+        //
+        //创建页面代理
+        //
+        lagc = new listAgency({
+            gridId: "gridTable",
+            gridHeight: winHeight - 136,
+            gridOptions: {
+                height: winHeight - 136,
+                url: "../../StandardSystem/StandardApply/GetListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'num',
+                sortorder: 'asc,createdate desc'
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return buildOper(rowObject);
+                    }
+                },
+                {
+                    label: '流程状态', name: 'flowstate', index: 'flowstate', width: 150, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.flowstate) {
+                            if (rowObject.flowstate == "结束") {
+                                html = "<div style='background-color:green;'><a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='标准修订审核（批）流程'>" + rowObject.flowstate + "</a></div>";
+                            } else {
+                                html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='标准修订审核（批）流程'>" + rowObject.flowstate + "</a>";
+                            }
+                        }
+                        return html;
+                    }
+                },
+                { label: '文件名称', name: 'filename', index: 'filename', width: 300, align: 'center', sortable: true },
+                { label: '修编部门', name: 'editdeptname', index: 'editdeptname', width: 150, align: 'center', sortable: true },
+                { label: '修编人', name: 'editperson', index: 'editperson', width: 200, align: 'center', sortable: true },
+                {
+                    label: '修编时间', name: 'editdate', index: 'editdate', width: 120, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '处理部门', name: 'checkdeptname', index: 'checkdeptname', width: 150, align: 'center', sortable: true },
+                { label: '处理人', name: 'checkusername', index: 'checkusername', width: 120, align: 'center', sortable: true }
+            ],
+            hasPowerOper: false,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            }
+        });
+        //
+        //绑定页面控件
+        //
+        lagc.bindPageControls({
+            searchId: "btn_Search",
+            resetId: "btn_Reset",
+            refreshId: "refresh",
+            addId: "add"
+        });
+        //
+        //添加页面事件
+        //
+        lagc.addPageEvents({
+            onBuildQuery: buidQuery, onReset: reset
+        });
+        //
+        //添加页面跳转地址参数
+        //
+        lagc.addPageGotoUrl({
+            addArg: {
+                title: '添加标准修编申请',
+                url: '/StandardSystem/StandardApply/Form',
+                btn: null
+            },
+            editArg: {
+                title: '编辑标准修编申请',
+                url: '/StandardSystem/StandardApply/Form',
+                btn: null
+            },
+            delArg: { url: '../../StandardSystem/StandardApply/RemoveForm' },
+            detailArg: {
+                title: '查看标准修编申请',
+                url: '/StandardSystem/StandardApply/Detail',
+                btn: null
+            }
+        });
+        //
+        //初始化
+        //
+        lagc.initialPage([
+            {
+                url: '../../StandardSystem/StandardApply/GetInitDataJson',
+                ctrls: [{ Id: 'FlowState', memberId: 'name', memberText: 'name', description: '==全部==', dataProName: 'data.FlowState' }]
+            },
+            {
+                data: [{ value: "1", text: "我申请的记录" }, { value: "2", text: "我处理的记录" }],
+                ctrl: { Id: 'DataScope', memberId: 'value', memberText: 'text', description: '==全部==', dataProName: 'data.DataScope' }
+            }
+        ]);
+    });
+    //
+    //重新定义查询条件
+    //
+    function buidQuery() {
+        var filename = $("#FileName").val();
+        var flowstate = $("#FlowState").attr("data-value");
+        var datascope = $("#DataScope").attr("data-value");
+        var rnd = Math.random();
+        var data = { filename: filename, flowstate: flowstate, datascope: datascope, indextype: indextype, rnd: rnd };
+        return JSON.stringify(data);
+    }
+    //
+    //重置条件
+    //
+    function reset() {
+        indextype = "";
+        $("#FlowState,#DataScope").resetCombobox("==全部==", "");
+        $("#FileName").val("");
+    }
+    //
+    //测试首页待办事项
+    //
+    function frmPage(data) {
+        var html = "&nbsp;&nbsp;<a href='Index?indextype=1'>重新申请:1</a>&nbsp;&nbsp;";
+        html += "<a href='Index?indextype=2'>待审核（批）:2</a>&nbsp;&nbsp;";
+        html += "<a href='Index?indextype=3'>待分配:3</a>&nbsp;&nbsp;";
+        $("#warning").html(html);
+    }
+    //
+    //构造操作链接
+    //
+    function buildOper(rowObject) {
+        var html = "<a href=javascript:detail('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+
+        var hasDel = false;
+        if (rowObject.flowstate == "申请人申请" && rowObject.createuserid == userId) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+            hasDel = true;
+        }
+        else if (rowObject.flowstate == "1级审核" && rowObject.checkuserid.indexOf(userId) >= 0) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:approve1('" + rowObject.id + "')  title='1级审核'><i class='fa fa-thumbs-o-up'></i></a>";
+        }
+        else if (rowObject.flowstate == "2级审核" && rowObject.checkuserid.indexOf(userId) >= 0) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:approve2('" + rowObject.id + "')  title='2级审核'><i class='fa fa-thumbs-o-up'></i></a>";
+        }
+        else if (rowObject.flowstate == "审核分配会签" && rowObject.checkuserid.indexOf(userId) >= 0) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:approve3('" + rowObject.id + "')  title='审核分配会签'><i class='fa fa-sitemap'></i></a>";
+        }
+        else if (rowObject.flowstate == "部门会签" && rowObject.checkuserid.indexOf(userId) >= 0 && rowObject.checkusername.indexOf(userName + "(已签)") < 0) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:deptsign('" + rowObject.id + "')  title='部门会签'><i class='fa fa-puzzle-piece'></i></a>";
+        }
+        else if (rowObject.flowstate == "分配分委会" && rowObject.checkuserid.indexOf(userId) >= 0) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:distributecommittee('" + rowObject.id + "')  title='分配分委会'><i class='fa fa-sitemap'></i></a>";
+        }
+        else if (rowObject.flowstate == "分委会审核" && rowObject.checkuserid.indexOf(userId) >= 0 && rowObject.checkusername.indexOf(userName + "(已审)") < 0) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:committee('" + rowObject.id + "')  title='分委会审核'><i class='fa fa-puzzle-piece'></i></a>";
+        }
+        else if (rowObject.flowstate == "审批" && rowObject.checkuserid.indexOf(userId) >= 0) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:president('" + rowObject.id + "')  title='总经理审批'><i class='fa fa-coffee'></i></a>";
+        }
+        if (rolename.indexOf("公司管理员") > 0 && !hasDel) {
+            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+        }
+
+        return html;
+    };
+    //
+    //页面跳转
+    //
+    {
+        //1级审核
+        function approve1(id) {
+            var keyValue = id;
+            var dlgArg = {
+                id: 'Form',
+                url: '/StandardSystem/StandardApprove/Form?keyValue=' + keyValue,
+                title: '1级审核',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    if (top.frames[iframeId].AcceptClick)
+                        top.frames[iframeId].AcceptClick();
+                },
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+        //2级审核
+        function approve2(id) {
+            var keyValue = id;
+            var dlgArg = {
+                id: 'Form',
+                url: '/StandardSystem/StandardApprove/Form2?keyValue=' + keyValue,
+                title: '2级审核',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    if (top.frames[iframeId].AcceptClick)
+                        top.frames[iframeId].AcceptClick();
+                },
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+        //审核分配会签
+        function approve3(id) {
+            var keyValue = id;
+            var dlgArg = {
+                id: 'Form',
+                url: '/StandardSystem/StandardApprove/Form3?keyValue=' + keyValue,
+                title: '审核分配会签',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    if (top.frames[iframeId].AcceptClick)
+                        top.frames[iframeId].AcceptClick();
+                },
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+        //部门会签
+        function deptsign(id) {
+            var keyValue = id;
+            var dlgArg = {
+                id: 'Form',
+                url: '/StandardSystem/StandardApprove/SignForm?keyValue=' + keyValue,
+                title: '部门会签',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    if (top.frames[iframeId].AcceptClick)
+                        top.frames[iframeId].AcceptClick();
+                },
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+        //分配分委会
+        function distributecommittee(id) {
+            var keyValue = id;
+            var dlgArg = {
+                id: 'Form',
+                url: '/StandardSystem/StandardApprove/DistributeForm?keyValue=' + keyValue,
+                title: '分配分委会',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    if (top.frames[iframeId].AcceptClick)
+                        top.frames[iframeId].AcceptClick();
+                },
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+        //分委会审核
+        function committee(id) {
+            var keyValue = id;
+            var dlgArg = {
+                id: 'Form',
+                url: '/StandardSystem/StandardApprove/CommitteeForm?keyValue=' + keyValue,
+                title: '分委会审核',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    if (top.frames[iframeId].AcceptClick)
+                        top.frames[iframeId].AcceptClick();
+                },
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+        //总经理审批
+        function president(id) {
+            var keyValue = id;
+            var dlgArg = {
+                id: 'Form',
+                url: '/StandardSystem/StandardApprove/PresidentForm?keyValue=' + keyValue,
+                title: '总经理审批',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    if (top.frames[iframeId].AcceptClick)
+                        top.frames[iframeId].AcceptClick();
+                },
+                btn: null
+            };
+            dialogOpen(dlgArg);
+        }
+        //流程图
+        function OpenViewFlow(keyValue) {
+            var title = "标准修（订）审核（批）流程图";
+            var rqUrl = "/StandardSystem/StandardApply/FlowDetail?keyValue=" + keyValue;
+            dialogOpen({
+                id: 'ApplyFlowForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() / 2 + 200) + "px",
+                height: ($(top.window).height() / 2 + 300) + "px",
+                btn: null
+            });
+        }
+    }
+</script>
+<style type="text/css">
+    .ui-select {
+        width: 200px;
+    }
+
+    .formTitle {
+        padding-left: 10px;
+    }
+
+    .titlePanel, .gridPanel {
+        min-width: 1130px;
+    }
+</style>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px;">
+          
+            <div class="titlePanel">
+                <div class="title-search" id="queryArea">
+                    <table>
+                        <tr>
+                            <td class="formTitle">数据范围：</td>
+                            <td class="formValue">
+                                <div id="DataScope" type="select" class="ui-select" querypro="datascope" />
+                            </td>
+                            <td class="formTitle">流程状态：</td>
+                            <td class="formValue">
+                                <div id="FlowState" type="select" class="ui-select" querypro="flowstate" />
+                            </td>
+                            <td class="formTitle">
+                                <input id="FileName" type="text" class="form-control" querypro="filename" placeholder="请输入要查询关键字（文件名称关键字搜索）" style="width: 300px;" />
+                            </td>
+                            <td style="padding-left: 15px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                            </td>
+                            <td id="warning"></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="refresh" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default"><i class="fa fa-plus"></i>新增</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,140 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    $(function () {
+        initControl();
+        GetGrid();
+    });
+    //初始化控件
+    function initControl() {
+        
+        //绑定考核项目
+        //$("#ItemId").ComboBox({
+        //    url: "../../BaseManage/ScoreSet/GetItemListJson",
+        //    param: { queryJson: JSON.stringify({ deptCode: top.currUserOrgCode }) },
+        //    id: "ItemValue",
+        //    text: "ItemName",
+        //    description: "==请选择==",
+        //    height: "200px"
+        //}).bind("change", function () {
+        //    var itemId = $(this).attr('data-value');
+        //    $.get("../../BaseManage/ScoreSet/GetForm", { keyValue: itemId }, function (data) {
+        //        var json = eval("(" + data + ")");
+        //        if (json.ItemType == "加分") {
+        //            $('#add').iCheck('check');
+                    
+        //        } else {
+        //            $('#cut').iCheck('check');
+                   
+        //        }
+        //        $("#Score").val(json.Score);
+        //    });
+        //});
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../PersonManage/UserScore/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        } else {
+            var data = $.currentIframe().window.$("#gridTable");
+            if (data.jqGridRowValue("userid").length > 0) {
+                $("#UserId").val(data.jqGridRowValue("userid"));
+                $("#UserName").val(data.jqGridRowValue("username"));
+            }
+        }
+       
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            width: 800,
+            height:300,
+            url: "../../BaseManage/ScoreSet/GetItemListJson",
+            postData: { queryJson: JSON.stringify({ deptCode: top.currUserOrgCode, isAuto:0 }) },
+            datatype: "json",
+            colModel: [
+                { label: 'id', name: 'Id', hidden: true },
+                {
+                    label: '选择', name: 'Oper', width: 60, align: 'center', sortable: false
+                    , formatter: function (value, options, rowObject) {
+                        var score = rowObject.ItemType == "加分" ? rowObject.Score : "-" + rowObject.Score
+                        return '<input type="checkbox" value="' + rowObject.Id + '" class="icheck" score="' + score+ '" />';
+                    }
+                },
+                { label: '考核项目', name: 'ItemName', width: 300, align: 'center', sortable: true },
+                { label: '项目类型', name: 'ItemType', width: 100, align: 'center', sortable: true },
+                { label: '分值', name: 'Score', align: 'center', sortable: true }
+              
+            ],
+            rowNum: 30,
+            pager: "#gridPager",
+            sortname: 'itemname',
+            sortorder: 'desc',
+            gridComplete: function () {
+                $('.icheck').iCheck({
+                    checkboxClass: 'icheckbox_square-blue',
+                    radioClass: 'iradio_square-blue',
+                    increaseArea: '20%'
+                });
+            }
+
+        });
+    }
+    //保存表单;
+    function AcceptClick() {
+        var arr = $("input:checked");
+        var itemIds = "";
+        var scores = "";
+        $(arr).each(function (i,chk) {
+            itemIds += chk.value + ",";
+            scores += $(chk).attr("score") + ",";
+        });
+        if (itemIds.length==0) {
+            dialogMsg("请选择考核项目！",0);
+        } else {
+            dialogConfirm("确定提交吗?", function (isSure) {
+                if (isSure) {
+                    $.SaveForm({
+                        url: "../../PersonManage/UserScore/SaveForm",
+                        param: { userIds: $("#UserId").val(), itemIds: itemIds, scores: scores },
+                        loading: "正在保存数据...",
+                        success: function () {
+                            $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                        }
+                    })
+                }
+            });
+        }
+      
+      
+    }
+</script>
+<div style="margin-left:10px;">
+    <div style="margin-top: 20px; margin-right: 30px;">
+        <table class="form">
+            <tr>
+                <td class="formTitle" style="width:80px;">考核人员：</td>
+                <td class="formValue">
+                    <input id="UserName" type="text" class="form-control" readonly="readonly" />
+                    <input type="hidden" id="UserId" />
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="gridPanel">
+        <table id="gridTable"></table><div id="gridPager"></div>
+    </div>
+</div>
+

@@ -1,0 +1,197 @@
+﻿@{
+    ViewBag.Title = "选择观察计划";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    $(function () {
+        InitCombobox();
+        InitialPage();
+        GetGrid();
+
+    })
+    //初始化页面
+    function InitialPage() {
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+
+            }, 200);
+            e.stopPropagation();
+        });
+        var currMonth = parseInt("@DateTime.Now.Month");
+        $("#PlanMonth").ComboBoxSetValue(currMonth);
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        var queryJson = {
+            PlanYear: $("#PlanYear").val(),
+            PlanMonth: $("#PlanMonth").attr("data-value")
+        }
+        $gridTable.jqGrid({
+            url: "../../ObserveRecord/ObsTask/GetStandingPageJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            height: $(window).height() - 160,
+            autowidth: true,
+            colModel: [
+               { label: '主键', name: 'tid', hidden: true }, { label: '', name: 'pid', hidden: true }, { label: '', name: 'oldplanid', hidden: true }, { label: '', name: 'oldworkid', hidden: true },
+                { label: '', name: 'planareacode', hidden: true }, { label: '观察人员', name: 'obsperson', hidden: true },
+                { label: '观察人员Id', name: 'obspersonid', hidden: true }, { label: '部门Id', name: 'plandeptid', hidden: true }, { label: '部门Id', name: 'plandeptcode', hidden: true },
+               { label: '部门', name: 'plandept', index: 'plandept', width: 180, align: 'center', sortable: true},
+               { label: '区域', name: 'planarea', index: 'planarea', width: 200, align: 'center', sortable: true },
+               { label: '作业内容', name: 'workname', index: 'workname', width: 220, align: 'center', sortable: true },
+               { label: '计划等级', name: 'planlevel', index: 'planlevel', width: 150, align: 'center', sortable: true },
+               { label: '计划年度', name: 'planyear', index: 'planyear', width: 180, align: 'center', sortable: true },
+               { label: '任务分解', name: 'fjname', index: 'fjname', width: 180, align: 'center', sortable: false },
+               { label: '风险等级', name: 'risklevel', index: 'risklevel', width: 150, align: 'center', sortable: false },
+               { label: '计划观察月份', name: 'obsmonth', index: 'obsmonth', width: 180, align: 'center', sortable: false },
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rownumWidth: 50,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            rownumbers: true,
+            sortname: 't.createdate desc,t.id',
+            sortorder: 'desc',
+            shrinkToFit: false,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                txt_Keyword: $("#txt_Keyword").val(),
+                PlanYear: $("#PlanYear").val(),
+                PlanLevel: $("#PlanLevel").attr("data-value"),
+                PlanMonth: $("#PlanMonth").attr("data-value")
+                //ItemCode: _itemCode
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //$("#btn_SearchAll").click(function () {
+        //    $("#txtKeyword").val("");
+        //    $gridTable.jqGrid('setGridParam', {
+        //        postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val() }) }, page: 1
+        //    }).trigger('reloadGrid');
+        //});
+    }
+    function AcceptClick() {
+        var jqGridTable = $('#gridTable');
+        var planId = jqGridTable.jqGridRowValue('oldplanid');
+        var planfjId = jqGridTable.jqGridRowValue('oldworkid');
+        var workname = jqGridTable.jqGridRowValue('workname');
+        var fjname = jqGridTable.jqGridRowValue('fjname');
+        var plandept = jqGridTable.jqGridRowValue('plandept');
+        var plandeptid = jqGridTable.jqGridRowValue('plandeptid');
+        var plandeptcode = jqGridTable.jqGridRowValue('plandeptcode');
+        var obsperson = jqGridTable.jqGridRowValue('obsperson');
+        var obspersonId = jqGridTable.jqGridRowValue('obspersonid');
+        var planareacode = jqGridTable.jqGridRowValue('planareacode');
+        if (!!planId) {
+            top.obsForm.window.$("#WorkName").val(workname + fjname);
+            top.obsForm.window.$("#WorkUnit").val(plandept);
+            top.obsForm.window.$("#WorkUnitCode").val(plandeptcode);
+            top.obsForm.window.$("#WorkUnitId").val(plandeptid);
+            top.obsForm.window.$("#ObsPerson").val(obsperson);
+            top.obsForm.window.$("#ObsPersonId").val(obspersonId);
+            top.obsForm.window.$("#WorkAreaId").ComboBoxTree({
+                url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + top.currUserOrgId,
+                height: "300px",
+                description: "请选择",
+                allowSearch: true
+            })
+            top.obsForm.window.$("#WorkAreaId").ComboBoxTreeSetValue(planareacode);
+            top.obsForm.window.$("#ObsPlanId").val(planId);
+            top.obsForm.window.$("#ObsPlanfjid").val(planfjId);
+            dialogClose();
+        }
+    }
+    function InitCombobox() {
+        var data = [
+            { no: "公司级", name: "公司级" },
+            { no: "部门级", name: "部门级" },
+        ];
+        $("#PlanLevel").ComboBox({
+            id: "no",
+            text: "name",
+            description: "==请选择==",
+            height: '400px',
+            allowSearch: false,
+            data: data
+        });
+        var data = [
+           { no: "1", name: "1" },
+           { no: "2", name: "2" },
+           { no: "3", name: "3" },
+           { no: "4", name: "4" },
+           { no: "5", name: "5" },
+           { no: "6", name: "6" },
+           { no: "7", name: "7" },
+           { no: "8", name: "8" },
+           { no: "9", name: "9" },
+           { no: "10", name: "10" },
+           { no: "11", name: "11" },
+           { no: "12", name: "12" },
+        ];
+        $("#PlanMonth").ComboBox({
+            id: "no",
+            text: "name",
+            description: "==请选择==",
+            height: '400px',
+            allowSearch: false,
+            data: data
+        });
+
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td class="formTitle">计划年度>=&nbsp;&nbsp;</td>
+                            <td class="formValue">
+                                <input id="PlanYear" type="text" class="form-control input-datepicker" value="@DateTime.Now.Year" onfocus="WdatePicker({ dateFmt: 'yyyy' })" />
+
+                            </td>
+                            <td class="formTitle">&nbsp;&nbsp;计划等级&nbsp;&nbsp;</td>
+                            <td class="formValue">
+                                <div id="PlanLevel" type="select" class="ui-select" style="width:150px;" />
+                            </td>
+                            <td class="formTitle">&nbsp;&nbsp;观察月份&nbsp;&nbsp;</td>
+                            <td class="formValue">
+                                <div id="PlanMonth" type="select" class="ui-select" style="width:150px;" />
+                            </td>
+                            <td width="10"></td>
+                            <td>
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入作业内容" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                @*  <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>*@
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

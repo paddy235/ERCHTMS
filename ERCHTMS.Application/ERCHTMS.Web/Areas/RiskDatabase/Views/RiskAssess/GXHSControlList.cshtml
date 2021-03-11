@@ -1,0 +1,626 @@
+﻿@{
+    ViewBag.Title = "危险点管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<style type="text/css">
+    td {
+        white-space: normal;
+    }
+</style>
+<script type="text/javascript">
+    var curdeptcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var areaId = "";
+    var areaName = "";
+    var areaCode = request("code");
+    var initAreaId = "";
+    var deptCode = "";
+    var mode = request("mode");
+    var orgCode = request("orgCode");
+    var orgId = request("orgId");
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+        if (roleNames.indexOf("集团用户") >= 0) {
+            deptCode = "00";
+        }
+        else
+        {
+            deptCode = top.currUserOrgCode;
+        }
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 240);
+                $("#itemTree").height($(window).height() - 65);
+
+            }, 200);
+            e.stopPropagation();
+        });
+
+    }
+
+    //加载树
+    var deptCode = "";//部门编码
+    function GetTree() {
+        if (top.currUserRoleName.indexOf("省级") >= 0) {
+            $("#area").remove();
+            var json = JSON.stringify(
+             {
+                 SelectMode: 0,
+                 Mode: 5
+             }
+           );
+
+        }
+        else {
+            var json = JSON.stringify(
+                       {
+                           SelectMode: 0,
+                           Mode: 0
+                       }
+              );
+        }
+        url = "../../BaseManage/Department/GetDepartTreeJson?json=" + json;
+        //加载组织机构树
+        var item = {
+            height: $(window).height() - 65,
+            url: url,
+            onnodeclick: function (item) {
+                deptCode = item.Code;
+                areaCode = "";
+                var $gridTable = $("#gridTable");
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化部门树
+        $("#deptTree").treeview(item);
+
+        var o = {
+            onnodeclick: function (item) {
+                deptCode = "";
+                initAreaId = item.initAreaIds;//多个用英文逗号分隔
+                areaCode = item.code;
+                areaId = item.id;
+                height: $(window).height() - 65;
+                //展开下级
+                // $(".bbit-tree-selected").children('.bbit-tree-ec-icon').trigger("click");
+                $('#btn_Search').trigger("click");
+            },
+            method: "GET",
+            datatype: "json",
+            url: "../../RiskDatabase/DangerSource/GetTreeJson1?organizeId=@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId"
+        };
+        $("#itemTree").treeview(o);
+
+        if ($("#deptTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+
+    var selectAll = true;
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/RiskAssess/GetPageControlListJson",
+            postData: { queryJson: JSON.stringify({ deptCode: deptCode, areaCode: areaCode, grade: $("#Grade").val(), name: $("#Name").val(), riskType: $("#RiskType").val() }) },
+            datatype: "json",
+            height: $(window).height() - 210,
+            autowidth:true,
+            colModel: [
+                { label: '', name: 'deptcode', hidden: true },
+                {
+                    label: '操作', name: 'Oper', index: 'Oper', width: 120, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + options.rowId+"')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (rowObject.deptcode == curdeptcode) {
+                            html += "<a href=javascript:edit('" + options.rowId +"') title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '中心（部门）', name: 'centerdept', index: 'centerdept', width: 100, align: 'center', sortable: false },
+                { label: '工序（班组）', name: 'deptname', index: 'deptname', width: 100, align: 'center', sortable: false },
+                { label: '作业活动/设备名称', name: 'name', index: 'name', width: 100, align: 'center', sortable: false },
+                { label: '风险类型', name: 'risktype', index: 'risktype', width: 100, align: 'center', sortable: false },
+                { label: '所在地点', name: 'districtname', index: 'districtname', width: 150, align: 'center', sortable: false },
+                { label: '所在地点id', name: 'areaid', index: 'areaid', width: 150, align: 'center',hidden:true },
+                { label: '所在地点code', name: 'areacode', index: 'areacode', width: 150, align: 'center',hidden:true },
+                { label: '风险种类', name: 'typesofrisk', index: 'typesofrisk', width: 100, align: 'center', sortable: false },
+                { label: '风险等级', name: 'grade', index: 'grade', width: 100, align: 'center', sortable: false },
+                { label: '管控层级', name: 'levelname', index: 'levelname', width: 100, align: 'center', sortable: false },
+                { label: '责任人', name: 'dutyperson', index: 'dutyperson', width: 100, align: 'center', sortable: false },
+                { label: '责任人id', name: 'dutypersonid', index: 'dutypersonid', width: 100, align: 'center', hidden: true },
+                { label: '备注', name: 'remark', index: 'remark', align: 'center', sortable: false }
+            ],
+            multiselect: true,
+            pager: "#gridPager",
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            rownumbers: true,
+            rownumWidth: 50,
+            shrinkToFit: true,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+                var objData = $gridTable.getRowData(rowid);
+                if (objData.deptcode != curdeptcode) {
+                    $('#gridTable').jqGrid("setSelection", rowid, false);
+                }
+            },
+            onSelectAll: function () {
+                var rowIds = $("#gridTable").jqGrid("getDataIDs");
+                if (selectAll) {
+                    for (var k = 0; k < rowIds.length; k++) {
+                        var curRowData = $("#gridTable").getRowData(rowIds[k]);
+                        if (curRowData.deptcode != curdeptcode) {
+                            $('#gridTable').jqGrid("setSelection", rowIds[k], false);
+                        }
+                    }
+                }
+                else
+                {
+                    for (var k = 0; k < rowIds.length; k++) {
+                        $('#gridTable').jqGrid("setSelection", rowIds[k], false);
+                    }
+                }
+                selectAll = !selectAll;
+            },
+            gridComplete: function () {
+                var rows = $gridTable.jqGrid("getRowData");//获取当前页记录行数据
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                var rowIds = $("#gridTable").jqGrid("getDataIDs");
+                    for (var k = 0; k < rowIds.length; k++) {
+                        var curRowData = $("#gridTable").getRowData(rowIds[k]);
+                        if (curRowData.deptcode != curdeptcode) {
+                            $("#jqg_gridTable_" + rowIds[k]).hide();
+                        }
+                    }
+            }
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ deptCode: deptCode, areaCode: areaCode, grade: $("#Grade").val(), name: $("#Name").val(), riskType: $("#RiskType").val() }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#Name").val(""); $("#Grade").val(""); $("button[data-id='Grade']").find(".filter-option").text('请选择');
+            $gridTable.jqGrid('setGridParam', {
+                postData: {queryJson: JSON.stringify({ deptCode: deptCode, areaCode: areaCode, grade: $("#Grade").val(), name: $("#Name").val(), riskType:$("#RiskType").val() })}, page: 1
+            }).trigger('reloadGrid');
+
+        });
+    }
+
+    //查看风险评估
+    function show(rowid) {
+        var objData = $('#gridTable').getRowData(rowid);
+        $("#centerdept").val(objData.centerdept);
+        $("#deptname").val(objData.deptname);
+        $("#name").val(objData.name);
+        $("#risktype").val(objData.risktype);
+        $("#areaname").val(objData.districtname);
+        $("#areaid").val(objData.areaid);
+        $("#areacode").val(objData.areacode);
+        $("#typesofrisk").val(objData.typesofrisk);
+        $("#grade").val(objData.grade);
+        $("#levelname").val(objData.levelname);
+        $("#dutyperson").val(objData.dutyperson);
+        $("#dutypersonid").val(objData.dutypersonid);
+        $("#remark").val(objData.remark);
+        if (objData.risktype == "作业活动") {
+            $("#modifytitle").html("作业风险管控信息");
+        }
+        else if (objData.risktype == "设备设施") {
+            $("#modifytitle").html("设备风险管控信息");
+        }
+        $("#btnTJ_M").hide();
+        $("#modifyModal").show();
+    }
+    //编辑风险评估
+    function edit(rowid) {
+        var objData = $('#gridTable').getRowData(rowid);
+        $("#centerdept").val(objData.centerdept);
+        $("#deptname").val(objData.deptname);
+        $("#deptcode").val(objData.deptcode);
+        $("#name").val(objData.name);
+        $("#risktype").val(objData.risktype);
+        $("#areaname").val(objData.districtname);
+        $("#areaid").val(objData.areaid);
+        $("#areacode").val(objData.areacode);
+        $("#typesofrisk").val(objData.typesofrisk);
+        $("#grade").val(objData.grade);
+        $("#levelname").val(objData.levelname);
+        $("#dutyperson").val(objData.dutyperson);
+        $("#dutypersonid").val(objData.dutypersonid);
+        $("#remark").val(objData.remark);
+        if (objData.risktype == "作业活动") {
+            $("#areaname").removeAttr("disabled");
+            $("#modifytitle").html("作业风险管控信息");
+        }
+        else if (objData.risktype == "设备设施") {
+            $("#areaname").attr("disabled", "disabled");
+            $("#modifytitle").html("设备风险管控信息");
+        }
+        $("#btnTJ_M").show();
+        $("#modifyModal").show();
+
+    }
+    function QX_Modify() {
+        $("#modifyModal").hide();
+    }
+    function TJ_Modify() {
+        var list = [];
+        var temp = {};
+        temp["Name"] = $("#name").val();
+        temp["RiskType"] = $("#risktype").val();
+        temp["AreaName"] = $("#areaname").val();
+        temp["AreaId"] = $("#areaid").val();
+        temp["AreaCode"] = $("#areacode").val();
+        temp["DutyPerson"] = $("#dutyperson").val();
+        temp["DutyPersonId"] = $("#dutypersonid").val();
+        temp["Remark"] = $("#remark").val();
+        temp["DeptCode"] = $("#deptcode").val();
+        list.push(temp);
+        $.SaveForm({
+            url: "../../RiskDatabase/RiskAssess/ModifyControlList",
+            contentType:"application/json;charset=utf-8",
+            param: JSON.stringify(list),
+            loading: "正在保存数据...",
+            success: function () {
+                $("#modifyModal").hide();
+                $("#gridTable").trigger('reloadGrid');
+            }
+        })
+    }
+    //删除
+    function del(id) {
+        var keyValue = !!id ? id : $("#gridTable").jqGridRowValue("id");
+        if (keyValue) {
+            $.RemoveForm({
+                url: "../../RiskDatabase/RiskAssess/RemoveForm",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的数据！', 0);
+        }
+    }
+    var isequ = false; //判断选择的行是否有设备设施
+    function multiModify() {
+        isequ = false;
+        var name = "";
+        var areaname = "";
+        var areaid = "";
+        var areacode = "";
+        var ids = $("#gridTable").jqGrid('getGridParam', 'selarrrow');
+        if (ids.length > 0) {
+            for (var i = 0; i < ids.length; i++) {
+                var rowData = $("#gridTable").jqGrid('getRowData', ids[i]);
+                name += rowData.name + ",";
+                areaname += rowData.districtname + ",";
+                areaid += rowData.areaid + ",";
+                areacode += rowData.areacode + ",";
+                if (rowData.risktype == "设备设施") {
+                    isequ = true;
+                }
+            }
+            if (!!name) {
+                name = name.substring(0, name.length - 1);
+            }
+            if (!!areaname) {
+                areaname = areaname.substring(0, areaname.length - 1).split(",").unique().join(",");
+            }
+            if (!!areaid) {
+                areaid = areaid.substring(0, areaid.length - 1).split(",").unique().join(",");
+            }
+            if (!!areacode) {
+                areacode = areacode.substring(0, areacode.length - 1).split(",").unique().join(",");
+            }
+            if (isequ == true) { //当选择行有设备设施时候 不能更改所在地点
+                $("#tempareaname").attr("disabled", "disabled");
+            } else {
+
+                $("#tempareaname").removeAttr("disabled");
+            }
+            $("#tempname").val(name);
+            $("#tempareaname").val(areaname);
+            $("#tempareaid").val(areaid);
+            $("#tempareacode").val(areacode);
+            $("#tempdutyperson").val("");
+            $("#tempdutypersonid").val("");
+            $("#tempremark").val("");
+            $("#MultiModal").show();
+        }
+        else
+        {
+            dialogMsg('请选择需要修改行！', 0);
+
+        }
+
+    }
+    function Muplt_QX_Modify() {
+        $("#MultiModal").hide();
+    }
+    function Muplt_TJ_Modify() {
+        var list = [];
+        var ids = $("#gridTable").jqGrid('getGridParam', 'selarrrow');
+        for (var i = 0; i < ids.length; i++) {
+            var rowData = $("#gridTable").jqGrid('getRowData', ids[i]);
+            var temp = {};
+            temp["Name"] = rowData.name;
+            temp["RiskType"] = rowData.risktype;
+            temp["AreaName"] = $("#tempareaname").val();
+            temp["AreaId"] = $("#tempareaid").val();
+            temp["AreaCode"] = $("#tempareacode").val();
+            temp["DutyPerson"] = $("#tempdutyperson").val();
+            temp["DutyPersonId"] = $("#tempdutypersonid").val();
+            temp["Remark"] = $("#tempremark").val();
+            temp["DeptCode"] = rowData.deptcode;
+            list.push(temp);
+        }
+
+        $.SaveForm({
+            url: "../../RiskDatabase/RiskAssess/ModifyControlList",
+            contentType: "application/json;charset=utf-8",
+            param: JSON.stringify(list),
+            loading: "正在保存数据...",
+            success: function () {
+                $("#MultiModal").hide();
+                $("#gridTable").trigger('reloadGrid');
+            }
+        })
+    }
+
+    function ExportExcel() {
+        location.href = "../../RiskDatabase/RiskAssess/ExportControlListExcel?queryJson=" + JSON.stringify({ deptCode: deptCode, areaCode: areaCode, grade: $("#Grade").val(), name: $("#Name").val(), riskType: $("#RiskType").val() });
+    }
+    if (!Array.prototype.unique) {
+        Array.prototype.unique = function () {
+            var res = [];
+            var json = {};
+            for (var i = 0; i < this.length; i++) {
+                if (!json[this[i]]) {
+                    res.push(this[i]);
+                    json[this[i]] = 1;
+                }
+            }
+            return res;
+        }
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <ul class="nav nav-tabs" id="ulTabs">
+                <li class="active">
+                    <a data-toggle="tab" href="#tab1">按部门</a>
+                </li>
+                <li id="area">
+                    <a data-toggle="tab" href="#tab2">按区域</a>
+                </li>
+            </ul>
+            <div class="tab-content">
+                <div id="tab1" class="tab-pane active">
+                    <div id="deptTree"></div>
+
+                </div>
+                <div id="tab2" class="tab-pane">
+                    <div id="itemTree" style="overflow: auto; height: 500px;">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title" id="divTitle">作业活动清单</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td class="formTitle">风险类型：</td>
+                            <td class="formValue">
+                                <select id="RiskType" class="form-control" style="width:100px;">
+                                    <option value="">请选择</option>
+                                    @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("RiskType"))
+                                </select>
+                            </td>
+                            <td class="formTitle">风险等级：</td>
+                            <td class="formValue">
+                                <select id="Grade" class="form-control" style="width:100px;">
+                                    <option value="">请选择</option>
+                                    <option value="1">一级风险</option>
+                                    <option value="2">二级风险</option>
+                                    <option value="3">三级风险</option>
+                                    <option value="4">四级风险</option>
+                                </select>
+                            </td>
+                            <td class="formValue" style="padding-left:10px">
+                                <input type="text" class="form-control" style="width:200px" id="Name" name="Name" placeholder="按作业活动、设备名称进行关键字搜索" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="multiModify" class="btn btn-default" onclick="multiModify()"><i class="fa fa-remove"></i>批量修改</a>
+                        <a id="export" class="btn btn-default" onclick="ExportExcel()"><i class="fa fa-download">导出</i></a>
+                    </div>
+                    @*<script>$('.toolbar').authorizeButton()</script>*@
+                </div>
+
+            </div>
+            @*<div class="titlePanel">
+                    <ul class="nav nav-tabs">
+                        <li class="active"><a id="tab1" data-toggle="tab">作业活动风险评估表</a></li>
+                        <li><a id="tab2" data-toggle="tab">设备设施风险评估表</a></li>
+                    </ul>
+                </div>*@
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal" id="modifyModal">
+    <div class="modal-dialog" style="width:610px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header" style="text-align:left;background-color:#2e99d4;color:#fff;padding:9px;">
+                <h5 id="modifytitle">作业风险管控信息</h5>
+            </div>
+            <div class="modal-body" id="modalBody" style="">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle" style="width:150px;">中心（部门）</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="centerdept" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">工序（班组）</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="deptname" class="form-control" />
+                            <input type="hidden" id="deptcode" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;" id="td_name">作业活动</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="name" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">类型</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="risktype" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">所在地点</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="areaname" class="form-control" onclick="selectArea(window.document.body, 'areaname,areacode,areaid', 2)" />
+                            <input type="hidden" id="areaid" />
+                            <input type="hidden" id="areacode" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">风险种类</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="typesofrisk" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">风险等级</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="grade" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">管控层级</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="levelname" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">责任人</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="dutyperson" class="form-control" onclick="selectUser({checkMode:1,mode:0,winObject:document.body,domId:'dutyperson,,dutypersonid'})" />
+                            <input type="hidden" id="dutypersonid" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">备注</td>
+                        <td class="formValue">
+                            <textarea type="text" id="remark" class="form-control" rows="7" ></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="modal-footer" style="padding:5px;">
+                <button id="btnTJ_M" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal" onclick="TJ_Modify()">提交</button>
+                <button id="btnQX_M" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal" onclick="QX_Modify()">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal" id="MultiModal">
+    <div class="modal-dialog" style="width:610px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header" style="text-align:left;background-color:#2e99d4;color:#fff;padding:9px;">
+                <h5 id="modifytitle">批量修改</h5>
+            </div>
+            <div class="modal-body" id="modalBody" style="">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle" style="width:150px;" id="td_name">作业活动</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="tempname" class="form-control" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">所在地点</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="tempareaname" class="form-control" onclick="selectArea(window.document.body, 'tempareaname,tempareacode,tempareaid', 2)" />
+                            <input type="hidden" id="tempareaid" />
+                            <input type="hidden" id="tempareacode" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">责任人</td>
+                        <td class="formValue">
+                            <input type="text" readonly id="tempdutyperson" class="form-control" onclick="selectUser({checkMode:1,mode:0,winObject:document.body,domId:'tempdutyperson,,tempdutypersonid'})" />
+                            <input type="hidden" id="tempdutypersonid" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">备注</td>
+                        <td class="formValue">
+                            <textarea type="text" id="tempremark" class="form-control" rows="7"></textarea>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="modal-footer" style="padding:5px;">
+                <button id="btnTJ_M" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal" onclick="Muplt_TJ_Modify()">提交</button>
+                <button id="btnQX_M" type="button" class="btn btn-default" style="background-color:#2e99d4;color:#fff;" data-dismiss="modal" onclick="Muplt_QX_Modify()">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+

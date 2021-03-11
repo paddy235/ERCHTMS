@@ -1,0 +1,378 @@
+﻿@{
+    ViewBag.Title = "辨识评估计划列表";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var pgusers = ""; var selectedRowIndex = 0;
+    var mode = request("mode");
+    var gxhs = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("广西华昇版本"))";
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($(".titlePanel").width()));
+                $("#gridTable").setGridHeight($(window).height() - 142);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //风险辨识
+    function risk(id, areaId, status, date) {
+        pgusers = $("#gridTable").jqGridRowValue("pgusers");
+        var url = status == 0 ? '/RiskDatabase/RiskAssess/Index?planId=' + id + "&areaId=" + areaId + "&users=" + pgusers + "&status=" + status + "&pDate=" + date : '/RiskDatabase/RiskAssess/History?planId=' + id + "&areaId=" + areaId;
+        idx = dialogOpen({
+            id: "Risk",
+            title: "风险辨识",
+            url: url,
+            width: ($(top.window).width()) + "px",
+            height: ($(top.window).height()) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                //top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                top.layer.close(idx);
+            }
+        });
+    }
+    //加载表格
+    function GetGrid() {
+
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/RiskPlan/GetPageListJson",
+            postData: { mode: mode },
+            datatype: "json",
+            height: $(window).height() - 142,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'id', hidden: true }, { label: '', name: 'areaid', hidden: true },
+                { label: '辨识人员', name: 'bsusers', hidden: true },
+                { label: '评估人员', name: 'pgusers', hidden: true },
+                { label: '', name: 'deptcode', hidden: true },
+                { label: '', name: 'createuserid', hidden: true },
+                 { label: '', name: 'createuserorgcode', hidden: true },
+                {
+                    label: '操作', name: 'Oper', index: 'Oper', width: 130, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:show('" + rowObject.id + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                        html += "<a href=javascript:edit('" + rowObject.id + "')  title='修改' name='edit'><i class='fa fa-pencil-square-o'></i></a>";
+                        html += "<a href=javascript:del('" + rowObject.id + "')  title='删除' name='delete'><i class='fa fa-trash-o'></i></a>";
+                        // html += "<a href=javascript:risk('" + rowObject.id + "','"+rowObject.areaid+"')  title='风险辨识评估' ><i class='fa fa-cog'></i></a>";
+                        return html;
+                    }
+                },
+                { label: '计划名称', name: 'planname', width: 300, align: 'center' },
+                {
+                    label: "计划开始时间", name: "startdate", width: 100, align: "center", formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' }
+                },
+                { label: "计划结束时间", name: "enddate", width: 100, align: "center", formatter: "date", formatoptions: { srcformat: 'Y-m-d', newformat: 'Y-m-d' } },
+                { label: "制定部门", name: "deptname", align: "center" },
+                {
+                    label: "原有风险数量", name: "num1", width: 90, align: "center" },
+                { label: "新增风险数量", name: "num2", width: 90, align: "center" },
+                { label: "完善风险数量", name: "num3", width: 90, align: "center" },
+                { label: "消除风险数量", name: "num4", width: 90, align: "center" },
+                { label: "现有风险数量", name: "num5", width: 90, align: "center" },
+                {
+                    label: "状态", name: "status", align: "center"
+                , formatter: function (cellvalue, options, rowObject) {
+                    return cellvalue == 0 ? "未完成" : "已完成";
+                }
+                }
+
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 30, 50],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onRowSelect: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            }
+            , gridComplete: function () {
+                var rows = $gridTable.jqGrid("getRowData");//获取当前页记录行数据
+                if (rows.length > 0) {
+                    var row = rows[0];
+                    //查询用户对该模块的数据操作权限
+                    $.post(top.contentPath + "/AuthorizeManage/PermissionJob/GetDataAuthority", { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val() }, function (data) {
+                        var jsonArr = eval("(" + data + ")");
+                        $(rows).each(function (i, item) {
+                            var uId = item.createuserid;//获取记录创建人的Id
+                            var dCode = item.deptcode; //获取记录创建人的所属部门Code
+                            var oCode = item.createuserorgcode;  //获取记录创建人的所属机构Code
+                            var btns = $("td[aria-describedby='gridTable_Oper']").eq(i);//获取操作列中定义的操作按钮
+                            var html = "";
+                            //如果操作列中没有定义任何按钮则根据系统权限设置自动绑定操作按钮
+                            //if (btns.length == 0) {
+
+
+                            $(jsonArr).each(function (j, item1) {
+                                var authType = parseInt(item1.authorizetype);//获取数据操作权限范围.1：本人,2：本部门，3：本部门及下属部门，4：本机构，5：全部
+
+                                switch (authType) {
+                                    //本用户
+                                    case 1:
+
+                                        if (top.currUserId == uId) {
+                                            if (btns.find("a[name='" + item1.encode + "']").length == 0 && item1.encode != "complate") {
+                                                html += "<a href=\"javascript:" + item1.actionname + "()\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                            }
+                                            if (item.status == '未完成' && item1.encode == "complate") {
+                                                html += "<a href=javascript:complate()  title='完成本次辨识评估计划' ><i class='fa fa-check'></i></a>";
+                                            }
+
+                                        } else {
+                                            if (btns.find("a[name='" + item1.encode + "']").length > 0) {
+                                                btns.find("a[name='" + item1.encode + "']").remove();
+                                            }
+                                        }
+                                        break;
+                                        //本部门
+                                    case 2:
+                                        if (dCode.indexOf(top.currUserDeptCode) >= 0) {
+                                            if (btns.find("a[name='" + item1.encode + "']").length == 0 && item1.encode != "complate") {
+                                                html += "<a href=\"javascript:" + item1.actionname + "()\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                            }
+                                            if (item.status == '未完成' && item1.encode == "complate") {
+                                                html += "<a href=javascript:complate()  title='完成本次辨识评估计划' ><i class='fa fa-check'></i></a>";
+                                            }
+                                        } else {
+                                            if (btns.find("a[name='" + item1.encode + "']").length > 0) {
+                                                btns.find("a[name='" + item1.encode + "']").remove();
+                                            }
+                                        }
+                                        break;
+                                        //本子部门
+                                    case 3:
+                                        if (dCode.indexOf(top.currUserDeptCode) >= 0) {
+                                            if (btns.find("a[name='" + item1.encode + "']").length == 0 && item1.encode != "complate") {
+                                                html += "<a href=\"javascript:" + item1.actionname + "()\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                            }
+                                            if (item.status == '未完成' && item1.encode == "complate") {
+                                                html += "<a href=javascript:complate()  title='完成本次辨识评估计划' ><i class='fa fa-check'></i></a>";
+                                            }
+                                        } else {
+                                            if (btns.find("a[name='" + item1.encode + "']").length > 0) {
+                                                btns.find("a[name='" + item1.encode + "']").remove();
+                                            }
+                                        }
+                                        break;
+                                        //本机构
+                                    case 4:
+                                        if (oCode == top.currUserOrgCode) {
+                                            if (btns.find("a[name='" + item1.encode + "']").length == 0 && item1.encode != "complate") {
+                                                html += "<a href=\"javascript:" + item1.actionname + "()\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                            }
+                                            if (item.status == '未完成' && item1.encode == "complate") {
+                                                html += "<a href=javascript:complate()  title='完成本次辨识评估计划' ><i class='fa fa-check'></i></a>";
+                                            }
+                                        } else {
+                                            if (btns.find("a[name='" + item1.encode + "']").length > 0) {
+                                                btns.find("a[name='" + item1.encode + "']").remove();
+                                            }
+                                        }
+                                        break;
+                                    case 5:
+                                        if (btns.find("a[name='" + item1.encode + "']").length == 0 && item1.encode != "complate") {
+                                            html += "<a href=\"javascript:" + item1.actionname + "()\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        if (item.status == '未完成' && item1.encode == "complate") {
+                                            html += "<a href=javascript:complate()  title='完成本次辨识评估计划' ><i class='fa fa-check'></i></a>";
+                                        }
+                                        break;
+                                }
+                            });
+                            var todayDate = new Date("@DateTime.Now.ToString("yyyy/MM/dd")");
+                            var startDate = new Date(item.startdate.replace(/-/g, "/"));
+                            if (jsonArr.length == 0) {
+                                $("td[aria-describedby='gridTable_Oper']").eq(i).html("");
+                                html += "<a href=javascript:show('" + item.id + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                            }
+                            var state = item.status == 0 || item.status == "未完成" ? 0 : 1;
+                            if (((item.bsusers + "," + item.pgusers + ",").indexOf(top.currUserAccount + ",") >= 0 && Date.parse(startDate) <= Date.parse(todayDate)) || state == 1) {
+                                html += "<a href=javascript:risk('" + item.id + "','" + item.areaid + "'," + state + ",'" + item.enddate + "')  title='风险辨识评估' ><i class='fa fa-cog'></i></a>";
+                            }
+                            $("td[aria-describedby='gridTable_Oper']").eq(i).append(html);
+                            if (item.status == '已完成') {
+                                $("td[aria-describedby='gridTable_Oper']").eq(i).find("a[name='edit']").remove();
+                                $("td[aria-describedby='gridTable_Oper']").eq(i).find("a[name='delete']").remove();
+                            }
+                            if (Date.parse(startDate) <= Date.parse(todayDate) && top.currUserAccount != "System") {
+                                $("td[aria-describedby='gridTable_Oper']").eq(i).find("a[name='delete']").remove();
+                            }
+                        });
+                    });
+                }
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                planName: $.trim($("#txt_Keyword").val())
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) },
+                page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val("");
+            var queryJson = {
+                planName: ""
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) },
+                page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: "Plan",
+            title: '新增辨识评估计划',
+            url: '/RiskDatabase/RiskPlan/Index?mode=0',
+            width: "1000px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    };
+    //编辑
+    function edit(id) {
+        var keyValue = !!id ? id : $("#gridTable").jqGridRowValue("id");
+        dialogOpen({
+            id: "Plan",
+            title: '修改辨识评估计划',
+            url: '/RiskDatabase/RiskPlan/Index?mode=0&keyValue=' + keyValue,
+            width: "1000px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    //查看
+    function show(id) {
+        var keyValue = !!id ? id : $("#gridTable").jqGridRowValue("id");
+        var idx = dialogOpen({
+            id: "Form",
+            title: '查看辨识评估计划',
+            url: '/RiskDatabase/RiskPlan/Show?mode=0&keyValue=' + keyValue,
+            width: "1000px",
+            height: ($(top.window).height() - 100) + "px",
+            btns: 1,
+            btn: ['关闭'],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //删除
+    function del() {
+        var keyValue = $("#gridTable").jqGridRowValue("id");
+        if (keyValue) {
+            $.RemoveForm({
+                url: "../../RiskDatabase/RiskPlan/RemoveForm",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#gridTable").trigger("reloadGrid");
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的角色！', 0);
+        }
+    }
+
+    //导出
+    function exported() {
+
+        var queryJson = {
+            planName: $.trim($("#txt_Keyword").val())
+        }
+        location.href = "../../RiskDatabase/RiskPlan/Export?queryJson=" + JSON.stringify(queryJson) + "&mode=" + mode;
+
+
+    }
+
+    //设置完成状态
+    function complate() {
+        //alert($("#gridTable").jqGridRowValue("areaid"));
+        var idx = dialogConfirm("确定设置完成吗？", function (isSure) {
+            if (isSure) {
+                var keyValue = $("#gridTable").jqGridRowValue("id");
+                $.SaveForm({
+                    url: "../../RiskDatabase/RiskPlan/SetComplate?keyValue=" + keyValue + "&areaId=" + $("#gridTable").jqGridRowValue("areaid"),
+                    param: { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").eq(0).val() },
+                    loading: "正在设置...",
+                    success: function () {
+                        top.layer.close(idx);
+                        $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                    }
+                })
+
+            } else {
+                dialogClose();
+            }
+
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入计划名称进行查询" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>&nbsp;新增计划</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton();</script>
+                </div>
+            </div>
+
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+   </div>
+</div>
+     
+      

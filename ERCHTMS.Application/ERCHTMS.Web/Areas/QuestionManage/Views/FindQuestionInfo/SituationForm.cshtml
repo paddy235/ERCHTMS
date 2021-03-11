@@ -1,0 +1,263 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+<script type="text/javascript">
+
+    var keyValue = request("keyValue"); //主键 问题信息主键
+
+    //初始方法
+    $(function () {
+
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../QuestionManage/FindQuestionInfo/GetFindQuestionHandleListJson?keyValue=" + keyValue,
+            datatype: "json",
+            height: $(window).height()  - 150,
+            autowidth: true,
+            colModel: [
+                 { label: '处理情况', name: 'handlestatus', index: 'handlestatus', width: 150, align: 'center', sortable: false },
+                 { label: '处理人', name: 'handlername', index: 'handlername', width: 120, align: 'center', sortable: false },
+                 {
+                     label: '处理时间', name: 'handledate', index: 'handledate', width: 150, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = formatDate(cellvalue, 'yyyy-MM-dd hh:mm');
+                         return html;
+                     }
+                 },
+                 {
+                     label: '处理流程状态', name: 'appstate', index: 'appstate', width: 150, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "";
+                         if (!!cellvalue) {
+                             html = "<a href=javascript:viewflow('" + rowObject.appid + "','" + rowObject.relevancetype + "')  style=\"color:blue;\" title='查看流程'>" + cellvalue + "</a>";
+                         }
+                         return html;
+                     }
+                 },
+                 {
+                     label: '详情', name: 'appid', index: 'appid', width: 150, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "";
+                         if (!!cellvalue) {
+                             html = "<a href=javascript:viewdetail('" + rowObject.appid + "','" + rowObject.appstate + "','" + rowObject.addtype + "','" + rowObject.relevancetype + "')  style=\"color:blue;\" title='查看详情'>查看详情</a>";
+                         }
+                         return html;
+                     }
+                 }
+            ],
+            pager: false,
+            rowNum: "100",
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+
+    });
+
+
+    //查看流程
+    function viewflow(appId, rType) {
+        if (!!appId) {
+            switch (rType) {
+                case "yh":
+                    var title = "隐患流程图";
+                    var rqUrl = "/SystemManage/WorkFlow/Index?keyValue=" + appId;
+                    dialogOpen({
+                        id: 'HidFlowForm',
+                        title: title,
+                        url: rqUrl,
+                        width: ($(top.window).width() / 2 + 220) + "px",
+                        height: ($(top.window).height() - 100) + "px",
+                        btn: null
+                    });
+                    break;
+                case "wz":
+                    var title = "违章流程图";
+                    var rqUrl = "/SystemManage/WorkFlow/Detail?keyValue=" + appId;
+                    dialogOpen({
+                        id: 'LllegalFlowForm',
+                        title: title,
+                        url: rqUrl,
+                        width: ($(top.window).width() / 2 + 200) + "px",
+                        height: ($(top.window).height() / 2 + 300) + "px",
+                        btn: null
+                    });
+                    break;
+                case "wt":
+                    var title = "问题流程图";
+                    var rqUrl = "/SystemManage/WorkFlow/Detail?keyValue=" + appId + "&mode=0";
+                    dialogOpen({
+                        id: 'QuestionFlowForm',
+                        title: title,
+                        url: rqUrl,
+                        width: ($(top.window).width() / 2 + 200) + "px",
+                        height: ($(top.window).height() / 2 + 300) + "px",
+                        btn: null
+                    });
+                    break;
+            }
+        }
+        else {
+            dialogMsg('当前查看的数据已不存在!', 0);
+        }
+    }
+
+    //查看明细
+    function viewdetail(appId, appstate, addType, rType) {
+        var rqUrl = "";
+        var title = "";
+
+        if (!!appId) {
+            switch (rType) {
+                case "yh":
+                    title = "查看隐患";
+                    //未整改隐患的查看页面
+                    if (appstate == "隐患登记") {
+                        if (addType == "0" || addType == "3") {
+                            rqUrl = '/HiddenTroubleManage/HTBaseInfo/Form?keyValue=' + appId + '&actiontype=view';
+                        }
+                        else if (addType == "2") {
+                            rqUrl = '/HiddenTroubleManage/HTBaseInfo/CForm?keyValue=' + appId + '&actiontype=view';
+                        }
+                        else  //已整改的查看页面
+                        {
+                            title = "已整改隐患查看";
+                            rqUrl = '/HiddenTroubleManage/HTBaseInfo/NewForm?keyValue=' + appId + '&actiontype=view';
+                        }
+                    }
+                    else if (appstate == "制定整改计划") {
+                        rqUrl = '/HiddenTroubleManage/HTChangePlan/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "隐患完善") {
+                        rqUrl = '/HiddenTroubleManage/HTPerfection/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "隐患评估") {
+                        rqUrl = '/HiddenTroubleManage/HTApproval/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "隐患整改") {
+                        rqUrl = '/HiddenTroubleManage/HTChangeInfo/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "隐患验收") {
+                        rqUrl = '/HiddenTroubleManage/HTAcceptInfo/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "复查验证") {
+                        rqUrl = '/HiddenTroubleManage/HTReCheck/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "整改效果评估") {
+                        rqUrl = '/HiddenTroubleManage/HTEstimate/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "整改结束") {
+                        rqUrl = '/HiddenTroubleManage/HTBaseInfo/DoneForm?keyValue=' + appId + '&actiontype=view';
+                    }
+                    dialogOpen({
+                        id: 'HidForm',
+                        title: title,
+                        url: rqUrl,
+                        width: ($(top.window).width() - 100) + "px",
+                        height: ($(top.window).height() - 100) + "px",
+                        btn: null
+                    });
+                    break;
+                case "wz":
+                    title = "查看违章";
+                    //未整改隐患的查看页面
+                    if (appstate == "违章登记" || appstate == "违章举报") {
+                        rqUrl = '/LllegalManage/LllegalRegister/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "违章核准" || appstate == "违章审核") {
+                        rqUrl = '/LllegalManage/LllegalApprove/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "制定整改计划") {
+                        rqUrl = '/LllegalManage/LllegalPlanReform/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "违章整改") {
+                        rqUrl = '/LllegalManage/LllegalReform/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "违章验收") {
+                        rqUrl = '/LllegalManage/LllegalAccept/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "验收确认") {
+                        rqUrl = '/LllegalManage/LllegalConfirm/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else {
+                        if (addType == "0") {
+                            rqUrl = '/LllegalManage/LllegalConfirm/Form?keyValue=' + appId + '&actiontype=view';
+                        }
+                        else  //已整改的查看页面
+                        {
+                            title = "已整改违章查看";
+                            rqUrl = '/LllegalManage/LllegalRegister/NewForm?keyValue=' + appId + '&actiontype=view';
+                        }
+                    }
+
+                    dialogOpen({
+                        id: 'LllegalForm',
+                        title: title,
+                        url: rqUrl,
+                        width: ($(top.window).width() - 100) + "px",
+                        height: ($(top.window).height() - 100) + "px",
+                        btn: null
+                    });
+                    break;
+                case "wt":
+                    title = "查看问题";
+                    //未整改隐患的查看页面
+                    if (appstate == "问题登记") {
+                        rqUrl = '/QuestionManage/QuestionInfo/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "问题整改") {
+                        rqUrl = '/QuestionManage/QuestionReform/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else if (appstate == "问题验证") {
+                        rqUrl = '/QuestionManage/QuestionVerify/Form?keyValue=' + appId + '&actiontype=view';
+                    }
+                    else {
+                        rqUrl = '/QuestionManage/QuestionInfo/DoneForm?keyValue=' + appId + '&actiontype=view';
+                    }
+
+                    dialogOpen({
+                        id: 'QuestionForm',
+                        title: title,
+                        url: rqUrl,
+                        width: ($(top.window).width() - 100) + "px",
+                        height: ($(top.window).height() - 100) + "px",
+                        btn: null
+                    });
+                    break;
+            }
+        }
+        else {
+            dialogMsg('当前查看的数据已不存在!', 0);
+        }
+    }
+
+
+</script>
+<div class="center-Panel">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;问题处理情况</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-top: 20px; margin-left:10px;">
+                <table id="gridTable"></table>
+            </div>
+        </div>
+    </div>
+</div>
+

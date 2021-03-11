@@ -1,0 +1,160 @@
+@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var FilesId = request('FilesId');
+    //查看
+    var mode = request('mode');
+    var flag = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+    var back = "1";
+    $(function () {
+        initControl();
+    });
+
+    //初始化控件
+    function initControl() {
+        //应急预案类型
+        $("#EmergencyType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "EmergencyLaw" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "",
+            height: "200px"
+        });
+
+
+        FilesId = FilesId.length == 0 ? "@Guid.NewGuid().ToString()" : FilesId;
+
+        file_upload.init({
+            keyValue: FilesId, fileNumLimit: 1, extensions: 'pdf,doc,docx,zip,rar', isImage: false
+        });
+
+        IsGeneric();
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../SafetyLawManage/EmergencyLaw/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                }
+            })
+        }
+
+        var status = mode == "view" ? false : true;
+        file_upload.bindFiles(status, false, FilesId, "uploader", status);
+
+       
+    }
+
+    //判断是否是通用版 做页面处理
+    function IsGeneric() {
+        $.ajax({
+            url: top.contentPath + '/Desktop/IsGeneric',
+            type: "GET",
+            async: false,
+            dataType: "text",
+            success: function (result) {
+                if (result == "true") {
+                    if (flag != "True") {
+                        $("#Source").val("本单位模板");
+                    }
+                    else {
+                        $("#Source").val("系统内置模板");
+                    }
+                } else {
+                    if (flag != "True") {
+                        $("#Source").val("本电厂模板");
+                    }
+                    else {
+                        $("#Source").val("系统内置模板");
+                    }
+                }
+            }
+        });
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        $("#FilesId").val(FilesId);
+        var postData = $("#form1").formSerialize(keyValue);
+        $.SaveForm({
+            url: "../../SafetyLawManage/EmergencyLaw/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    function callBack(filename, ext) {
+        if (filename != undefined) {
+            if (filename.includes(ext)) {
+                var f = filename.split("." + ext);
+                $("#FileName").val(f[0]);
+            }
+        }
+    }
+
+    function cancelBack() {
+        $("#FileName").val("");
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">文件和资料名称<font face="宋体">*</font></td>
+            <td class="formValue" colspan='3'>
+                <input id="FileName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">应急预案类型<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="EmergencyType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+            <td class="formTitle">来源<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="Source" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly/>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">备注</td>
+            <td class="formValue" colspan='3'>
+                <textarea id="Remark" class="form-control" style="min-height: 80px;" maxlength="125"></textarea>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">文件</td>
+            <td class="formValue" colspan='3'>
+                <input id="FilesId" type="text" hidden="hidden" />
+                <div id="uploader" class="uploader" style="border: 1px solid #ccc; margin-top: 10px; min-height: 100px; margin-bottom: 10px;">
+                    <div class="queueList">
+                        <div id="dndArea" class="placeholder">
+                            <div class="filePicker" style="margin-left: 25px; margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display: none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>

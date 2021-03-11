@@ -1,0 +1,164 @@
+﻿@{
+    ViewBag.Title = "历史记录";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js"></script>
+<script src="~/Content/scripts/business/Grid.js"></script>
+<script>
+    var rolename="@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    //加载页面
+    $(function () {
+        //页面初始化
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 108.5);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../RiskDatabase/RiskAssess/GetAssessHisToryPage",
+            datatype: "json",
+            height: $(window).height() - 173,
+            autowidth: true,
+            colModel: [
+                   {
+                       label: '操作', name: 'Oper', width: 150, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                           var html = "";
+                           if (rolename.indexOf("公司级") >= 0 || rolename.indexOf("厂级") >= 0 || (rolename.indexOf("部门级") >= 0 && rolename.indexOf("负责人") >= 0)) {
+                               html += "<a href=javascript:DelHis('" + rowObject.id + "')  title='删除' style='text-decoration:underline'><i class='fa fa-trash-o'></i></a>";
+                           }
+                           html += "<a href=javascript:DialogOpenShow('/RiskDatabase/RiskAssess/HistoryRecord?historyId=" + rowObject.id +"','查看历史记录','"+($(top.window).width())+"',''," + true + ") style='color:blue; text-decoration:underline'  title='查看'><i class='fa fa-eye'></i></a>";
+                           return html;
+                       }
+                   },
+                { label: '主键', name: 'id', index: 'id', align: 'center', sortable: true, hidden: true },
+                { label: '安全风险清单名称', name: 'hisname', index: 'hisname', align: 'center', sortable: true },
+                {
+                    label: '设为历史记录时间', name: 'createdate', index: 'createdate', align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd hh:mm:ss');
+                    }
+                },
+                { label: '设为历史记录人员', name: 'createusername', index: 'createusername', align: 'center', sortable: true }
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            rownumbers: true,
+            sortname: 'createdate',
+            sortorder: 'desc',
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+      
+      
+       
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ TimeStart: $("#TimeStart").val(), TimeEnd: $("#TimeEnd").val(), DangerSourceName: $("#txtDangerSourceName").val() }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txtDangerSourceName").val(""); $("#TimeStart").val(""); $("#TimeEnd").val("");
+            $gridTable.jqGrid('setGridParam', {
+                postData: { TimeStart: "", TimeEnd: "", DangerSourceName: "" }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    function DelHis(keyValue) {
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../RiskDatabase/RiskAssess/RemoveAssessHistory',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除数据！', 0);
+        }
+    }
+
+</script>
+
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            <tr>
+                <td>查询条件</td>
+                <td style="padding-left: 10px;">
+                    <div class="ui-filter" style="width: 200px;">
+                        <div class="ui-filter-text">
+                            <input id="see" type="hidden" />
+                            请选择过滤条件
+                        </div>
+                        <div class="ui-filter-list" style="width: 350px;">
+                            <table class="form" id="filter-form" style="margin-left:-20%">
+                                <tr>
+                                    <td style="float: right; ">时间范围：</td>
+                                    <td class="formValue">
+                                        <div style="float: left; ">
+                                            <input id="TimeStart" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                                        </div>
+
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="float:right; "></td>
+                                    <td class="formValue">
+                                        <div style="float: left;">
+                                            <input id="TimeEnd" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="float: right; ">清单名称：</td>
+                                    <td class="formValue">
+                                        <input id="txtDangerSourceName" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 180px;" />
+                                    </td>
+                                </tr>
+                            </table>
+                            <div class="ui-filter-list-bottom">
+                                <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+
+
+    <div class="toolbar">
+
+        <div class="btn-group">
+            <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+        </div>
+
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

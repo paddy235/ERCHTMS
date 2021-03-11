@@ -1,0 +1,229 @@
+@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+
+
+<style>
+    .form .formTitle {
+        width: 110px;
+    }
+
+    .form .formValue select {
+        padding: 0px;
+    }
+</style>
+<script>
+    var keyValue = request('keyValue');
+    var mode = request('mode');
+    var riskFlag = false;
+    $.ajaxSetup({
+        async:false
+         });
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        if (mode == "view") {
+            $("#btn_Save,#btn_Submit").attr("style", "display:none");
+            $("#form1 input,textarea,select, .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+        if (mode == "add" || mode == "edit") {
+            riskFlag = true;
+            $("#select,#choose1").removeAttr("disabled");
+        }
+
+        GetRiskGrid();
+        var jsondata = top.Form.window.$("#RiskRecord").val();
+        if (!!jsondata) {
+            var data = eval("(" + jsondata + ")");
+            $("#gridAnalyse")[0].addJSONData(data);
+        }
+
+
+    }
+    //保存表单;
+    function AcceptClick(type) {
+        var $gridTable = $('#gridAnalyse');
+        var risk = $gridTable.jqGrid('getRowData');
+        var arr = [];
+        var flag = false;
+        for (var i = 0; i < risk.length; i++) {
+            var dom = risk[i];
+            if (($.trim($gridTable.find("textarea[name='atrisk']").eq(i).val()).length == 0 || $.trim($gridTable.find("textarea[name='controls']").eq(i).val()).length == 0 ||$.trim($gridTable.find("textarea[name='worktask']").eq(i).val()).length == 0 ||$.trim($gridTable.find("textarea[name='workprocess']").eq(i).val()).length == 0) && !flag) {
+                flag = true;
+            } else {
+                if($.trim($gridTable.find("textarea[name='worktask']").eq(i).val()).length <=500) {
+                    arr.push({
+                        WorkTask:$gridTable.find("textarea[name='worktask']").eq(i).val(),
+                        WorkProcess:$gridTable.find("textarea[name='workprocess']").eq(i).val(),
+                        AtRisk: $gridTable.find("textarea[name='atrisk']").eq(i).val(),
+                        Controls: $gridTable.find("textarea[name='controls']").eq(i).val(),
+                        WorkId: keyValue,
+                        Id: newGuid(),
+                        CreateDate: formatDate(new Date(), "yyyy-MM-dd hh:mm:ss")
+                    });
+                }
+                else
+                {
+                    dialogMsg("工作任务字符过大,不可超过500个字符！", 2);
+                    return false;
+                }
+            }
+        }
+        if (flag) {
+            dialogMsg("工作任务、工序、风险描述和控制措施都不能为空！", 2);
+            return false;
+        }
+        else {
+            json = JSON.stringify(arr);
+            top.Form.window.$("#RiskRecord").val(json);
+            top.layer.close(top.dlgIndex);
+        }
+    }
+
+    //加载作业安全分析
+    function GetRiskGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridAnalyse');
+        $gridTable.jqGrid({
+            url: "../../HighRiskWork/HighRiskCommonApply/GetRiskListJson",
+            postData: { workId: keyValue },
+            datatype: "json",
+            height: "400px",
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 80, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (riskFlag) {
+                            html += "&nbsp;&nbsp;<a href=javascript:delRow('" + rowObject.Id + "',this)  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '工作任务', name: 'WorkTask', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var str = "";
+                        if (!riskFlag) {
+                            str = 'disabled = "disable"';
+                        }
+                        var html = '<textarea type="text"  name="worktask" ' + str + ' role="textbox" maxlength="500" style="width: 100%;height:120px;" class="form-control"';
+                        html += '>' + cellvalue + '</textarea>';
+                        return html;
+                    }
+                },
+                {
+                    label: '工序', name: 'WorkProcess', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var str = "";
+                        if (!riskFlag) {
+                            str = 'disabled = "disable"';
+                        }
+                        var html = '<textarea type="text"  name="workprocess" ' + str + ' role="textbox" maxlength="500" style="width: 100%;height:120px;" class="form-control" >';
+                        if (cellvalue) {
+                            html += cellvalue + '</textarea>';
+                        }
+                        else {
+                            html += '</textarea>';
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '风险描述', name: 'AtRisk', width: 250, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var str = "";
+                        if (!riskFlag) {
+                            str = 'disabled = "disable"';
+                        }
+                        var html = '<textarea type="text"  name="atrisk" ' + str + ' role="textbox" maxlength="500"  style="width: 100%;height:120px;" class="form-control" ';
+                        html += '>' + cellvalue + '</textarea>';
+                        return html;
+                    }
+                },
+                {
+                    label: '风险控制措施', name: 'Controls', width: 200, sortable: false, align: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var str = "";
+                        if (!riskFlag) {
+                            str = 'disabled = "disable"';
+                        }
+                        var html = '<textarea type="text"  name="controls" ' + str + ' role="textbox" maxlength="500" style="width: 100%;height:120px;" class="form-control" ';
+                        html += '>' + cellvalue + '</textarea>';
+                        return html;
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 100000,
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true ,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+
+    //删除数据行
+    function delRow(id, obj) {
+        var jqTable = $("#gridAnalyse");
+        var idx = dialogConfirm("确认删除吗？", function (isSure) {
+            if (isSure) {
+                jqTable.delRowData(jqTable.getGridParam('selrow'));
+                top.layer.close(idx);
+            } else {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //添加行
+    function addItems(obj) {
+        var rowId = $("#gridAnalyse").jqGrid('getRowData').length + 1;
+        $("#gridAnalyse").addRowData(rowId, { ID: newGuid(),WorkTask:"",WorkProcess:"", AtRisk: "", Controls: "" }, "first");
+    }
+
+    //从风险库中选择数据
+    function selRisk() {
+        var worktypevale = top.Form.window.$("#WorkType").attr("data-value");
+        if (!!worktypevale) {
+            dialogOpen({
+                id: 'SelectRisk',
+                title: '选择工作任务',
+                url: '/HighRiskWork/HighRiskCommonApply/Select?worktypevale=' + worktypevale + '&highrisktype=common',
+                width: ($(window).width() - 200) + 'px',
+                height: ($(window).height() - 20) + 'px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick(window.document.body);
+                }
+            })
+        }
+        else {
+            dialogMsg('请先选择作业类型！', 0);
+        };
+    }
+</script>
+<div class="panel panel-default" id="riskAnalyse">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;作业安全分析</strong>
+        <span class="tools pull-right">
+            <a href="javascript:selRisk()" id="select" disabled="disabled" class="btn btn-primary btn-xs">选择工作任务</a>&nbsp;&nbsp;&nbsp;&nbsp;
+            <a href="javascript:addItems(this)" id="choose1" disabled="disabled" class="btn btn-primary btn-xs">新增工作任务</a>&nbsp;&nbsp;&nbsp;&nbsp; <a class="fa fa-chevron-down" title="展开/收起"></a>
+        </span>
+    </div>
+    <div class="panel-body">
+        <table id="gridAnalyse"></table>
+        <div id="AnalysePager"></div>
+    </div>
+</div>

@@ -1,0 +1,617 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+
+
+<script>
+    var orgId = "";
+    var flag = request('flag');
+    if (flag == "proFiles")
+        orgId = request('orgId');
+    else orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    @*var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id*@
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var engineerid = request('engineerid');
+    var contractid = request('contractid'); //关联ID
+    var username = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    var orgIddept = top.currUserOrgId;
+    var enTemName = '';
+    var kbsVersion = 0; //0:非康巴什 1:康巴什
+    $(function () {
+        GetKBSVersion();
+        loadSendDept(orgIddept);
+        InitProject();
+        initControl();
+        
+       
+
+        //登记
+        $("#btn_Save").click(function () {
+            AcceptClick();
+        });
+
+        //提交流程
+        $("#btn_Submit").click(function () {
+            SubmitAction();
+        });
+
+        //如果是查看记录过来的请求，隐藏当前的历史记录
+        if (!!contractid) {
+            $("#historyRecord").css("display", "none");
+        }
+    });
+
+    // 判断是否康巴什版本
+    function GetKBSVersion() {
+        $.ajax({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson?EnCode=KbsManage",
+            type: "GET",
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                if (data.length == 0) {
+                    kbsVersion = 0;
+                    $('#belongkbs').hide();
+                    
+                } else {
+                    kbsVersion = 1;
+                    
+                    
+                }
+
+            }
+        })
+    }
+    
+    //初始化控件
+    function initControl() {
+        //查看
+        if (actiontype == "view") {
+            $("#organizerBtn").css("display", "none");
+            $("#btn_Save").css("display", "none");
+            $("#btn_Submit").css("display", "none");
+            $(".center-Panel").removeAttr("style");
+            $(".form-button").css("display", "none");
+            $("#form1 input,textarea , .ui-select, .ui-select-text , .ui-select-option-content").each(function (ele, index) {
+                $(this).attr("disabled", "disabled");
+            });
+        }
+
+
+        var isDel = actiontype == "view" ? false : true;
+        //工程类型
+        $("#ENGINEERTYPE").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ProjectType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        ////所属区域
+        //$("#ENGINEERAREA").ComboBoxTree({
+        //    url: "../../BaseManage/District/GetTreeJson",
+        //    param: { orgID: orgId, areaIds: "", planId: "" },
+        //    id: "DistrictID",
+        //    text: "DistrictName",
+        //    description: "==请选择==",
+        //    height: "200px"
+        //});
+        //风险等级
+        $("#ENGINEERLEVEL").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "ProjectLevel" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        $("#BELONGMAJOR").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "BelongMajor" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        //工程
+        //$("#ENGINEERID").ComboBox({
+        //    url: "../../OutsourcingProject/Outsouringengineer/GetEngineerDataByCurrdeptId?mode=006",
+        //    id: "engineerid",
+        //    text: "engineername",
+        //    description: "==请选择==",
+        //    height: "200px",
+        //    allowSearch: true
+        //}).bind("change", function () {
+        //    var sel = $(this).attr('data-value');
+        //    if (!!sel) {
+        //        GetEngineerInfo($(this).attr('data-value'));
+        //    }
+        //});
+        var now = new Date();
+        var time = now.getFullYear() + "-" + ((now.getMonth() + 1) < 10 ? "0" : "") + (now.getMonth() + 1) + "-" + (now.getDate() < 10 ? "0" : "") + now.getDate();
+        $("#SUBMITDATE").val(time);
+        $("#SUBMITPERSON").val(username);
+        //获取表单
+        if (!!keyValue) {
+            //当前详情
+            var formUrl = "../../OutsourcingProject/SchemeMeasure/GetFormJson";
+            //历史记录
+            if (!!contractid) {
+                var formUrl = "../../OutsourcingProject/SchemeMeasure/GetHistoryFormJson";
+            }
+            $.SetForm({
+                url: formUrl,
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#EngAreaName").val(data.ENGINEERAREANAME);
+                    $("#ENGINEERLETDEPTID").ComboBoxTreeSetValue(data.ENGINEERLETDEPTID);
+                    $("#BELONGDEPTID").ComboBoxTreeSetValue(data.BELONGDEPTID);
+                    if (data.SummitContent != null && data.SummitContent != undefined) {
+                        $("#SummitContent").val(data.SummitContent);
+                        
+                 
+                        $("#SummitContent").find("option").each(function (i, dom) {
+                            if (data.SummitContent.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+                    }
+                }
+            })
+        }
+        keyValue = keyValue.length == 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+        //方案措施附件
+        file_upload.init({
+            keyValue: keyValue, extensions: '', isImage: false, el: '#uploader', multiple: true
+        });
+
+        file_upload.bindFiles(isDel, false, keyValue, "uploader", isDel);
+        if (engineerid != null && engineerid != "") {
+            $("#ENGINEERID").attr("readonly", "readonly");
+            GetEngineerInfo(engineerid);
+        }
+    }
+    //获取工程详情
+    function GetEngineerInfo(id) {
+        $.SetForm({
+            url: "../../OutsourcingProject/ToolsCheckMain/GetOutsouringengineerByID",
+            param: { keyValue: id },
+            success: function (data) {
+                $("#form1").formDeserialize(data);
+                if (data != null) {
+                    $("#PROJECTID").val(data.ID);
+                    $("#ENGINEERLETDEPTID").attr("disabled", "disabled");
+                    $("#EngAreaName").attr("disabled", "disabled");
+                    $("#ENGINEERTYPE").attr("disabled", "disabled");
+                    $("#ENGINEERLEVEL").attr("disabled", "disabled");
+                    $("#ENGINEERCONTENT").attr("disabled", "disabled");
+                    $("#ENGINEERCODE").attr("disabled", "disabled");
+                    //$("#ENGINEERID").ComboBoxSetValue(data.ID);
+                }
+            }
+        })
+    }
+
+
+    //获取历史记录信息
+    function GetHistoryInfo() {
+        dialogOpen({
+            id: 'HistoryIndexFrm',
+            title: '查看历史记录信息',
+            url: '/OutsourcingProject/SchemeMeasure/HistoryIndex?contractid=' + keyValue,
+            width: ($(top.window).width() - 150) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+
+        if ($.trim($("#ENGINEERNAME").val()).length == 0) {
+            $("#ENGINEERNAME").attr("isvalid", "yes");
+            $("#ENGINEERNAME").attr("checkexpession", "NotNull");
+        }
+        if (!$('#form2').Validform()) {
+            return false;
+        }
+
+        var ENGINEERNAME = $("#ENGINEERNAME").val();
+        if (ENGINEERNAME.length == 0 || ENGINEERNAME == null || ENGINEERNAME == undefined) {
+            ValidationMessage($("#ENGINEERNAME"), "值不能为空");
+            return false;
+        }
+        //判断是否上传附件
+        //if (!($("#uploader .queueList .filelist").find("tr").length > 1)) {
+        //    dialogMsg('请先上传附件！', 0);
+        //    return false;
+        //}
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["ENGINEERLETDEPT"] = $("#ENGINEERLETDEPTID").attr("data-text");
+        postData["ENGINEERLETDEPTCODE"] = $("#ENGINEERLETDEPTID").attr("data-code");
+
+        postData["BELONGDEPTNAME"] = $("#BELONGDEPTID").attr("data-text");
+        postData["BELONGCODE"] = $("#BELONGDEPTID").attr("data-code");
+
+        postData["ENGINEERAREANAME"] = $("#EngAreaName").val();
+        postData["SummitContent"] = $(".filter-option").text().replace("请选择", "");
+        $.SaveForm({
+            url: "../../OutsourcingProject/SchemeMeasure/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+
+    //提交到审核
+    function SubmitAction() {
+
+        if ($.trim($("#ENGINEERNAME").val()).length == 0) {
+            $("#ENGINEERNAME").attr("isvalid", "yes");
+            $("#ENGINEERNAME").attr("checkexpession", "NotNull");
+        }
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        //判断是否上传附件
+        if (!($("#uploader .queueList .filelist").find("tr").length > 1)) {
+            dialogMsg('请先上传附件！', 0);
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["ENGINEERLETDEPT"] = $("#ENGINEERLETDEPTID").attr("data-text");
+        postData["ENGINEERLETDEPTCODE"] = $("#ENGINEERLETDEPTID").attr("data-code");
+        postData["BELONGDEPTNAME"] = $("#BELONGDEPTID").attr("data-text");
+        postData["BELONGCODE"] = $("#BELONGDEPTID").attr("data-code");
+        postData["ENGINEERAREANAME"] = $("#EngAreaName").val();
+        $.SaveForm({
+            url: "../../OutsourcingProject/SchemeMeasure/SubmitForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    //选择提交人
+    function setValue() {
+        selectUser({ deptId: "", checkMode: 0, mode: 2, winObject: document.body, domId: 'SUBMITPERSON' });
+    }
+    //选择编制人
+    function setOrgValue() {
+        selectUser({
+            deptId: "", checkMode: 1, mode: 2, winObject: document.body, domId: 'ORGANIZER', callBack(userNames, userAccounts, deptCodes, deptNames, deptIds) {
+                if (userNames.indexOf(",") == -1) {
+                    $("#BELONGDEPTID").ComboBoxTreeSetValue(deptIds);
+                }
+            }
+        });
+    }
+
+
+    function InitProject() {
+        var select = $(".ENGINEERNAME");
+        select.html('');
+        select.append('<option value="">请输入外包工程或选择</option>');
+        $('.ENGINEERNAME').comboSelect();
+        $.ajax({
+            url: "../../OutsourcingProject/Outsouringengineer/GetEngineerDataByCurrdeptId?mode=006",
+            type: "GET",
+            //data: { orgCode: orgCode },
+            dataType: "JSON",
+            async: false,
+            success: function (data) {
+                select.html('');
+                select.append('<option value="">请输入外包工程或选择</option>');
+                if (data) {
+                    for (var i = 0; i < data.length; i++) {
+                        select.append('<option value="' + data[i].engineerid + '">' + data[i].engineername + '</option>');
+                    }
+                }
+                //解决控件重新渲染 input id取不到的问题
+                if (!$(".ENGINEERNAME").attr("id")) {
+                    $(".ENGINEERNAME").attr("id", "ENGINEERNAME");
+                }
+                $('.ENGINEERNAME').comboSelect();
+                // 判断权限是否可以填写
+                //$('#ENGINEERNAME').attr('readonly', 'readonly');
+
+                
+            }
+        })
+        
+        $('#ENGINEERNAME').bind("change", function () {
+            //console.log($('#ENGINEERNAME').val())
+            enTemName = $('#ENGINEERNAME').val();
+            $("#ENGINEERLEVEL").attr("data-text", "一级安全风险");
+            $("#ENGINEERLEVEL").attr("data-value", "001");
+            $("#ENGINEERLEVEL div:eq(0)").text("一级安全风险");
+
+
+            $("#ENGINEERLETDEPTID").attr("data-text", "==请选择==");
+            $("#ENGINEERLETDEPTID").attr("data-value", "");
+            $("#ENGINEERLETDEPTID div:eq(0)").text("==请选择==");
+            $("#ENGINEERLETDEPTID").attr("disabled", false);
+            $("#ENGINEERCODE").val("");
+            $("#ENGINEERCODE").attr("disabled", false);
+
+            $('#EngAreaName').val("");
+            $('#ENGINEERAREA').val("");
+            $("#EngAreaName").attr("disabled", false);
+
+            $("#ENGINEERTYPE").attr("data-text", "==请选择==");
+            $("#ENGINEERTYPE").attr("data-value", "");
+            $("#ENGINEERTYPE div:eq(0)").text("==请选择==");
+            $("#ENGINEERTYPE").attr("disabled", false);
+
+            $("#ENGINEERLEVEL").attr("data-text", "一级安全风险");
+            $("#ENGINEERLEVEL").attr("data-value", "001");
+            $("#ENGINEERLEVEL div:eq(0)").text("一级安全风险");
+            $("#ENGINEERLEVEL").attr("disabled", false);
+
+            $("#ENGINEERCONTENT").val("");
+            $("#ENGINEERCONTENT").attr("disabled", false);
+        });
+        if (actiontype == "approve" || actiontype == "view") {
+            $('.combo-dropdown').hide();
+            $('#ENGINEERNAME').attr('disabled','disabled');
+        }
+    }
+
+    //发包部门+用工部门
+    function loadSendDept(orgid) {
+        //发包部门
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 44
+            }
+        );
+        $("#ENGINEERLETDEPTID").ComboBoxTree({
+            url: "../../BaseManage/Department/GetDepartTreeJson",
+            param: { json: json },
+            id: "DepartmentId",
+            text: "FullName",
+            description: "==请选择==",
+            height: "200px"
+        }).bind("change", function () {
+            var value = $(this).attr('data-value');
+            if (value == "" || value == null || value == undefined) {
+                return;
+            }
+
+        });
+
+        $("#BELONGDEPTID").ComboBoxTree({
+            url: "../../BaseManage/Department/GetDepartTreeJson",
+            param: { json: json },
+            id: "DepartmentId",
+            text: "FullName",
+            description: "==请选择==",
+            height: "200px"
+        }).bind("change", function () {
+            var value = $(this).attr('data-value');
+            if (value == "" || value == null || value == undefined) {
+                return;
+            }
+
+        });
+
+    }
+
+
+    function proChange(obj) {
+
+        var projectid = $(obj).val();
+        if (projectid != "" && projectid != null && projectid != undefined) {
+            enTemName = "";
+            $.SetForm({
+                url: "../../OutsourcingProject/Outsouringengineer/GetFormJson",
+                param: { keyValue: projectid },
+                success: function (data) {
+                    $("#form1").formDeserialize(data.data);
+                    $("#ENGINEERLETDEPTID").attr("disabled", "disabled");
+                    $("#EngAreaName").attr("disabled", "disabled");
+                    $("#ENGINEERTYPE").attr("disabled", "disabled");
+                    $("#ENGINEERLEVEL").attr("disabled", "disabled");
+                    $("#ENGINEERCONTENT").attr("disabled", "disabled");
+                    $("#ENGINEERCODE").attr("disabled", "disabled");
+                }
+            })
+        } else {
+            $('#ENGINEERNAME').val(enTemName);
+            $("#ENGINEERCODE").val("");
+            $("#ENGINEERCODE").attr("disabled", false);
+            $("#ENGINEERLETDEPTID").attr("data-text", "==请选择==");
+            $("#ENGINEERLETDEPTID").attr("data-value", "");
+            $("#ENGINEERLETDEPTID div:eq(0)").text("==请选择==");
+            $("#ENGINEERLETDEPTID").attr("disabled", false);
+
+
+            $('#EngAreaName').val("");
+            $('#ENGINEERAREA').val("");
+            $("#EngAreaName").attr("disabled", false);
+
+            $("#ENGINEERTYPE").attr("data-text", "==请选择==");
+            $("#ENGINEERTYPE").attr("data-value", "");
+            $("#ENGINEERTYPE div:eq(0)").text("==请选择==");
+            $("#ENGINEERTYPE").attr("disabled", false);
+
+            $("#ENGINEERLEVEL").attr("data-text", "一级安全风险");
+            $("#ENGINEERLEVEL").attr("data-value", "001");
+            $("#ENGINEERLEVEL div:eq(0)").text("一级安全风险");
+            $("#ENGINEERLEVEL").attr("disabled", false);
+
+            $("#ENGINEERCONTENT").val("");
+            $("#ENGINEERCONTENT").attr("disabled", false);
+  
+        }
+
+        if ($(".ENGINEERNAME").val() != "" && $(".ENGINEERNAME").val() != null && $(".ENGINEERNAME").val() != undefined) {
+            $('#PROJECTID').val($(".ENGINEERNAME").val());
+        } else {
+            $('#PROJECTID').val('');
+        }
+    }
+</script>
+<div class="center-Panel" style="margin-top:42px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;工程基本信息&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#" id="historyRecord" style="font-weight: bold;" onclick="GetHistoryInfo()" class="btn btn-primary btn-xs">历史记录信息</a></strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form" id="form2">
+                    <tr>
+                        <td class="formTitle">外包工程<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <select id="ENGINEERNAME" class="ENGINEERNAME" onchange="proChange(this)"></select>
+
+                            @*<div id="ENGINEERID" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style=""></div>*@
+                        </td>
+                        <td class="formTitle">工程编号</td>
+                        <td class="formValue">
+                            <input id="ENGINEERCODE" type="text" class="form-control"  />
+                            
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工程类型</td>
+                        <td class="formValue">
+                            <div id="ENGINEERTYPE" type="select" class="ui-select" @*isvalid="yes" checkexpession="NotNull"*@></div>
+                        </td>
+                        <td class="formTitle">所属区域</td>
+                        <td class="formValue">
+                            @*<input id="EngAreaName" type="text" readonly="readonly" class="form-control" />*@
+                            @*<div id="ENGINEERAREA" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" readonly></div>*@
+                            <input id="EngAreaName" type="text" length="300" class="form-control" @*isvalid="yes" checkexpession="LenStr"*@ placeholder="请选择区域" readonly onclick="selectMulArea(window.document.body, 'EngAreaName,,ENGINEERAREA','ENGINEERAREA');" />
+                            <input id="ENGINEERAREA" type="hidden" class="form-control" />
+
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工程风险等级<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="ENGINEERLEVEL" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                        </td>
+                        <td class="formTitle">责任部门<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            @*<input id="ENGINEERLETDEPT" type="text" class="form-control" />*@
+                            <div id="ENGINEERLETDEPTID" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">工程内容</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="ENGINEERCONTENT" class="form-control" style="height: 120px;"></textarea>
+                        </td>
+                    </tr>
+
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default" id="panel2">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;方案措施信息（施工方案、应急预案、安全措施、组织措施、技术措施、其他方案）</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-top: 5px; margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">编制人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ORGANIZER" placeholder="请输入编制人或选择" onchange="" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" ondblclick="setOrgValue()" />
+                        </td>
+                        <td class="formTitle">编制时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ORGANIZTIME" type="text" class="form-control" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" checkexpession="NotNull" />
+                            <input type="hidden" id="PROJECTID" />
+                        </td>
+
+                    </tr>
+                    <tr id="belongkbs">
+                        <td class="formTitle">所属专业<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="BELONGMAJOR" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                        </td>
+                        <td class="formTitle">所属部门<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <div id="BELONGDEPTID" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td class="formTitle">提交人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SUBMITPERSON" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="setValue()" />
+                        </td>
+                        <td class="formTitle">提交时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SUBMITDATE" type="text" class="form-control" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" checkexpession="NotNull" />
+                            @*<input type="hidden" id="PROJECTID" />*@
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">提交内容</td>
+                        <td class="formValue">
+                            <select id="SummitContent" class="form-control selectpicker show-menu-arrow" multiple placeholder="请选择提交内容">
+                                @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("SummitContent"))
+                            </select>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td class="formTitle">附件信息</td>
+                        <td class="formValue" colspan="3">
+                            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="uploaderFile" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <a id="btn_Save" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+    &nbsp;&nbsp;
+    <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+    &nbsp;&nbsp;
+</div>

@@ -1,0 +1,216 @@
+﻿@{
+    ViewBag.Title = "CaseList";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+
+<script>
+
+    var code = request('code');
+    var caseType = request('caseType');
+    var st = request('st');
+    var et = request('et');
+    var keyword = request('keyword');
+    var type = request("type");
+    var year = request("year");
+    var month = request("month");
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var url = "";
+    $(function () {
+        GetGrid();
+    });
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        switch (caseType) {
+            case "1":
+                caseType = "";
+                break;
+            case "2":
+                caseType = "正在施工";
+                break;
+            case "3":
+                caseType = "未施工";
+                break;
+            case "4":
+                caseType = "已完工";
+                break;
+            default:
+                break;
+        }
+        var queryJson = JSON.stringify({
+            code: code,
+            st: st,
+            et: et,
+            keyword: keyword,
+            casetype: caseType,
+            type: type,
+            year: year,
+            month: month
+        })
+        if (rolename.includes("省级用户")) {
+            url = "../../EngineeringManage/PerilEngineering/GetPageListJsonForSJ";
+        }
+        else {
+            url = "../../EngineeringManage/PerilEngineering/GetPageListJson";
+        }
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: url,
+            postData: { queryJson: queryJson },
+            datatype: "json",
+            colModel: [
+                  {
+                      label: '操作', name: 'Oper', width: 80, align: 'center', sortable: false,
+                      formatter: function (cellvalue, options, rowObject) {
+                          var html = "";
+                          html += "<a href=javascript:show()  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                          return html;
+                      }
+
+                  },
+                { label: '工程名称', name: 'engineeringname', width: 200, align: 'center', sortable: true },
+                {
+                    label: '工程类别', name: 'engineeringtype', width: 150, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return loadType(cellvalue);
+                    }
+                },
+                { label: '所属单位', name: 'belongdeptname', width: 150, align: 'center', sortable: true },
+                {
+                    label: '单位类别', name: 'unittype', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == "1") {
+                            var process = "单位内部";
+                        }
+                        else {
+                            var process = "外包单位";
+                        }
+                        return process;
+                    }
+                },
+                {
+                    label: '开始时间', name: 'estarttime', width: 100, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '结束时间', name: 'efinishtime', width: 100, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '施工方案', name: 'constructfiles', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return loadFile(cellvalue);
+                    }
+                },
+                {
+                    label: '安全技术交底', name: 'taskfiles', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return loadFile(cellvalue);
+                    }
+                },
+                {
+                    label: '进展情况', name: 'evolvecase', width: 100, align: 'center', sortable: false
+                },
+                { label: '主键', name: 'id', width: 10, align: 'left', hidden: true },
+                { label: '文件主键1', name: 'constructfiles', width: 10, align: 'left', hidden: true },
+                { label: '文件主键2', name: 'taskfiles', width: 10, align: 'left', hidden: true }
+
+            ],
+            viewrecords: true,
+            rowNum: 10,
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+        });
+    }
+
+    //加载附件
+    function loadFile(cellvalue) {
+        $.ajax({
+            url: '../../SaftProductTargetManage/SafeProductDutyBook/GetFiles',
+            data: { fileId: cellvalue },
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                if (result == "" || result == undefined || result == null) {
+                    cellvalue = "&nbsp;&nbsp;无";
+                }
+                else {
+                    cellvalue = "<a href=javascript:funcAction('" + cellvalue + "') style='color:blue; text-decoration:underline'  title='查看文件'>有</a>";
+                }
+            }
+        });
+        return cellvalue;
+    }
+
+    //加载工程类别
+    function loadType(cellvalue) {
+        $.ajax({
+            url: '../../EngineeringManage/EngineeringSetting/GetFormJson',
+            data: { keyValue: cellvalue },
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                if (result != null && result != undefined) {
+                    cellvalue = result.ProgrammeCategory;
+                }
+                else {
+                    cellvalue = "";
+                }
+            }
+        });
+        return cellvalue;
+    }
+
+    //文件显示
+    function funcAction(a) {
+        var idx = dialogOpen({
+            id: "Form1",
+            title: "查看文件",
+            url: '/EngineeringManage/PerilEngineering/Files?filesid=' + a,
+            width: "500px",
+            height: "400px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+
+    //查看详情
+    function show() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        var constructfiles = $('#gridTable').jqGridRowValue('constructfiles');
+        var taskfiles = $('#gridTable').jqGridRowValue('taskfiles');
+        var idx = dialogOpen({
+            id: "Form1",
+            title: "查看危险性较大工程",
+            url: '/EngineeringManage/PerilEngineering/Form?keyValue=' + keyValue + "&ConstructFiles=" + constructfiles + "&TaskFiles=" + taskfiles + "&mode=view",
+            width: "900px",
+            height: ($(top.window).height() - 100) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+</script>
+<div class="titlePanel" style="height: 40px;">
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

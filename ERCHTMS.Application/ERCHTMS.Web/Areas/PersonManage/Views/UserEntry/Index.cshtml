@@ -1,0 +1,668 @@
+﻿@using ERCHTMS.Busines.OccupationalHealthManage
+@{
+    ViewBag.Title = "用户管理";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+    var di = new ERCHTMS.Busines.SystemManage.DataItemDetailBLL();
+}
+<script type="text/javascript">
+    var deptId = "";
+    var apiUrl ="@di.GetItemValue("WebApiUrl", "AppSettings")";
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid1();
+        GetGrid();
+        GetGrid2();
+    });
+    function setStatus(mode) {
+        if (mode == 0) {
+            $(".ui-layout-west").css({ left: "0px", display: "block"});
+            $(".ui-layout-center").css({ left: $(".ui-layout-west").width() + 5, width: $(window).width() - $(".ui-layout-west").width() - 10 });
+            if ($(".ui-jqgrid-btable").length > 0) {
+                $('.ui-jqgrid-btable').setGridWidth(($('.ui-layout-center').width() - 30));
+            }
+
+        } else {
+            $(".ui-layout-west").css({ left: "-185px",display:"none" });
+            $(".ui-layout-center").css({ left: "35px", width: $(window).width() - 40 });
+            if ($(".ui-jqgrid-btable").length > 0) {
+                $('.ui-jqgrid-btable').setGridWidth(($('.ui-layout-center').width() - 30));
+            }
+        }
+
+    }
+    //初始化页面
+    function InitialPage() {
+        $(".nav-tabs li").click(function () {
+            var index = $(this).index();
+            if (index == 0) {
+                setStatus(0);
+            } else {
+                setStatus(1);
+            }
+        });
+        $.get("GetTrainProjects", function (data) {
+            var json = $.parseJSON(data);
+            if (json.type==1) {
+                $("#selProject").ComboBox({
+                    id: "projectId",
+                    text: "projectName",
+                    description: "==请选择==",
+                    height: "200px",
+                    allowSearch: true,
+                    data: json.data
+                });
+            }
+        });
+        $.get("GetGJXBoxes", function (data) {
+            var json = $.parseJSON(data);
+            if (json.type == 1) {
+                var data = json.resultdata;
+                $("#selSno").ComboBox({
+                    id: "deviceno",
+                    text: "deviceno",
+                    description: "==请选择==",
+                    height: "200px",
+                    allowSearch: true,
+                    data: data
+                });                data.push({ deviceno: "培训平台", sno:"PX001"});                $("#selSource").ComboBox({
+                    id: "sno",
+                    text: "deviceno",
+                    description: "==请选择==",
+                    height: "200px",
+                    allowSearch: true,
+                    data: data
+                });
+            }
+        });
+        
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('#gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 210);
+
+                $('#gridTable1').setGridWidth(($('#gridPanel1').width()));
+                $("#gridTable1").setGridHeight($(window).height() - 210);
+
+                $("#itemTree").setTreeHeight($(window).height()-55);
+            }, 200);
+            e.stopPropagation();
+        });
+       
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 400
+            }
+        );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                deptId = item.id;
+                $('#btn_Search1').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    //已推送的人员数据，来自双控历史记录表
+    function GetGrid2() {
+
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable2');
+        $gridTable.jqGrid({
+            url: "../../PersonManage/UserEntry/GetPushRecordPageList",
+            postData: { queryJson: JSON.stringify({ deptId: deptId }) },
+            datatype: "json",
+            height: $(window).height() - 250,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'userid', hidden: true },
+                {
+                    label: '姓名', name: 'username', index: 'username', width: 100, align: 'center'
+                },
+                {
+                    label: '性别', name: 'sex', index: 'sex', width: 45, align: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var len = rowObject.idcard.length;
+                        if (rowObject.idcard.length == 15 || rowObject.idcard.length == 18) {
+                            var sex = rowObject.idcard.substring(len - 2, len - 1);
+                            if (sex % 2 == 0) {
+                                return "女";
+                            }
+                            else {
+                                return "男";
+                            }
+                        }
+                        else {
+                            return "";
+                        }
+                    }
+                },
+                {
+                    label: '证件号', name: 'idcard', width: 140, align: 'center' 
+                },
+                {
+                    label: '单位', name: 'unitname', index: 'unitname', width: 150, align: 'center'
+
+                },
+                {
+                    label: '部门', name: 'deptname', index: 'deptname', width: 120, align: 'center'
+
+                },
+                { label: '岗位', name: 'postname', index: 'postname', width: 90, align: 'center' },
+                { label: '工种', name: 'worktype', index: 'worktype', width: 120, align: 'center' } ,
+                { label: '同步时间', name: 'time', index: 'time', align: 'center' }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            pager: "#gridPager2",
+            sortname: 'time',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+
+            },
+            gridComplete: function () {
+                $gridTable.setGridWidth(($('.tab-content').width() - 10));
+            }
+        });
+        //$gridTable.authorizeColModel()
+        //查询条件
+        $("#queryCondition2 .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition2 .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search2").click(function () {
+            var source = $("#selSource").ComboBoxGetValue() == undefined ? "" : $("#selSource").ComboBoxGetValue();
+            var queryJson = {
+                source:source,
+                condition: $("#queryCondition2").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword2").val())
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll2").click(function () {
+            $("#selSource").find('.ui-select-text').html('请选择');
+            $("#txt_Keyword2").val("");
+            var queryJson = {
+                source:'',
+                condition: '',
+                keyword: ''
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword2').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search2').trigger("click");
+            }
+        });
+    }
+    //从培训平台获取数据
+    function GetGrid1() {
+
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable1');
+        $gridTable.jqGrid({
+            url: "../../PersonManage/UserEntry/GetTrainUsersPageList",
+            postData: { queryJson: JSON.stringify({ deptId: deptId }) },
+            datatype: "json",
+            height: $(window).height() - 250,
+            autowidth: true,
+            colModel: [
+              
+                {
+                    label: '姓名', name: 'userName', width: 100, align: 'center', sortable: false
+                },
+                {
+                    label: '性别', name: 'sex', index: 'sex', width: 45, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue != null) {
+                            if (cellvalue.length > 0) {
+                                return cellvalue == "1" ? "男" : "女";
+                            }
+                        }
+                        return "";
+                    }
+                },
+                {
+                    label: '证件号', name: 'idNumber', width: 140, align: 'center', sortable: false
+                     
+                },
+                { label: '账号', name: 'userAccount', index: 'userAccount', width: 90, align: 'center', sortable: false },
+                {
+                    label: '单位', name: 'companyName', index: 'companyName', width: 150, align: 'center', sortable: false
+
+                },
+                {
+                    label: '部门', name: 'deptName', index: 'deptName', width: 120, align: 'center', sortable: false
+
+                },
+                { label: '岗位', name: 'station', index: 'station', width: 90, align: 'center', sortable: false },
+                { label: '工种', name: 'category', index: 'category', width: 120, align: 'center', sortable: false },
+                { label: '培训项目', name: 'projectName', index: 'projectName', width: 120, align: 'center', sortable: false },
+                {
+                    label: '培训时间', name: 'projectTime', index: 'projectTime', width: 150, align: 'center', sortable: false
+                    
+                },
+                {
+                    label: '成绩', name: 'examScore', index: 'examScore', align: 'center'
+
+                }
+
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            multiboxonly: false,
+            multiselect: true,
+            pager: "#gridPager1",
+            sortname: 'projectname',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+
+            },
+            gridComplete: function () {
+                $gridTable.setGridWidth(($('.tab-content').width() - 10));
+            }
+        });
+        //$gridTable.authorizeColModel()
+        //查询条件
+        $("#queryCondition1 .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition1 .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search1").click(function () {
+            var projectId = $("#selProject").ComboBoxGetValue() == undefined ? "" : $("#selProject").ComboBoxGetValue();
+            var queryJson = {
+                deptId: deptId,
+                projectId: projectId,
+                condition: $("#queryCondition1").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword1").val())
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll1").click(function () {
+            $("#selProject").find('.ui-select-text').html('请选择');
+            $("#txt_Keyword1").val("");
+            var queryJson = {
+                projectId:'',
+                condition: '',
+                keyword: ''
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword1').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search1').trigger("click");
+            }
+        });
+    }
+
+    //获取工具箱的培训数据（来自消息队列并同步接收数据存在双控平台）
+    function GetGrid() {
+      
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            url: "../../PersonManage/UserEntry/GetGJXTrainUsersPageList",
+            postData: { queryJson: JSON.stringify({ deptId: deptId}) },
+            datatype: "json",
+            height:$(window).height()-250,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'userid', hidden: true }, { label: 'account', name: 'account', hidden: true },
+                {
+                    label: '工具箱编号', name: 'deviceno', index: 'deviceno', width: 100, align: 'center'
+                },
+                {
+                    label: '姓名', name: 'username', index: 'username', width: 100, align: 'center'
+                },
+                {
+                    label: '性别', name: 'sex', index: 'sex', width: 45, align: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        var len = rowObject.idcard.length;
+                        if (rowObject.idcard.length == 15 || rowObject.idcard.length == 18) {
+                            var sex = rowObject.idcard.substring(len - 2, len-1);
+                            if (sex % 2 == 0) {
+                                return "女";
+                            }
+                            else {
+                                return "男";
+                            }
+                        }
+                        else {
+                            return "";
+                        }
+                    }
+                },
+                {
+                    label: '证件号', name: 'idcard', width: 140, align: 'center' 
+                },
+             
+                {
+                    label: '单位', name: 'unitname', index: 'unitname', width: 150, align: 'center'
+
+                },
+                {
+                    label: '部门', name: 'deptname', index: 'deptname', width: 120, align: 'center'
+
+                },
+                { label: '岗位', name: 'postname', index: 'postname', width: 90, align: 'center' },
+                { label: '工种', name: 'worktype', index: 'worktype', width: 120, align: 'center' },
+                { label: '培训项目', name: 'projectname', index: 'projectname', width: 120, align: 'center' },
+                {
+                    label: '培训时间', name: 'starttime', index: 'starttime', width: 150, align: 'center', sortable: false
+                    , formatter: function (cellvalue, options, rowObject) {
+                        return cellvalue + "至" + rowObject.endtime;
+                    }
+                },
+                {
+                    label: '成绩', name: 'score', index: 'score', align: 'center'
+                    , formatter: function (cellvalue, options, rowObject) {
+                        return cellvalue == -1 ? "无考试" : cellvalue;
+                    }
+
+                }
+                
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            multiboxonly: false,
+            multiselect: true,
+            pager: "#gridPager",
+            sortname: 'projectname',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+              
+            },
+            gridComplete: function () {
+                $gridTable.setGridWidth(($('.tab-content').width() - 10));
+            }
+        });
+        //$gridTable.authorizeColModel()
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var sno = $("#selSno").ComboBoxGetValue() == undefined ? "" : $("#selSno").ComboBoxGetValue();
+            var queryJson = {
+                sno: sno,
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $.trim($("#txt_Keyword").val())
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#selSno").find('.ui-select-text').html('请选择');
+            $("#txt_Keyword").val("");
+            var queryJson = {
+                sno:'',
+                condition: '',
+                keyword: ''
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    }
+ 
+    //推送用户到海康平台
+    function syncUsers(mode) {
+        var idx = mode == 0? "1" : "";
+        var fieldName = mode == 0 ? "userAccount" : "account";
+        var accounts = $("#gridTable" + idx).jqGridRowValue(fieldName);
+        if (accounts.length == 0) {
+            dialogAlert("请至少选择一条记录！", 0);
+            return false;
+        }
+        else {
+            top.Loading(true, "正在操作,请稍候……");
+            $.post(apiUrl + "/synctrain/Syncusers?pfrom=" + mode, { accounts: accounts }, function (data) {
+                top.Loading(false);
+                dialogAlert(data.message, 0);
+                if (data.code == 0) {
+                    var queryJson = {
+                        sno: '',
+                        condition: '',
+                        keyword: ''
+                    }
+                    $("#gridTable" + idx).jqGrid('setGridParam', {
+                        postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+                    }).trigger('reloadGrid');
+                }
+            });
+        }
+        
+    }
+ </script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">准入人员信息</div>
+            <ul class="nav nav-tabs">
+                <li class="active"><a href="#pxpt" data-toggle="tab">培训平台</a></li>
+                <li><a href="#gjx" data-toggle="tab">工具箱</a></li>
+                <li><a href="#zrjl" data-toggle="tab">准入记录</a></li>
+            </ul>
+               <div class="tab-content" style="padding-top: 15px;">
+
+                <div id="pxpt" class="tab-pane active">
+                    <div class="titlePanel">
+                        <div class="title-search">
+                            <table>
+                                <tr>
+                                    <td>培训项目</td>
+                                    <td width="250px">
+                                        <div id="selProject" type="select" class="ui-select" >
+
+                                        </div>
+                                    </td>
+                                    <td style="padding-left:5px;">
+                                        <div id="queryCondition1" class="btn-group">
+                                            <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false" data-value="userName">姓名</a>
+                                            <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                            <ul class="dropdown-menu">
+                                                <li><a data-value="userName">姓名</a></li>
+                                                <li><a data-value="deptName">部门</a></li>
+                                                <li><a data-value="station">岗位</a></li>
+                                                <li><a data-value="category">工种</a></li>
+                                                <li><a data-value="idNumber">证件号</a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                    <td style="padding-left: 2px;">
+                                        <input id="txt_Keyword1" type="text" class="form-control" placeholder="请输入关键字" style="width: 100px;" />
+                                    </td>
+                                    <td style="padding-left: 2px;">
+                                        <a id="btn_Search1" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                        <a id="btn_SearchAll1" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                                    </td>
+
+                                </tr>
+                            </table>
+
+                        </div>
+                        <div class="toolbar" style="margin-left:10px; margin-bottom:5px;">
+                            <div class="btn-group">
+                                <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                                <a class="btn btn-default" onclick="syncUsers(0)"> <i class="fa fa-text-height"></i> &nbsp;同步到海康平台</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gridPanel" id="gridPanel1">
+
+                        <table id="gridTable1"></table>
+                        <div id="gridPager1"></div>
+                    </div>
+                </div>
+                <div id="gjx" class="tab-pane">
+                    <div class="titlePanel">
+                        <div class="title-search">
+                            <table>
+                                <tr>
+                                    <td>工具箱编号</td>
+                                    <td width="150px">
+                                        <div id="selSno" type="select" class="ui-select">
+
+                                        </div>
+                                    </td>
+                                    <td style="padding-left:5px;">
+                                        <div id="queryCondition" class="btn-group">
+                                            <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false" data-value="UserName">姓名</a>
+                                            <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                            <ul class="dropdown-menu">
+                                                <li><a data-value="UserName">姓名</a></li>
+                                                <li><a data-value="UnitName">单位</a></li>
+                                                <li><a data-value="WorkType">岗位</a></li>
+                                                <li><a data-value="DeptName">工种</a></li>
+                                                <li><a data-value="IdCard">证件号</a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                    <td style="padding-left: 2px;">
+                                        <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入关键字" style="width: 100px;" />
+                                    </td>
+                                    <td style="padding-left: 2px;">
+                                        <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                        <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                                    </td>
+
+                                </tr>
+                            </table>
+
+                        </div>
+                        <div class="toolbar" style="margin-left:10px; margin-bottom:5px;">
+                            <div class="btn-group">
+                                <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                                <a class="btn btn-default" onclick="syncUsers(1)"> <i class="fa fa-text-height"></i> &nbsp;同步到海康平台</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gridPanel" id="gridPanel">
+                        <table id="gridTable"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                </div>
+                <div id="zrjl" class="tab-pane">
+                    <div class="titlePanel">
+                        <div class="title-search">
+                            <table>
+                                <tr>
+                                    <td>数据来源</td>
+                                    <td width="150px">
+                                        <div id="selSource" type="select" class="ui-select">
+
+                                        </div>
+                                    </td>
+                                    <td style="padding-left:5px;">
+                                        <div id="queryCondition2" class="btn-group">
+                                            <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false" data-value="UserName">姓名</a>
+                                            <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                            <ul class="dropdown-menu">
+                                                <li><a data-value="UserName">姓名</a></li>
+                                                <li><a data-value="UnitName">单位</a></li>
+                                                <li><a data-value="PostName">岗位</a></li>
+                                                <li><a data-value="WorkType">工种</a></li>
+                                                <li><a data-value="IdCard">证件号</a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                    <td style="padding-left: 2px;">
+                                        <input id="txt_Keyword2" type="text" class="form-control" placeholder="请输入关键字" style="width: 100px;" />
+                                    </td>
+                                    <td style="padding-left: 2px;">
+                                        <a id="btn_Search2" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                        <a id="btn_SearchAll2" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                                    </td>
+
+                                </tr>
+                            </table>
+
+                        </div>
+                        <div class="toolbar" style="margin-left:10px; margin-bottom:5px;">
+                            <div class="btn-group">
+                                <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gridPanel" id="gridPane2">
+                        <table id="gridTable2"></table>
+                        <div id="gridPager2"></div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+</div>
+
+
+
+
+
+

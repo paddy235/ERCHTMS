@@ -1,0 +1,1367 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var action = request('action');
+    var kpiid = "";
+    var PunishType = "";
+    var PunishName = "";
+    var PunishNameId = "";
+    var PunishNum = "";
+    var PunishPerformance = "";
+    var deptId = "";
+    var deptName = "";
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName";
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    $(function () {
+        
+        if (action == "show") {
+            $("input").attr("readonly", "readonly");
+            $("input").attr("disabled", "disabled");
+            $("div").attr("disabled", "disabled");
+            $("textarea").attr("disabled", "disabled");
+            top.window.$(".layui-layer-btn0").hide();
+            $("#addkhobject").hide();
+            $("#addrelateobject").hide();
+            $("#yhtz").hide();
+        }
+        ComBoxForData("PunishType", "AEM_WSSJTYPE");
+        initControl();
+        GetApproveGrid();
+    });
+
+
+    //初始化控件
+    function initControl() {
+        top.window.$(".layui-layer-btn1").attr("style", "background: #5cb85c;border: 1px solid #4cae4c;color: #fff;");
+        //类型
+        $("#AmerceType").ComboBox({
+            description: "==请选择=="
+        });
+        //公司级用户取机构对象
+        @*if (roleNames.indexOf("公司级用户") >= 0)
+        {
+            deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";  //机构ID
+            deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeName";//机构名称
+        }
+    else {*@
+        deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId"; //部门ID
+        deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName"; //部门ID
+        //}
+        $("#AUDITTIME").val("@DateTime.Now.ToString("yyyy-MM-dd HH:mm")");
+        $("#AUDITPEOPLE").val(userName); //审核人姓名
+        $("#AUDITPEOPLEID").val(userId); //审核人ID
+        $("#AUDITDEPTID").val(deptId); //审核部门ID
+        $("#AUDITDEPT").val(deptName); //审核部门名称
+        $("#panel3 tr").each(function (index, ele) {
+            $(this).css("display", "none");
+        });
+        $("#panel3 tr input").each(function (index, ele) {
+            $(this).val("");
+        });
+        //if (roleNames.indexOf("厂级部门用户") < 0) {
+        //    //$("#sgsjli").hide();
+        //    $("#qtli").hide();
+        //}
+        $('select').comboSelect();
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../SafePunish/Safepunish/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    var punishdata = data.punishdata;
+                    var kpidata = data.kpidata;
+                    $("#panel0").formDeserialize(punishdata);
+                    $(".ExamineType").val(punishdata.ExamineType);
+                    AmerceTypeChange();
+                    PunishTypeChange();
+                    $("#panel3").formDeserialize(kpidata);
+                    kpiid = $("#ID").val();
+                    $("#PunishDeptName").val(punishdata.PunishDeptName);
+                    $("#PunishDeptId").val(punishdata.PunishDeptId);
+                    $("#ApplyPunishRmb").val(punishdata.ApplyPunishRmb);
+                    $("#AmerceType").ComboBoxSetValue(punishdata.AmerceType);
+                    if (punishdata.AmerceType == 1) {
+                        $("#PunishType").ComboBoxSetValue(punishdata.PunishType);
+                    } else {
+                        $("#PunishType").ComboBoxSetValue('');
+                    }
+
+                    if (punishdata.FlowState == 1) {
+                        $("#export").show();
+                    }
+                    else {
+                        $("#export").hide();
+                    }
+
+                    //修改
+                    if (punishdata != null) {
+                        if (punishdata.ApplyState == "1" || punishdata.ApplyState == "2") {
+                            top.window.$(".layui-layer-btn0").hide();
+                            //审批中禁止修改
+                            action = "show";
+                            $("#panel0 tr input").each(function (index, ele) {
+                                $(this).attr("disabled", "disabled");
+                            });
+                            $("#panel3 tr input").each(function (index, ele) {
+                                $(this).attr("disabled", "disabled");
+                            });
+                            $("#panel4 tr input").each(function (index, ele) {
+                                $(this).attr("disabled", "disabled");
+                            });
+                            $("#PunishRemark").attr("disabled", "disabled");
+                            $("#sgName").attr("disabled", "disabled");
+                            $("#AmerceType").attr("disabled", "disabled");
+                            $("#PunishType").attr("disabled", "disabled");
+                            $("#PunishAccord").attr("disabled", "disabled");
+                            $("#addkhobject").hide();
+                            $("#addrelateobject").hide();
+                            $("#yhtz").hide();
+
+                            if (punishdata.ApproverPeopleIds !== "" && punishdata.ApproverPeopleIds.indexOf('@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId') != -1) {
+                                $("#panel1").show();
+                                $("#panel2").show();
+                                top.window.$(".layui-layer-btn1").show();
+                            } else {
+                                top.window.$(".layui-layer-btn1").hide();
+                                $("#panel1").show();
+                                $("#panel2").hide();
+                            }
+
+                        } else if (punishdata.ApplyState == "0") {
+                            top.window.$(".layui-layer-btn0").show();
+                            top.window.$(".layui-layer-btn1").show();
+                            $("#panel1").show();
+                        } else {
+                            action = "show";
+                            //审批中禁止修改
+                            $("#panel0 tr input").each(function (index, ele) {
+                                $(this).attr("disabled", "disabled");
+                            });
+                            $("#panel3 tr input").each(function (index, ele) {
+                                $(this).attr("disabled", "disabled");
+                            });
+                            $("#panel4 tr input").each(function (index, ele) {
+                                $(this).attr("disabled", "disabled");
+                            });
+                            $("#PunishRemark").attr("disabled", "disabled");
+                            $("#sgName").attr("disabled", "disabled");
+                            $("#AmerceType").attr("disabled", "disabled");
+                            $("#PunishType").attr("disabled", "disabled");
+                            top.window.$(".layui-layer-btn0").hide();
+                            top.window.$(".layui-layer-btn1").hide();
+                            $("#panel1").show();
+                            $("#PunishAccord").attr("disabled", "disabled");
+                            $("#addkhobject").hide();
+                            $("#addrelateobject").hide();
+                            $("#yhtz").hide();
+                        }
+                    }
+
+
+
+                }
+            });
+        }
+        else {
+            $("#ApplyUserName").val(userName); //申请人姓名
+            $("#ApplyUserId").val(userId); //申请人id
+            $("#BelongDept").val(deptName); //所属部门
+            $("#BelongDeptId").val(deptId); //所属部门ID
+            @*$.get("GetPunishCode", function (data) {
+                var json = eval("(" + data + ")");
+                var year = "@DateTime.Now.ToString("yyyy")";
+                var month = "@DateTime.Now.ToString("MM")";
+                var punishCode = "Q/CRPHZHB 2208.06.01-JL02-" + year + month + json;
+                $("#SafePunishCode").val(punishCode);//奖励编号
+            });*@
+          
+            top.window.$(".layui-layer-btn0").show();
+            top.window.$(".layui-layer-btn1").show();
+            $("#panel1").hide();
+            $("#panel2").hide();
+            $("#AmerceType").ComboBoxSetValue(3);
+            $("#export").hide();
+            
+            AmerceTypeChange();
+            PunishTypeChange();
+            keyValue = keyValue.length === 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+        }
+
+        ShowOrEdit(action, "uploader1", keyValue);
+
+        GetPunishGrid();
+
+        GetRelatedPunishGrid();
+
+        $("#AmerceType").bind("change", function () {
+            AmerceTypeChange();
+        });
+
+        $("#PunishType").bind("change", function () {
+            PunishTypeChange();
+        });
+
+        //选择已有的隐患数据
+        $("#ChooseHaveCheck").click(function () {
+            dialogOpen({
+                id: 'ChosseForm',
+                title: '选择隐患',
+                url: '/HiddenTroubleManage/HTBaseInfo/DetailList?viewall=1',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    var data = new Array("", "PunishRemark");
+                    top.document.getElementById(iframeId).contentWindow.GetObjectData(window.document.body, data);
+                }
+            });
+        });
+    }
+
+    //惩罚类型联动
+    function AmerceTypeChange() {
+        //var SGTYPE = $("#AmerceType").attr('data-value');
+        var SGTYPETxt = $("#AmerceType").attr('data-text');
+        //$("#panel3 tr input").each(function (index, ele) {
+        //    $(this).val("");
+        //});
+        //$("#panel4 tr input").each(function (index, ele) {
+        //    $(this).val("");
+        //});
+        //$("#PunishRemark").val("");
+        if (SGTYPETxt == "隐患排查治理" || SGTYPETxt == "其他") {
+            $("#panel3").css("display", "none");
+            $("#panel4").css("display", "none");
+            $("#panel5").css("display", "");
+            $("panel3").find("input[name=qt]").each(function (index, ele) {
+                $(this).removeAttr("isvalid");
+            })
+            $("#sjxzselect").css("display", "none");
+            $("#khlbselect").css("display", "none");
+            $("#PunishType").removeAttr("isvalid");
+            //$(".ExamineType").removeAttr("isvalid");
+            $("#sjxz").css("display", "none");
+            $("#khlb").css("display", "none");
+            $("#PrincipalName").removeAttr("isvalid");
+            $("#KpiScore10").removeAttr("isvalid");
+            $("#remarktitle").html("信息描述");
+            if (SGTYPETxt == "隐患排查治理") {
+                $("#yhtz").show();
+            }
+            else {
+                $("#yhtz").hide();
+            }
+
+        } else if (SGTYPETxt == "日常考核") {
+            $("#panel3").css("display", "none");
+            $("#panel4").css("display", "none");
+            $("#panel5").css("display", "");
+            $("panel3").find("input[name=qt]").each(function (index, ele) {
+                $(this).removeAttr("isvalid");
+            })
+            $("#sjxzselect").css("display", "none");
+            $("#khlbselect").css("display", "");
+            $("#PunishType").removeAttr("isvalid");
+            //$(".ExamineType").attr("isvalid", "yes");
+            $("#sjxz").css("display", "none");
+            $("#khlb").css("display", "");
+            $("#PrincipalName").removeAttr("isvalid");
+            $("#KpiScore10").removeAttr("isvalid");
+            $("#remarktitle").html("考核内容");
+            $("#yhtz").hide();
+        } else if (SGTYPETxt == "事故事件") {
+            $("#panel3").css("display", "");
+            $("#panel4").css("display", "");
+            $("#panel5").css("display", "none");
+            $("panel3").find("input[name=qt]").each(function (index, ele) {
+                $(this).attr("isvalid","yes");
+            })
+            $("#khlbselect").css("display", "none");
+            $("#sjxzselect").css("display", "");
+            //$(".ExamineType").removeAttr("isvalid");
+            $("#PunishType").attr("isvalid", "yes");
+            $("#sjxz").css("display", "");
+            $("#khlb").css("display", "none");
+            $("#PrincipalName").attr("isvalid", "yes");
+            $("#KpiScore10").attr("isvalid", "yes");
+            $("#remarktitle").html("事件描述");
+            $("#yhtz").hide();
+        }
+    }
+
+    
+
+    //事件性质联动
+    function PunishTypeChange() {
+        //var SGTYPE = $("#PunishType").attr('data-value');
+        var SGTYPETxt = $("#PunishType").attr('data-text');
+        ////事故类型
+        //if (SGTYPE == "") {
+        //    $("#wssj").hide();
+        //    $("#ycsj").hide();
+        //    $("#elsj").hide();
+        //}
+        //else {
+        //    $("#panel3").css("display", "");
+        //    $("#panel4").css("display", "");
+        //    $("#truser").css("display", "none");
+        //    $("#trdept").css("display", "none");
+        //    $("#tramount").css("display", "none");
+        //}
+
+        $("#panel3 tr").each(function (index, ele) {
+            if (SGTYPETxt == "未遂") {
+                $("#WssjScore").attr("placeholder", "5");
+                if (index != 0) {
+                    $(this).css("display", "none");
+                    $(this).find("input[name=qt]").each(function (index, ele) {
+                        $(this).removeAttr("isvalid");
+                    })
+                } else {
+                    $(this).css("display", "");
+                    $(this).find("input[name=qt]").each(function (index, ele) {
+                        $(this).attr("isvalid", "yes");
+                    })
+                   
+                }
+            }
+            else if (SGTYPETxt == "异常") {
+                $("#WssjScore").attr("placeholder", "10");
+                $("#KpiScore1").attr("placeholder", "5");
+                $("#KpiScore2").attr("placeholder", "3");
+                $("#KpiScore3").attr("placeholder", "3");
+                $("#KpiScore4").attr("placeholder", "2");
+                if (index > 4) {
+                    $(this).css("display", "none");
+                    $(this).find("input[name=qt]").each(function (index, ele) {
+                        $(this).removeAttr("isvalid");
+                    })
+                } else {
+                    $(this).css("display", "");
+                    $(this).find("input[name=qt]").each(function (index, ele) {
+                        $(this).attr("isvalid", "yes");
+                    })
+                   
+                }
+            }
+            else if (SGTYPETxt == "二类障碍") {
+                $("#WssjScore").attr("placeholder", "50");
+                $("#KpiScore1").attr("placeholder", "20");
+                $("#KpiScore2").attr("placeholder", "15");
+                $("#KpiScore3").attr("placeholder", "15");
+                $("#KpiScore4").attr("placeholder", "15");
+                $("#KpiScore5").attr("placeholder", "10");
+                $("#KpiScore6").attr("placeholder", "5");
+                $("#KpiScore7").attr("placeholder", "5");
+                $("#KpiScore8").attr("placeholder", "5");
+                $("#KpiScore9").attr("placeholder", "5");
+                if (index < 10) {
+                    $(this).css("display", "");
+                    $(this).find("input[name=qt]").each(function (index,ele) {
+                        $(this).attr("isvalid", "yes");
+                    })
+                } else {
+                    $(this).css("display", "none");
+                    $(this).find("input .bt").each(function (index, ele) {
+                        $(this).removeAttr("isvalid");
+                    })
+                }
+            }
+            else if (SGTYPETxt == "一类障碍") {
+                if (index > 9) {
+                    $(this).css("display", "");
+                    $(this).find("input[name=qt]").each(function (index, ele) {
+                        $(this).attr("isvalid", "yes");
+                    })
+                } else {
+                    $(this).css("display", "none");
+                    $(this).find("input[name=qt]").each(function (index, ele) {
+                        $(this).removeAttr("isvalid");
+                    })
+                }
+            }
+            else {
+                $(this).css("display", "none");
+                $(this).find("input[name=qt]").each(function (index, ele) {
+                    $(this).removeAttr("isvalid");
+                })
+            }
+        });
+        $("#panel3 tr input").each(function (index, ele) {
+            $(this).val("");
+        });
+        if (SGTYPETxt == "一类障碍" || SGTYPETxt == "其他") {
+            $("#KpiUserName").val(0);
+            $("#KpiUserId").val(0);
+            $("#WssjScore").val(0);
+        }
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if ($("#AmerceType").attr('data-value') == 2) {
+            $("#PunishType").ComboBoxSetValue(1);
+            //给主要负责人赋值过验证
+            $("#panel3 tr input[name='qt']").each(function (index, ele) {
+                $(this).val("0");
+            });
+        } else {
+            //给被考核人员，单位，金额赋值过验证
+            $("#panel0 tr input[name='qt']").each(function (index, ele) {
+                $(this).val("0");
+            });
+            if ($("#PunishType").ComboBoxGetText() != "一类障碍") {
+                $("#PrincipalName").val(0);
+                $("#PrincipalId").val(0);
+                $("#KpiScore10").val(0);
+            }
+        }
+
+        
+        if ($("#AmerceType").attr('data-value') == 4) {
+            var obj = $("#ExamineType").val();
+            obj = $.trim(obj);
+            if (obj.length == 0 || obj == null || obj == undefined) {
+                ValidationMessage($("#ExamineType"), "不能为空!");
+                return false;
+            }
+        }
+        
+
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        if ($("#AmerceType").attr('data-text') != "事故事件") {
+            if ($("#gridTable1").jqGrid('getRowData').length == 0) {
+                dialogMsg('请先新增被考核对象！', 0);
+                return false
+            }
+
+        }
+
+        var data = $("#form1").formSerialize(keyValue);
+        data["AmerceType"] = $("#AmerceType").attr('data-value');
+        data["ID"] = kpiid;
+        if ($("#AmerceType").attr('data-value') == 1) {
+            data["PunishType"] = $("#PunishType").attr('data-value');
+        } else {
+            data["PunishType"] = "";
+        }
+
+        //获取考核对象信息
+        var punishData = $("#gridTable1").jqGrid('getRowData');
+        var arr = [];
+        if (punishData.length > 0) {
+            $(punishData).each(function (i, dom) {
+                arr.push({ PunishType: dom.PunishType, PunishName: dom.PunishName, PunishNameId: dom.PunishNameId, PunishNum: dom.PunishNum, Id: dom.Id, PunishId: keyValue, Type: '0', PunishPerformance: dom.PunishPerformance });
+            });
+        }
+        punishData = JSON.stringify(arr);
+        data["punishJson"] = punishData;
+
+        //获取关联考核对象信息
+        var relatedpunishJson = $("#gridTable2").jqGrid('getRowData');
+        arr = [];
+        if (relatedpunishJson.length > 0) {
+            $(relatedpunishJson).each(function (i, dom) {
+                arr.push({ PunishType: dom.PunishType, PunishName: dom.PunishName, PunishNameId: dom.PunishNameId, PunishNum: dom.PunishNum, Id: dom.Id, PunishId: keyValue, type: '1', PunishPerformance: dom.PunishPerformance });
+            });
+        }
+        relatedpunishJson = JSON.stringify(arr);
+        data["relatedpunishJson"] = relatedpunishJson;
+        $.SaveForm({
+            url: "../../SafePunish/Safepunish/SaveForm?keyValue=" + keyValue,
+            param: data,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        });
+    }
+
+
+    //提交表单;
+    function CommitApply() {
+        if ($("#AmerceType").attr('data-value') == 2) {
+            $("#PunishType").ComboBoxSetValue(1);
+            //给主要负责人赋值过验证
+            $("#panel3 tr input[name='qt']").each(function (index, ele) {
+                $(this).val("0");
+            });
+        } else {
+            //给被考核人员，单位，金额赋值过验证
+            $("#panel0 tr input[name='qt']").each(function (index, ele) {
+                $(this).val("0");
+            });
+            if ($("#PunishType").ComboBoxGetText() != "一类障碍") {
+                $("#PrincipalName").val(0);
+                $("#PrincipalId").val(0);
+                $("#KpiScore10").val(0);
+            }
+        }
+
+        if ($("#AmerceType").attr('data-value') == 4) {
+            var obj = $("#ExamineType").val();
+            obj = $.trim(obj);
+            if (obj.length == 0 || obj == null || obj == undefined) {
+                ValidationMessage($("#ExamineType"), "不能为空!");
+                return false;
+            }
+        }
+
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        if ($("#AmerceType").attr('data-text') != "事故事件") {
+            if ($("#gridTable1").jqGrid('getRowData').length == 0) {
+                dialogMsg('请先新增被考核对象！', 0);
+                return false
+            }
+
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["ID"] = kpiid;
+        //审核结果
+        var auditresult = $("input[name='AUDITRESULT']:checked").val();
+        postData["AUDITRESULT"] = auditresult;
+        //审核结果
+        if ($("#ApplyState").val() != 0 && auditresult != "") {
+            if (auditresult == "" || auditresult == undefined) {
+                dialogAlert("审查结果未勾选,无法进行提交!!!", function () {
+                    return false;
+                })
+                return false;
+            }
+        }
+        postData["AUDITSIGNIMG"] = $("#AuditSignImg").attr("src");
+
+        //获取考核对象信息
+        var punishData = $("#gridTable1").jqGrid('getRowData');
+        var arr = [];
+        if (punishData.length > 0) {
+            $(punishData).each(function (i, dom) {
+                arr.push({ PunishType: dom.PunishType, PunishName: dom.PunishName, PunishNameId: dom.PunishNameId, PunishNum: dom.PunishNum, Id: dom.Id, PunishId: keyValue, Type: '0', PunishPerformance: dom.PunishPerformance });
+            });
+        }
+        punishData = JSON.stringify(arr);
+        postData["punishJson"] = punishData;
+
+        //获取关联考核对象信息
+        var relatedpunishJson = $("#gridTable2").jqGrid('getRowData');
+        arr = [];
+        if (relatedpunishJson.length > 0) {
+            $(relatedpunishJson).each(function (i, dom) {
+                arr.push({ PunishType: dom.PunishType, PunishName: dom.PunishName, PunishNameId: dom.PunishNameId, PunishNum: dom.PunishNum, Id: dom.Id, PunishId: keyValue, type: '1', PunishPerformance: dom.PunishPerformance });
+            });
+        }
+        relatedpunishJson = JSON.stringify(arr);
+        postData["relatedpunishJson"] = relatedpunishJson;
+        $.SaveForm({
+            url: "../../SafePunish/Safepunish/CommitApply?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在提交数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        });
+
+    };
+
+
+    //安全惩罚审核列表
+    function GetApproveGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#approveGridTable');
+        $gridTable.jqGrid({
+            url: "../../SafePunish/Safepunish/GetSpecialAuditList?keyValue=" + keyValue,
+            datatype: "json",
+            height: 200,
+            autowidth: true,
+            colModel: [
+                //{
+                //    label: '操作', name: 'ID', index: 'ID', width: 120, align: 'center',
+                //    formatter: function (cellvalue, options, rowObject) {
+                //        var html = "<a href=javascript:Detail('" + rowObject.ID + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                //        return html;
+                //    }
+                //},
+                 {
+                     label: '审核部门', name: 'AUDITDEPT', width: 150, align: 'center',
+                 },
+                { label: '审核人', name: 'AUDITPEOPLE', index: 'AUDITPEOPLE', width: 120, align: 'center' },
+                {
+                    label: '审核结果', name: 'AUDITRESULT', index: 'AUDITRESULT', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = rowObject.AUDITRESULT == "0" ? "通过" : "不通过";
+                        return html;
+                    }
+                },
+                {
+                    label: '审核时间', name: 'AUDITTIME', index: 'AUDITTIME', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var content = "";
+                        if (!!rowObject.AUDITTIME) {
+                            content = rowObject.AUDITTIME.replace("00:00:00", "");
+                        }
+                        return content;
+                    }
+                },
+                {
+                    label: '签名', name: 'AUDITSIGNIMG', index: 'AUDITSIGNIMG', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var content = !!rowObject.AUDITSIGNIMG ? rowObject.AUDITSIGNIMG : "";
+                        var html = "";
+                        if (content == "" || content == undefined) {
+                            var html = "<img  style=\"height:50px;\" />&nbsp;";
+                        } else {
+                            html = "<img style=\"height:50px;\"  src=\"" + content + "\"/>&nbsp;";
+                        }
+
+                        return html;
+                    }
+                },
+                {
+                    label: '审核意见', name: 'AUDITOPINION', index: 'AUDITOPINION',align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.AUDITOPINION) {
+                            html = "<span style='white-space:pre-wrap;' title=" + rowObject.AUDITOPINION + ">" + rowObject.AUDITOPINION + "</span>";
+                        }
+                        return html;
+                    }
+                }
+            ],
+            pager: false,
+            rowNum: "20",
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            ondblClickRow: function (id) {
+
+            }
+        });
+    }
+
+    //选择专工人员
+    function setSpecialtyPrincipal(itemName, itemValue) {
+        var col = '' + itemName + ',,' + itemValue + '';
+        selectUser({ deptId: $("#deptId").val(), checkMode: 0, mode: 0, winObject: document.body, domId: col });
+    }
+
+    //选择被考核
+    function setPunishUser() {
+        var col = 'PunishUserName,,PunishUserId,ApplyDeptId,ApplyDeptCode,ApplyDeptName';
+        selectUser({ deptId: $("#deptId").val(), checkMode: 0, mode: 0, winObject: document.body, domId: col });
+    }
+
+
+    function selectWssjName(winObject, domId, checkMode) {
+        if ($("#PunishType").ComboBoxGetText() == "==请选择==" || $("#PunishType").ComboBoxGetText() ==undefined) {
+            dialogMsg('请选择事件类型！', 0);
+            return false;
+        }
+        return dialogOpen({
+            id: "WssjName",
+            title: "选择未遂事件名称",
+            url: '/AccidentEvent/Wssjbg_deal/Select?type=' + $("#PunishType").attr('data-value') + '&checkMode=' + checkMode,
+            
+            width: ($(top.window).width() - 200) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(winObject, domId);
+            }
+        });
+    }
+
+    //加载被考核对象表格
+    function GetPunishGrid() {
+        var $gridTable = $('#gridTable1');
+        $gridTable.jqGrid({
+            url: "../../SafePunish/Safepunishdetail/GetDataListJson",
+            postData: { punishId: keyValue, type:'0'},
+            datatype: "json",
+            height: 200,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        var id = rowObject.Id == undefined ? "-1" : rowObject.Id;
+                        if (action !="show") {
+                            html += "<a href=javascript:edit(0)  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:del('" + rowObject.Id + "','#gridTable1')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '被考核对象类型', name: 'PunishType', width: 250, align: 'center', sortable: false },
+                { label: '被考核对象名称', name: 'PunishName', width: 400, align: 'center', sortable: false },
+                { label: '被考核对象ID', name: 'PunishNameId', width: 150, align: 'center', sortable: false, hidden: true },
+                { label: '考核金额', name: 'PunishNum', width: 150, align: 'center', sortable: false },
+                { label: '考核EHS绩效', name: 'PunishPerformance', width: 150, align: 'center', sortable: false }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            //sortname: 'CreateDate',
+            //sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+            }
+        });
+    }
+
+    //加载连带考核对象表格
+    function GetRelatedPunishGrid() {
+        var $gridTable = $('#gridTable2');
+        $gridTable.jqGrid({
+            url: "../../SafePunish/Safepunishdetail/GetDataListJson",
+            postData: { punishId: keyValue,type:'1' },
+            datatype: "json",
+            height: 200,
+            autowidth: true,
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        var id = rowObject.Id == undefined ? "-1" : rowObject.Id;
+                        if (action != "show") {
+                            html += "<a href=javascript:edit(1)  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:del('" + rowObject.Id + "','#gridTable2')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '连带考核对象类型', name: 'PunishType', width: 250, align: 'center', sortable: false },
+                { label: '连带考核对象名称', name: 'PunishName', width: 400, align: 'center', sortable: false },
+                { label: '连带考核对象ID', name: 'PunishNameId', width: 150, align: 'center', sortable: false, hidden: true },
+                { label: '考核金额', name: 'PunishNum', width: 150, align: 'center', sortable: false },
+                { label: '考核EHS绩效', name: 'PunishPerformance', width: 150, align: 'center', sortable: false }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            //sortname: 'CreateDate',
+            //sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+            }
+        });
+    }
+
+    //添加被考核对象
+    function addpunish(type) {
+        var url = "/SafePunish/Safepunish/PunishDetail?type=" + type;
+        PunishType = ""; PunishName = ""; PunishNameId = ""; PunishNum = ""; PunishPerformance = "";
+        idx = dialogOpen({
+            id: "Details",
+            title: "新增考核",
+            url: url,
+            width: "800px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //编辑被考核对象
+    function edit(type) {
+        var $gridTable = "";
+        if (type == "0") {
+            $gridTable = $('#gridTable1');
+        }
+        else if (type=="1") {
+            $gridTable = $('#gridTable2');
+        }
+        var punishtype = $gridTable.jqGridRowValue('PunishType');
+        var punishname = $gridTable.jqGridRowValue('PunishName');
+        var punishnameid = $gridTable.jqGridRowValue('PunishNameId');
+        var punishnum = $gridTable.jqGridRowValue('PunishNum');
+        var punishperformance = $gridTable.jqGridRowValue('PunishPerformance');
+        var id = $gridTable.jqGridRowValue('Id');
+        PunishType = punishtype; PunishName = punishname; PunishNameId = punishnameid; PunishNum = punishnum; PunishPerformance = punishperformance;
+        idx = dialogOpen({
+            id: "Details",
+            title: "修改考核",
+            url: '/SafePunish/Safepunish/PunishDetail?keyValue=' + id + '&type=' + type,
+            width: "800px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    };
+
+    //删除被考核对象
+    function del(id, gId) {
+        var jqTable = $(gId);
+        if (id != "undefined" && $("#SendStatus").val() != "") {
+            $.RemoveForm({
+                url: "../../SafePunish/Safepunishdetail/RemoveForm",
+                param: { keyValue: id },
+                success: function (data) {
+                    jqTable.delRowData(jqTable.getGridParam('selrow'));
+                }
+            })
+        } else {
+            var idx = dialogConfirm("确认删除吗？", function (isSure) {
+                if (isSure) {
+                    jqTable.delRowData(jqTable.getGridParam('selrow'));
+                    top.layer.close(idx);
+                } else {
+                    top.layer.close(idx);
+                }
+            });
+        }
+    };
+
+    function exportData() {
+        window.location.href = "ExportSafePunishInfo?keyValue=" + keyValue;
+    }
+
+
+    function auditCheck(obj) {
+        var signImg = getUserSignPic(userId);
+        if (signImg != "" && signImg != undefined) {
+            $("#AuditSignImg").attr("src", "../.." + signImg);
+        } else {
+            $(obj).get(0).checked = false;
+        }
+
+
+    }
+</script>
+<!-- 基础信息 -->
+<div class="panel panel-default" id="panel0">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;基础信息</strong>
+        <span class="tools" style="float:right">
+            <a href="javascript:exportData()" class="btn btn-primary btn-xs" id="export">导出审批表</a>&nbsp;&nbsp;
+        </span>
+    </div>
+    <div class="panel-body">
+        <div style="margin-top: 20px; margin-right: 30px;">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">编号</td>
+                    <td class="formValue">
+                        <input id="SafePunishCode" type="text" class="form-control" readonly placeholder="自动生成" />
+                        <input type="hidden" id="ApplyState" />
+                    </td>
+                    <td class="formTitle">申请人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ApplyUserName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                        <input type="hidden" id="ApplyUserId" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">所属专业(部门)<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="BelongDept" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                        <input type="hidden" id="BelongDeptId" />
+                    </td>
+                    <td class="formTitle">申请时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="ApplyTime" type="text" class="form-control" value='@DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")' onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">惩罚类型<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="AmerceType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull">
+                            <ul>
+                                <li data-value="3">隐患排查治理</li>
+                                <li data-value="4">日常考核</li>
+                                @*<li data-value="1" id="sgsjli">事故事件</li>*@
+                                @*<li data-value="2" id="qtli">其他</li>*@
+                            </ul>
+                        </div>
+                    </td>
+                    <td class="formTitle" id="sjxz">事件性质<font face="宋体">*</font></td>
+                    <td class="formValue" id="sjxzselect">
+                        <div id="PunishType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                    <td class="formTitle" id="khlb">考核类别<font face="宋体">*</font></td>
+                    <td class="formValue" id="khlbselect">
+                        <select id="ExamineType" class="ExamineType" style="width:100%" >
+                            <option value="">请选择或者输入</option>
+                            <option value="安全管理">安全管理</option>
+                            <option value="文明生产">文明生产</option>
+                            <option value="生产管理">生产管理</option>
+                            <option value="技术监督">技术监督</option>
+                            <option value="缺陷管理">缺陷管理</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </td>
+                    @*<td class="formValue">
+                        <a href="#" id="HidStandard" class="btn btn-primary" title='考核标准'><i class='fa fa-pencil-square-o'></i>考核标准</a>
+                    </td>*@
+                </tr>
+                @*<tr style="display: none" id="truser">
+                    <td class="formTitle">被考核人员<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <input id="PunishUserName" name="qt" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="setPunishUser()" />
+                        <input type="hidden" id="PunishUserId" name="qt" />
+                    </td>
+                </tr>
+                <tr style="display: none" id="trdept">
+                    <td class="formTitle">被考核单位<font face="宋体"></font></td>
+                    <td class="formValue" colspan="3">
+                        <input id="ApplyDeptName" name="qt" type="text" class="form-control" onclick="selectDept('', 0, 0, '选择部门', this.parentNode, 'ApplyDeptName,ApplyDeptCode,ApplyDeptId', $('#DeptId').val());" />
+                        <input type="hidden" id="ApplyDeptId" name="qt" />
+                        <input type="hidden" id="ApplyDeptCode" name="qt" />
+
+                    </td>
+                </tr>*@
+                @*<tr>
+                    <td class="formTitle">审核人<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <input id="SpecialtyPrincipalName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly onclick="setSpecialtyPrincipal('SpecialtyPrincipalName', 'SpecialtyPrincipalId')" />
+                        <input type="hidden" id="SpecialtyPrincipalId" />
+                    </td>
+                </tr>
+                <tr style="display: none" id="tramount">
+                    <td class="formTitle" style="width:200px">考核金额<font face="宋体"></font></td>
+                    <td class="formValue" style="width:70%" colspan="3">
+                        <input id="AmerceAmount" name="qt" type="text" class="form-control" isvalid="yes" checkexpession="PositiveNumOrNull" />
+                    </td>
+                </tr>*@
+                <tr>
+                    <td class="formTitle" style="width:200px"><span id="remarktitle">事件描述</span><font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <div style="float:left;width:90%"><textarea id="PunishRemark" type="text" rows="5" class="form-control" isvalid="yes" checkexpession="NotNull" style="width:100%"> </textarea></div>
+                        @*<div style="float:left;width:10%;padding-left:20px"><a href="#" id="sgName" class="btn btn-primary" title='未遂事件' onclick="selectWssjName({ winObject: window.document.body, domId: 'PunishRemark', checkMode: 0 });"><i class='fa fa-pencil-square-o'></i>未遂事件</a></div>*@
+                        <div style="float:left;width:10%;padding-left:20px" id="yhtz"><a href="#" id="ChooseHaveCheck" class="btn btn-primary" title='隐患台账'><i class='fa fa-pencil-square-o'></i>隐患台账</a></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">考核依据</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="PunishAccord" rows="5" type="text" class="form-control" style="width:100%"> </textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">专业意见</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="SpecialtyOpinion" rows="5" type="text" class="form-control" style="width:100%"> </textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">附件信息</td>
+                    <td class="formValue" colspan="3">
+                        <div id="uploader1" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                            <div class="queueList">
+                                <div id="uploaderFile" class="placeholder">
+                                    <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <div class="statusBar" style="display:none;">
+                                <div class="progress">
+                                    <span class="text">0%</span>
+                                    <span class="percentage"></span>
+                                </div>
+                                <div class="info"></div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+</div>
+
+<!-- 考核信息 -->
+<div class="panel panel-default" style="margin-top: 20px;" id="panel5">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;考核信息&nbsp;&nbsp;</strong>
+        <span class="tools" style="text-align:right">
+            <a href="javascript:addpunish(0)" class="btn btn-primary btn-xs" id="addkhobject">新增被考核对象</a>&nbsp;&nbsp;
+        </span>
+        <span class="tools" style="text-align:right">
+            <a href="javascript:addpunish(1)" class="btn btn-primary btn-xs" id="addrelateobject">新增连带被考核对象</a>&nbsp;&nbsp;
+        </span>
+    </div>
+    <div class="panel-body">
+        <table id="gridTable1"></table>
+        <div id="gridPager"></div>
+    </div>
+    <div class="panel-body">
+        <table id="gridTable2"></table>
+        <div id="gridPager"></div>
+    </div>
+</div>
+
+<!-- 事故时间考核信息 -->
+<div class="panel panel-default" id="panel3">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;考核信息</strong>
+        <span class="tools pull-right">
+            <a class="fa fa-chevron-down" title="展开/收起"></a>
+        </span>
+    </div>
+    <div style="margin-top: 20px; margin-right: 30px;">
+        <table class="form">
+            <tr id="wssj">
+                @*<td style="width: 50px;" align="right"><i class="fa fa-plus"></i></td>
+                    <td style="width: 50px;" align="right"><i class="fa fa-trash-o"></i></td>*@
+                <td class="formTitle" style="width: 150px">主要负责人<font face="宋体">*</font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiUserName" name="qt" type="text" class="form-control bt" readonly isvalid="yes" checkexpession="NotNull" onclick="setSpecialtyPrincipal('KpiUserName', 'KpiUserId')" />
+                    <input type="hidden" id="KpiUserId" name="qt" />
+                    <input type="hidden" id="ID" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体">*</font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="WssjScore" type="text" placeholder="50" class="form-control bt" isvalid="yes" checkexpession="NumNotNull" name="qt" />
+                </td>
+            </tr>
+            <tr id="ycsj1">
+
+
+                <td class="formTitle" style="width: 150px">次要责任人<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="MinorUserName" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('MinorUserName', 'MinorUserId')" />
+                    <input type="hidden" id="MinorUserId" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore1" type="text" placeholder="20" class="form-control" />
+                </td>
+            </tr>
+            <tr id="ycsj2">
+
+
+                <td class="formTitle" style="width: 150px">专工<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="SpecialtyUserName" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('SpecialtyUserName', 'SpecialtyUserId')" />
+                    <input type="hidden" id="SpecialtyUserId" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore2" type="text" placeholder="15" class="form-control" />
+                </td>
+            </tr>
+            <tr id="ycsj3">
+
+
+                <td class="formTitle" style="width: 150px">主管<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="SupervisorName" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('SupervisorName', 'SupervisorId')" />
+                    <input type="hidden" id="SupervisorId" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore3" type="text" placeholder="15" class="form-control" />
+                </td>
+            </tr>
+            <tr id="ycsj4">
+
+
+                <td class="formTitle" style="width: 150px">主要部门副职<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="SecondaryName2" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('SecondaryName2', 'SecondaryId2')" />
+                    <input type="hidden" id="SecondaryId2" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore4" type="text" placeholder="15" class="form-control" />
+                </td>
+            </tr>
+            <tr id="ycsj5">
+
+
+                <td class="formTitle" style="width: 150px">主要部门正职<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="SecondaryName1" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('SecondaryName1', 'SecondaryId1')" />
+                    <input type="hidden" id="SecondaryId1" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore5" type="text" placeholder="10" class="form-control" />
+                </td>
+            </tr>
+            <tr id="elsj1">
+
+
+                <td class="formTitle" style="width: 150px">专工或值班负责人<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="OnDutyUserName" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('OnDutyUserName', 'OnDutyUserId')" />
+                    <input type="hidden" id="OnDutyUserId" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore6" type="text" placeholder="5" class="form-control" />
+                </td>
+            </tr>
+            <tr id="elsj2">
+
+
+                <td class="formTitle" style="width: 150px">主任工程师<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="DirecotorName" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('DirecotorName', 'DirecotorId')" />
+                    <input type="hidden" id="DirecotorId" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore7" type="text" placeholder="5" class="form-control" />
+                </td>
+            </tr>
+            <tr id="elsj3">
+
+
+                <td class="formTitle" style="width: 150px">次要部门副职<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="SecondaryName3" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('SecondaryName3', 'SecondaryId3')" />
+                    <input type="hidden" id="SecondaryId3" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore8" type="text" placeholder="5" class="form-control" />
+                </td>
+
+            </tr>
+            <tr id="elsj4">
+
+
+                <td class="formTitle" style="width: 150px">次要部门正职<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="SecondaryName4" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('SecondaryName4', 'SecondaryId4')" />
+                    <input type="hidden" id="SecondaryId4" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效扣分<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore9" type="text" placeholder="5" class="form-control" />
+                </td>
+            </tr>
+            <tr id="ylza1">
+
+
+                <td class="formTitle" style="width: 150px">主要负责人<font face="宋体">*</font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="PrincipalName" type="text" name="qt" class="form-control bt" isvalid="yes" checkexpession="NotNull" readonly onclick="setSpecialtyPrincipal('PrincipalName', 'PrincipalId')" />
+                    <input type="hidden" id="PrincipalId" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效考核<font face="宋体">*</font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore10" type="text" name="qt" placeholder="100%" class="form-control bt" isvalid="yes" checkexpession="NumNotNull" />
+                </td>
+            </tr>
+            <tr id="ylza2">
+
+
+                <td class="formTitle" style="width: 150px">次要负责人<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="OtherPrincipalName" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('OtherPrincipalName', 'OtherPrincipalId')" />
+                    <input type="hidden" id="OtherPrincipalId" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效考核<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore11" type="text" placeholder="50%" class="form-control" />
+                </td>
+            </tr>
+            <tr id="ylza3">
+
+
+                <td class="formTitle" style="width: 150px">责任部门领导<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="DeptLeadName" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('DeptLeadName', 'DeptLeadId')" />
+                    <input type="hidden" id="DeptLeadId" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效考核<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore12" type="text" placeholder="30%" class="form-control" />
+                </td>
+            </tr>
+            <tr id="ylza4">
+
+
+                <td class="formTitle" style="width: 150px">责任部门分管副职<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="FgDeptLeadName" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('FgDeptLeadName', 'FgDeptLeadId')" />
+                    <input type="hidden" id="FgDeptLeadId" />
+                </td>
+                <td class="formTitle" style="width: 150px">绩效考核<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore13" type="text" placeholder="30%" class="form-control" />
+                </td>
+            </tr>
+            <tr id="ylza5">
+
+
+                <td class="formTitle" style="width: 150px">项目公司分管副职<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="FgLeadFzName" type="text" class="form-control" readonly onclick="setSpecialtyPrincipal('FgLeadFzName', 'FgLeadFzId')" />
+                    <input type="hidden" id="FgLeadFzId" />
+                </td>
+                <td class="formTitle" style="width: 150px">现金考核<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="KpiScore14" type="text" placeholder="3000-5000" class="form-control bt" isvalid="yes" checkexpession="NumOrNull" />
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<!-- 外包单位 -->
+<div class="panel panel-default" id="panel4">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;外包单位</strong>
+    </div>
+    <div style="margin-top: 20px; margin-right: 30px;">
+        <table class="form">
+            <tr id="wssj">
+                <td class="formTitle" style="width: 150px">单位名称<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="PunishDeptName" type="text" class="form-control" onclick="selectDept('', 0, 8, '选择部门', this.parentNode, 'PunishDeptName,,PunishDeptId', $('#DeptId').val());" readonly/>
+                    <input type="hidden" id="PunishDeptId" />
+                </td>
+                <td class="formTitle" style="width: 150px">罚款金额<font face="宋体"></font></td>
+                <td class="formValue" style="width: 70%">
+                    <input id="ApplyPunishRmb" type="text" class="form-control" isvalid="yes" checkexpession="PositiveNumOrNull" />
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<!-- 审核记录 -->
+<div class="panel panel-default" id="panel1" style="display: none">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;审核记录</strong>
+        <span class="tools pull-right">
+            <a class="fa fa-chevron-down" title="展开/收起"></a>
+        </span>
+    </div>
+    <div class="panel-body">
+        <div style="margin-top: 5px; margin-right: 30px;">
+            <table id="approveGridTable"></table>
+        </div>
+    </div>
+</div>
+
+<!-- 审核信息 -->
+<div class="panel panel-default" id="panel2" style="display: none">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;审核信息</strong>
+        <span class="tools pull-right">
+            <a class="fa fa-chevron-down" title="展开/收起"></a>
+        </span>
+    </div>
+    <div class="panel-body">
+        <div style="margin-top: 5px; margin-right: 30px;">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">审核人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="AUDITPEOPLE" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                        <input type="hidden" id="AUDITPEOPLEID" />
+                        <input type="hidden" id="AUDITDEPTID" />
+                        <input type="hidden" id="AUDITDEPT" />
+
+                    </td>
+                    <td class="formTitle">审核时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="AUDITTIME" type="text" class="form-control" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" disabled="disabled" readonly isvalid="yes" checkexpession="NotNull" />
+                        <input type="hidden" id="PROJECTID" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审核结果<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="AUDITRESULT" id="AUDITRESULT1" value="0" onclick="auditCheck(this)" />同意
+                            </label>
+                        </div>
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="AUDITRESULT" id="AUDITRESULT2" value="1" onclick="auditCheck(this)" />不同意
+                            </label>
+                        </div>
+                    </td>
+                    <td class="formTitle">签名<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <img id="AuditSignImg" style="height:50px;" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审核意见</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="AUDITOPINION" name="AUDITOPINION" class="form-control"></textarea>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    @*<div class="panel-body">
+        <div style="margin-top: 5px; margin-right: 30px;">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">审核人<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="AUDITPEOPLE" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                        <input type="hidden" id="AUDITPEOPLEID" />
+                        <input type="hidden" id="AUDITDEPTID" />
+                        <input type="hidden" id="AUDITDEPT" />
+
+                    </td>
+                    <td class="formTitle">审核时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="AUDITTIME" type="text" class="form-control" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" disabled="disabled" readonly isvalid="yes" checkexpession="NotNull" />
+                        <input type="hidden" id="PROJECTID" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审核结果<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="AUDITRESULT" id="AUDITRESULT1" value="0" checked="checked" />同意
+                            </label>
+                        </div>
+                        <div class="radio-inline">
+                            <label>
+                                <input type="radio" name="AUDITRESULT" id="AUDITRESULT2" value="1" />不同意
+                            </label>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">审核意见</td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="AUDITOPINION" name="AUDITOPINION" class="form-control"></textarea>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>*@
+</div>

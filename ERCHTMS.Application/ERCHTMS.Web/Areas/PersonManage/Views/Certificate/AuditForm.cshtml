@@ -1,0 +1,297 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+@*<script src="~/Content/scripts/plugins/jquery.md5.js"></script>*@
+@*<script src="~/Content/scripts/plugins/uploadify/ajaxfileupload.js"></script>*@
+@*<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+    <script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>*@
+<style type="text/css">
+    .file {
+        position: relative;
+        display: inline-block;
+        overflow: hidden;
+        text-decoration: none;
+        text-indent: 0;
+        cursor: pointer !important;
+    }
+
+        .file input {
+            position: absolute;
+            font-size: 100px;
+            right: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer !important;
+        }
+
+        .file:hover {
+            text-decoration: none;
+            cursor: pointer !important;
+        }
+</style>
+<script type="text/javascript">
+    var keyValue = request('keyValue');
+    var userId = request('userId');
+    var mode = request("mode");
+    var pFrom = request("pFrom");
+    var certId = request('certId');
+    var action = request('action');
+    var selectedRowIndex = request('selectedRowIndex');
+    var years = request('years');
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        if(action=="show"){
+            disabledControl();
+        }
+        if(action=="edit"){
+            document.getElementById("audittype").disabled = true;
+        }
+        if (mode == 1) {
+            if (action == "add") {
+                $(".sendorgan").val(top.Form.window.sendOrg);
+            }
+            $(".mode2").remove();
+        } else {
+            if(action=="add"){
+                $("#itemcode").val(top.Form.window.itemCode);
+                $(".sendorgan").val(top.Form.window.sendOrg);
+                $("#itemcode").attr("readonly", "readonly");
+            }
+            $(".mode2" ).show();
+            $("#row1,#row2,#row3").remove();
+            $(".mode2").find("input").attr("isvalid", "yes");
+        }
+       
+        
+        keyValue = keyValue.length == 0 ? newGuid() : keyValue;
+        file_upload.init({
+            keyValue: keyValue, fileNumLimit: 4, multiple: true, extensions: 'jpg,gif,bmp,png', isImage: true, el: '#uploader'
+        });
+        var isEditl = action == "show" ? false : true;
+        file_upload.bindFiles(isEditl, true, keyValue, "uploader", isEditl);
+        if (!!userId) {
+            $("#UserId").val(userId);
+        }
+        selType(document.getElementById("audittype"));
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../PersonManage/Certificate/GetAuditFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    if (data==null) {
+                        return;
+                    }
+                    $("#form1").formDeserialize(data);
+                    $("#audittype").val(data.AuditType);
+                    if (data.AuditType=="复审") {
+                        if (data.Result == "合格") {
+                            document.getElementById("Result1").checked = true;
+                        }
+                        else {
+                            document.getElementById("Result2").checked = true;
+                        }
+                    }
+                   
+                    if (data.AuditDate!=null) {
+                        $(".auditdate").val(formatDate(data.AuditDate, "yyyy-MM-dd"));
+                    }
+                    $("#itemcode").val(data.ItemCode);
+                    $(".sendorgan").val(data.SendOrgan);
+                    $("#auditdate").val(formatDate(data.AuditDate, "yyyy-MM-dd"));
+                    $("#nextdate").val(formatDate(data.NextDate, "yyyy-MM-dd"));
+                    $("#enddate").val(formatDate(data.EndDate, "yyyy-MM-dd"));
+                    $("#audittype").trigger("change");
+                   
+                }
+            })
+        }
+       
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        if ($("#audittype").val() == "到期换证") {
+            if ($(".filelist").find("li").length==0) {
+                dialogAlert("请上传证书照片！",0);
+                return false;
+            }
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["certid"] = certId;
+        postData["userid"] = userId;
+        postData["Id"] = keyValue;
+        if (mode == 1) {
+            if ($("#audittype").val() == "复审") {
+                postData["result"] = document.getElementById("Result1").checked ? "合格" : "不合格";
+            }
+        }
+      
+        if (pFrom==1) {
+            if (action == "edit") {
+                //修改
+                var rowId = top.NewForm.$("#gridTable").jqGrid('getRowData').length + 1;
+                top.NewForm.$("#gridTable").delRowData(selectedRowIndex);
+                top.NewForm.$("#gridTable").addRowData(rowId, postData);
+                dialogClose();
+            } else {
+                //新增
+                var rowId = top.NewForm.$("#gridTable").jqGrid('getRowData').length + 1;
+                var arr = [];
+                arr.push(postData);
+                top.NewForm.fillItems(arr);
+                dialogClose();
+
+            }
+        } else {
+            $.SaveForm({
+                url: "../../PersonManage/Certificate/SaveAuditForm?keyValue=" + keyValue,
+                param: postData,
+                loading: "正在保存数据...",
+                success: function () {
+                    if (top.NewForm != undefined) {
+                        top.NewForm.window.reload();
+                       // top.NewForm.bindForm();
+                        //top.NewForm.$("#gridTable").trigger("reloadGrid");
+                    }
+                }
+            })
+        }
+       
+    }
+    //验证数字 num
+    function isInteger(obj) {
+        reg = /^[-+]?\d+$/;
+        if (!reg.test(obj)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+    function setDate(id) {
+        var val = $("#" + id).val();
+        if (val.length > 0 && years.length>0) {
+            if (id == "auditdate") {
+                var date = new Date(val);
+                 date.setFullYear(date.getFullYear() + parseInt(years));
+                 date.setDate(date.getDate() - 1);
+                 $("#enddate").val(formatDate(date, "yyyy-MM-dd"));
+            }
+        } 
+    }
+    function selType(obj) {
+        var value = $(obj).val();
+        if (value=="复审") {
+            $("#row3").hide();
+            $(".result").show(); $("#endDate").hide();
+            $("#auditdate").parent().prev().html('复审日期<font face="宋体">*</font></td>');
+            $("#enddate").parent().prev().html('复审结果<font face="宋体">*</font></td>');
+            $("#enddate").hide();
+            $("#row2").find(".sendorgan").attr("isvalid", "yes");
+            $("#row1").find(".auditdate").attr("isvalid", "yes");
+          
+        }
+        if (value == "到期换证") {
+            $("#nextdate").attr("isvalid", "yes");
+            $("#row3").show(); $("#enddate").show(); $("#enddate").parent().prev().html('有效期结束日期<font face="宋体">*</font></td>');
+            $(".result").hide();
+            $("#auditdate").parent().prev().html('换证日期(有效期开始日期)<font face="宋体">*</font></td>');
+        }
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        
+        <tr id="row1" class="mode">
+            <td class="formTitle">类别<font face="宋体">*</font></td>
+            <td class="formValue">
+                <select id="audittype" class="form-control" onchange="selType(this)">
+                    <option value="复审">复审</option>
+                    <option value="到期换证">到期换证</option>
+                </select>
+            </td>
+            <td class="formTitle" style="width:200px;">复审日期<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="auditdate" type="text" class="form-control input-wdatepicker auditdate" onfocus="WdatePicker()" checkexpession="NotNull" onblur="setDate('auditdate')" />
+            </td>
+        </tr>
+        <tr id="row2" class="mode">
+            <td class="formTitle">发证机关<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="sendorgan" type="text" class="form-control sendorgan" checkexpession="LenStr" length="32" />
+            </td>
+            <td class="formTitle">复审结果<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input type="radio" id="Result1" value="合格" name="Result" class="result" checked="checked" /><label for="Result1" class="result">合格</label>
+                <input type="radio" id="Result2" value="不合格" name="Result" class="result" /><label for="Result2" class="result">不合格</label>
+
+                <input id="enddate" type="text" class="form-control input-wdatepicker" checkexpession="NotNull" onfocus="WdatePicker()" style="display:none;" />
+
+            </td>
+        </tr>
+        <tr id="row3" style="display:none;" class="mode">
+            <td class="formTitle">下次复审日期<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="nextdate" type="text" class="form-control input-wdatepicker" checkexpession="NotNull" onfocus="WdatePicker()" />
+            </td>
+        </tr>
+
+        <tr style="display:none;" class="mode mode2">
+            <td class="formTitle">复审项目代号</td>
+            <td class="formValue">
+                <input id="itemcode" type="text" class="form-control"   />
+            </td>
+            <td class="formTitle">复审日期<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="auditdate" type="text" class="form-control input-wdatepicker auditdate" checkexpession="NotNull" onfocus="WdatePicker()" onblur="setDate('auditdate')" />
+
+            </td>
+        </tr>
+        <tr style="display:none;" class="mode mode2" >
+            <td class="formTitle">发证机关<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="sendorgan" type="text" class="form-control sendorgan" checkexpession="LenStr" length="32" />
+            </td>
+            <td class="formTitle">复审有效期限<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="enddate" type="text" class="form-control input-wdatepicker" checkexpession="NotNull" onfocus="WdatePicker()" />
+
+            </td>
+        </tr>
+
+
+        <tr>
+            <td class="formTitle">照片</td>
+            <td class="formValue" colspan="3" align="center">
+                <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                    <div class="queueList">
+                        <div id="dndArea" class="placeholder">
+                            <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                        </div>
+                    </div>
+                    <div class="statusBar" style="display:none;">
+                        <div class="progress">
+                            <span class="text">0%</span>
+                            <span class="percentage"></span>
+                        </div>
+                        <div class="info"></div>
+                    </div>
+                </div>
+                <input type="hidden" id="FilePath" name="FilePath" />
+                <input type="hidden" id="UserId" name="UserId" />
+            </td>
+        </tr>
+    </table>
+</div>

@@ -1,0 +1,103 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request("keyValue"); //主键 隐患信息主键
+    var keyId = request("keyId");
+    var isPrincipal = "";
+    $(function () {
+        //获取当前用户身份，判定是否是部门负责人，如果是部门负责人则直接进行选择部门
+        $.ajax({
+            type: "get",
+            url: "../../HiddenTroubleManage/HTExtension/QueryReplayerRole",
+            success: function (data) {
+   
+                //如果是非负责人,则隐藏
+                isPrincipal = data;
+                if (parseInt(data) == 0) {
+                    $(".form tr:eq(2)").css("display", "none");
+                    $(".form tr:eq(2) td").each(function (index, ele) {
+                        $(this).css("display", "none");
+                    });
+                    $(".form tr:eq(2) input").each(function (index, ele) {
+                        $(this).removeAttr("isvalid");
+                        $(this).removeAttr("checkexpession");
+                    });
+                }
+            }
+        });
+    });
+
+    //提交延期申请
+    function AcceptClick() {
+        if (!$('#form1').Validform())
+        {
+            return false;
+        }
+
+        if (!!$("#POSTPONEDAYS").val()) {
+            var postData = $("#form1").formSerialize(keyValue);
+            postData["POSTPONEDEPT"] = $("#POSTPONEDEPT").val();
+            postData["POSTPONEDEPTNAME"] = $("#POSTPONEDEPTNAME").val();
+            postData["POSTPONEREASON"] = $("#POSTPONEREASON").val();
+            postData["HIDID"] =keyId;
+            var applicationStatus = ""; //标识
+            var url = "";  //请求地址
+            //非负责人提交
+            if (parseInt(isPrincipal) == 0) {
+                applicationStatus = "1";  //标识，当前部门负责人审核
+            }
+            else  //负责人
+            {
+                applicationStatus = "2";  //标识，指定部门的所有人员进行批复
+                //url = "../../HiddenTroubleManage/HTExtension/SaveForm?keyValue=" + keyValue;
+            }
+            postData["APPLICATIONSTATUS"] = applicationStatus;
+            url = "../../HiddenTroubleManage/HTChangeInfo/SaveSettingForm?keyValue=" + keyValue;
+
+            $.SaveForm({
+                url: url,  //提交延期天数
+                param: postData,  //参数
+                loading: "正在保存数据...",
+                success: function () {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            })
+        }
+        else
+        {
+            dialogMsg("延期天数未填写!", 0);
+        }
+    }
+</script>
+
+<div class="center-Panel" style="overflow-y: scroll; ">
+    <div class="gridPanel">
+        <div style="margin-top: 20px; margin-left:10px;">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">延期天数<span style="color:red;">*</span></td>
+                    <td class="formValue" colspan="3">
+                        <input id="POSTPONEDAYS" type="text" class="form-control" errormsg="延期天数" isvalid="yes" checkexpession="Num"  value="0"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">延期理由<span style="color:red;">*</span></td>
+                    <td class="formValue" colspan="3">
+                        <textarea id="POSTPONEREASON" class="form-control" style="width: 98%; height: 80px;" errormsg="延期理由" isvalid="yes" checkexpession="LenStr" length="2000"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">批复部门<span style="color:red;">*</span></td>
+                    <td class="formValue" colspan="3">
+                        @*部门名称,部门Code*@
+                        <input id="POSTPONEDEPTNAME" type="text" class="form-control" errormsg="批复部门" placeholder="请选择批复部门" isvalid="yes" checkexpession="NotNull" readonly onclick="selectDept('', 1, 2, '选择批复部门', window.document.body, 'POSTPONEDEPTNAME,POSTPONEDEPT');" />
+                        <input id="POSTPONEDEPT" type="hidden" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>

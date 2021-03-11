@@ -1,0 +1,407 @@
+﻿@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var superviseid = request('superviseid');//督办数据id
+    var copy = request('copy');
+    var action = request('action');
+    var datatype = request('datatype');//0查看历史记录
+    var fid = request('fid');//历史反馈记录id
+    var FILEPS = "@Guid.NewGuid().ToString()";
+    var FILES = "@Guid.NewGuid().ToString()";
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var win = top.Form.window;
+    var b = false;
+    var flowstate;
+    var FeedbackUserId;//负责人id
+    var ConfirmationUserId;//督办人id
+    $(function () {
+        initControl();
+    });
+
+    //初始化控件
+    function initControl() {
+        if (action == "view") {
+            $(".form-button").css("display", "none");
+            $("#form1").find("input,textarea,.ui-select,.ui-select-text,.ui-select-option-content").each(function (ele, index) {
+                var it = $(this);
+                it.attr("disabled", "disabled");
+                it.attr("readonly", "readonly");
+            });  
+        }
+
+        //获取表单
+        if (!!superviseid && superviseid != "-1") {
+            $.SetForm({
+                url: "../../SafetyWorkSupervise/Safetyworksupervise/GetEntityByT",
+                param: { keyValue: superviseid, fid: fid },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    flowstate = data.FlowState;//流程状态
+                    if (datatype == "0") {
+                        $("#btn_r").hide();
+                        flowstate = "3";//历史记录查看所有
+                    }
+                    FeedbackUserId = data.DutyPersonId;//反馈人id
+                    ConfirmationUserId = data.SupervisePersonId;//督办人id
+                    if (data.SignUrl && data.SignUrl.length > 0) {//反馈签名url
+                        $("#SignUrl").val(data.SignUrl);
+                        $("#signPreview").attr("src", "../.." + data.SignUrl);
+                    }
+                    if (data.SignUrlT && data.SignUrlT.length > 0) {//督办确认签名url
+                        $("#SignUrlT").val(data.SignUrlT);
+                        $("#signPreview1").attr("src", "../.." + data.SignUrlT);
+                    }
+                    if (action == "view") {//查看
+                        $("#btn_f").hide();
+                        $("#btn_c").hide();
+                        if (flowstate == "0" || flowstate == "1") {//查看督办基本信息
+                            $("#div1").hide();
+                            $("#div2").hide();
+                        } else if (flowstate == "2") {//反馈处理中信息
+                            keyValue = data.Fid;//反馈信息id
+                            $("#div1").show();
+                            $("#div2").hide();
+                        } else if (flowstate == "3") {//督办确认中信息
+                            keyValue = data.Fid;//反馈信息id
+                            $("#div1").show();
+                            $("#div2").show();
+                            if (data.SuperviseResult == "1") {
+                                document.getElementById("SuperviseResult2").checked = true;
+                            }
+                        }
+
+                    } else if (action == "feedback") {//处理反馈
+                        getUserSignPicFeedback(0);
+                    } else if (action == "confirmation") {//督办确认
+                        keyValue = data.Fid;
+                        getUserSignPicFeedback(1);              
+                    }
+
+                }
+            })
+        }
+        keyValue = keyValue.length == 0 ? "@Guid.NewGuid().ToString()" : keyValue;
+        //会议资料附件
+        file_upload.init({
+            keyValue: keyValue, extensions: 'doc,docx,xls,xlsx,zip,jpg,png,ppt,pdf', isImage: false, el: '#uploader'
+        });
+        var isDel = action == "view" || action =="confirmation" ? false : true;
+        file_upload.bindFiles(isDel, false, keyValue, "uploader", isDel);
+
+        if (action == "feedback") {
+            $("#div2").hide();
+            $("#FeedbackDate").val("@DateTime.Now.ToString("yyyy-MM-dd")");//默认反馈时间
+        } else if (action == "confirmation") {
+            $("#div1").find("input,textarea,.ui-select,.ui-select-text,.ui-select-option-content").each(function (ele, index) {
+                var it = $(this);
+                it.attr("disabled", "disabled");
+                it.attr("readonly", "readonly");
+            });  
+            $("#ConfirmationDate").val("@DateTime.Now.ToString("yyyy-MM-dd")");//默认督办确认时间
+        }
+        //发送
+        $("#btn_Submit").click(function () {
+            if (action == "feedback") {
+                AcceptClick("1");
+            } else if (action == "confirmation") {
+                AcceptClick("2");
+            }
+
+        });
+    }
+    //保存表单;
+    function AcceptClick(type) {
+        if (type == "1") {//如果是反馈提交只验证反馈信息
+            if (!$('#div1').Validform()) {
+                return false;
+            } 
+            var singurl = $("#SignUrl").val();
+            if (!singurl) {
+                dialogMsg('请获取签名！', 0);
+                return false;
+            }
+        } else {
+            if (!$('#div2').Validform()) {//如果是督办确认提交只验证督办确认信息
+                return false;
+            } 
+            var singurlT = $("#SignUrlT").val();
+            if (!singurlT) {
+                dialogMsg('请获取签名！', 0);
+                return false;
+            }
+        }
+
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["Flag"] = "0";
+        
+        var url;
+        if (type == "1") {//反馈提交
+            postData["SuperviseId"] = superviseid;
+            url = "../../SafetyWorkSupervise/Safetyworkfeedback/SaveForm?keyValue=" + keyValue;
+        } else {
+            //督办提交
+            if (document.getElementById("SuperviseResult1").checked) {//督办结果
+                postData["SuperviseResult"] = "0";
+            } else {
+                postData["SuperviseResult"] = "1";
+            }
+            postData["SuperviseId"] = superviseid;//督办id
+            postData["FeedbackId"] = keyValue;//反馈id
+            postData["SignUrl"] = $("#SignUrlT").val();//督办确认签名url
+            url = "../../SafetyWorkSupervise/Superviseconfirmation/SaveForm?keyValue=";
+        }
+        $.SaveForm({
+            url: url,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+    
+    //获取反馈人签名
+    function getUserSignPicFeedback(type) {
+        var currUserId;
+        if (type == "0") {//反馈签名
+            currUserId = FeedbackUserId;
+        } else {
+            currUserId = ConfirmationUserId;
+        }
+        var signImg = "";
+        $.ajax({
+            url: "../../BaseManage/User/GetEntity?keyValue=" + currUserId,
+            dataType: "JSON",
+            async: false,
+            success: function (result) {
+                if (result != null) {
+                    signImg = result.SignImg;
+                }
+            }
+        });
+        if (!!signImg) {
+            if (type == "0") {
+                $('#SignUrl').val(signImg);
+                if (signImg.indexOf("http") >= 0) {
+                    $("#signPreview").attr("src", signImg);
+                } else {
+                    $("#signPreview").attr("src", "../.." + signImg);
+                }
+            } else {
+                $('#SignUrlT').val(signImg);
+                if (signImg.indexOf("http") >= 0) {
+                    $("#signPreview1").attr("src", signImg);
+                } else {
+                    $("#signPreview1").attr("src", "../.." + signImg);
+                }
+            }
+            $("#btn_f").hide();
+            $("#btn_c").hide();
+        } else {
+            var idx = dialogConfirm("请先上传签名图片？", function (isSure) {
+                if (isSure) {
+                    dlg = dialogOpen({
+                        id: 'SetForm',
+                        title: '个人设置',
+                        url: '/PersonCenter/Index?mode=0&callframeid=&currUserId=' + currUserId,
+                        width: "800px",
+                        height: "800px",
+                        btn: null
+                    })
+                    top.layer.close(idx);
+                } else {
+                    
+                }
+            });
+
+        }
+    }
+    function showRecord() {
+        dialogOpen({
+            id: 'Form1',
+            title: '查看历史记录',
+            url: '/SafetyWorkSupervise/Safetyworkfeedback/Index?keyValue=' + superviseid,
+            width: '1000px',
+            height: "500px",
+            btn: null
+        });
+    }
+</script>
+<div style="margin-left: 10px; margin-right: 10px;">
+
+    <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px;padding-top:40px;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;督办信息</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body" style="height:424px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle" style="width:100px;">重点工作任务<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="WorkTask" class="form-control" readonly style="height: 120px;" isvalid="yes" checkexpession="NotNull"></textarea>
+                        </td>
+                    </tr>
+                    <tr id="HandleTr">
+                        <td class="formTitle">责任部门(单位)<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DutyDeptName" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                        <td class="formTitle">责任人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DutyPerson" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">完成时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="FinishDate" type="text" isvalid="yes" readonly checkexpession="NotNull" class="form-control" />
+                        </td>
+                        <td class="formTitle">督办人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SupervisePerson" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">备注<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="Remark" class="form-control" readonly style="height: 120px;" isvalid="yes" checkexpession="NotNull"></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">创建人<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="CreateUserName" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                        <td class="formTitle">创建时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="CreateDate" type="text" class="form-control" readonly isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <div class="panel panel-default" id="div1">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;完成反馈信息</strong>
+                <span class="tools pull-right">
+                    <a id="btn_r" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4;height:19px;padding:0px 0px; " onclick="showRecord()">历史记录</a>
+                    &nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body" style="height:440px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle" style="width:100px;">完成情况<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="FinishInfo" class="form-control" style="height: 120px;" isvalid="yes" checkexpession="NotNull"></textarea>
+                        </td>
+                    </tr>
+                    <tr id="HandleTr">
+                        <td class="formTitle">部门(单位)<br />确认签字<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SignUrl" type="hidden" />
+                            <img id="signPreview" style="width: 100px; height: 40px;" src="" />
+                            <a id="btn_f" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="getUserSignPicFeedback(0)">获取签名</a>
+                        </td>
+                        <td class="formTitle">反馈时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="FeedbackDate" type="text" isvalid="yes" checkexpession="NotNull" disabled="disabled" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="4">
+                            <div class="panel-body">
+                                附件：
+                                <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:200px; margin-bottom:10px;">
+                                    <div class="queueList">
+                                        <div id="uploaderFile" class="placeholder">
+                                            <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                        </div>
+                                    </div>
+                                    <div class="statusBar" style="display:none;">
+                                        <div class="progress">
+                                            <span class="text">0%</span>
+                                            <span class="percentage"></span>
+                                        </div>
+                                        <div class="info"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+        </div>
+        <div class="panel panel-default" id="div2">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;督办确认信息</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body" style="height:300px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle" id="tddept">督办结果<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="2">
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="SuperviseResult" id="SuperviseResult1" value="0" checked="checked" />通过
+                                </label>
+                            </div>
+                            <div class="radio-inline">
+                                <label>
+                                    <input type="radio" name="SuperviseResult" id="SuperviseResult2" value="1" />不通过
+                                </label>
+                            </div>
+                            <input type="hidden" id="SuperviseResult" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:100px;">督办意见</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="SuperviseOpinion" class="form-control" style="height: 120px;"  checkexpession="NotNull"></textarea>
+                        </td>
+                    </tr>
+                    <tr id="HandleTr">
+                        <td class="formTitle">党组织成员签字<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="SignUrlT" type="hidden" />
+                            <img id="signPreview1" style="width: 100px; height: 40px; " src="" />
+                            <a id="btn_c" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; " onclick="getUserSignPicFeedback(1)">获取签名</a>
+                        </td>
+                        <td class="formTitle">确认时间<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ConfirmationDate" type="text" isvalid="yes" checkexpession="NotNull" disabled="disabled" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                        </td>
+                    </tr>
+                    
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Submit" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+        &nbsp; &nbsp;
+    </div>
+</div>

@@ -1,0 +1,335 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script>
+    ;
+    var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    var belongD = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var belongCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var parentid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().ParentId";
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户ID
+    var dept = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var _deptCode = "";
+
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+        //绑定作业级别
+        $("#JobLevel").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "DangerousJobCheck", Remark: '001' },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+
+        //绑定作业人数
+        $("#NumberofPeople").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "NumberofPeople" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+
+
+        $.ajax({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson?EnCode=spdepart",
+            dataType: 'Json',
+            async: false,
+            success: function (data) {
+                if (data.length > 0) {
+                    if (orgId == belongD || data[0].ItemValue.indexOf(belongCode) != -1) {
+                        var chooseorgObj = "#itemTree_" + orgId.replace(/-/g, "_");
+                        $(chooseorgObj).toggleClass("bbit-tree-selected");
+                    } else {
+                        var choosedepObj = "#itemTree_" + belongD.replace(/-/g, "_");
+                        $(choosedepObj).toggleClass("bbit-tree-selected");
+                    }
+                }
+                else {
+                    var choosedepObj = "#itemTree_" + belongD.replace(/-/g, "_");
+                    $(choosedepObj).toggleClass("bbit-tree-selected");
+                }
+
+            }
+        });
+
+  
+
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                keyword: $("#txt_Keyword").val(),//关键字
+                joblevel: $("#JobLevel").ComboBoxGetValue(),//危险作业级别
+                numberofpeople: $("#NumberofPeople").ComboBoxGetValue(),//作业人数
+                code: _deptCode //树节点code
+
+            }
+            $('#gridTable').jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+            $(".ui-filter-list").css("display", "none");
+            $(".ui-filter-text ").removeClass("active");
+            $(".ui-filter-text ").removeAttr("style");
+        });
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 0
+            }
+        );
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json + "&selectCode=" + belongCode,
+            onnodeclick: function (item) {
+                _deptCode = item.Code;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            autowidth: true,
+            height: $(window).height() - 147,
+            url: "../../DangerousJob/Dangerjoblist/GetPageListJson",
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'id', width: 100, align: 'left', sortable: true, hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 100, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        html += "<a href=javascript:show('" + rowObject.id + "')  title='查看' name='show'><i class='fa fa-eye'></i></a>";
+                        //if (rowObject.createuserid == UserId) {
+                        //    html += "<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        //    html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        //}
+                        return html;
+                    }
+                },
+
+                { label: '创建用户id', name: 'createuserid', index: 'createuserid', width: 100, align: 'left', sortable: true, hidden: true },
+                { label: '创建时间', name: 'createdate', index: 'createdate', width: 100, align: 'left', sortable: true, hidden: true },
+                { label: '创建用户姓名', name: 'createusername', index: 'createusername', width: 100, align: 'left', sortable: true, hidden: true },
+                { label: '修改用户id', name: 'modifyuserid', index: 'modifyuserid', width: 100, align: 'left', sortable: true, hidden: true },
+                { label: '修改记录时间', name: 'modifydate', index: 'modifydate', width: 100, align: 'left', sortable: true, hidden: true },
+                { label: '修改用户名称', name: 'modifyusername', index: 'modifyusername', width: 100, align: 'left', sortable: true, hidden: true },
+                { label: '创建用户所属部门编码', name: 'createuserdeptcode', index: 'createuserdeptcode', width: 100, align: 'left', sortable: true, hidden: true },
+                { label: '创建用户所属机构编码', name: 'createuserorgcode', index: 'createuserorgcode', width: 100, align: 'left', sortable: true, hidden: true },
+                { label: '危险作业名称', name: 'dangerjobname', index: 'dangerjobname', width: 200, align: 'left', sortable: true },
+                { label: '作业人数', name: 'numberofpeoplename', index: 'numberofpeoplename', width: 200, align: 'left', sortable: true },
+                { label: '作业单位', name: 'deptnames', index: 'deptnames', width: 120, align: 'left', sortable: true },
+                { label: '作业频次', name: 'jobfrequency', index: 'jobfrequency', width: 100, align: 'left', sortable: true },
+                { label: '存在的危险因素', name: 'dangerfactors', index: 'dangerfactors', width: 200, align: 'left', sortable: true },
+                { label: '可能发生的事故类别', name: 'accidentcategories', index: 'accidentcategories', width: 200, align: 'left', sortable: true },
+                { label: '拟采取的安全措施', name: 'safetymeasures', index: 'safetymeasures', width: 200, align: 'left', sortable: true },
+                { label: '危险作业级别', name: 'joblevelname', index: 'joblevelname', width: 100, align: 'left', sortable: true },
+                { label: '现场监护负责人', name: 'principalnames', index: 'principalnames', width: 100, align: 'left', sortable: true }],
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 't.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+        });
+    }
+    //查看
+    function show(id) {
+        if (id) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: "查看危险作业清单信息",
+                url: '/DangerousJob/Dangerjoblist/Form?keyValue=' + id + "&action=view",
+                width: "1000px",
+                height: ($(top.window).height() - 80) + "px",
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                },
+                btn: false
+            });
+        } else {
+            dialogMsg('请选择数据！', 0);
+        }
+    }
+
+    //新增
+    function btn_add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加危险作业清单信息',
+            url: '/DangerousJob/Dangerjoblist/Form',
+            width: "1000px",
+            height: ($(top.window).height() - 80) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit(keyValue) {
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑危险作业清单信息',
+                url: '/DangerousJob/Dangerjoblist/Form?keyValue=' + keyValue + "&action=add",
+                width: "1000px",
+                height: ($(top.window).height() - 80) + "px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        }
+    }
+    //删除
+    function del(keyValue) {
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../DangerousJob/Dangerjoblist/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            });
+        } else {
+            dialogMsg('请选择需要删除的危险作业清单信息！', 0);
+        }
+    }
+
+    //重置查询条件
+    function ResetCondition() {
+        //关键字
+        $("#txt_Keyword").val("");
+        $("#JobLevel").ComboBoxSetText("==请选择==");
+        $("#NumberofPeople").ComboBoxSetText("==请选择==");
+    }
+
+
+    //导出
+    function exportData() {
+        var queryJson = {
+            keyword: $("#txt_Keyword").val(),//关键字
+            joblevel: $("#JobLevel").ComboBoxGetValue(),//危险作业级别
+            numberofpeople: $("#NumberofPeople").ComboBoxGetValue(),//作业人数
+            code: _deptCode,//树节点code
+            pageIndex: 0,
+            pageSize: 20
+        }
+        location.href = "../../DangerousJob/Dangerjoblist/ExportDangerJobList?queryJson=" + JSON.stringify(queryJson);
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west" id="divTree">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">        
+            <div class="titlePanel" id="divTitle">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件:</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 380px;">
+                                    <div class="ui-filter-text">
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 380px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle" style="width: 80px;">关键字：</td>
+                                                <td class="formValue">
+                                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="作业名称、作业单位、危险因素、事故类别查询" style="width: 261px;" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">危险作业级别：</td>
+                                                <td class="formValue">
+                                                    <div id="JobLevel" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width:85%;float:left;"></div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">作业人数：</td>
+                                                <td class="formValue">
+                                                    <div id="NumberofPeople" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width: 85%; float: left;"></div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                        <a id="export" class="btn btn-default" onclick="exportData()"><i class="fa fa-download"></i>&nbsp;导出</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

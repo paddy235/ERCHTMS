@@ -1,0 +1,629 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var _parentId = "";
+    var _isOrg = "";
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var toolname = request('toolname');
+    var equipmenttype = request('equipmenttype');
+    $(function () {
+        InitialPage();
+        if (!!equipmenttype) {
+            $("#EquipmentType").ComboBoxSetValue(equipmenttype);
+        }
+        if (!!toolname) {
+            $("#queryCondition .dropdown-text").html("设备名称").attr('data-value', "equipmentvalue");
+            $("#txt_Keyword").val(toolname);
+        }
+        GetTree();
+        GetDistrict();
+        GetGrid();//安全工器具
+
+    });
+    //初始化页面
+    function InitialPage() {
+        if (roleNames.indexOf("承包商") >= 0) {
+            $("#add").css("display", "none");
+        }
+        $("#btnModal").click(function () {
+            $('#QrCodeModal').modal('hide');
+        });
+        //安全工器具类型
+        $("#EquipmentType").ComboBox({
+            description: "==请选择=="
+        });
+        ////设备类型
+        //var frmEquType = $("#EquipmentType");
+        //frmEquType.ComboBox({
+        //    url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+        //    param: { EnCode: "SafeTool" },
+        //    id: "ItemValue",
+        //    text: "ItemName",
+        //    description: "==请选择==",
+        //    height: "200px"
+        //});
+        var equtype = request("equtype");
+        if (!!equtype) {
+            frmEquType.ComboBoxSetValue(equtype);
+            frmEquType.attr("data-value", equtype);
+        }
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value);
+        });
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+                $("#itemTree").setTreeHeight($(window).height() - 61);
+                //$("#districtTree").setTreeHeight($(window).height() - 61);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+              {
+                  SelectMode: 0,
+                  Mode: 0
+              }
+            );
+        var item = {
+            height: $(window).height() - 61,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = item.Nature;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize();
+                }
+            });
+        }
+    }
+    function GetDistrict() {
+        var item = {
+            height: $(window).height() - 61,
+            url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + top.currUserOrgId,
+            onnodeclick: function (item) {
+                _parentId = item.value;
+                _isOrg = "District";
+                $('#btn_Search').trigger("click");
+            }
+        };
+    }
+
+    //加载安全工器具表格
+    function GetGrid() {
+        var queryJson = {
+            ToolType: "2",
+            condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+            Etype: $("#EquipmentType").attr('data-value'),
+            txtSearch: $("#txt_Keyword").val(),
+            code: _parentId,
+            isOrg: _isOrg,
+            startTime: request("st"),
+            endTime: request("et")
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../ToolEquipmentManage/Toolequipment/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '创建用户id',
+                    name: 'createuserid',
+                    index: 'createuserid',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '创建时间',
+                    name: 'createdate',
+                    index: 'createdate',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '创建用户',
+                    name: 'createusername',
+                    index: 'createusername',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '修改用户id',
+                    name: 'modifyuserid',
+                    index: 'modifyuserid',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '修改时间',
+                    name: 'modifydate',
+                    index: 'modifydate',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '修改用户',
+                    name: 'modifyusername',
+                    index: 'modifyusername',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '创建用户所属部门编码',
+                    name: 'createuserdeptcode',
+                    index: 'createuserdeptcode',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '创建用户所属机构编码',
+                    name: 'createuserorgcode',
+                    index: 'createuserorgcode',
+
+                    align: 'left',
+                    sortable: true,
+                    hidden: true
+                },
+                {
+                    label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false
+                    //, formatter: function (cellvalue, options, rowObject) {
+                    //    var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                    //    var participant = rowObject.createuserid;
+                    //    var controluserid = rowObject.controluserid;
+                    //    if ((participant !== "" && participant !== null)) {
+                    //        if (participant.indexOf(top.currUserId) != -1 && (top.currUserRoleName.indexOf("专工") != -1 || top.currUserRoleName.indexOf("负责人") != -1 || top.currUserRoleName.indexOf("副管用户") != -1 || top.currUserRoleName.indexOf("分包商级用户") != -1 || top.currUserRoleName.indexOf("承包商级用户") != -1)) {
+                    //            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                    //            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                    //        } else if (controluserid.indexOf(top.currUserId) != -1) {
+                    //            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                    //            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                    //        }
+                    //    }
+
+                    //    return html;
+                    //}
+                },
+                { label: '生成二维码使用', name: 'equipmentvalue', index: 'equipmentvalue', hidden: true },
+                {
+                    label: '安全工器具名称', name: 'equipmentname', index: 'equipmentname', align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        var equipmentvalue = rowObject.equipmentvalue;
+                        //if (rowObject.equipmentname !== "") {
+                        //    if (rowObject.equipmentname === "1") {
+                        //        equipmentname = "梯子";
+                        //    } else if (rowObject.equipmentname === "2") {
+                        //        equipmentname = "安全带";
+                        //    } else if (rowObject.equipmentname === "3") {
+                        //        equipmentname = "安全绳";
+                        //    } else if (rowObject.equipmentname === "4") {
+                        //        equipmentname = "登高板";
+                        //    } else if (rowObject.equipmentname === "5") {
+                        //        equipmentname = "防护眼睛";
+                        //    } else if (rowObject.equipmentname === "6") {
+                        //        equipmentname = "防护面具";
+                        //    } else if (rowObject.equipmentname === "7") {
+                        //        equipmentname = "防毒面具";
+                        //    } else if (rowObject.equipmentname === "8") {
+                        //        equipmentname = "耐酸手套";
+                        //    } else if (rowObject.equipmentname === "9") {
+                        //        equipmentname = "耐酸服";
+                        //    } else if (rowObject.equipmentname === "10") {
+                        //        equipmentname = "脚扣";
+                        //    }  else {
+                        //        equipmentname = "其他";
+                        //    }
+
+                        //}
+                        var endDate = new Date(rowObject.nextcheckdate);
+                        var warnDate = new Date('@DateTime.Now.AddMonths(1).ToString("yyyy-MM-dd")');
+                        if (endDate < new Date('@DateTime.Now.ToString("yyyy-MM-dd 00:00:00")')) {
+                            return "<div class='data-danger' title='设备逾期未检验'>" + equipmentvalue + "</div>";
+                        }
+                        else if (endDate < warnDate && endDate >= new Date('@DateTime.Now.ToString("yyyy-MM-dd 00:00:00")')) {
+                            return "<div class='data-warn' title='设备即将到期未检验'>" + equipmentvalue + "</div>";
+                        }
+                        else {
+                            return equipmentvalue;
+                        }
+                    }
+                },
+                {
+                    label: '种类', name: 'equipmenttype', index: 'equipmenttype', align: 'center', sortable: true, hidden: true, formatter: function (cellvalue, options, rowObject) {
+                        var equipmenttype = "";
+                        if (rowObject.equipmenttype !== "") {
+                            if (rowObject.equipmenttype === "1") {
+                                equipmenttype = "电气安全工器具";
+                            } else if (rowObject.equipmenttype === "2") {
+                                equipmenttype = "机械、化学安全工器具";
+                            }
+                        }
+                        return equipmenttype;
+                    }
+                },
+                { label: '规格型号', name: 'specifications', index: 'specifications', align: 'center', sortable: true },
+                { label: '生产厂家', name: 'outputdeptname', index: 'outputdeptname',  align: 'center', sortable: true },
+                {
+                    label: '出厂日期', name: 'factorydate', index: 'factorydate', align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '编号', name: 'equipmentno', index: 'equipmentno', align: 'center', sortable: true },
+                {
+                    label: '检验结果', name: 'appraise', index: 'appraise', align: 'center', sortable: true, hidden: true, formatter: function (cellvalue, options, rowObject) {
+                        var appraise = "";
+                        if (rowObject.appraise !== "") {
+                            if (rowObject.appraise === "1") {
+                                appraise = "合格";
+                            } else if (rowObject.appraise === "2") {
+                                appraise = "不合格";
+                            }
+                        }
+                        return appraise;
+                    }
+                },
+                {
+                    label: '检验日期', name: 'checkdate', index: 'checkdate',  align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '下次检验日期', name: 'nextcheckdate', index: 'nextcheckdate', align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                { label: '检验人', name: 'operuser', index: 'operuser', align: 'center', sortable: true },
+                { label: '所属区域', name: 'district', index: 'district', align: 'center', sortable: true, hidden: true },
+                { label: '存放位置', name: 'depositary', index: 'depositary', align: 'center', sortable: true, hidden: true },
+                { label: '管理人员', name: 'controlusername', index: 'controlusername', align: 'center', sortable: true, hidden: true },
+                { label: '管理人员Id', name: 'controluserid', hidden: true },
+                {
+                    label: '二维码', name: 'qrcode', index: 'qrcode', align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:GetQrCode('" + rowObject.id + "','" + encodeURIComponent(rowObject.equipmentvalue) + "','" + encodeURIComponent(rowObject.equipmentno) + "')  style='text-decoration:underline;color:blue;'  title='二维码'>查看</a>";
+                        return html;
+                    }
+                }],
+            multiboxonly: true,
+            multiselect: true,
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                ToolType: "2",
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                Etype: $("#EquipmentType").attr('data-value'),
+                txtSearch: $("#txt_Keyword").val(),
+                code: _parentId,
+                isOrg: _isOrg,
+                startTime: request("st"),
+                endTime: request("et")
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        //全部
+        $("#btn_SearchAll").click(function () {
+            $("#EquipmentType").attr("data-text", "==选择==");
+            $("#EquipmentType").attr("data-value", "");
+            $("#EquipmentType div:eq(0)").text("==选择==");
+            $("#txt_Keyword").val("");
+            $('#btn_Search').trigger("click");
+        });
+    }
+
+
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加安全工器具基本信息',
+            url: '/ToolEquipmentManage/Toolequipment/Form?ToolType=' + "2",
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit(obj) {
+        var keyValue = obj;
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑安全工器具基本信息',
+                url: '/ToolEquipmentManage/Toolequipment/Form?actiontype=edit&keyValue=' + keyValue + '&ToolType=' +  "2",
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            });
+        }
+    }
+    //删除
+    function del(obj) {
+        var keyValue = obj;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../ToolEquipmentManage/Toolequipment/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function(data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            });
+        } else {
+            dialogMsg('请选择需要删除的安全工器具基本信息！', 0);
+        }
+    }
+    //查看
+    function show(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看安全工器具信息',
+                url: '/ToolEquipmentManage/Toolequipment/Form?action=show&actiontype=view&keyValue=' + keyValue + '&ToolType=' + "2",
+                //content: top.contentPath + '/SafeReward/SafeReward/Form?action=show&keyValue=' + keyValue,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //查看二维码
+    function GetQrCode(id, equName, equNo) {
+        id = id + "|安全工器具";
+        var url = "../../Utility/BuilderImage?keyValue=" + id;
+        $("#imgEquQrCode").attr("src", url);
+        var equMaxLen = 40;
+        var equ = $("#divEquName");
+        equ.attr("title", equName);
+        equ.text(equName.length > equMaxLen ? equName.substring(0, equMaxLen) + "..." : equName);
+        $("#divEquNo").text(equNo);
+        $("#QrCodeModal").modal('show');
+        $("#aDow").attr("href", "../../Utility/DownloadQrImage10?keyValue=" + id + "&equipName=" + encodeURIComponent(equName) + "&equipNo=" + encodeURIComponent(equNo));
+    }
+    //导出
+    function exportData() {
+        var queryJson = {
+            ToolType: "2",
+            Etype: $("#EquipmentType").attr('data-value'),
+            code: _parentId,
+            isOrg: _isOrg,
+            startTime: request("st"),
+            endTime: request("et")
+        }
+        location.href = "../../ToolEquipmentManage/Toolequipment/Export?queryJson=" + JSON.stringify(queryJson) + "&tooltype=" + "2";
+    }
+    //批量生成二维码
+    function builderImg() {
+        var ids = $("#gridTable").jqGridRowValue("id");
+        if (ids.length == 0) {
+            dialogMsg("请选择至少一条记录！", 0);
+            return false;
+        } else {
+            idx = dialogOpen({
+                id: "Builder",
+                title: '生成二维码',
+                url: '/ToolEquipmentManage/Toolequipment/BuilderImage?equiptype=安全工器具',
+                width: "800px",
+                height: ($(window).height() - 80) + "px",
+                btn: ["导出", "关闭"],
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+        }
+    }
+    function reset()  {
+        $("#EquipmentType").attr("data-text", "==请选择==");
+        $("#EquipmentType").attr("data-value", "");
+        $("#EquipmentType div:eq(0)").text("==请选择==");
+        $("#queryCondition .dropdown-text").html("==请选择==").attr('data-value', "");
+        $("#txt_Keyword").val("");
+        $('#btn_Search').trigger("click");
+    };
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入安全工器具',
+            url: '/ToolEquipmentManage/Toolequipment/Import?tooltype=2',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    $("#gridTable").jqGrid('setGridParam', {
+                        postData: { keyWord: "" }
+                    }).trigger('reloadGrid');
+                }
+
+            }
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <ul class="nav nav-tabs">
+                <li class="active"><a href="#itemTreePanel" data-toggle="tab">按部门</a></li>
+                <li class="col-md-2 text-right" style="display:inline-block;float:right;margin-top:8px;"><i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i></li>
+            </ul>
+            <div class="tab-content">
+                <div id="itemTreePanel" class="tab-pane active">
+                    @*<div class="center-Panel">
+                        <div class="panel panel-default">*@
+                            <div id="itemTree"></div>
+                        @*</div>
+                    </div>*@
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">安全工器具</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown" aria-expanded="false">颜色说明</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="true"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li style="width: 230px;">
+                                            <a style="float: left">设备逾期未检验</a>
+                                            <div style="float: left; margin-left: 24px; background-color: red; height: 22px; width: 80px;"></div>
+                                        </li>
+                                        <li style="width: 230px;">
+                                            <a style="float: left">设备即将到期未检验</a>
+                                            <div style="float: left; background-color: orange; height: 22px; width: 80px;"></div>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left: 20px;">
+                                设备类别：
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <div id="EquipmentType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width: 130px;">
+                                    <ul>
+                                        <li data-value="1">电气安全工器具</li>
+                                        <li data-value="2">机械、化学工器具</li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a data-value="equipmentvalue">设备名称</a></li>
+                                        <li><a data-value="equipmentno">设备编号</a></li>
+                                        <li><a data-value="specifications">规格型号</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 130px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>全部</a>
+                                &nbsp;<a id="btn_Reset" class="btn btn-primary" onclick="reset()"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>          
+                        <a class="btn btn-default" onclick="builderImg()"><i class="fa fa-th"></i>&nbsp;生成二维码</a>
+                        <a id="export" class="btn btn-default" onclick="exportData()"><i class="fa fa-download"></i>&nbsp;导出</a>                  
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal" id="QrCodeModal">
+    <div class="modal-dialog" style="width:377px;height:414px;">
+        <div class="modal-content" style="text-align:center;">
+            <div class="modal-header">
+                <h5>工器具二维码</h5>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <img id="imgEquQrCode" style="width:302px;height:302px;" />
+                <div style="text-align:center;">
+                    <div id="divEquName">设备名称</div>
+                    <div id="divEquNo">设备编号</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a id="aDow" href="#" target="_blank" style="float: left; color: black; text-decoration: underline; font-size: 12px; margin-top:7px;">下载二维码</a>
+                <button id="btnModal" type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>

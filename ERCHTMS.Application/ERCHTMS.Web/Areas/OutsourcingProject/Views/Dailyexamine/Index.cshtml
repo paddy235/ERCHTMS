@@ -1,0 +1,461 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+<script>
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户id
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var orgid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";  //部门信息
+    var state = 0;
+    var qtype = request('qtype');//首页代办
+    var examinetodeptid = "";
+    var safeids = request('safeids'); // 安全检查过来的id
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+        GetTree();
+        safeCheck();
+    });
+
+    // 安全检查调转过来的数据直接打开新增页面
+    function safeCheck() {
+        
+        if (safeids) {
+            window.setTimeout(function () {
+                dialogOpen({
+                    id: 'Form',
+                    title: '添加日常考核',
+                    url: '/OutsourcingProject/Dailyexamine/Form?actiontype=add&safeids=' + safeids,
+                    width: ($(top.window).width() - 200) + "px",
+                    height: ($(top.window).height() - 150) + "px",
+                    btn: null,
+                    callBack: function (iframeId) {
+                        top.frames[iframeId].AcceptClick();
+                    }
+                });
+            }, 200);
+            
+        }
+    }
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth($(".gridPanel").width());
+                $('#gridTable').setGridHeight($(window).height() - 150);
+                $("#itemTree").setTreeHeight($(window).height() - 55);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+              {
+                  SelectMode: 0,
+                  Mode: 1,
+                  Ids: orgid
+              }
+            );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                examinetodeptid = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            qtype: qtype
+        };
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 150,
+            url: "../../OutsourcingProject/Dailyexamine/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                 { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 100, align: 'center', sortable: false
+                },
+                { label: '考核编号', name: 'examinecode', index: 'examinecode', width: 100, align: 'center', sortable: true },
+                { label: '考核类别', name: 'examinetype', index: 'examinetype', width: 100, align: 'center' },
+                {
+                    label: '考核内容', name: 'examinecontent', index: 'examinecontent', width: 550, align: 'left',headerAlign:"center", formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (cellvalue) {
+                            if (cellvalue.length > 500) {
+                                cellvalue = cellvalue.substring(0, 500) + "...";
+                            }
+                            html = "<div style='white-space: normal;line-height: initial;'>" + cellvalue + "</div>"
+                        }
+                        return html;
+                    }
+                },
+                {
+                    label: '被考核单位', name: 'examinetodept', index: 'examinetodept', width: 100, align: 'center'
+                },
+                { label: '考核金额', name: 'examinemoney', index: 'examinemoney', width: 100, align: 'center' },
+                { label: '考核人', name: 'examineperson', index: 'examineperson', width: 100, align: 'center' },
+                {
+                    label: '备注', name: 'remark', index: 'remark', width: 300, align: 'center'
+                },
+                { label: '审核状态', name: 'auditresult', index: 'auditresult', align: 'center',sortable:false
+                      ,formatter: function (cellvalue, options, rowObject) {
+                          if (rowObject.issaved == "0") {
+                              return "未提交";
+                          } else if (rowObject.issaved == "2") {
+                              return "审核未通过";
+                          } else {
+                              if (rowObject.isover == 0) {
+                                  return "待审核";
+                              }else{
+                                  return "审核完成";
+                              }
+                          }
+
+                      }
+                },
+                { label: '流程部门编码/ID', name: 'flowdept', hidden: true },
+                { label: '流程角色名称', name: 'flowrolename', hidden: true },
+                { label: '创建人所属部门Code', name: 'createuserdeptcode', hidden: true },
+                { label: '创建人所属机构Code', name: 'createuserorgcode', hidden: true },
+                { label: '创建人用户ID', name: 'createuserid', hidden: true },
+                { label: '是否保存', name: 'issaved', hidden: true },
+                { label: '是否流程完成', name: 'isover', hidden: true }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+
+                var $gridTable = $('#gridTable');
+                var rows = $gridTable.jqGrid("getRowData");//获取当前页记录行数据
+                //查询用户对该模块的数据操作权限
+                $.post(top.contentPath + "/AuthorizeManage/PermissionJob/GetDataAuthority", { __RequestVerificationToken: $("input[name='__RequestVerificationToken']").val() }, function (data) {
+                    var jsonArr = eval("(" + data + ")");
+                    $(rows).each(function (k, item) {
+                        var uId = item.createuserid;
+                        var keyValue = item.id;
+                        var dCode = item.createuserdeptcode; //获取记录创建人的所属部门Code
+                        var oCode = item.createuserorgcode;  //获取记录创建人的所属机构Code
+                        var html = "";
+
+
+                        html += "<a href=javascript:show('" + item.id + "','" + item.issaved + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+                        //当issaved为0,则为登记状态，可以编辑，反之则无法编辑
+                        if (UserId == item.createuserid && item.issaved == "0") {
+                            html += "<a href=javascript:btn_edit('" + item.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>&nbsp;";
+                            html += "<a href=javascript:btn_delete('" + item.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>&nbsp;";
+                        }
+                        if (!!roleNames) {
+                            var roleArr = roleNames.split(','); //当前人员角色
+                            var roleName = item.flowrolename; //审核橘色
+                            var curdept = item.flowdept; //审核部门
+                            for (var i = 0; i < roleArr.length; i++) {
+                                //满足审核部门同当前人部门id一致，切当前人角色存在与审核角色中
+                                if (curdept == deptId && roleName.indexOf(roleArr[i]) >= 0) {
+                                    html += "<a href=javascript:btn_approve('" + item.id + "')  title='审核'><i class='fa fa-check'></i></a>";
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (item.isover == "1") {
+                            $(jsonArr).each(function (j, item1) {
+                                var authType = parseInt(item1.authorizetype);//获取数据操作权限范围.1：本人,2：本部门，3：本部门及下属部门，4：本机构，5：全部
+                                switch (authType) {
+                                    //本用户
+                                    case 1:
+                                        if (top.currUserId == uId) {
+                                            html += "<a href=\"javascript:" + item1.actionname + "('" + item.id + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                        //本部门
+                                    case 2:
+                                        if (top.currUserOrgCode == dCode) {
+                                            html += "<a href=\"javascript:" + item1.actionname + "('" + item.id + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                        //本子部门
+                                    case 3:
+                                        if (dCode.indexOf(top.currUserOrgCode) >= 0) {
+                                            html += "<a href=\"javascript:" + item1.actionname + "('" + item.id + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                        //本机构
+                                    case 4:
+                                        if (oCode == top.currUserOrgCode) {
+                                            html += "<a href=\"javascript:" + item1.actionname + "('" + item.id + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        }
+                                        break;
+                                    case 5:
+                                        html += "<a href=\"javascript:" + item1.actionname + "('" + item.id + "')\" title=\"" + item1.fullname + "\"><i class=\"" + item1.faimage + "\"></i></a>";
+                                        break;
+                                }
+
+
+                            });
+                        }
+
+
+                        $("td[aria-describedby='gridTable_oper']").eq(k).html(html);
+
+                    });
+                });
+            },
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var StartTime = $("#sTime").val();
+            var EndTime = $("#eTime").val();
+            if (new Date(StartTime.replace("-", "/").replace("-", "/")) > new Date(EndTime.replace("-", "/").replace("-", "/"))) {
+                alert("开始时间不可大于结束时间！");
+                return;
+            }
+            var queryJson = {
+                sTime: StartTime,
+                eTime: EndTime,
+                examinetype: $("#examinetype").val(),
+                examinecontent: $("#examinecontent").val(),
+                examinetodeptid: examinetodeptid
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加日常考核',
+            url: '/OutsourcingProject/Dailyexamine/Form?actiontype=add',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //查看
+    function show(id, issaved) {
+        var keyValue = id;
+        var title = "查看日常考核";
+        var url = "";
+        //登记情况下查看审核的详情
+        if (issaved == "0") {
+            url = "/OutsourcingProject/Dailyexamine/Form?keyValue=";
+
+        } else {  //非登记状态下查看
+            url = "/OutsourcingProject/Dailyexamine/ApproveForm?keyValue=";
+        }
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: title,
+                url: url + keyValue + '&actiontype=view',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //编辑
+    function btn_edit(id, engineerid) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑日常考核',
+                url: '/OutsourcingProject/Dailyexamine/Form?actiontype=edit&keyValue=' + keyValue,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function btn_delete(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../OutsourcingProject/Dailyexamine/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的日常考核！', 0);
+        }
+    }
+
+    //审核日常考核
+    function btn_approve(id, engineerid) {
+        var keyValue = id;
+        var title = "审核日常考核";
+        var url = "/OutsourcingProject/Dailyexamine/ApproveForm?keyValue=";
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "AppForm",
+                title: title,
+                url: url + keyValue,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //导出
+    function exportResult(){
+        var StartTime = $("#sTime").val();
+        var EndTime = $("#eTime").val();
+        if (new Date(StartTime.replace("-", "/").replace("-", "/")) > new Date(EndTime.replace("-", "/").replace("-", "/"))) {
+            alert("开始时间不可大于结束时间！");
+            return;
+        }
+        var queryJson = {
+            sTime: StartTime,
+            eTime: EndTime,
+            examinetype: $("#examinetype").val(),
+            examinecontent: $("#examinecontent").val(),
+            examinetodeptid: examinetodeptid
+        }
+        location.href = "../../OutsourcingProject/Dailyexamine/ExportData?queryJson=" + JSON.stringify(queryJson);
+    }
+
+    function ResetCondition()
+    {
+        $("#sTime").val("");
+        $("#eTime").val("");
+        $("#examinetype").val("");
+        $("#examinecontent").val("");
+        $("div[unselectable='on']").attr("class", "bbit-tree-node-el bbit-tree-node-expanded");
+        examinetodeptid = "";
+    }
+
+    function examineCollent() {
+        var dlg = dialogOpen({
+            id: "examineCollent",
+            title: "日常考核汇总",
+            url: "/OutsourcingProject/Dailyexamine/ExamineCollent?sTime=" + $("#sTime").val() + '&eTime=' + $("#eTime").val() + '&examinetype=' + $("#examinetype").val() + '&examinecontent=' + $("#examinecontent").val() + '&examinetodeptid=' + examinetodeptid,
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right: 8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor: pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="text-align:right;">
+                                考核时间：
+                            </td>
+                            <td style="width:100px">
+                                <input id="sTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" style="width:100px" />
+                            </td>
+                            <td style="width: 20px; text-align: center;">至</td>
+                            <td>
+                                <input id="eTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" style="width:100px" />
+                            </td>
+                            <td style="width:70px; text-align:right;">考核类别：</td>
+                            <td style="width:100px">
+                                <select id="examinetype" class="form-control">
+                                    <option value="">请选择</option>
+                                    <option value="安全管理">安全管理</option>
+                                    <option value="文明生产">文明生产</option>
+                                    <option value="生产管理">生产管理</option>
+                                    <option value="技术监督">技术监督</option>
+                                    <option value="缺陷管理">缺陷管理</option>
+                                    <option value="其他">其他</option>
+                                </select>
+                            </td>
+                            <td style="width:70px; text-align:right;">考核内容：</td>
+                            <td style="width:150px">
+                                <input id="examinecontent" type="text" class="form-control" placeholder="请输入搜索关键字" />
+                            </td>
+                            <td style="padding-left:5px">
+                                <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                            </td>
+                            <td style="padding-left:5px">
+                                <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a  class="btn btn-default" onclick="examineCollent()"><i class="fa fa-refresh"></i>考核汇总表</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,477 @@
+﻿@{
+    ViewBag.Title = "区域管理";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<style type="text/css">
+    .ui-jqgrid tr.jqgrow td{
+        white-space:normal !important;
+        height:auto;
+        vertical-align:text-top;
+    }
+    .ui-state-default ui-th-column ui-th-ltr{
+        text-align:center;
+    }
+</style>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var parentId = request('parentId');
+    var mode = request('mode');
+    var workId = request('workId');
+    var dangerId = request('dangerId');
+    var areaId = request('areaId');
+    var areaName = request('areaName');
+    var workName = request('workName');
+    var dangerName = request('dangerName');
+    $(function () {
+        initControl();
+        GetGrid();
+    })
+    //初始化控件
+    function initControl() {
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../RiskDatabase/Risk/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#container").formDeserialize(data);
+                    selRiskType(document.getElementById("RiskType"));
+                    selWay(document.getElementById("Way"));
+                }
+            });
+        } else {
+            $("#WorkContent").val(decodeURIComponent(workName));
+            $("#AreaName").val(decodeURIComponent(areaName));
+            $("#DangerName").val(decodeURIComponent(dangerName));
+        }
+    }
+    //保存表单
+    function AcceptClick() {
+        if (!$('#container').Validform()) {
+            return false;
+        }
+        var json="";
+        var postData = $("#container").formSerialize(keyValue);
+        var measures = $("#gridTable").jqGrid('getRowData');
+        if(measures.length>0){
+                var arr = [];
+                $(measures).each(function (i, dom) {
+                    arr.push({ Content: dom.Content, TypeName: dom.TypeName, TypeCode: dom.TypeCode, WorkId: workId, RiskId:$("#Id").val(),DangerId:dangerId });
+                });
+                json=JSON.stringify(arr);
+         }
+         postData["AccidentName"] = $(".filter-option").text();
+        $.SaveForm({
+            url: "../../RiskDatabase/Risk/SaveForm?keyValue=" + keyValue + "&measuresJson=" + json,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                if (top.win != undefined) {
+                    top.win.initControl();
+                  top.win.$("#gridTable").trigger("reloadGrid");
+                } else {
+                    $.currentIframe().window.initControl();
+                    $.currentIframe().window.$("#gridTable").trigger('reloadGrid');
+                }
+            }
+        })
+    }
+    var selectedRowIndex = 0;
+    //加载表格
+    function GetGrid() {
+        var arr = new Array("", "1", "2", "3", "4");
+        var types = new Array("工程技术", "管理", "个体防护", "培训教育", "应急处置");
+        $(arr).each(function (i, idx) {
+            var $gridTable = $("#gridTable" + idx);
+            $gridTable.jqGrid({
+                url: "../../RiskDatabase/Measures/GetListJson",
+                postData: { riskId: !!keyValue ? keyValue : "-1", typeName: types[i] },
+                datatype: "json",
+                height: 200,
+                width: $(window).width() - 100,
+                cellEdit: true,
+                sortable: false,
+                colModel: [
+                    { label: '主键', name: 'id', hidden: true },
+                    //{ label: '措施类型', name: 'TypeName', width: 300, align: 'center' },
+                    {
+                        label: '具体措施', name: 'content', width: 300, align: 'left', headerAlign: "center", sortable: false
+                       
+                    }
+                ],
+                // pager: "#gridPager",
+                viewrecords: true,
+                rowNum: 20,
+                rowList: [20, 50, 100],
+                rownumbers: true
+
+            });
+           
+        });
+
+        //var $gridTable = $("#gridTable");
+        //$gridTable.jqGrid({
+        //    url: "../../RiskDatabase/Measures/GetListJson",
+        //    postData: { workId: workId, dangerId: dangerId, riskId: !!keyValue?keyValue:"-1" },
+        //    datatype: "json",
+        //    height:200,
+        //    autowidth: true,
+        //    colModel: [
+        //        { label: '主键', name: 'id', hidden: true },
+        //        { label: '具体措施', name: 'content', width: 300, align: 'left' }
+        //    ],
+        //    // pager: "#gridPager",
+        //    viewrecords: true,
+        //    rowNum: 20,
+        //    rowList: [20, 50, 100],
+        //    rownumbers: true,
+        //    onSelectRow: function () {
+        //        selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+        //    },
+        //    gridComplete: function () {
+        //        $("#" + this.id).setSelection(selectedRowIndex, false);
+        //    }
+        //});
+        //查询事件
+       
+    }
+    //删除管控措施
+    function del(id,workId) {
+        var jqTable = $("#gridTable"); 
+        //alert($("#gridTable").jqGrid('getRowData'));
+        if (workId.length>0) {
+          $.RemoveForm({
+            url: "../../RiskDatabase/Measures/RemoveForm",
+            param: { keyValue: id },
+            success: function (data) {
+                jqTable.delRowData(jqTable.getGridParam('selrow'));
+           }
+           })
+        } else {
+            var idx = dialogConfirm("确认删除吗？", function (isSure) {
+                if (isSure) {
+                    jqTable.delRowData(jqTable.getGridParam('selrow'));
+                    top.layer.close(idx);
+                } else {
+                    top.layer.close(idx);
+                }
+            });
+        }
+    }
+    //管控措施
+    var idx1 = null;
+    function addMeasure(obj) {
+        idx1=dialogOpen({
+            id: "Measure",
+            title: "采取的风险控制措施",
+            url: '/RiskDatabase/Measures/Form?workId=' + workId + "&dangerId=" + dangerId + "&areaId=" + areaId + "&workName=" + encodeURIComponent(workName)+"&riskId="+$("#Id").val(),
+            width: "500px",
+            height:  "400px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    };
+    function selWay(obj) {
+        var val = $(obj).val();
+        var arr = null;
+        if (obj.id == "Way1") {
+            mark = true;
+        }
+        if (val == "LEC") {
+            arr = new Array("事故发生的可能性L<font face='宋体'>*</font>", "暴露于危险环境的频繁程度E<font face='宋体'>*</font>", "发生事故产生的后果C<font face='宋体'>*</font>");
+        } else if (val == "PSE") {
+            arr = new Array("可能性 P<font face='宋体'>*</font>", "后果 S<font face='宋体'>*</font>", "暴露 E<font face='宋体'>*</font>");
+        } else {
+            arr = new Array("事故发生的可能性L<font face='宋体'>*</font>", "事故后果严重程度S<font face='宋体'>*</font>");
+        }
+        for (var j = 1; j < 4; j++) {
+            $("." + obj.id + j).html(arr[j - 1]);
+        }
+        for (var j = 1; j < 4; j++) {
+            if (val == "TRA" && j == 3) {
+                $("." + obj.id + j).next().find("input").removeAttr("checkexpession");
+                $("." + obj.id + j).next().find("input").removeAttr("isvalid", "yes");
+                $("." + obj.id + j).hide();
+                $("." + obj.id + j).next().hide();
+            } else {
+                $("." + obj.id + j).next().find("input").attr("checkexpession", "NotNull");
+                $("." + obj.id + j).next().find("input").attr("isvalid", "yes");
+                $("." + obj.id + j).show();
+                $("." + obj.id + j).next().show();
+            }
+        }
+    }
+    function selRiskType(obj) {
+        var val = $(obj).val();
+        switch (val) {
+            case "设备":
+                $("#tabContent").find("tr").show();
+                $("#tr80").show(); $("#tr70").show(); $("#tr5").hide();
+                $("#tr1").show(); $("#tr2").show(); $("#tr3").hide(); $("#tr4").hide(); $("#tr0").show();
+                $("#tr10").hide(); $("#tr20").hide(); $("#tr30").hide(); $("#tr40").hide();
+                break;
+            case "管理":
+                $("#tabContent").find("tr").show();
+                $("#tr80").hide(); $("#tr70").show(); $("#tr5").show();
+                $("#tr0").show(); $("#tr1").hide(); $("#tr2").hide(); $("#tr3").hide(); $("#tr4").hide();
+                $("#tr10").hide(); $("#tr20").hide(); $("#tr30").hide(); $("#tr40").hide();
+                break;
+            case "环境":
+                $("#tabContent").find("tr").show();
+                $("#tr80").hide(); $("#tr70").show(); $("#tr5").show();
+                $("#tr1").hide(); $("#tr2").hide(); $("#tr3").hide(); $("#tr4").hide(); $("#tr0").show();
+                $("#tr10").hide(); $("#tr20").hide(); $("#tr30").hide(); $("#tr40").hide();
+                break;
+            case "作业":
+                $("#tabContent").find("tr").show();
+                $("#tr80").hide(); $("#tr70").show(); $("#tr5").show();
+                $("#tr1").hide(); $("#tr2").hide(); $("#tr3").show(); $("#tr4").show(); $("#tr0").show();
+                $("#tr10").hide(); $("#tr20").hide(); $("#tr30").hide(); $("#tr40").hide();
+                break;
+            case "职业病危害":
+                $("#tabContent").find("tr").hide();
+
+                $("#tr80").hide(); $("#tr70").show(); $("#tr5").hide();
+                $("#tr").show(); $("#tr10").show(); $("#tr20").show(); $("#tr30").show(); $("#tr40").show(); $("#tr0").show();
+                $("#tr50").show(); $("#tr60").show(); $("#tr90").show();
+                $("#EquipmentName").removeAttr("isvalid");
+                $("#Parts").removeAttr("isvalid");
+                $("#Process").removeAttr("isvalid");
+                $("#WorkTask").removeAttr("isvalid");
+                $("#DangerSource").removeAttr("isvalid");
+                $("#RiskDesc").removeAttr("isvalid"); $("#AccidentType").removeAttr("isvalid");
+                $("#ResultType").removeAttr("isvalid"); $("#Result").removeAttr("isvalid");
+                break;
+
+        }
+    }
+</script>
+<div style="margin:10px;" id="container">
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;风险辨识</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table class="form" id="tabContent">
+                    
+                    <tr id="tr">
+                        <td class="formTitle" style="width:150px;">风险类别<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="RiskType" type="text" class="form-control" placeholder="请输入风险后果" isvalid="yes" checkexpession="NotNull" readonly />
+                        </td>
+                    </tr>
+                    <tr id="tr0">
+                        <td class="formTitle" style="width:150px;">所属区域<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="AreaName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                        </td>
+                    </tr>
+                    <tr id="tr10" style="display:none;">
+                        <td class="formTitle">风险点<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="MajorName" type="text" class="form-control" placeholder="风险点" />
+                        </td>
+                    </tr>
+                    <tr id="tr20" style="display:none;">
+                        <td class="formTitle">职业病危害因素<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="Description" type="text" class="form-control" placeholder="职业病危害因素" />
+                        </td>
+                    </tr>
+                    <tr id="tr30" style="display:none;">
+                        <td class="formTitle">作业分级<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="HarmType" type="text" class="form-control" />
+                             
+                        </td>
+                    </tr>
+                    <tr id="tr40" style="display:none;">
+                        <td class="formTitle">导致的职业病或健康损伤<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input type="text" id="HarmProperty" class="form-control" isvalid="yes" checkexpession="NotNull"></input>
+                                
+                        </td>
+                    </tr>
+
+                    <tr id="tr1" style="display:none;">
+                        <td class="formTitle">设备名称<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="EquipmentName" type="text" class="form-control" placeholder="请输入设备名称" isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+                    <tr id="tr2" style="display:none;">
+                        <td class="formTitle">部件</td>
+                        <td class="formValue">
+                            <input id="Parts" type="text" class="form-control" placeholder="请输入部件"  />
+                        </td>
+                    </tr>
+                    <tr id="tr80" style="display:none;">
+                        <td class="formTitle">故障类型<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="FaultType" type="text" class="form-control" placeholder="请输入故障类型" />
+                        </td>
+                    </tr>
+                    <tr id="tr3">
+                        <td class="formTitle">工作任务<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="WorkTask" type="text" class="form-control" placeholder="请输入工作任务" isvalid="yes" checkexpession="NotNull" />
+                        </td>
+                    </tr>
+                    <tr id="tr4">
+                        <td class="formTitle">工序</td>
+                        <td class="formValue">
+                            <input id="Process" type="text" class="form-control" placeholder="请输入工序"  />
+                        </td>
+                    </tr>
+
+                    <tr id="tr5">
+                        <td class="formTitle">危险源<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DangerSource" type="text" class="form-control" placeholder="请输入危险源或潜在事件" isvalid="yes" checkexpession="NotNull" readonly />
+                        </td>
+                    </tr>
+                    <tr id="tr6">
+                        <td class="formTitle">危害因素</td>
+                        <td class="formValue">
+                            <input id="RiskDesc" type="text" class="form-control" placeholder="请输入风险描述"  />
+                        </td>
+                    </tr>
+                    @*<tr id="tr7">
+                        <td class="formTitle">风险后果分类<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ResultType" type="text" class="form-control" placeholder="请输入风险后果" isvalid="yes" checkexpession="NotNull" readonly />
+                        </td>
+                    </tr>*@
+                    <tr id="tr8">
+                        <td class="formTitle">危害后果<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="Result" type="text" class="form-control" placeholder="请输入风险后果" isvalid="yes" checkexpession="NotNull" readonly />
+                        </td>
+                    </tr>
+                    @*<tr id="tr9">
+                        <td class="formTitle">可能导致的事故类型<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="AccidentName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                        </td>
+                    </tr>*@
+                    <tr id="tr70">
+                        <td class="formTitle">管控层级<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="LevelName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                           @* <div id="LevelName" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>*@
+                        </td>
+                    </tr>
+                    <tr id="tr50">
+                        <td class="formTitle">管控责任单位<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="DeptName" type="text" class="form-control" placeholder="请选择管控责任单位" isvalid="yes" checkexpession="NotNull" readonly />
+                        </td>
+                    </tr>
+                    <tr id="tr90">
+                        <td class="formTitle">管控责任岗位</td>
+                        <td class="formValue">
+                            <input id="PostName" type="text" class="form-control" placeholder="请选择岗位" readonly />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+        </div>
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;采取的风险控制措施</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <ul class="nav nav-tabs">
+                    <li class="active" data-index=""><a href="#con" data-toggle="tab">工程技术</a></li>
+                    <li data-index="1"><a href="#con1" data-toggle="tab">管理</a></li>
+                    <li data-index="2"><a href="#con2" data-toggle="tab">个体防护</a></li>
+                    <li data-index="3"><a href="#con3" data-toggle="tab">培训教育</a></li>
+                    <li data-index="4"><a href="#con4" data-toggle="tab">应急处置</a></li>
+
+                </ul>
+                <div class="tab-content" style="padding-top: 15px;">
+                    <div id="con" class="tab-pane active" style="padding-right: 30px;">
+                        <table id="gridTable" typename="工程技术"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                    <div id="con1" class="tab-pane" style="padding-right: 30px;">
+                        <table id="gridTable1" typename="管理"></table>
+                        <div id="gridPager1"></div>
+                    </div>
+                    <div id="con2" class="tab-pane" style="padding-right: 30px;">
+                        <table id="gridTable2" typename="个体防护"></table>
+                        <div id="gridPager2"></div>
+                    </div>
+                    <div id="con3" class="tab-pane" style="padding-right: 30px;">
+                        <table id="gridTable3" typename="培训教育"></table>
+                        <div id="gridPager3"></div>
+                    </div>
+                    <div id="con4" class="tab-pane" style="padding-right: 30px;">
+                        <table id="gridTable4" typename="应急处置"></table>
+                        <div id="gridPager4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;风险控制效果评估</strong>
+                <span class="tools pull-right">
+                    <a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle" style="width:150px;">风险评估方法<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3">
+                            <input id="Way" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle Way1">事故发生的可能性L<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ItemA" type="text" class="form-control" placeholder="请选择" readonly isvalid="yes" checkexpession="NotNull" />
+
+                        </td>
+                        <td class="formTitle Way2">露于危险环境的频繁程度E<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ItemB" type="text" class="form-control" placeholder="请选择" readonly isvalid="yes" checkexpession="NotNull" />
+
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle Way3">发生事故产生的后果C<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ItemC" type="text" class="form-control" placeholder="请选择" readonly isvalid="yes" checkexpession="NotNull" />
+
+                        </td>
+                        <td class="formTitle">风险值R<font face="宋体">*</font></td>
+                        <td class="formValue">
+                            <input id="ItemR" type="text" class="form-control" placeholder="结果自动计算" readonly isvalid="yes" checkexpession="NotNull" />
+
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle" style="width:150px;">风险等级<font face="宋体">*</font></td>
+                        <td class="formValue" colspan="3" >
+                            <input id="Grade" type="text" class="form-control" placeholder="自动获取" readonly isvalid="yes" checkexpession="NotNull" / >
+                            <input id="GradeVal" type="hidden" />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+</div>

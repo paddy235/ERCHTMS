@@ -1,0 +1,243 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script>
+    var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+    var areaId = request('areaId');
+    var planId = request('planId');
+    var AreaId = "";//所有区域id，用来验证是否重复
+    var keyValue = request('keyValue');
+    var action= request('action');
+    var myid;
+    $(function () {
+        initControl();
+        GetUser();
+        if (action == "show") {
+            $("#AreaId").attr("readonly", "readonly");
+            $("#RiskValue").removeAttr("onclick");
+            $("#UserName").removeAttr("onclick");
+        }
+    });
+    //初始化控件
+    function initControl() {
+        var url = top.contentPath + "/BaseManage/District/GetTreeJson";
+        //加载区域
+        $("#AreaId").ComboBoxTree({
+            url: url + "?orgID=" + orgId + "&areaIds=" + areaId + "&planId=" + planId,
+            height: "100px",
+            description: "请选择"
+        }).bind("change", function () {
+            $("#AreaValue").val($("#AreaId").attr("data-text"));
+
+        });
+
+        ////加载区域数据
+        //$("#AreaId").ComboBox({
+        //    url: top.contentPath + "/OccupationalHealthManage/Occupationalstaffdetail/GetCmbJson?Code=Area",
+        //    id: "ItemValue",
+        //    text: "ItemName",
+        //    height: '100px',
+        //    description: "==请选择==",
+        //    allowSearch: true
+        //}).bind("change", function () {
+        //    $("#AreaValue").val($(this).attr('data-text'));
+
+        //});
+
+
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../OccupationalHealthManage/Hazardfactors/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    myid = data.AreaId;
+                    GetUsers();
+                    // $("#Area").trigger("change");
+                    //if (data.Riskid != null && data.Riskid != undefined) {
+                    //    $("#RiskId").val(data.Riskid);
+                    //    $("#RiskId").find("option").each(function (i, dom) {
+                    //        if (data.Riskid.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                    //            $(dom).attr("selected", "selected");
+
+                    //        }
+                    //    });
+                    //}
+                }
+            })
+        }
+    }
+
+    function GetUsers() {
+        //初始化职位json
+        $.ajax({
+            url: top.contentPath + "/OccupationalHealthManage/Hazardfactoruser/GetListJson?queryJson="+keyValue,
+            type: "get",
+            dataType: "json",
+            async: false,
+            success: function (data) {
+                var username = "";
+                var userid = "";
+                for (var i = 0; i < data.length; i++) {
+                    if (i == 0) {
+                        username = data[i].UserName;
+                        userid = data[i].UserId;
+                    } else {
+                        username +=","+ data[i].UserName;
+                        userid += "," + data[i].UserId;
+                    }
+                }
+                $("#UserId").val(userid);
+                $("#UserName").val(username);
+            }
+        });
+    }
+
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        var postData = $("#form1").formSerialize(keyValue);
+        $.SaveForm({
+            url: "../../OccupationalHealthManage/Hazardfactors/SaveForm?keyValue=" + keyValue,
+            param: { entity: postData, UserName: $("#UserName").val(), UserId: $("#UserId").val() },
+            loading: "正在保存数据...",
+            success: function (data) {
+                if (data.message == "1") {
+                    dialogMsg('操作成功！', 1);
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                } else {
+                    dialogMsg('请不要提交重复数据！', 0);
+                    return false;
+                }
+            }
+        })
+
+    }
+
+    /// <summary>
+    /// 选择职业病种类
+    /// </summary>
+    ///<param name="deptId">查询条件，根据mode的值查询方式会不同</param>
+    /// <param name="checkMode">单选或多选，0:单选，1:多选</param>
+    /// <param name="mode">查询模式，0:获取机构ID为Ids下所有的部门(即EnCode=Ids)，1:获取部门ParentId为Ids下所有部门(即ParentId=Ids)，2:获取部门的parentId在Ids中的部门(即EnCode in(Ids))，3:获取部门Id在Ids中的部门(即DepartmentId in(Ids))4.获取承包商和分包商</param>
+    ///<param name="title">弹出层标题</param>
+    ///<param name="winObject">窗体中需要查找domId的对象，一般可写成window.document.body或this.parentNode</param>
+    ///<param name="domId">接收返回值的dom节点的ID，多个用逗号分隔，顺序依次为部门名称,部门Code，部门Id,部门负责人姓名,部门负责人ID（多选用逗号分隔）</param>
+    function selectTree(Code, checkMode, mode, title, winObject, domId, deptIds) {
+        return dialogOpen({
+            id: "Staff",
+            title: title,
+            url: '/OccupationalHealthManage/Hazardfactors/Select?Code=' + Code + "&checkMode=" + checkMode + "&mode=" + mode + "&deptIds=" + deptIds,
+            width: "700px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(winObject, domId, window);
+            }
+        });
+    }
+
+    /// <summary>
+    /// 选择用户
+    /// </summary>
+    ///<param name="deptId">查询条件，根据mode的值查询方式会不同</param>
+    /// <param name="checkMode">单选或多选，0:单选，1:多选</param>
+    /// <param name="mode">查询模式，0:获取机构ID为Ids下所有的部门(即OrganizeId=Ids)，1:获取部门ParentId为Ids下所有部门(即ParentId=Ids)，2:获取部门的parentId在Ids中的部门(即ParentId in(Ids))，3:获取部门Id在Ids中的部门(即DepartmentId in(Ids))</param>
+    ///<param name="winObject">窗体中需要查找domId的对象，一般可写成window.document.body或this.parentNode</param>
+    ///<param name="domId">接收返回值的dom节点的ID，多个用逗号分隔，顺序依次为用户名称,用户账号，用户Id（多选用逗号分隔）</param>
+    ///<param name="userIds">用户页面带过来的用户ids</param>
+    function selectUser(options) {
+        var deptCode = options.deptCode == undefined ? "" : options.deptCode;
+        return dialogOpen({
+            id: "User",
+            title: "选择用户",
+            url: '/BaseManage/User/Select?deptId=' + options.deptId + "&checkMode=" + options.checkMode + "&mode=" + options.mode + "&deptCode=" + deptCode + "&userIds=" + "UserId",// options.userIds,
+            width: ($(top.window).width() - 200) + "px",
+            height: "600px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick(options);
+                ChangeTxt();
+            }
+        });
+    }
+
+    function ChangeTxt() {
+        var value = $("#UserName").val();
+        var values = value.split(',');
+        $("#ContactNumber").val(values.length);
+    }
+
+    //查询已经录入区域
+    function GetUser() {
+        //初始化职位json
+        $.ajax({
+            url: top.contentPath + "/OccupationalHealthManage/Hazardfactors/GetList",
+            type: "get",
+            dataType: "json",
+            async: false,
+            success: function (data) {
+                for (var i = 0; i < data.length; i++) {
+                    if (i == 0) {
+                        AreaId = data[i].areaid;
+                    } else {
+                        AreaId += "," + data[i].areaid;
+                    }
+                }
+            }
+        });
+    }
+    function selectRisk() {
+        if (action == "add") {
+            selectTree('Risk', 1, 0, '选择职业病危害因素名称', window.document.body, 'RiskValue,,Riskid,,,', $('#Riskid').val())
+        }
+        else {
+            selectTree('Risk', 0, 0, '选择职业病危害因素名称', window.document.body, 'RiskValue,,Riskid,,,', $('#Riskid').val())
+        }
+    }
+
+
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle" style="width:150px;">区域<font face=“宋体”>*</font></td>
+            <td class="formValue">
+                <div id="AreaId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                @*<input type="hidden" id="AreaId" />*@
+                <input id="AreaValue" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" style="width: 150px;">职业病危害因素名称<font face=“宋体”>*</font></td>
+            <td class="formValue">
+                @*<select id="RiskId" class="form-control selectpicker show-menu-arrow" isvalid="yes" checkexpession="NotNull" multiple>
+                        @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetOptionsString("Risk"))
+                    </select>
+                    <input type="hidden" id="RiskValue" />*@
+
+                <input id="RiskValue" type="text" class="form-control" errormsg="职业病危害因素名称" placeholder="请选择职业病危害因素名称" isvalid="yes" checkexpession="NotNull" readonly onclick="selectRisk()" />
+                <input id="Riskid" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" style="width: 150px;">接触人员<font face=“宋体”>*</font></td>
+            <td class="formValue">
+                <input id="UserName" type="text" class="form-control" errormsg="接触人员" placeholder="请选择接触人员" isvalid="yes" checkexpession="NotNull" readonly onclick="selectUser({ deptId: '', deptCode: '', checkMode: 1, mode: 2, winObject: this.parentNode, domId: 'UserName,UserId' })" />
+                <input id="UserId" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" style="width: 150px;">接触人数<font face=“宋体”>*</font></td>
+            <td class="formValue">
+                <input id="ContactNumber" type="text" class="form-control" readonly="readonly" isvalid="yes" checkexpession="NumOrNull" />
+            </td>
+        </tr>
+
+    </table>
+</div>

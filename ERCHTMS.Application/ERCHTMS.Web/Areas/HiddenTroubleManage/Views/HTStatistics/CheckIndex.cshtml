@@ -1,0 +1,268 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+<script src="~/content/scripts/plugins/highcharts/highcharts.7.0.js"></script>
+<script src="~/content/scripts/plugins/highcharts/modules/exporting.7.0.js"></script>
+<script src="~/content/scripts/plugins/highcharts/modules/drilldown.7.0.js"></script> @*下钻获取图表数据*@
+@*<script src="~/content/scripts/plugins/highcharts/modules/exporting.js"></script>*@
+<style type="text/css">
+    $ {
+        demo .css;
+    }
+
+    .ui-row-ltr a {
+        padding-left: 0px;
+    }
+</style>
+
+<script src="~/content/scripts/plugins/highcharts/modules/no-data-to-display.7.0.js"></script>
+<script src="~/Content/scripts/business/check_statistics.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+
+    var ischeck = request("ischeck");
+
+    var iscompany = "";
+    var curDeptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var curDeptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";
+    var curOrganizeCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var curOrganizeName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeName";
+    $(function () {
+
+        $('#layout').height(1080);
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#layout').height(1080);
+                $('#gridTable1').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable1').setGridHeight($(window).height() / 2 - 100);
+                $('#gridTable2').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable2').setGridHeight($(window).height() / 2 - 100);
+            }, 800);
+            e.stopPropagation();
+        });
+
+        $("#lr-panel-one").css("background-color", "#337ab7");
+        $("#lr-panel-one").css("color", "#fff");
+        $("#CurPanel").val("统计图"); //标记当前活动的统计图
+        $("#lr-panel-one i").css("color", "#fff");
+
+
+        //默认设置隐患数量统计图及列表
+        //var widthValue = ($(window).width() - 300) + "px";
+        //var heightValue = "500px";
+
+        //$("#container1").css("min-width", widthValue);
+        //$("#container1").css("height", heightValue);
+        ///*趋势图*/
+        //$("#container2").css("min-width", widthValue);
+        //$("#container2").css("height", heightValue);
+
+        ///*对比图*/
+        //$("#container3").css("min-width", widthValue);
+        //$("#container3").css("height", heightValue);
+
+        $.ajax({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            data: { EnCode: "SaftyCheckType" },
+            type: "GET",
+            dataType: "json",
+            async: false,
+            success: function (data) {
+                data.splice(data.findIndex(function (x) { return x.ItemName == "其他安全检查"; }), 1)
+                $("#CheckDataType").ComboBox({
+                    data: data,
+                    id: "ItemValue",
+                    text: "ItemName",
+                    description: "==请选择==",
+                    height: "200px"
+                });
+                $("#CheckDataType").attr("data-text", "请选择");
+                $("#CheckDataType").attr("data-value", "");
+            }
+        });
+
+        //时间范围
+        $("#TimeScope").ComboBox({
+            id: "id",
+            text: "text",
+            url: "../../HiddenTroubleManage/HTStatistics/QueryTime",
+            description: "",
+            allowSearch: false
+        });
+
+        var curTimeScope = $("#TimeScope-option li:eq(0)").attr("data-value");
+        $("#TimeScope").ComboBoxSetValue(curTimeScope);
+        $("#TimeScope").attr("data-text", curTimeScope);
+        $("#TimeScope").attr("data-value", curTimeScope);
+
+
+
+        $.ajax({
+            type: "get",
+            url: "../../HiddenTroubleManage/HTStatistics/QueryCurUser",
+            success: function (data) {
+                iscompany = data;
+                if (iscompany == "1") {
+                    $("#DepartmentName").val(curOrganizeName);
+                    $("#DepartmentCode").val(curOrganizeCode);
+                }
+                else {
+                    $("#DepartmentName").val(curDeptName);
+                    $("#DepartmentCode").val(curDeptCode);
+                }
+
+                var queryJson = {
+                    deptCode: $("#DepartmentCode").val(),
+                    year: $("#TimeScope").attr("data-value"),
+                    hidPoint: $("#HidPoint").val(),
+                    hidRank: $("button[data-id='HidRank']").attr("title"),
+                    ischeck: ischeck,
+                    checkType: $("#CheckDataType").attr("data-value")
+                };
+
+                //获取统计图
+                $.ajax({
+                    type: "get",
+                    url: "../../HiddenTroubleManage/HTStatistics/QueryHidNumberColumn",
+                    data: { queryJson: JSON.stringify(queryJson) },
+                    success: function (data) {
+                        if (!!data) {
+
+                            var ndata = eval("(" + data + ")");
+
+                            LoadContainer1(ndata.sdata);
+
+                            GetGridTable1(ndata.tdata);
+                        }
+                    }
+                });
+
+
+            }
+        });
+
+
+
+
+
+
+
+        //重置控件
+        $("#btn_Reset").click(function () {
+            //选择单位
+            if (iscompany == "1") {
+                $("#DepartmentName").val(curOrganizeName);
+                $("#DepartmentCode").val(curOrganizeCode);
+            }
+            else {
+                $("#DepartmentName").val(curDeptName);
+                $("#DepartmentCode").val(curDeptCode);
+            }
+
+            //区域范围
+            $("#HidPointName").val("");
+            $("#HidPoint").val("");
+            //时间范围
+            var curTime = $("#TimeScope-option li:eq(0)").attr("data-value");
+            $("#TimeScope").ComboBoxSetValue(curTime);
+            $("#TimeScope").attr("data-text", curTime);
+            $("#TimeScope").attr("data-value", curTime);
+            //隐患级别
+            $("button[data-id='HidRank']").removeClass().addClass("btn dropdown-toggle btn-default bs-placeholder");
+            $("button[data-id='HidRank']").attr("title", "请选择");
+            $("button[data-id='HidRank'] span:eq(0)").text("请选择");
+            $("button[data-id='HidRank']").next().find("ul li").each(function (index, ele) {
+                $(this).removeClass();
+            });
+            //安全检查类型
+            $("#CheckDataType").attr("data-text", "请选择");
+            $("#CheckDataType").attr("data-value", "");
+            $("#CheckDataType div:eq(0)").text("请选择");
+        });
+    })
+
+</script>
+<div class="ui-layout" id="layout" style="background: #fff;  min-width: 1235px;">
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title">隐患数量统计信息</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table class="queryform">
+                        <tr>
+                            <th style="padding-left: 10px;">选择单位</th>
+                            <td style="padding-left: 5px;">
+                                <input id="DepartmentName" type="text" style="width: 120px;" class="form-control" placeholder="请选择单位" readonly onclick="selectDept('', 0, 0, '选择单位', window.document.body, 'DepartmentName,DepartmentCode');" />
+                                <input id="DepartmentCode" type="hidden" />
+                            </td>
+                            <th style="padding-left: 10px; ">区域范围</th>
+                            <td style="padding-left: 5px;">
+                                <input id="HidPointName" type="text" class="form-control" readonly onclick="selectArea(window.document.body, 'HidPointName,HidPoint');" />
+                                <input id="HidPoint" type="hidden" class="form-control" />
+                            </td>
+                            <th style="padding-left: 10px;">检查类型</th>
+                            <td style="padding-left: 5px;">
+                                <div id="CheckDataType" type="select" class="ui-select" style="width:100px;"></div>
+                            </td>
+                            <th style="padding-left: 10px;">隐患级别</th>
+                            <td style="padding-left: 5px;">
+                                <select id="HidRank" class="selectpicker show-menu-arrow form-control" width="100px" multiple placeholder="请选择隐患级别">
+                                    <option value="一般隐患">一般隐患</option>
+                                    <option value="重大隐患">重大隐患</option>
+                                </select>
+                            </td>
+                            <th style="padding-left: 10px;">时间范围</th>
+                            <td style="padding-left: 5px;">
+                                <div id="TimeScope" type="select" class="ui-select" style="width:80px;"></div>
+                            </td>
+                            <td style="padding-left: 20px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="lr-panel-one" class="btn btn-default" onclick="showChart(this,'统计图')"><i class="fa fa fa-pie-chart"></i>&nbsp;统计图</a>
+                        <a id="lr-panel-two" class="btn btn-default" onclick="showChart(this, '趋势图')"><i class="fa fa fa-area-chart"></i>&nbsp;趋势图</a>
+                        <a id="lr-panel-three" class="btn btn-default" onclick="showChart(this, '对比图')"><i class="fa fa fa-bar-chart"></i>&nbsp;对比图</a>
+                        <input id="CurPanel" type="hidden" />@*标记当前活动的统计图*@
+                    </div>
+                </div>
+            </div>
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计图</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                @*饼图*@<div class="panel-body"><div id="container1"></div></div>
+                @*趋势图*@<div class="panel-body"><div id="container2" style="display:none;"></div> @*隐患数量变化趋势图*@</div>
+                @*对比图*@<div class="panel-body"><div id="container3" style="display:none;"></div> @*各单位整改对比*@</div>
+            </div>
+        </div>
+        <div class="center-Panel">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <strong>&nbsp;&nbsp;统计列表</strong>
+                    <span class="tools pull-right">
+                        <a class="fa fa-chevron-down" title="展开/收起"></a>
+                    </span>
+                </div>
+                <div class="panel-body gridPanel">
+                    <table id="gridTable1"></table>
+                    @*各单位整改对比列表*@
+                    <table id="gridTable2" style="display:none"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

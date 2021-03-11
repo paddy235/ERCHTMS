@@ -1,0 +1,1564 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>发电企业安全风险-隐患排查双控管理平台</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    @*<meta name="renderer" content="webkit|ie-comp|ie-stand">*@
+    
+    <link href="~/Content/styles/font-awesome.min.css" rel="stylesheet" />
+    <link href="~/Content/scripts/plugins/jquery-ui/jquery-ui.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="~/content/scripts/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="~/content/scripts/plugins/swiper/css/swiper.min.css">
+    <link rel="stylesheet" href="~/content/scripts/plugins/layui/css/layui.css">
+    <link rel="stylesheet" href="~/content/styles/desktop/layout.css">
+    <link rel="stylesheet" href="~/content/styles/desktop/index.css">
+    <link rel="stylesheet" type="text/css" href="~/content/styles/desktop/date.css" />
+    <script src="~/content/scripts/jquery/jquery-1.8.2.min.js"></script>
+    <script src="~/Content/scripts/utils/framework-ui.js"></script>
+    <style type="text/css">
+        .box_3 {
+            height: 250px;
+        }
+    </style>
+    <script type="text/javascript">
+        var roleName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+        var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+          var isGxhs = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("广西华昇版本"))";
+        $(function () {
+            initPage();
+            if (isGxhs.length > 0) {
+
+            } else {
+                $("#aqzx").remove();
+            }
+        });
+
+        //<div style="width: 173.75px; margin-right: 15px;"><a onclick="showRedBlack('c47671a7-9b6f-4000-b888-90e86c0ce4b0')" style="cursor:pointer;"><img src="../Resource/ht/images/20190807/2d90b1f3-17a6-4727-9806-2becba913e2a.jpg" style="height:150px;width:150px;"><br>测试<br><span>2019-08-07</span></a></div>
+        //获取班组安全之星（广西华昇）
+        function getStars(type) {
+            $.get(top.contentPath + '/home/GetStars', { type: type }, function (data) {
+                var json = $.parseJSON(data);
+                if (json.code == 0) {
+                    json = $.parseJSON(json.data);
+                    if (json.code == 0) {
+                        var html = "<";
+                        if (json.data.record.length > 0) {
+                            var rows = json.data.record;
+                            var arr = ["金牌","银牌","铜牌"];
+                            $(rows).each(function (j, item) {
+                                var imgUrl = item.Photo == null || rows[1].Photo == "" ? top.contentPath +"/content/images/no.png" : item.Photo;
+                                var rank = arr[j];
+                                html += '<td style="width: 173.75px; margin-right: 15px;text-align:center;"><a  onclick="top.openTab(\'\',\'' + json.data.url + '?userId=' + rows[1].UserId +'\',\'积分统计\')" style="cursor:pointer;"><img src"' + imgUrl + '" alt="" style="height:150px;width:150px;"><br>'+item.UserName+'<br><span>'+rank+'</span></a></td>';
+                            });
+                            $("#divStars").html("<table style='width:100%'><tr>"+html+"</tr></table>");
+                        } else {
+                            $("#divStars").html("暂无数据显示");
+                        }
+                    }
+                }
+            });
+        }
+        function openTab(id, url, title) {
+            if (top.$.tab != undefined) {
+                top.$.tab.addTab(id, url, title);
+            } else {
+                top.tablist.newTab({ id: id, title: title, closed: true, icon: "fa fa-list-alt", url: url, moduleIdCookie: true });
+            }
+        }
+        function initPage() {
+            getStatData();
+            getNews();
+            getHt(); //隐患曝光
+            getLllegal(); //违章曝光
+            getProjectStat();
+            getWork();
+            outExplain();
+            }
+            //getWorkRecord();
+        //外包人员资料说明提醒
+        function outExplain() {
+            //外包用户弹出资料提交说明界面
+            if (roleName.indexOf("承包商级用户") >= 0 || roleName.indexOf("分包商级用户") >= 0) {
+                $.post("../Desktop/GetEntityByOrgCode", { orgCode: orgCode }
+                   , function (data) {
+                       if (!!data) {
+                           var ndata = eval("(" + data + ")");
+                           if (!!ndata.userSet && ndata.userSet.IsSetting == 1) {
+
+                           } else {
+                               if (!!ndata.data) {
+                                   var idx = top.dialogOpen({
+                                       id: "warn",
+                                       title: "资料提交说明",
+                                       url: '/Content/SecurityDynamics/ShowCommitFile.html?keyValue=' + ndata.data.ID,
+                                       width: "900px",
+                                       height: ($(top.window).height() - 200) + "px",
+                                       //btns: 1,
+                                       btn: ["<label><input id='IsExplain' type='checkbox' />下次不在提醒</label>", "确认"],
+                                       btn2: function (iframeId) {
+                                           top.frames[iframeId].AcceptClick();
+                                       },
+                                       callBack: function (iframeId) {
+                                       }
+                                   });
+                               }
+                           }
+                       }
+                   })
+            }
+        }
+        //安全事例
+        function getWorkRecord() {
+            $.post("../Desktop/GetWorksRecord", function (data) {
+                var json = eval("(" + data + ")");
+                var arr = [];
+                $(json.resultdata).each(function (j, item) {
+                    if (arr.indexOf(item.time) < 0) {
+                        arr.push(item.time);
+                    }
+                });
+            });
+        }
+        //查看会议
+        function showMeet(id) {
+                var dlg = dialogOpen({
+                    id: "Form",
+                    title: '查看安全会议',
+                    url: '/RoutineSafetyWork/Conference/Form?keyValue=' + id + '&actiontype=view',
+                    width: "800px",
+                    height: ($(top.window).height() - 150) + "px",
+                    btn: ["关闭"],
+                    callBack: function (iframeId) {
+                        top.layer.close(dlg);
+                    }
+                });
+           
+        }
+        //查看隐患
+        function showHT(id) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看隐患详情',
+                url: '/HiddenTroubleManage/HTEstimate/Form?keyValue=' + id + '&actiontype=view',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+        //查看检查
+        function showJC(id) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看安全检查详情',
+                url: '/SaftyCheck/SaftyCheckDataRecord/ZXForm?recid=' + id + '&action=view',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+        //查看违章
+        function showWZ(id) {
+            var dlg = dialogOpen({
+                id: "Form",
+                title: '查看违章详情',
+                url: '/LllegalManage/LllegalRegister/NewForm?keyValue=' + id + '&actiontype=view',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+
+        }
+        //查看公告
+        function showNews(id, issend) {
+                var dlg = dialogOpen({
+                    id: "Form",
+                    title: '查看公告',
+                    url: '/Content/SecurityDynamics/showNotice.html?keyValue=' + id + "&issend=" + issend,
+                    width: "690px",
+                    height: ($(top.window).height() - 150) + "px",
+                    btn: ["关闭"],
+                    callBack: function (iframeId) {
+                        top.layer.close(dlg);
+                    }
+                });
+        }
+        //查看安全动态
+        function showDy(id) {
+                var dlg = dialogOpen({
+                    id: "Form",
+                    title: '查看安全动态',
+                    url: '/Content/SecurityDynamics/Show.html?keyValue=' + id + "&state=0",
+                    width: "900px",
+                    height: ($(top.window).height() - 150) + "px",
+                    btn: ["关闭"],
+                    callBack: function (iframeId) {
+                        top.layer.close(dlg);
+                    }
+                });
+             
+        }
+        //查看安全红黑榜
+        function showRedBlack(id) {
+                var dlg = dialogOpen({
+                    id: "Form",
+                    title: '查看安全红黑榜',
+                    url: '/Content/SecurityDynamics/Show.html?keyValue=' + id + "&state=1",
+                    width: "900px",
+                    height: ($(top.window).height() - 150) + "px",
+                    btn: ["关闭"],
+                    callBack: function (iframeId) {
+                        top.layer.close(dlg);
+                    }
+                });
+            
+        }
+
+        //数据指标
+        function getStatData() {
+            $.post("../Desktop/GetStatData", function (data) {
+                var json = eval("(" + data + ")");
+                var arr = eval(json.resultdata);
+                $("#wxy").html(arr[4]);
+                $("#fx").html(arr[13]);
+                $("#aqjc").html(arr[9]);
+                $("#yh").html(arr[0]);
+                $("#yqyh").html(arr[15]);
+                $("#zy").html(arr[14]);
+                $("#sg").html(arr[6]);
+            });
+        }
+        //查看隐患详情
+        function viewdata(obj, atype, workstream) {
+            var rqUrl = "";
+            var title = "查看隐患";
+
+            //未整改隐患的查看页面
+            if (workstream == "隐患登记") {
+                if (atype == "0" || atype == "3") {
+                    rqUrl = '/HiddenTroubleManage/HTBaseInfo/Form?keyValue=' + obj + '&actiontype=view';
+                }
+                else if (atype == "2") {
+                    rqUrl = '/HiddenTroubleManage/HTBaseInfo/CForm?keyValue=' + obj + '&actiontype=view';
+                }
+                else  //已整改的查看页面
+                {
+                    title = "已整改隐患查看";
+                    rqUrl = '/HiddenTroubleManage/HTBaseInfo/NewForm?keyValue=' + obj + '&actiontype=view';
+                }
+            }
+            else if (workstream == "制定整改计划") {
+                rqUrl = '/HiddenTroubleManage/HTChangePlan/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患完善") {
+                rqUrl = '/HiddenTroubleManage/HTPerfection/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患评估") {
+                rqUrl = '/HiddenTroubleManage/HTApproval/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患整改") {
+                rqUrl = '/HiddenTroubleManage/HTChangeInfo/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "隐患验收") {
+                rqUrl = '/HiddenTroubleManage/HTAcceptInfo/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "复查验证") {
+                rqUrl = '/HiddenTroubleManage/HTReCheck/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "整改效果评估") {
+                rqUrl = '/HiddenTroubleManage/HTEstimate/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (workstream == "整改结束") {
+                rqUrl = '/HiddenTroubleManage/HTBaseInfo/DoneForm?keyValue=' + obj + '&actiontype=view';
+            }
+
+            var dlg = dialogOpen({
+                 id: 'HidForm',
+                 title: title,
+                 url: rqUrl,
+                 width: ($(top.window).width() - 100) + "px",
+                 height: ($(top.window).height() - 100) + "px",
+                 btn: ["关闭"],
+                 callBack: function (iframeId) {
+                 top.layer.close(dlg);
+             }
+             });
+        }
+
+        //查看违章详情
+        function viewlllegal(obj, atype, flowstate) {
+            var rqUrl = "";
+            var title = "";
+
+            //未整改隐患的查看页面
+            if (flowstate == "违章登记" || appstate == "违章举报") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalRegister/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (flowstate == "违章核准" || appstate == "违章审核") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalApprove/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (flowstate == "违章整改") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalReform/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (flowstate == "违章验收") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalAccept/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else if (flowstate == "验收确认") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalConfirm/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else {
+                if (atype == "0") {
+                    title = "查看违章";
+                    rqUrl = '/LllegalManage/LllegalConfirm/Form?keyValue=' + obj + '&actiontype=view';
+                }
+                else  //已整改的查看页面
+                {
+                    title = "已整改违章查看";
+                    rqUrl = '/LllegalManage/LllegalRegister/NewForm?keyValue=' + obj + '&actiontype=view';
+                }
+            }
+
+            var dlg = dialogOpen({
+                id: 'LllegalForm',
+                title: title,
+                url: rqUrl,
+                width: ($(top.window).width() - 100) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+
+        function getNews() {
+            //公告
+            $.post("../Desktop/getNotices", function (data) {
+                var json = eval("(" + data + ")");
+                json = eval(json.resultdata);
+                var html = "";
+                if (json.length == 0) {
+                    html = "<center>暂无数据显示</center>";
+                } else {
+                    $(json).each(function (j, item) {
+                        html += "<li><a onclick=showNews('" + item.id + "','" + item.issend+ "') style='cursor:pointer'><span>" + item.title + "</span><i>" + item.time + "</i></a></li>";
+                    });
+                }
+                $("#notices").html(html);
+            });
+            //安全会议
+            $.post("../Desktop/getMeets", function (data) {
+                var json = eval("(" + data + ")");
+                json = eval(json.resultdata);
+                var html = "";
+                if (json.length == 0) {
+                    html = "<center>暂无数据显示</center>";
+                } else {
+                    $(json).each(function (j, item) {
+                        html += "<li><a onclick=showMeet('" + item.id + "')  style='cursor:pointer'><span>" + item.content + '</span><i>' + item.time + '</i></a></li>';
+                    });
+                }
+                $("#meets").html(html);
+            });
+            //安全动态
+            $.post("../Desktop/GetTrends", function (data) {
+                var json = eval("(" + data + ")");
+                json = eval(json.resultdata);
+                var html = "";
+                if (json.length == 0) {
+                    html = "<div style='padding-left:50px;'>暂无数据显示</div>";
+                } else {
+                    $(json).each(function (j, item) {
+                        html += "<div class='swiper-slide'><a onclick=showDy('" + item.id + "') style='cursor:pointer'>";
+                        var path = item.filepath == null ? "" : item.filepath.substring(1, item.filepath.length);
+                        html += '<img src="..' + path + '" style="height:150px;width:150px;"><br>' + item.title + '<br><span>' + item.time + '</span></a></div>';
+                    });
+                }
+                $("#dy").html(html);
+                new Swiper('.swiper-container1 .swiper-container', {
+                    slidesPerView: 4,
+                    slidesPerGroup: 4,
+                    speed: 1000,
+                    spaceBetween: 15,
+                    //freeMode: true,
+                    allowTouchMove: false,
+                    navigation: {
+                        nextEl: '.swiper-container1 .swiper-button-next',
+                        prevEl: '.swiper-container1 .swiper-button-prev'
+                    }
+                });
+            });
+
+            //安全红榜
+            $.post("../Desktop/GetRedBlack", { mode: 0 }, function (data) {
+                var json = eval("(" + data + ")");
+                json = eval(json.resultdata);
+                var html = "";
+                if (json.length == 0) {
+                    html = "<div style='padding-left:50px;'>暂无数据显示</div>";
+                } else {
+                    $(json).each(function (j, item) {
+                        html += "<div class='swiper-slide'><a onclick=showRedBlack('" + item.id + "') style='cursor:pointer;'>";
+                        var path = item.filepath == null ? "" : item.filepath.substring(1, item.filepath.length);
+                        html += '<img src="..' + path + '" style="height:150px;width:150px;"><br>' + item.title + '<br><span>' + item.time + '</span></a></div>';
+                    });
+                }
+                $("#red").html(html);
+                new Swiper('.swiper-container3 .swiper-container', {
+                    slidesPerView: 4,
+                    slidesPerGroup: 4,
+                    speed: 1000,
+                    spaceBetween: 15,
+                    //freeMode: true,
+                    observer: true,
+                    observeParents: true,
+                    allowTouchMove: false,
+                    navigation: {
+                        nextEl: '.swiper-container3 .swiper-button-next',
+                        prevEl: '.swiper-container3 .swiper-button-prev'
+                    }
+                });
+            });
+            //安全黑榜
+            $.post("../Desktop/GetRedBlack", { mode: 1 }, function (data) {
+                var json = eval("(" + data + ")");
+                json = eval(json.resultdata);
+                var html = "";
+                if (json.length == 0) {
+                    html = "<div style='padding-left:50px;'>暂无数据显示</div>";
+                } else {
+                    $(json).each(function (j, item) {
+                        html += "<div class='swiper-slide'><a onclick=showRedBlack('" + item.id + "') style='cursor:pointer;'>";
+                        var path = item.filepath == null ? "" : item.filepath.substring(1, item.filepath.length);
+                        html += '<img src="..' + path + '" style="height:150px;width:150px;"><br>' + item.title + '<br><span>' + item.time + '</span></a></div>';
+                    });
+                }
+
+                $("#black").html(html);
+                new Swiper('.swiper-container4 .swiper-container', {
+                    slidesPerView: 4,
+                    slidesPerGroup: 4,
+                    speed: 1000,
+                    spaceBetween: 15,
+                    //freeMode: true,
+                    observer: true,
+                    observeParents: true,
+                    allowTouchMove: false,
+                    navigation: {
+                        nextEl: '.swiper-container4 .swiper-button-next',
+                        prevEl: '.swiper-container4 .swiper-button-prev'
+                    }
+                });
+              
+            });
+          
+
+        }
+        
+        function getHt() {
+
+            ////隐患曝光
+            $.post("../HiddenTroubleManage/HTStatistics/QueryExposureHid", { num: 10 }, function (data) {
+                var obj = eval("(" + data + ")");
+                var html = "";
+                if (null != obj && obj.length > 0) {
+                    for (var i = 0; i < obj.length; i++) {
+                        var tempValue = obj[i].hiddescribe.length > 12 ? obj[i].hiddescribe.substring(0, 10) : obj[i].hiddescribe;
+
+                        var url = !!obj[i].hidbasefilepath ? obj[i].hidbasefilepath.replace("~", "..") : "#";
+
+                        html += "<div class=\"swiper-slide\" style=\"cursor:pointer;\"><a onclick=viewdata('" + obj[i].id + "','" + obj[i].addtype + "','" + obj[i].workstream + "') class='stat_number' title='点击查看详情' style='cursor:pointer;'><img src=\"" + url + "\" style=\"height:150px;width:150px;\" /><br /> " + tempValue + "</div>"
+                    }
+                    $("#ht").html(html);
+                    new Swiper('.swiper-container5 .swiper-container', {
+                        slidesPerView: 4,
+                        slidesPerGroup: 4,
+                        speed: 1000,
+                        spaceBetween: 15,
+                        //freeMode: true,
+                        allowTouchMove: false,
+                        navigation: {
+                            nextEl: '.swiper-container5 .swiper-button-next',
+                            prevEl: '.swiper-container5 .swiper-button-prev'
+                        }
+                    });
+                } else {
+                    $("#ht").html("暂无数据显示");
+                }
+            });
+        }
+
+        function getLllegal() {
+            //违章曝光
+            $.post("../LllegalManage/LllegalStatistics/QueryExposureLllegal", { num: 10 }, function (data) {
+                var obj = eval("(" + data + ")");
+                var html = "";
+                if (!!obj) {
+                    for (var i = 0; i < obj.length; i++) {
+                        var tempValue = "";
+                        var url = "";
+                        if (!!obj[i].lllegaldescribe) {
+                             tempValue = obj[i].lllegaldescribe.length > 12 ? obj[i].lllegaldescribe.substring(0, 10) : obj[i].lllegaldescribe;
+                        }
+                        if (!!obj[i].filepic) {
+                             url = !!obj[i].filepic ? obj[i].filepic.replace("~", "..") : "#";
+                        }
+                        html += "<div  class=\"swiper-slide\" style=\"cursor:pointer;\"><a onclick=viewlllegal('" + obj[i].id + "','" + obj[i].addtype + "','" + obj[i].flowstate + "') class='stat_number' title='点击查看详情' style='cursor:pointer;'><img src=\"" + url + "\" style=\"height:150px;width:150px;\" /><br /> " + tempValue + "</div>"
+                    }
+                }
+
+                if (!!html) {
+                    $("#lllegal").html(html);
+                }
+                else {
+                    $("#lllegal").html("暂无数据显示");
+                }
+                new Swiper('.swiper-container6 .swiper-container', {
+                    slidesPerView: 4,
+                    slidesPerGroup: 4,
+                    speed: 1000,
+                    spaceBetween: 15,
+                    //freeMode: true,
+                    allowTouchMove: false,
+                    navigation: {
+                        nextEl: '.swiper-container6 .swiper-button-next',
+                        prevEl: '.swiper-container6 .swiper-button-prev'
+                    }
+                });
+            });
+        }
+
+
+        //安全检查
+        function showBigTrb(val1, val2, val3, val4, val5, url) {
+            var title = "安全检查";
+            url = url + '&rcnum=' + val1 + "&zxnum=" + val2 + "&jjrnum=" + val3 + "&jjnum=" + val4 + "&zhnum=" + val5;
+            openTab("3e3772fb-e1c2-42c9-9f98-fb0477158845", url, "待办安全检查");
+        }
+        //外包工程概况
+        function getProjectStat() {
+            $.get("../Desktop/GetProjectStat", function (data) {
+                var json = eval("(" + data + ")");
+                var html = "";
+                $(JSON.parse(json.resultdata)).each(function (i, item) {
+                    html += "<tr><td>" + item[0] + "</td><td>" + item[1] + "</td><td>" + item[2] + "</td><td>" + item[3] + "</td><td>" + item[4] + "</td><td>" + item[5] + "</td></tr>";
+                });
+                $("#tab0").append(html);
+            });
+        }
+            //待办事项和实时监控
+        function getWork() {
+            //待办事项
+           
+                $.get("../Desktop/GetDeptStatData", { itemType: "DBSX" }, function (data) {
+                    if (data.length > 2) {
+                        var num = 0;
+                        var json = eval("(" + data + ")");
+                        var html = "";
+                        $(json.resultdata).each(function (i, item) {
+                            if (item.Num != "0") {
+                                if (item.itemcode == "CKPLAN") {
+                                    var arr = item.Num.split(',');
+                                    if (arr[0] != "0") {
+                                        num += parseInt(item.Num);
+                                    var content = item.itemstyle.replace("{func}", "showBigTrb('" + arr[1] + "','" + arr[2] + "','" + arr[3] + "','" + arr[4] + "','" + arr[5] + "','" + item.address + "')");
+                                        content = content.replace("{Sum}", arr[0]);
+                                        html += content;
+                                    }
+                                  
+                                } else {
+                                    num += parseInt(item.Num);
+                                    html += item.itemstyle;
+                                }
+                               
+                            }
+                        });
+                    if (num == 0) {
+                            html = "暂无待办事项";
+                        }
+                        $("#work").html(html);
+                    }
+                });
+                //实时监控
+                $.get("../Desktop/GetDeptStatData", { itemType: "SSJK" }, function (data) {
+                  
+                    var json = eval("(" + data + ")");
+                    if (json.resultdata.length > 0) {
+                        var html = "";
+                        $(json.resultdata).each(function (i, item) {
+                          
+                            if (item.itemcode == "CKPLAN") {
+                               
+                                var arr = item.Num.split(',');
+                                //if (arr[0] != "0") {
+                                    var content = item.itemstyle.replace("{func}", "showBigTrb('" + arr[1] + "','" + arr[2] + "','" + arr[3] + "','" + arr[4] + "','" + arr[5] + "')");
+                                    content = content.replace("{Sum}", arr[0]);
+                                    html += content;
+                                //}
+
+                            } else {
+                                html += item.itemstyle;
+                            }
+                        });
+                        $("#items").html(html);
+                    } else {
+                        $("#items").html("暂无数据显示");
+                    }
+                });
+
+            }
+            var pMode = 0;
+            function setMode(mode) {
+                pMode = mode;
+            }
+            function openWin() {
+                top.openTab('5c81df39-e5c2-4dd4-aa72-39d14e71ccb1', '../RoutineSafetyWork/SecurityRedList/Index?action=safety&mode=' + pMode, '安全红黑榜');
+            }
+    </script>
+</head>
+<body class="full">
+    <div class="bs-warp">
+        <div class="bs-main">
+            <div class="row row_box">
+                <div class="col-md-9">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>实时监控<span>Monitor</span></h3></div>
+                        <ul class="monitor_list clearfix" id="items" style="min-height:300px;">
+                            <img src="~/content/images/loading1.gif" border="0" />&nbsp;正在加载数据……
+                            @*<li onclick="openTab('9d01ad79-5851-4a2c-aaa2-f00f219fc78a', '../HazardsourceManage/Hisrelationhd_qd/Index', '危险源清单')"><img src="../content/images/desktop/realTime_icon1.png"><br><p>危险源数量<br><span id="wxy"></span></p></li>
+                            <li onclick="openTab('d472030f-3094-4ad8-89cd-90c949fd4d91', '../RiskDatabase/DangerSource/List', '安全风险清单')"><img src="../content/images/desktop/realTime_icon2.png"><br><p>风险数量<br><span id="fx"></span></p></li>
+                            <li onclick="openTab('abdd09c6-4e92-48ee-a85a-021877fa6d1d', '../SaftyCheck/SaftyCheckDataRecord/IndexView?ctype=', '安全检查')"><img src="../content/images/desktop/realTime_icon3.png"><br><p>安全检查次数<br><span id="aqjc"></span></p></li>
+                            <li onclick="openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0', '../HiddenTroubleManage/HTBaseInfo/Index?mode=qbyh', '隐患台账')"><img src="../content/images/desktop/realTime_icon4.png"><br><p>隐患数量<br><span id="yh"></span></p></li>
+                            <li onclick="openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0', '../HiddenTroubleManage/HTBaseInfo/Index?mode=qbyqwzg', '逾期未整改隐患')"><img src="../content/images/desktop/realTime_icon5.png"><br><p>逾期未整改数量<br><span id="yqyh"></span></p></li>
+                            <li onclick="openTab('33b9a7c4-df09-4aa6-ada4-5155363f966b', '../HighRiskWork/HighRiskCommonApply/Index?indexstatus=5', '高风险作业')"><img src="../content/images/desktop/realTime_icon6.png"><br><p>高风险作业<br><span id="zy"></span></p></li>
+                            <li onclick="openTab('912a6cef-39a1-4bbc-8327-8041a24f6ed9', '../AccidentEvent/Bulletin_Deal/Index?pMode=0', '事故事件')"><img src="../content/images/desktop/realTime_icon7.png"><br><p>事故事件总数<br><span id="sg"></span></p></li>*@
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>待办事项<span>Pending</span></h3></div>
+                        <ul class="bs-list pending_list" id="work" style="min-height:300px;">
+                            <img src="~/content/images/loading1.gif" border="0" />&nbsp;正在加载数据……
+                            @*<li><a href="javascript:;">待执行安全检查<span>1</span></a></li>
+                            <li><a href="javascript:;">待完善隐患数<span>2</span></a></li>
+                            <li><a href="javascript:;">待评估隐患数<span>3</span></a></li>
+                            <li><a href="javascript:;">待整改隐患数<span>4</span></a></li>
+                            <li><a href="javascript:;">待审(核)批整改延期隐患数<span>5</span></a></li>
+                            <li><a href="javascript:;">待验收隐患数<span>6</span></a></li>
+                            <li style="display:none"><a href="javascript:;">待复查验证数<span>7</span></a></li>
+                            <li><a href="javascript:;">待效果评估隐患数<span>8</span></a></li>
+                            <li><a href="javascript:;">进行中风险计划数<span>9</span></a></li>*@
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row row_box">
+                <div class="col-md-6">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>公告<span>Notice</span><a onclick="openTab('fe8d5f36-64a1-408e-8aa7-42469400ef0c', '../RoutineSafetyWork/Announcement/Index', '公告')" style="cursor:pointer;">更多&gt;&gt;</a> </h3></div>
+                        <ul class="bs-list notice_list" id="notices">
+                            <li><center style="margin-top:10px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>></li>
+                           
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>安全会议<span>Meeting</span><a onclick="openTab('10d10b8d-c5f6-418d-924d-07859f942164', '../RoutineSafetyWork/Conference/Index', '安全会议')" style="cursor:pointer;">更多&gt;&gt;</a> </h3></div>
+                        <ul class="bs-list notice_list" id="meets">
+                            <li><center style="margin-top:10px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center></li>
+                           
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row row_box">
+                <div class="col-md-6">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>安全动态<span>Trends</span><a onclick="openTab('759a4216-8b42-4d89-a698-158a6fd5d549', '../RoutineSafetyWork/SecurityDynamics/Index', '安全动态')" style="cursor:pointer;">更多&gt;&gt;</a> </h3></div>
+                        <div class="box_2 swiper-container1" style="height:261px;">
+                            <div class="swiper-container">
+                                <div class="swiper-wrapper" id="dy">
+                                    <center style="margin-top:10px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+
+                            </div>
+                            <!-- Add Pagination -->
+                            <div class="swiper-button-prev"></div><!--左箭头-->
+                            <div class="swiper-button-next"></div><!--右箭头-->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="box_bg">
+                        <div class="bs-head clearfix">
+                            <ul class="billboard_list clearfix">
+                                <li class="active">安全红榜</li>
+                                <li>安全黑榜</li>
+                                <li id="aqzx">安全之星</li>
+                            </ul>
+                            <a onclick="openWin()" style="cursor:pointer;">更多&gt;&gt;</a>
+                        </div>
+
+                        <div class="billboard_div">
+                            <div class="box_2 swiper-container3" style="height:260px;">
+                                <div class="swiper-container">
+                                    <div class="swiper-wrapper" id="red">
+                                        <center style="margin-top:10px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                    </div>
+                                </div>
+                                <!-- Add Pagination -->
+                                <div class="swiper-button-prev"></div><!--左箭头-->
+                                <div class="swiper-button-next"></div><!--右箭头-->
+                            </div>
+                            <div class="box_2 swiper-container4" style="display: none;">
+                                <div class="swiper-container">
+                                    <div class="swiper-wrapper" id="black">
+                                        <center style="margin-top:10px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                        
+                                    </div>
+                                </div>
+                                <!-- Add Pagination -->
+                                <div class="swiper-button-prev"></div><!--左箭头-->
+                                <div class="swiper-button-next"></div><!--右箭头-->
+                            </div>
+
+                            <div id="divStars">
+                                <center style="margin-top:10px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row row_box">
+                <div class="col-md-4">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>风险统计<span>Statistics</span></h3></div>
+                        <div class="chart1" id="chart1"></div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>风险前10排行榜<span>Rankings</span><a onclick="openTab('d472030f-3094-4ad8-89cd-90c949fd4d91','../RiskDatabase/DangerSource/List?mode=1','风险清单排名')" style="cursor:pointer">更多&gt;&gt;</a> </h3></div>
+                        <div class="chart4" id="chart4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row row_box">
+                <div class="col-md-6">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>隐患曝光台<span>Exposure</span><a onclick="openTab('67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0', '../HiddenTroubleManage/HTBaseInfo/Index?mode=1&qyear=@DateTime.Now.ToString("yyyy")', '隐患台账')" style="cursor:pointer" ">更多&gt;&gt;</a> </h3></div>
+                        <div class="box_3 swiper-container5">
+                            <div class="swiper-container">
+                                <div class="swiper-wrapper" id="ht">
+                                    <center style="margin-top:10px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+
+                            </div>
+                            <!-- Add Pagination -->
+                            <div class="swiper-button-prev"></div><!--左箭头-->
+                            <div class="swiper-button-next"></div><!--右箭头-->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>违章曝光台<span>Exposure</span><a onclick="openTab('109d0e86-d8d8-4794-a15e-7308d1646344', '../LllegalManage/LllegalRegister/SdIndex?isexposure=是&qyear=@DateTime.Now.ToString("yyyy")', '违章台账')" style=" cursor:pointer" ">更多&gt;&gt;</a> </h3></div>
+                        <div class="box_3 swiper-container6">
+                            <div class="swiper-container">
+                                <div class="swiper-wrapper" id="lllegal">
+                                    <center style="margin-top:10px;"><img src="../content/images/loading1.gif" border="0" />&nbsp;正在加载数据……</center>
+                                </div>
+
+                            </div>
+                            <!-- Add Pagination -->
+                            <div class="swiper-button-prev"></div><!--左箭头-->
+                            <div class="swiper-button-next"></div><!--右箭头-->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row row_box">
+                <div class="col-md-5">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>隐患类别统计<span>Statistics</span></h3></div>
+                        <div class="chart2" id="chart2"></div>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="box_bg">
+                        <div class="bs-head clearfix">
+                            <ul class="statistics_list clearfix">
+                                <li class="active">隐患数量变化趋势</li>
+                                <li>安全事例</li>
+                            </ul>
+                            @*<a href="javascript:;">更多&gt;&gt;</a>*@
+                        </div>
+                        <div>
+                            <div>
+                                <ul class="chart3" style="overflow: hidden;">
+                                    <li id="chart3"></li>
+                                    <li class="container" style="display: none;">
+                                        <div class="layui-inline" id="test-n2"></div>
+                                        <div class="right">
+                                            @*<div class="group">
+                                                <input type="button" id='store' value="保存" />
+                                                <input type="button" id='cancel' value="取消" />
+                                            </div>*@
+                                            <p>
+                                                <span>显示详情</span>
+                                                <span class="add">+新建</span>
+                                            </p>
+                                            <ul id="chart_ui">
+                                                <li><span style="background: #75b9e6;"></span>蓝色代表系统自带的安全事例</li>
+                                                <li style="color: red;"><span style="background:red "></span>红色代表用户新建事例</li>
+                                                <li>当天没有实例显示：无事例</li>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="row" style="padding-bottom:20px;">
+                <div class="col-md-12">
+                    <div class="box_bg">
+                        <div class="bs-head"><h3>外包工程安全管控统计表<span>Statistics</span></h3></div>
+                        <div class="box_1">
+                            <table class="statistics_table" id="tab0">
+                                <tr>
+                                    <th>单位名称</th>
+                                    <th>在建工程数量</th>
+                                    <th>在厂人数</th>
+                                    <th>特种作业人数</th>
+                                    <th>特种设备作业人数</th>
+                                    <th>特种设备数量</th>
+                                </tr>
+                                
+                            </table>
+                            <div id="page" class="clearfix" style="display:none;">
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+    </div>
+    <script src="~/content/scripts/plugins/nicescroll/nicescroll.min.js"></script>
+    <script src="~/content/scripts/plugins/swiper/js/swiper.min.js"></script>
+    <script src="~/content/scripts/plugins/layui/layui.all.js"></script>
+    <script src="~/content/scripts/plugins/echarts/echarts.min.js"></script>
+    <script src="~/content/scripts/desktop/layout-common.js"></script>
+    <script>
+        $.ajaxSetup({ async: false });
+        $('.statistics_list li').click(function () {
+            var index = $(this).index();
+            $(this).addClass('active').siblings().removeClass('active');
+            $('.chart3 li').eq(index).show().siblings().hide();
+
+        });
+        //日历开始
+        var arr = [];
+        $.post("../Desktop/GetWorksRecord", function (data) {
+            var json = eval("(" + data + ")");
+         
+            $(json.resultdata).each(function (j, item) {
+                if (arr.indexOf(item.time) < 0) {
+                    var time = item.time;
+                    arr.push('"' + item.time + '":""');
+                }
+            });
+            
+        });
+        var arrDate = eval("({" + arr.toString() + "})");
+        layui.use(['layer', 'form', 'jquery', 'laydate'], function () {
+            var layer = layui.layer,
+                $ = layui.jquery,
+                laydate = layui.laydate,
+                form = layui.form;
+            var data = {};
+            var mode = "";
+            var new_date = new Date();
+           
+            loding_date(new_date, data, arrDate);
+            //日历插件调用方法
+            function loding_date(date_value, data, markData) {
+
+                laydate.render({
+                    elem: '#test-n2',
+                    type: 'date',
+                    theme: 'grid',
+                    max: '2099-06-16 23:59:59',
+                    position: 'static',
+                    range: false,
+                    value: date_value,
+                    calendar: false,
+                    btns: false,
+                    mark: markData,
+                    done: function (value, date, endDate) {
+                        //读取数据
+                        $.ajax({
+                            url: "../Home/GetDateNote?time=" + value + "&state=1",
+                            type: "get",
+                            success: function (data) {
+                                $('#chart_ui').html("");
+                         
+                                var data = eval("(" + data + ")");
+                                if (data.length > 0) {
+                                    for (var i = 0; i < data.length; i++) {
+                                        var title = data[i].Value;
+                                        title = title.length > 20 ? title.substring(0, 20) + "..." : title;
+                                        if (data[i].Type == "2") {
+                                         
+                                            $('#chart_ui').append("<li id='" + data[i].Id + "'><span style='background: red;'></span>&nbsp;<font style='cursor:pointer; text-decoration:underline;' title='" + data[i].Value + "' class='edit' id='" + data[i].Id + "' time='" + data[i].Time + "'>" + title + "</font><a class='delNote' id='" + data[i].Id + "' lay-time'" + data[i].Time + "'  title='删除'><i class='fa fa-trash-o'></i></a></li>");
+                                        }
+                                        else {
+                                           
+                                            //工作会议
+                                            if (data[i].Type == "1") {
+                                                $('#chart_ui').append("<li onclick=showMeet(\"" + data[i].Id + "\") style='cursor:pointer; text-decoration:underline;' title='" + data[i].Value + "'><span style='background: #75b9e6;'></span>【会议】" + title + "</li>");
+                                            }
+                                            //隐患排查
+                                            if (data[i].Type == "3") {
+                                                $('#chart_ui').append("<li onclick=showHT(\"" + data[i].Id + "\")  style='cursor:pointer; text-decoration:underline;' title='" + data[i].Value + "'><span style='background: #75b9e6;'></span>【隐患】" + title + "</li>");
+                                            }
+                                            //违章登记
+                                            if (data[i].Type == "4") {
+                                                $('#chart_ui').append("<li onclick=showWZ(\"" + data[i].Id + "\")  style='cursor:pointer; text-decoration:underline;' title='" + data[i].Value + "'><span style='background: #75b9e6;'></span>【违章】" + title + "</li>");
+                                            }
+                                            //安全检查
+                                            if (data[i].Type == "5") {
+                                                $('#chart_ui').append("<li onclick=showJC(\"" + data[i].RecId + "\")  style='cursor:pointer; text-decoration:underline;' title='" + data[i].Value + "'><span style='background: #75b9e6;'></span>【检查】" + title + "</li>");
+                                            }
+                                        }
+                                          
+                                    }
+                                } else {
+                                    $('#chart_ui').append("<tr><td> <li>无事例</li></td></tr>");
+                                }
+                              
+                                $('.edit').click(function () {
+                                    mode = "edit";
+                                    var id = $(this).attr('id');
+                                    date_chose($(this).attr('time').replace("T00:00:00", ""), { Value: $(this).attr('title'), Id: id });
+                                })
+                                $('.delNote').click(function () {
+                                    mode = "del";
+                                    var id = $(this).attr('Id')
+                                    var time = $(this).attr('lay-time')
+                                    var IsDel = confirm("确认删除吗?")
+                                    if (IsDel) {
+                                        $.ajax({
+                                            url: "../Home/RemoveNote?keyValue=" + id,
+                                            type: "post",
+                                            success: function (data) {
+                                                layer.msg(data, {
+                                                    icon: 0
+                                                });
+                                                $("li[id='" + id + "']").remove();
+                                                $('#test-n2').html('');
+
+                                                arr.push('"' + date_value + '":""');
+                                                arrDate = eval("({" + arr.toString() + "})");
+                                                loding_date(date_value, data, arrDate);
+ 
+                                            }
+                                        })
+                                    }
+                                })
+                             
+                            }
+                        })
+                    },
+                    ready: function (value, date) {
+                       
+                        $.ajax({
+                            url: "../Home/GetDateNote?time=2018-08-14&state=0&pDate=" + new Date(),
+                            type: "get",
+                            success: function (resultdata) {
+                              
+                                var data = eval("(" + resultdata + ")");
+                                if (data.length > 0) {
+                                    for (var i = 0; i < data.length; i++) {
+                                        if (data[i].Type == "2") {
+                                            $("#test-n2").find("td[lay-ymd='" + data[i].Time + "']").attr("id", "test");
+                                        }
+                                        else {
+                                                $("#test-n2").find("td[lay-ymd='" + data[i].Time + "']").attr("class", "laydate-day-mark");
+                                        }
+                                    }
+                                }
+                            }
+                        })
+                    },
+                    change: function (value, data) {
+                        $("#test-n2").find("td").attr("id", "");
+                        $.ajax({
+                            url: "../Home/GetDateNote?time=2018-08-14&state=0",
+                            type: "get",
+                            success: function (resultdata) {
+                                var data = eval("(" + resultdata + ")");
+                                if (data.length > 0) {
+                                    for (var i = 0; i < data.length; i++) {
+                                        if (data[i].Type == "2") {
+                                            $("#test-n2").find("td[lay-ymd='" + data[i].Time + "']").attr("id", "test");
+                                        }
+                                        else {
+                                            $("#test-n2").find("td[lay-ymd='" + data[i].Time + "']").attr("class", "laydate-day-mark");
+                                        }
+                                    }
+                                }
+                            }
+                        })
+                    }
+                });
+            }
+            //获取隐藏的弹出层内容
+            var date_choebox = $('.date_box').html();
+            //定义弹出层方法
+            function date_chose(obj_date, data) {
+                var index = layer.open({
+                    type: 1,
+                    skin: 'layui-layer-rim', //加上边框
+                    title: '添加记录',
+                    area: ['400px', 'auto'], //宽高
+                    btn: ['确定', '取消'],
+                    content: '<div class="text_box">' +
+                        '<form class="layui-form" id="formDate" action="">' +
+                        '<div class="layui-form-item layui-form-text">' +
+                        '<input id="text_date" name="Time" class="layui-input" readonly /><br />' +
+                        '<input id="text_Id" type="hidden"  />' +
+                        ' <textarea id="text_book" name="Value" placeholder="请输入内容"  class="layui-textarea"></textarea>' +
+                        '</div>' +
+                        '</form>' +
+                        '</div>',
+                    success: function () {
+                        if (data != null) {
+                            $('#text_book').val(data.Value)
+                            $('#text_date').val(obj_date)
+                            $('#text_Id').val(data.Id)
+                        }
+                     
+                    },
+                    yes: function () {
+                        //调用添加/编辑标注方法
+                        if ($('#text_book').val() != '') {
+                            chose_moban(obj_date, data);
+                          
+                            layer.close(index);
+                        } else {
+                            layer.msg('不能为空', {
+                                icon: 2
+                            });
+                        }
+
+                    }
+                });
+            }
+    
+            //定义添加/编辑标注方法
+            function chose_moban(obj_date, markJson) {
+                //获取弹出层val
+                 var chose_moban_val = $('#text_book').val();
+                 var chose_moban_time = $('#text_date').val();
+                var chose_moban_Id = $('#text_Id').val();
+                 $.ajax({
+                     url: "../Home/SaveDateNote?keyValue=" + chose_moban_Id + "&time=" + chose_moban_time + "&value=" + chose_moban_val,
+                    type: "post",
+                     loading: "正在保存数据...",
+                     success: function (data) {
+                         layer.msg(data, {
+                             icon: 0
+                         });
+                     }
+                 })
+                 
+                 if (mode == "add") $('.layui-this').click();
+                 if (mode == "edit") {
+                     var title = chose_moban_val;
+                     title = title.length > 20 ? title.substring(0, 20) + "..." : title;
+                     var font = $("li[id='" + chose_moban_Id + "']").find("font");
+                     font.attr("title", chose_moban_val);
+                     font.text(title);
+                 }
+                 
+                 $('#test-n2').html(''); //重要！由于插件是嵌套指定容器，再次调用前需要清空原日历控件
+                //再次调用日历控件，
+                 arr.push('"' + obj_date + '":""');
+                 arrDate = eval("({" + arr.toString() + "})");
+                 loding_date(obj_date, markJson, arrDate); //重要！，再标注一个日期后会刷新当前日期变为初始值，所以必须调用当前选定日期。
+            }
+
+            //日历开始
+            $('.add').click(function () {
+                mode = "add";
+                date_chose($('.layui-this').attr("lay-ymd"), data);
+                $('.layui-this').attr('id', 'test');
+              
+            })
+            $('#cancel').click(function () {
+                $('.layui-this').attr('id', '')
+            })
+          
+        });
+     
+        //日历结束
+
+
+        //统计图开始
+        //风险类别统计
+        var obj1 = document.getElementById('chart1')
+        $.post("../Desktop/GetRiskCounChart", function (data) {
+            
+            var json = eval("(" + data + ")");
+            var data1 = JSON.parse(json.resultdata);
+            var color = ['#ff0000', '#ffc000', '#ffff00', '#00b0f0'];
+            var option1 = {
+                legend: {
+                    selectedMode: true,
+                    bottom: 34,
+                    textStyle: {
+                        fontSize: 12,
+                        color: '#858585'
+                    },
+                    data: ['重大风险', '较大风险', '一般风险', '低风险']
+
+                },
+                series: [{
+                    type: 'pie',
+                    radius: ['0', '55%'],
+                    hoverAnimation: true,
+                    color: color,
+                    label: {
+                        normal: {
+                            show: true,
+                            formatter: '{b}:{c}个',
+                            color: '#858585'
+                        }
+                    },
+                    labelLine: {
+                        normal: {
+                            show: true,
+                            length: 15,
+                            length2: 10,
+                            lineStyle: {
+                                color: '#858585'
+                            }
+                        }
+                    },
+                    data: data1
+                }]
+            }
+            count(obj1, option1);
+          
+        });
+        
+        $.post("../Desktop/GetHtTypeChart", function (data) {
+            var obj2 = document.getElementById('chart2')
+            var json = eval("(" + data + ")");
+            var data2 = json.resultdata;
+            var color = ['#d19392', '#4572a7', '#aa4643', '#89a54e', '#71588f', '#4198af', '#db843d', '#93a9cf']
+            var option2 = {
+
+                series: [{
+                    type: 'pie',
+                    radius: ['45%', '70%'],
+                    hoverAnimation: true,
+                    color: color,
+                    label: {
+                        normal: {
+                            show: true,
+                            formatter: '{b}:{c}个'
+                        }
+                    },
+                    labelLine: {
+                        normal: {
+                            show: true,
+                            length: 15,
+                            length2: 10
+                        }
+                    },
+                    data: data2
+                }]
+            }
+            count(obj2, option2);
+
+        });
+
+        $.post("../Desktop/GetHTChangeChart", function (data) {
+            var json = eval("(" + data + ")"); 
+            var obj3 = document.getElementById('chart3');
+            json = JSON.parse(json.resultdata);
+            if (json.yYB != undefined) {
+                var data3 = [
+               json.yYB,
+               json.yZD,
+               json.y
+                ]
+                var option3 = {
+                    legend: {
+                        selectedMode: true,
+                        bottom: 0,
+                        textStyle: {
+                            fontSize: 12,
+                            color: '#858585'
+                        },
+                        data: ['重大隐患', '一般隐患', '全部']
+
+                    },
+                    tooltip: {
+                        trigger: 'axis'
+                    },
+                    xAxis: [{
+                        type: 'category',
+                        data: json.xValues,
+                        axisLine: {
+                            lineStyle: {
+                                color: '#cccccc'
+                            }
+                        }
+                    }],
+                    yAxis: [{
+                        type: 'value',
+                        min: 0,
+                        minInterval: 1,
+                        axisLabel: {
+                            formatter: '{value}',
+                            textStyle: {
+                                color: '#cccccc'
+                            }
+                        },
+                        axisLine: {
+                            lineStyle: {
+                                color: '#cccccc'
+                            }
+                        }
+                    }
+                    ],
+                    series: [
+
+            {
+                name: '重大隐患',
+                type: 'line',
+                barWidth: '10%',
+                data: data3[1],
+
+                symbol: 'arrow',
+                symbolSize: 6,
+                color: '#c0504d',
+                itemStyle: {
+                    normal: {
+                        label: {
+                            show: true
+                        }
+                    },
+                },
+                lineStyle: {
+                    color: '#c0504d'
+                }
+            },
+            {
+                name: '一般隐患',
+                type: 'line',
+                symbol: 'star' + 3,
+                symbolSize: 6,
+                barWidth: '10%',
+                color: '#9bbb59',
+                data: data3[0],
+
+                itemStyle: {
+                    normal: {
+                        label: {
+                            show: true
+                        }
+                    },
+                },
+                lineStyle: {
+                    color: '#9bbb59'
+                }
+
+            },
+            {
+                name: '全部',
+                type: 'line',
+                barWidth: '10%',
+                data: data3[2],
+                symbol: 'star' + 3,
+                symbolSize: 6,
+                color: '#96b4d7',
+                itemStyle: {
+                    normal: {
+                        label: {
+                            show: true
+                        }
+                    },
+                },
+                lineStyle: {
+                    color: '#96b4d7'
+                }
+
+            },
+                    ]
+                };
+                count(obj3, option3);
+
+            }
+        });
+      
+        var arrRisk;
+        //风险排名
+        $.post("../RiskDatabase/risk/GetRiskRank", function (data) {
+            var arr = eval(data);
+            var data4 = new Array();
+            var data = new Array();
+            var len = arr.length;
+            arrRisk = arr;
+            $(arr).each(function (i, item) {
+              
+                data4.push(arr[len - i - 1].itemr);
+                data.push("Top" + (len - i) + ":" + arr[len - i - 1].itemr);
+            });
+            var obj4 = document.getElementById('chart4')
+            var option4 = {
+                tooltip: {
+                    trigger: 'axis'
+                    
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: [{
+                    type: 'value',
+                    boundaryGap: [0, 0.01]
+                }],
+                yAxis: [{
+                    type: 'category',
+                    data: data
+                }, ],
+                series: [
+
+                    {
+                        name: '',
+                        type: 'bar',
+                        data: data4,
+                        itemStyle: {
+                            normal: {
+                                color: function (params) {
+                                    var colorList = ['#b3d465', '#cc99ff', '#aeaeae', '#bebbd8', '#99cccc', '#b0d961', '#cc99ff', '#fb8070', '#80b1d2', '#ffb155']
+                                    return colorList[params.dataIndex]
+                                }
+                            }
+                        },
+                        tooltip: {
+                            trigger: 'item',
+                            formatter: function (params) {
+                              
+                                var text = "风险排名：" + (10 - params.dataIndex) + "<br />";
+                                text += "风险值：" + arrRisk[9 - params.dataIndex].itemr + "<br />";
+                                text += "风险类别：" + arrRisk[9 - params.dataIndex].risktype + "<br />";
+                                text += "风险描述：" + arrRisk[9 - params.dataIndex].riskdesc + "<br />";
+                                return text;
+                            }
+                        }
+                        
+
+                    }
+                ]
+            };
+            count(obj4, option4);
+        });
+        
+        function count(obj, option) {
+            var Chart4 = echarts.init(obj)
+            var colors = ['#f6b327', '#32d03b', '#ccc'];
+            Chart4.setOption(option);
+            Chart4.on("click", function (args) {
+                if (obj.id == "chart1") {
+                    if (args.value > 0) {
+                        openTab('d472030f-3094-4ad8-89cd-90c949fd4d91', '../RiskDatabase/DangerSource/List?level=' + (args.dataIndex + 1), '安全风险清单');
+                    }
+                   
+                }
+                if (obj.id == "chart4") {
+                    
+                    if (args.value > 0) {
+                        openTab('d472030f-3094-4ad8-89cd-90c949fd4d91', '../RiskDatabase/RiskAssess/Show?keyValue=' + arrRisk[arrRisk.length - (args.dataIndex + 1)].id, '安全风险详情');
+                    }
+
+                }
+                if (obj.id == "chart2") {
+                    if (args.value > 0) {
+                        var tId = "";
+                        $.ajax({
+                            url: top.contentPath + '/Desktop/IsGeneric',
+                            type: "GET",
+                            async: false,
+                            dataType: "text",
+                            success: function (result) {
+                                if (result == "true") {
+                                    switch (args.name) {
+                                        case "设备设施":
+                                            tId = "dc0e9c77-3e47-4ad1-b942-0890d068f387";
+                                            break;
+                                        case "场所环境":
+                                            tId = "99a3477c-8a71-4868-bbc0-23c5eb534d70";
+                                            break;
+                                        case "从业人员操作行为":
+                                            tId = "60a3c6dd-5675-4818-b936-5bfa4f64d587";
+                                            break;
+                                        case "消防及应急设施":
+                                            tId = "192145c5-c7b8-4ff2-8c6b-5a6b99425898";
+                                            break;
+                                        case "供配电设施":
+                                            tId = "a7b22792-1c75-437b-a437-85a2545ebcb5";
+                                            break;
+                                        case "职业卫生防护设施":
+                                            tId = "a6fdb8e6-bbb4-4304-956d-e665c833f9f7";
+                                            break;
+                                        case "辅助动力系统":
+                                            tId = "256ba68d-c602-4f48-bb5d-15c063f5a145";
+                                            break;
+                                        case "现场其他方面":
+                                            tId = "236b8b37-2a37-412d-8cca-f337eb196dd1";
+                                            break;
+                                        case "生产经营单位资质证照":
+                                            tId = "13e8aa7c-7571-4f92-bc3f-fcbf929f0dc6";
+                                            break;
+                                        case "安全生产管理机构及人员":
+                                            tId = "8f92dc56-08ef-4b85-8a2e-f7732cad751c";
+                                            break;
+                                        case "安全生产责任制":
+                                            tId = "9817f30b-2889-47dd-b2e4-547dfd487a6d";
+                                            break;
+                                        case "安全生产管理制度":
+                                            tId = "b31ec12d-6a82-4083-b6dd-bd7db1ddfb9b";
+                                            break;
+                                        case "教育培训":
+                                            tId = "0a0ab921-9f87-4194-aee8-a80bd89f2e42";
+                                            break;
+                                        case "安全生产管理档案":
+                                            tId = "f1ca97f4-105c-4063-bd13-92cbe72b97b0";
+                                            break;
+                                        case "安全生产投入":
+                                            tId = "f88b9a64-c324-40f1-94cb-9351902f7754";
+                                            break;
+                                        case "应急管理":
+                                            tId = "3bb331fb-c0dd-4d3e-add7-7bbd0e62c32d";
+                                            break;
+                                        case "职业卫生基础管理":
+                                            tId = "0cc631d2-09e0-41a7-87e2-65f4fb2b69f4";
+                                            break;
+                                        case "相关方安全管理":
+                                            tId = "cd935151-60ce-4cd8-9df5-edbfd016720d";
+                                            break;
+                                        case "基础管理其他方面":
+                                            tId = "dc077646-6743-4bc2-b51e-f4e903583750";
+                                            break;
+
+                                    }
+
+                                } else {
+                                    switch (args.name) {
+                            case "人身安全隐患":
+                                tId = "2efd52b1-a424-4f12-84b8-f0227a147e61";
+                                break;
+                            case "电力安全事故隐患":
+                                tId = "1c27460a-c325-4e1e-b9f3-45730766f161";
+                                break;
+                            case "设备设施事故隐患":
+                                tId = "9dac546e-1a55-4f85-8a64-219ba783cc78";
+                                break;
+                            case "大坝安全隐患":
+                                tId = "6202bb56-5974-4d90-ae75-08a66342ea5b";
+                                break;
+                            case "安全管理隐患":
+                                tId = "de1e5961-3e51-49f4-8668-4fdabffc15c7";
+                                    break;
+                            case "其他事故隐患":
+                                tId = "cf0df7fd-9fbf-4545-843c-846efbf3d45b";
+                                break;
+
+                        }
+                                }
+                            }
+                        });
+
+                        top.tablist.newTab({ id: '67fdd0b7-6629-48dc-a70f-3eb7ba2df1f0', url: '../HiddenTroubleManage/HTBaseInfo/Index?mode=pType&bmmark=1&hType=' + tId, title: args.name });
+                    }
+
+                }
+                
+            });
+        }
+
+        //统计图结束
+        //$(function () {
+            $('.bs-main').niceScroll({
+                autohidemode: false
+            });
+            $('.bs-nav').niceScroll({
+                autohidemode: "cursor",
+                cursoropacitymax: 0
+            });
+           
+            $('.billboard_list li').on('click', function () {
+                var index = $(this).index();
+                $(this).attr('class', 'active').siblings().removeAttr('class', 'active');
+                $('.billboard_div > div').eq(index).show().siblings().hide();
+                if (index==2) {
+                    getStars(2);
+                }
+            })
+
+            $('.statistics_list li').on('click', function () {
+                var index = $(this).index();
+                $(this).attr('class', 'active').siblings().removeAttr('class', 'active');
+            })
+        //})
+
+        layui.use('laypage', function () {
+            var laypage = layui.laypage;
+            laypage.render({
+                elem: 'page',
+                count: 50,
+                prev: '<em>&lt;</em>',
+                next: '<em>&gt;</em>',
+                layout: ['limit', 'prev', 'page', 'next'],
+                limits: [10, 20, 50],
+                theme: '#75b9e6'
+            });
+        });
+    </script>
+</body>
+</html>

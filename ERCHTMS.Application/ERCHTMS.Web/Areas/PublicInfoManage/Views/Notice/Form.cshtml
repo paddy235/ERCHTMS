@@ -1,0 +1,111 @@
+﻿@{
+    ViewBag.Title = "公告管理";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/plugins/ckeditor/ckeditor.js"></script>
+<script src="~/Content/scripts/plugins/simditor/js/module.min.js"></script>
+<script src="~/Content/scripts/plugins/simditor/js/uploader.min.js"></script>
+<script src="~/Content/scripts/plugins/simditor/js/hotkeys.min.js"></script>
+<link href="~/Content/scripts/plugins/cxColor/css/jquery.cxcolor.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/cxColor/js/jquery.cxcolor.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var editor = null;
+    $(function () {
+        CKEDITOR.replace('NewsContent');
+        initControl();
+    })
+    //初始化控件
+    function initControl() {
+        //公告类别
+        $("#Category").ComboBox({
+            param: { EnCode: "NoticeCategory" },
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            description: "==请选择==",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px"
+        });
+        //获取表单
+        if (!!keyValue) {
+            editor = CKEDITOR.instances.NewsContent;
+            $.SetForm({
+                url: "../../PublicInfoManage/Notice/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    editor.insertHtml(data.NewsContent);
+                    $("#FullHead").attr("color", data.FullHeadColor).css("color", data.FullHeadColor);
+                }
+            });
+        }
+    }
+    //选择颜色-设置标题色彩
+    function SelectColorEvent() {
+        var mycolor = $("#select_color").cxColor();
+        mycolor.show();
+        $("#select_color").bind("change", function () {
+            $("#FullHead").css("color", this.value).attr("color", this.value);
+        });
+    }
+    //保存表单
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        editor = CKEDITOR.instances.NewsContent;
+        var postData = {
+            FullHead: $("#FullHead").val(),
+            FullHeadColor: $('#FullHead').attr('color'),
+            Category: $("#Category").attr('data-value'),
+            ReleaseTime: $("#ReleaseTime").val(),
+            NewsContent: editor.getData()
+        }
+        $.SaveForm({
+            url: "../../PublicInfoManage/Notice/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+</script>
+<div style="margin:10px;">
+    <table class="form" style="table-layout: auto; width:100%;">
+        <tr>
+            <td class="formTitle" style="width:100px;">公告标题<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="FullHead" type="text" class="form-control" style="color: #000000;" placeholder="请输入标题" isvalid="yes" checkexpession="NotNull" />
+                <span id="select_color" class="input-button" style="width: 18px;  height: auto; margin-top:-242px; margin-right:12px;" title="使用彩色标题" onclick="SelectColorEvent()">
+                    <img src="~/Content/images/large_tiles.png" /></span>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle" style="width:100px;">公告类别<font face="宋体">*</font></td>
+            <td class="formValue" style="width:400px;">
+                <div id="Category" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull" style="width:350px;"></div>
+            </td>
+            <td class="formTitle" style="width:120px;">发布时间</td>
+            <td class="formValue">
+                <input id="ReleaseTime" readonly type="text" class="form-control" value="@BSFramework.Util.Time.GetToday("yyyy/MM/dd HH:mm")" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">信息来源</td>
+            <td class="formValue" style="width:300px;">
+                <input id="SourceName" type="text" class="form-control" />
+            </td>
+            <td class="formTitle">来源地址</td>
+            <td class="formValue">
+                <input id="SourceAddress" type="text" class="form-control" />
+            </td>
+        </tr>
+        <tr>
+            <th class="formTitle" valign="top" style="padding-top: 4px;">公告内容</th>
+            <td class="formValue" colspan="3">
+                <textarea id="NewsContent" class="form-control" rows="5"></textarea>
+            </td>
+        </tr>
+    </table>
+</div>

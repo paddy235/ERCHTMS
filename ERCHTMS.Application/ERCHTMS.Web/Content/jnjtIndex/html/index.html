@@ -1,0 +1,306 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        .content{
+            width: 446px;
+            height: 256px;
+            background: url("../images/bg.jpg");
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            margin: auto;
+            color: red;
+            text-align: center;
+        }
+        .title{
+            font-size: 26px;
+            margin: 20px 0 10px 0;
+        }
+        .date{
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .number{
+            display: inline-block;
+            background: red;
+            color: #fff;
+            width: 14px;
+            height: 23px;
+            font-weight: bold;
+            line-height: 23px;
+            border-radius: 2px;
+        }
+        li{
+            list-style: none;
+        }
+        ul{
+            -moz-padding-start: 0px;
+            -webkit-padding-start: 0px;
+            width: 205px;
+            -webkit-margin-before: 5px;
+            -webkit-margin-after: 5px;
+        }
+        .body_content .person li{
+            height: 28px;
+            line-height: 28px;
+            border-bottom: 1px solid red;
+            font-size: 14px;
+        }
+        .body_content .comeIn li span{
+            display: inline-block;
+            width: 45px;
+        }
+        .body_content .elity li span{
+            display: inline-block;
+            width: 100px;
+        }
+        .body_content .person li:nth-child(1){
+            height: 25px;
+            line-height: 25px;
+            background: red;
+            color: #fff;
+            font-weight: bold;
+            border-radius: 20px;
+        }
+        .body_content{
+            padding: 0 10px;
+        }
+        .name{
+            font-size: 11px;
+            background: red;
+            color: #fff;
+            border-radius: 10px;
+        }
+        .name li{
+            height: 28px;
+            line-height: 28px;
+        }
+        .name li span:nth-child(1){
+            width: 130px;
+            text-align: left;
+            display: inline-block;
+        }
+    </style>
+    <script src="../../js/jquery.min.js"></script>
+    <script>
+     
+        $(function () {
+            //页面开始加载一次
+            InitWorkDays();
+            InitDate();
+            GetPowerCount();
+            CarPeopleInOutCount();
+            GetCarPeopleTopData();
+            LoadInterval(1000 * 60, "InitWorkDays()");//安全生产天数一分钟刷新一次
+            LoadInterval(1000 * 30, "InitDate()");//当前时间三十秒刷新一次
+            LoadInterval(1000 * 5, "CarPeopleInOutCount()");//统计车辆人员进出数量 五秒 刷新一次
+            LoadInterval(1000 * 30, "GetPowerCount()");//获取发电负荷 半分钟 刷新一次
+            LoadInterval(1000 * 5, "GetCarPeopleTopData()");//加载车辆人员进出数据，五秒刷新一次
+        })
+        /**
+         * 加载页面定时器刷新数据
+         * @param {any} timer 刷新时间 毫秒
+         * @param {any} functionName 方法名
+         */
+        var LoadInterval = (timer, functionName) => {
+            let globalInterval = setInterval(functionName, timer);
+        }
+
+        /**加载安全生产天数 */
+        var InitWorkDays = () => {
+            /**当前时间 */
+            var dateNow = new Date();
+            /**开始生产的时间 */
+            var startWorkDate = new Date("2010-02-01");
+            var timesDiff = Math.abs(dateNow.getTime() - startWorkDate.getTime());
+            var dayDiff = Math.ceil(timesDiff / (1000 * 60 * 60 * 24));//向上取整
+            var daysStr = dayDiff.toString();
+            var htmlStr = "";
+            for (var i = 0; i < daysStr.length; i++) {
+                htmlStr += '<span class="number">' + daysStr[i] + '</span>&nbsp;';
+            }
+            htmlStr += '<span>天</span>';
+            $("#workDays").html(htmlStr);
+        }
+
+        /**加载时间 */
+        var InitDate = () => {
+            var dateNow = new Date();
+            $("#span_year").text(dateFormat(dateNow, 'yyyy/MM/dd'));
+            $("#span_time").text(dateFormat(dateNow, 'hh:mm'));
+        }
+
+        /**获取人员车辆当天进出的数量 */
+        var CarPeopleInOutCount = () => {
+            $.ajax({
+                url: "../../../Login/GetTodayCarPeopleCount",
+                type: "GET",
+                dataType: "JSON",
+                success: function (data) {
+                    if (!!data) {
+                        $("#peopleIn").text(data.PeopleIn);
+                        $("#peopleOut").text(data.PeopleOut);
+                        $("#carIn").text(data.CarIn);
+                        $("#carOut").text(data.CarOut);
+                    }
+                },
+                error: function (error) { console.log(error) }
+            })
+        }
+
+        /**获取发电负荷 */
+        var GetPowerCount = () => {
+            $.ajax({
+                url: "../../../Login/GetItemDetailListByCategory",
+                data: { category:"发电机组负荷"},
+                type: "GET",
+                dataType: "JSON",
+                success: function (data) {
+                    var html = "<li><span>机组</span><span>负荷</span></li>";
+                    if (!!data && data.length > 0) {
+                        if (data.length == 1) {
+                            html += '<li><span>'+data[0].ItemName+'</span> <span>' + data[0].ItemValue + '</span></li>'
+                        } else {
+                            html += '<li><span>' + data[0].ItemName + '</span> <span>' + data[0].ItemValue + '</span></li>'
+                            html += '<li><span>' + data[1].ItemName + '</span> <span>' + data[1].ItemValue + '</span></li>'
+                        }
+                    }
+                    $("#PowerCount").html(html);
+                },
+                error: function (error) { console.log(error) }
+            })
+        }
+
+        /**获取人员车辆进出数据 */
+        var GetCarPeopleTopData = () => {
+            $.ajax({
+                url: "../../../Login/GetCarPeopleTopData",
+                type: "GET",
+                dataType: "JSON",
+                success: function (data) {
+                    try {
+                        var json = JSON.parse(data);
+                        if (!!json) {
+                            var peopleList = json.People;
+                            var carList = json.Car;
+                            var peopleHtml = "";
+                            peopleList.forEach((value, index) => {
+                                if (index < 2) {
+                                    var createdate = new Date(value.CreateDate);
+                                    peopleHtml += '<li><span>' + value.UserName + '&nbsp;' + dateFormat(createdate,'hh:mm') + '</span><span>' + value.InOut + value.AreaName + '</span></li>';
+                                }
+                            })
+                            $("#peopleInOut").html(peopleHtml);
+                            var carHtml = "";
+                            carList.forEach((value, index) => {
+                                if (index < 2) {
+                                    var createdate = new Date(value.CreateDate);
+                                    carHtml += '<li><div>' + (!!value.DriverName ? value.DriverName : "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp") + '&nbsp;' + value.CarNo + '&nbsp;' + dateFormat(createdate, 'hh:mm') + value.InOut + value.Address +'</div></li>';
+                                }
+                            })
+                            $("#carInOut").html(carHtml)
+                        }
+                    } catch (e) {
+                        console.error(e)
+                    }
+                },
+                error: function (error) { console.log(error) }
+            })
+        }
+
+        // 格式化时间
+        function dateFormat(oDate, fmt) {
+            var o = {
+                "M+": oDate.getMonth() + 1, //月份
+                "d+": oDate.getDate(), //日
+                "h+": oDate.getHours(), //小时
+                "m+": oDate.getMinutes(), //分
+                "s+": oDate.getSeconds(), //秒
+                "q+": Math.floor((oDate.getMonth() + 3) / 3), //季度
+                "S": oDate.getMilliseconds()//毫秒
+            };
+            if (/(y+)/.test(fmt)) {
+                fmt = fmt.replace(RegExp.$1, (oDate.getFullYear() + "").substr(4 - RegExp.$1.length));
+            }
+            for (var k in o) {
+                if (new RegExp("(" + k + ")").test(fmt)) {
+                    fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+                }
+            }
+            return fmt;
+        }
+    </script>
+</head>
+<body>
+    <div class="content">
+        <div class="title">内蒙古京泰发电有限责任公司</div>
+        <div class="date">
+            <img src="../images/date.png" alt="" class="img_date">
+            <span id="span_year">2020/9/11</span>&nbsp;&nbsp;&nbsp;&nbsp;
+            <span id="span_time">09:25</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <span>安全生产</span>
+            <span id="workDays">
+                <span class="number">3</span>
+                <span class="number">0</span>
+                <span class="number">5</span>
+                <span class="number">2</span>
+                <span>天</span>
+            </span>
+        </div>
+        <div class="body_content">
+            <ul style="float: left;" class="person comeIn">
+                <li>
+                    <span>人员</span>
+                    <span>合计</span>
+                    <span>车辆</span>
+                    <span>合计</span>
+                </li>
+                <li>
+                    <span>进入</span>
+                    <span id="peopleIn">0</span>
+                    <span>进入</span>
+                    <span id="carIn">0</span>
+                </li>
+                <li>
+                    <span>外出</span>
+                    <span id="peopleOut">0</span>
+                    <span>外出</span>
+                    <span id="carOut">0</span>
+                </li>
+            </ul>
+            <ul style="float: right;" class="person elity" id="PowerCount">
+                <li><span>机组</span><span>负荷</span></li>
+            </ul>
+            <div style="clear: both;"></div>
+            <div>
+                <ul id="peopleInOut" class="name" style="float: left;">
+                    <li>
+                        <span>周晓明&nbsp;17:25</span>
+                        <span>进入1#门禁</span>
+                    </li>
+                    <li>
+                        <span>周晓明&nbsp;17:25</span>
+                        <span>进入1#门禁</span>
+                    </li>
+                </ul>
+
+                <ul id="carInOut" class="name" style="float: right;">
+                    <li>
+                        <span>周晓明&nbsp;蒙A88888&nbsp;17:25</span>
+                        <span>进入1#门禁</span>
+                    </li>
+                    <li>
+                        <span>周晓明&nbsp;蒙A88888&nbsp;17:25</span>
+                        <span>进入1#门禁</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

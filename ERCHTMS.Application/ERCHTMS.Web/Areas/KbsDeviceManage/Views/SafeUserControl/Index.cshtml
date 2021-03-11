@@ -1,0 +1,257 @@
+﻿@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+
+<link type="text/css" rel="stylesheet" href="~/Content/styles/kbscss/common.css">
+<link type="text/css" rel="stylesheet" href="~/Content/styles/kbscss/dilog.css">
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+<style type="text/css">
+    .btndiv {
+        float: left;
+        width: 95px;
+        height: 29px;
+        background: inherit;
+        border: none;
+        border-radius: 14px;
+        -moz-box-shadow: none;
+        -webkit-box-shadow: none;
+        box-shadow: none;
+        font-weight: 400;
+        font-style: normal;
+        font-size: 14px;
+        color: rgb(67, 67, 67);
+        text-align: center;
+        line-height: 25px;
+        cursor: pointer;
+    }
+
+    .activebtndiv {
+        float: left;
+        width: 95px;
+        height: 29px;
+        background: inherit;
+        background-color: rgba(24, 144, 255, 1);
+        border: none;
+        border-radius: 14px;
+        -moz-box-shadow: none;
+        -webkit-box-shadow: none;
+        box-shadow: none;
+        font-weight: 400;
+        font-style: normal;
+        font-size: 14px;
+        color: #FFFFFF;
+        text-align: center;
+        line-height: 25px;
+    }
+</style>
+
+
+
+<script>
+
+    var selectType = "";
+    var selectStatus = "";
+    var deptCode = "";
+
+
+    $(function () {
+        GetTree();
+        InitialPage();
+        GetGrid();
+
+    });
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: 400
+            }
+        );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                deptCode = item.Code;
+                Search();
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 226);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 227);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            startTime: $("#StartTime").val(),
+            endTime: $("#EndTime").val(),
+            AreaCode: deptCode,
+            Search: $("#txt_Keyword").val(),
+            type: 1
+        }
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 110,
+            url: "../../KbsDeviceManage/SafeUserControl/GetPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                { label: '预警内容', name: 'warningcontent', index: 'warningcontent', width: 600, align: 'center', sortable: true },
+                { label: '责任人', name: 'liablename', index: 'liablename', width: 300, align: 'center', sortable: true },
+                { label: '部门/班组', name: 'deptname', index: 'deptName', width: 300, align: 'center', sortable: true },
+                { label: '预警时间', name: 'warningtime', index: 'warningtime', width: 200, align: 'center', sortable: true },
+            ],
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 50, 100],
+            pager: "#gridPager",
+            sortname: 'warningtime',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+     
+    
+
+    //查询
+    function Search() {
+        var queryJson = {
+            startTime: $("#StartTime").val(),
+            endTime: $("#EndTime").val(),
+            deptCode: deptCode,
+            Search: $("#txt_Keyword").val()
+        }
+        $("#gridTable").setGridParam({ url: top.contentPath + "/KbsDeviceManage/SafeUserControl/GetPageListJson" });
+        $("#gridTable").setGridParam({ datatype: 'json', page: 1 })
+            .jqGrid('setGridParam', { page: 1, postData: { queryJson: JSON.stringify(queryJson) } })
+            .trigger("reloadGrid");
+    }
+
+
+
+</script>
+
+
+
+
+<div class="main">
+    <div class="main_top">
+        <div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+            <div class="ui-layout-west">
+                <div class="west-Panel">
+                    <div class="panel-Title">
+                        <div class="col-md-10">
+                            部门
+                        </div>
+                        <div class="col-md-2 text-right" style="padding-right: 8px;">
+                            <i class="fa fa-arrow-left" style="cursor: pointer;" title="展开/收起"></i>
+                        </div>
+                    </div>
+                    <div id="itemTree"></div>
+                </div>
+            </div>
+            <div class="ui-layout-center">
+                <div class="center-Panel" style="height: 75px;">
+                    <div style="margin-top: 5px;">
+                        <div class="row">
+                            <div style="padding-top:18px; " class="col-md-12">
+                                <table>
+                                    <tr>
+                                        <td style="padding-left: 10px; font-weight: bold;">时间：</td>
+                                        <td style="width: 186px;">
+                                            <input id="StartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm'})">
+                                        </td>
+                                        <td style="padding-left: 10px" class="area">-</td>
+                                        <td style="width: 186px;" class="area">
+                                            <input id="EndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm' })">
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div style="padding-top: 27px;" id="status" class="col-md-12">
+                            </div>
+                        </div>
+                        <div class="row" style="margin-top: 5px; margin-bottom: 5px;">
+                            <div id="type" class="col-md-12">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="center-Panel">
+                    <div class="titlePanel">
+                        <div class="title-search">
+                            <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        </div>
+                        <div class="toolbar">
+                            <div class="btn-group">
+                                <table>
+                                    <tr>
+                                        <td>
+                                            <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                        </td>
+                                        <td style="padding-left: 5px;">
+                                            <a id="btn_Search" class="btn btn-primary" onclick="Search()"><i class="fa fa-search"></i>搜索</a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="gridPanel">
+                        <table id="gridTable"></table>
+                        <div id="gridPager"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="~/Content/scripts/kbsjs/dilog.js"></script>
+

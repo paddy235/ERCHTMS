@@ -1,0 +1,114 @@
+﻿
+@{
+    ViewBag.Title = "ToolSelect";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    $(function () {
+        //加载选择消防工具
+        LoadToolGrid();
+        var oldValue = top.Form.window.$("#hdTool").val(); //上一次选择的内容
+        var list = oldValue.split(',');
+        for (var i = 0; i < list.length; i++) {
+            var $gridTable = $('#ToolGridTable');
+            var table = $gridTable.jqGrid('getRowData');
+            for (var i = 0; i < table.length; i++) {
+                var dom = table[i];
+                if (dom.Tool == list[i].substr(0, list[i].indexOf('('))) {
+                    $("input[name='WorkProcess_" + dom.Id + "'][value='" + list[i].substr(list[i].indexOf('(') + 1, 2) + "']").eq(0).attr("checked", "checked");
+                }
+            }
+        }
+    })
+
+    function LoadToolGrid() {
+        var result = [];
+        $.ajax({
+            url: "../../SystemManage/DataItemDetail/GetListByCodeJson?itemCode=FireWaterTool",
+            type: "get",
+            dataType: "json",
+            async: false,
+            success: function (data) {
+
+                for (var i = 0; i < data.length; i++) {
+                    var temp = {
+                        Id: data[i].itemvalue,
+                        Tool: data[i].itemname,
+                        WorkProcess: ""
+                    };
+                    result.push(temp);
+                }
+            }
+        });
+        var $gridTable = $('#ToolGridTable');
+        $gridTable.jqGrid({
+            data: result,
+            datatype: 'local',
+            height: "300px",
+            colModel: [
+                { label: '主键', name: 'Id', hidden: true },
+                {
+                    label: '使用消防工具', name: 'Tool', width: 200, align: 'center', sortable: false
+                },
+                {
+                    label: '借用/自备', name: 'WorkProcess', width: 200, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = '<input type="checkbox" name="WorkProcess_' + rowObject.Id + '" id="WorkDeptType1_' + rowObject.Id + '" value="借用" onclick="chooseTool(this)"/>借用&nbsp;&nbsp;&nbsp; <input type="checkbox" name="WorkProcess_' + rowObject.Id + '" id="WorkDeptType2_' + rowObject.Id + '" value="自备" onclick="chooseTool(this)"/>自备';
+                        return html;
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 100000,
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true
+
+        });
+    }
+
+    function chooseTool(obj) {
+        var name = $(obj).attr("name");
+        var id = $(obj).attr("id");
+        $("input[name='" + name + "']:checked").each(function () {
+            if (id != $(this).attr("id")) {
+                $(this).removeAttr("checked");
+            }
+        })
+    }
+
+    function AcceptClick() {
+        var $gridTable = $('#ToolGridTable');
+        var table = $gridTable.jqGrid('getRowData');
+        var value = "";
+        for (var i = 0; i < table.length; i++) {
+            var dom = table[i];
+            if ($("#WorkDeptType1_" + dom.Id).is(":checked")) {
+                value += dom.Tool + "(" + $("#WorkDeptType1_" + dom.Id).val() + ")" + ",";
+            }
+            if ($("#WorkDeptType2_" + dom.Id).is(":checked")) {
+                value += dom.Tool + "(" + $("#WorkDeptType2_" + dom.Id).val() + ")" + ",";
+            }
+        }
+        value = value.length > 0 ? value.substr(0, value.length - 1) : "";
+        var oldValue = top.Form.window.$("#hdTool").val(); //上一次选择的内容
+        top.Form.window.$("#hdTool").val(value);
+        var oldText = top.Form.window.$("#Tool").val(); //选择前表单中使用消防工具的内容(包括手动输入的)
+        if (oldValue.length > 0) {
+            top.Form.window.$("#Tool").val(oldText.replace(oldValue, value));
+        } else {
+            var text = oldText.length > 0 ? oldText + "," + value : value;
+            top.Form.window.$("#Tool").val(text);
+        }
+    }
+</script>
+
+<div class="panel panel-default" id="ToolTable">
+    <div class="panel-heading">
+        <strong>&nbsp;&nbsp;选择消防工具</strong>
+    </div>
+    <div class="panel-body">
+        <table id="ToolGridTable"></table>
+    </div>
+</div>
+

@@ -1,0 +1,358 @@
+﻿@{;
+    ViewBag.Title = "历史列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户id
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var orgid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";  //部门信息
+    var state = 0;
+    var qtype = request('qtype');//首页代办
+    var contractid = request('contractid');
+    var examinetodeptid = "";
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+        GetTree();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth($(".gridPanel").width());
+                $('#gridTable').setGridHeight($(window).height() - 150);
+                $("#itemTree").setTreeHeight($(window).height() - 55);
+
+            }, 200);
+            e.stopPropagation();
+        });
+
+        $("#examinetype").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "SAFETYPE" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "250px"
+        })
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+              {
+                  SelectMode: 0,
+                  Mode: 1,
+                  Ids: orgid
+              }
+            );
+        var item = {
+            height: $(window).height() - 53,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                examinetodeptid = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            qtype: qtype,
+            contractid: contractid
+        };
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 150,
+            url: "../../OutsourcingProject/SafetyAssessment/GetHistoryPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                 { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', width: 200, align: 'center', sortable: false,formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:show('" + rowObject.id + "','" + rowObject.issaved + "')  title='查看'><i class='fa fa-eye'></i></a>&nbsp;";
+
+                        return html;
+                    }
+                },
+                //{
+                //    label: '审核状态', name: 'auditresult', index: 'auditresult', align: 'center', sortable: false
+                //    , formatter: function (cellvalue, options, rowObject) {
+                //        if (rowObject.issaved == "0") {
+                //            return "填报中";
+                //        } else {
+                //            if (rowObject.isover == 0) {
+                //                return "考核中";
+                //            } else {
+                //                return "审核通过";
+                //            }
+                //        }
+
+                //    }
+                //},
+                { label: '编号', name: 'examinecode', index: 'examinecode', width: 150, align: 'center', sortable: true },
+                {
+                    label: '被考核单位(人)', name: 'examinetodept', index: 'examinetodept', width: 150, align: 'center', sortable: true
+                    , formatter: function (cellvalue, options, rowObject) {
+                        //alert(rowObject.examinetodept != "");
+                        if (rowObject.examinetodept != "" && rowObject.examinetodept != null) {
+                            return rowObject.examinetodept.replace(',', '、');
+                        } else {
+                            return "";
+                        }
+
+
+                    }
+
+                },
+
+                { label: '考核类型', name: 'examinetypename', index: 'examinetypename', width: 150, align: 'center' },
+                //{
+                //    label: '考核事由', name: 'examinereason', index: 'examinereason', width: 400, align: 'left',headerAlign:"center", formatter: function (cellvalue, options, rowObject) {
+                //        var html = "";
+                //        if (cellvalue) {
+                //            if (cellvalue.length > 500) {
+                //                cellvalue = cellvalue.substring(0, 500) + "...";
+                //            }
+                //            html = "<div style='white-space: normal;line-height: initial;'>" + cellvalue + "</div>"
+                //        }
+                //        return html;
+                //    }
+                //},
+                //{
+                //    label: '考核依据', name: 'examinebasis', index: 'examinebasis', width: 400, align: 'left', headerAlign: "center", formatter: function (cellvalue, options, rowObject) {
+                //        var html = "";
+                //        if (cellvalue) {
+                //            if (cellvalue.length > 500) {
+                //                cellvalue = cellvalue.substring(0, 500) + "...";
+                //            }
+                //            html = "<div style='white-space: normal;line-height: initial;'>" + cellvalue + "</div>"
+                //        }
+                //        return html;
+                //    }
+                //},
+                //{
+                //    label: '考核内容', name: 'applycontent', index: 'applycontent', width: 400, align: 'left', headerAlign: "center", formatter: function (cellvalue, options, rowObject) {
+                //        var html = "";
+                //        if (cellvalue) {
+                //            if (cellvalue.length > 500) {
+                //                cellvalue = cellvalue.substring(0, 500) + "...";
+                //            }
+                //            html = "<div style='white-space: normal;line-height: initial;'>" + cellvalue + "</div>"
+                //        }
+                //        return html;
+                //    }
+                //},
+                { label: '考核事由', name: 'examinereason', index: 'examinereason', width: 300, align: 'left', headerAlign: 'center' },
+                { label: '考核依据', name: 'examinebasis', index: 'examinebasis', width: 300, align: 'left', headerAlign: 'center' },
+                { label: '考核内容', name: 'applycontent', index: 'applycontent', width: 300, align: 'left', headerAlign: 'center' },
+                { label: '提出考核人', name: 'examineperson', index: 'examineperson', width: 150, align: 'center' },
+                { label: '提出考核单位部门', name: 'examinedept', index: 'examinedept', width: 130, align: 'center', sortable: true },
+                { label: '考核时间', name: 'examinetime', index: 'examinetime', width: 150, align: 'center', sortable: true },
+                { label: '流程部门编码/ID', name: 'flowdept', hidden: true },
+                { label: '流程角色名称', name: 'flowrolename', hidden: true },
+                { label: '创建人所属部门Code', name: 'createuserdeptcode', hidden: true },
+                { label: '创建人所属机构Code', name: 'createuserorgcode', hidden: true },
+                { label: '创建人用户ID', name: 'createuserid', hidden: true },
+                { label: '是否保存', name: 'issaved', hidden: true },
+                { label: '是否流程完成', name: 'isover', hidden: true }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            },
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var StartTime = $("#sTime").val();
+            var EndTime = $("#eTime").val();
+            if (new Date(StartTime.replace("-", "/").replace("-", "/")) > new Date(EndTime.replace("-", "/").replace("-", "/"))) {
+                alert("开始时间不可大于结束时间！");
+                return;
+            }
+            var queryJson = {
+                sTime: StartTime,
+                eTime: EndTime,
+                //examinetype: $("#examinetype").val(),
+                examinetype: $("#examinetype").ComboBoxGetValue(),
+                examinereason: $("#examinereason").val(),
+                examinetodeptid: examinetodeptid,
+                contractid: contractid
+
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '新增安全考核',
+            url: '/OutsourcingProject/SafetyAssessment/Form?actiontype=add',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 150) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //查看
+    function show(id, issaved) {
+        var keyValue = id;
+        var title = "查看日常考核";
+        var url = "/OutsourcingProject/SafetyAssessment/Form?keyValue=";
+        //判断是否提交，未提交查看基础
+        if (issaved == "0") {
+            url = "/OutsourcingProject/SafetyAssessment/Form?keyValue=";
+
+        } else {  //提交下查看审核状态
+            url = "/OutsourcingProject/SafetyAssessment/ApplyForm?keyValue=";
+        }
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: "HistoryForm",
+                title: title,
+                url: url + keyValue + '&actiontype=view&his=1',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 150) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+
+    //导出
+    function exportResult(){
+
+    }
+
+    function ResetCondition()
+    {
+        $("#sTime").val("");
+        $("#eTime").val("");
+        $("#examinetype").val("");
+        $('#flowtype').val("");
+        $("#examinereason").val("");
+        $("div[unselectable='on']").attr("class", "bbit-tree-node-el bbit-tree-node-expanded");
+        examinetodeptid = "";
+
+
+        $("#examinetype").attr("data-text", "==全部==");
+        $("#examinetype").attr("data-value", "");
+        $("#examinetype div:eq(0)").text("==全部==");
+
+        $('#btn_Search').click();
+    }
+
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right: 8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor: pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="text-align:right;">
+                                考核时间：
+                            </td>
+                            <td style="width:100px">
+                                <input id="sTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" style="width:100px" />
+                            </td>
+                            <td style="width: 20px; text-align: center;">至</td>
+                            <td>
+                                <input id="eTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" style="width:100px" />
+                            </td>
+                            <td style="width:70px; text-align:right;">考核类型：</td>
+                            <td style="width:150px">
+                                @*<select id="examinetype" class="form-control">
+                    <option value="">请选择</option>
+                    <option value="1">安健环目标考核</option>
+                    <option value="2">安全环保事故(事件)考核</option>
+                    <option value="3">安全环保专项奖励</option>
+                    <option value="4">安全环保管理考核</option>
+                    <option value="5">反违章管理考核</option>
+                    <option value="6">安全文明生产管理考核</option>
+
+                    <option value="7">交通安全管理考核</option>
+                    <option value="8">保卫</option>
+                    <option value="9">消防安全管理考核</option>
+                    <option value="10">网络信息安全管理考核</option>
+                </select>*@
+                                <div id="examinetype" type="select" class="ui-select"></div>
+                            </td>
+                            @*<td style="width:70px; text-align:right;">流程状态：</td>
+                            <td style="width:100px">
+                                <select id="flowtype" class="form-control">
+                                    <option value="">请选择</option>
+                                    <option value="1">填报中</option>
+                                    <option value="2">考核中</option>
+                                    <option value="3">审核通过</option>
+                                </select>
+                            </td>*@
+                            <td style="width:70px; text-align:right;">考核事由：</td>
+                            <td style="width:150px">
+                                <input id="examinereason" type="text" class="form-control" placeholder="请输入搜索关键字" />
+                            </td>
+                            <td style="padding-left:5px">
+                                <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                            </td>
+                            <td style="padding-left:5px">
+                                <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

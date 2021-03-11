@@ -1,0 +1,1247 @@
+﻿@{
+    ViewBag.Title = "用户管理";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<link href="~/content/scripts/plugins/icheck/skins/square/_all.css" type="text/css" rel="stylesheet" />
+<script src="~/content/scripts/plugins/icheck/js/icheck.min.js" type="text/javascript"></script>
+<script src="~/content/scripts/plugins/icheck/js/custom.min.js" type="text/javascript"></script>
+
+<script src="~/Content/scripts/plugins/jquery.md5.js"></script>
+<script src="~/Content/scripts/plugins/uploadify/ajaxfileupload.js"></script>
+
+
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script src="~/Content/scripts/plugins/combo-select/jquery.combo.select.js"></script>
+<link rel="stylesheet" href="~/Content/scripts/plugins/combo-select/combo.select.css">
+
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+
+
+<style type="text/css">
+    .file {
+        position: relative;
+        display: inline-block;
+        overflow: hidden;
+        text-decoration: none;
+        text-indent: 0;
+        cursor: pointer !important;
+    }
+
+        .file input {
+            position: absolute;
+            font-size: 100px;
+            right: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer !important;
+        }
+
+        .file:hover {
+            text-decoration: none;
+            cursor: pointer !important;
+        }
+</style>
+<script>
+    var keyValue = request('keyValue');
+    var rqaction = request('action');
+    var instanceId = "";
+    var formId = "";
+    $(function () {
+        $('select').comboSelect();
+        initControl();
+        GetGrid();
+        buttonOperation();
+    });
+    //获取人员证书
+    function getCerts(userId) {
+        var $gridTable = $('#gridTableCert');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 200,
+            url: "../Certificate/GetListJson?userId=" + userId,
+            datatype: "json",
+            colModel: [
+                 { label: 'ID', name: 'Id', hidden: true },
+                { label: '证书名称', name: 'CertName', index: 'CERTNAME', width: 220, align: 'center', sortable: true },
+                { label: '证书编号', name: 'CertNum', index: 'CERTNUM', width: 200, align: 'center', sortable: true },
+                {
+                    label: '发证日期', name: 'SendDate', index: 'SENDDATE', width: 80, align: 'center', sortable: true, formatter: function (value, options, rowObject) {
+
+                        return formatDate(value, 'yyyy-MM-dd');
+                    }
+                },
+                 {
+                     label: '失效日期', name: 'EndDate', width: 80, align: 'center', sortable: true, formatter: function (value, options, rowObject) {
+
+                         return formatDate(value, 'yyyy-MM-dd');
+                     }
+                 },
+                { label: '发证机关', name: 'SendOrgan', index: 'SENDORGAN', width: 200, align: 'center', sortable: true },
+                { label: '有效期（年）', name: 'Years', index: 'YEARS', width: 90, align: 'center', sortable: true }]
+
+        });
+    }
+    //职业健康信息
+    function getHealth(userId) {
+        var $gridTable = $('#gridTableHealth');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 200,
+            url: "../../OccupationalHealthManage/Occupationalstaffdetail/GetUserList?UserId=" + userId,
+            datatype: "json",
+            colModel: [
+                {
+                    label: '体检时间', name: 'inspectiontime', width: 220, align: 'center', sortable: true, formatter: function (cellvalue, options, rowObject) {
+
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                },
+                {
+                    label: '是否有职业病', name: 'issick', width: 100, align: 'center', sortable: true
+                },
+                { label: '所患职业病', name: 'itemname', width: 400, align: 'center', sortable: true }
+            ]
+
+        });
+    }
+    function IntiDuty(organizeId, isOrg) {
+        //通用change方法
+        $("#DutyId").ComboBox({
+            url: top.contentPath + "/BaseManage/Post/GetListJson?organizeId=" + organizeId + "&isOrg=" + isOrg,
+            id: "RoleId",
+            text: "FullName",
+            description: "==请选择=="
+            , allowSearch: true
+        }).bind("change", function () {
+            $.ajax({
+                url: '../../BaseManage/Post/GetRoleById',
+                data: { id: $(this).attr('data-value') },
+                dataType: "JSON",
+                success: function (result) {
+                    if (!!result.RoleNames) {
+                        if ($("#DepartmentId").attr('data-isorg') == "1") {
+                            $.ajax({
+                                url: '../../BaseManage/Post/GetListByCode',
+                                data: { code: "100103" },
+                                dataType: "JSON",
+                                success: function (vr) {
+                                    $("#RoleName").val(vr.FullName + "," + result.RoleNames);
+                                    $("#RoleId").val(vr.RoleId + "," + result.RoleIds);
+                                }
+                            });
+
+                        } else {
+                            $("#RoleName").val(result.RoleNames);
+                            $("#RoleId").val(result.RoleIds);
+                        }
+                    }
+                }
+            });
+        });
+        //
+    }
+    function ClearValue() {
+        //清空岗位
+        $("#DutyId").attr('data-value', '').attr('data-text', '');
+        $("#DutyId").find("div").html("==请选择==");
+        //清空角色
+        $("#RoleName").val("");
+        $("#RoleId").val("");
+    }
+    //上传签名图片
+    function UploadSign(self) {
+        var file = self.get(0).files[0];
+        if (file.type.indexOf("image") >= 0) {
+            var size = file.size;
+            var file_id = self.attr("id");
+            var img_id = self.attr("img_id");
+            //上传应用图标
+            $.ajaxFileUpload({
+                url: top.contentPath + "/PersonCenter/UploadFile?mode=1",
+                secureuri: false,
+                fileElementId: file_id,
+                dataType: 'json',
+                success: function (data) {
+
+                    document.getElementById('signPreview').src = top.contentPath + data.resultdata;
+                    $("#SignImg").val(data.resultdata);
+                    dialogMsg(data.message, 1);
+                    if (window.location.href.indexOf("mode=0") >= 0) {
+                        top.layer.close(top.AppForm.window.dlg);
+                        top.AppForm.window.reload();
+                    }
+                },
+                complete: function () {
+
+                    $("#signFile").change(function () {
+                        UploadSign($(this), file_id, img_id);
+                    })
+                }
+            });
+        } else {
+            dialogMsg("仅支持上传图片！", 2);
+        }
+    }
+
+    //人员上传图片
+    function Upload(self) {
+        var file = self.get(0).files[0];
+        if (file.type.indexOf("image") >= 0) {
+            var size = file.size;
+            var file_id = self.attr("id");
+            var img_id = self.attr("img_id");
+            //上传应用图标
+            $.ajaxFileUpload({
+                url: "UploadPhoto",
+                secureuri: false,
+                fileElementId: file_id,
+                dataType: 'json',
+                success: function (data) {
+                    document.getElementById('uploadPreview').src = top.contentPath + data.resultdata;
+                    $("#HeadIcon").val(data.resultdata);
+                    dialogMsg(data.message, 1);
+                },
+                complete: function () {
+                    $("#uploadFile").change(function () {
+                        Upload($(this), file_id, img_id);
+                    })
+                }
+            });
+        } else {
+            dialogMsg("仅支持上传图片！", 2);
+        }
+    }
+
+    //人员上传图片
+    function InitUpload() {
+        $('#uploadFile').change(function () {
+            Upload($(this));
+        });
+        $('#signFile').change(function () {
+            UploadSign($(this));
+        });
+    }
+
+    //初始化控件
+    function initControl() {
+        if (keyValue.length == 0) {
+            $(".nav-tabs").hide();
+        }
+        InitUpload();
+        if (!!rqaction) {
+            $("#btn_finish").remove();
+            $("input").attr("readonly", "readonly");
+            $("textarea").attr("readonly", "readonly");
+            $("#certificate").find(".toolbar").remove();
+            $('.icheck').find("input:radio").iCheck('disable');
+        }
+        //籍贯
+        $("#Native").ComboBox({
+            url: "../../SystemManage/Area/GetListJson",
+            param: { EnCode: "Native" },
+            id: "AreaName",
+            text: "AreaName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //人员类型
+        $("#UserType").ComboBox({
+            //url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            //param: { EnCode: "UserType" },
+            //id: "ItemValue",
+            //text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        //民族
+        $("#Nation").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListSortJson",
+            param: { EnCode: "Nation" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //学历
+        $("#DegreesID").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "Degrees" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //技术等级
+        $("#TechnicalGrade").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "TechnicalGrade" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //职称
+        $("#JobTitle").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "JobTitle" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+
+        $("#LateDegreesID").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "Degrees" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //政治面貌
+        $("#Political").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "Political" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //四种人类别
+        //$("#FourPersonType").ComboBox({
+        //    description: "==请选择==",
+        //    height: "200px"
+        //});
+        //公司
+        $("#OrganizeId").ComboBoxTree({
+            url: top.contentPath + "/BaseManage/Organize/GetTreeJson",
+            description: "==请选择==",
+            height: "200px",
+        }).bind("change", function () {
+            //当公司选择发生变化的时候清空岗位和角色
+            ClearValue();
+            if ($(this).attr('data-isdept')=="0") {
+                dialogAlert("该部门无法选择！");
+                $(this).removeAttr('data-text'); $(this).removeAttr('data-value'); $(this).removeAttr('data-code');
+                $(this).find(".ui-select-text").html("==请选择==");
+                return false;
+            }
+            var value = $(this).attr('data-value');
+            //加载部门
+            $("#DepartmentId").ComboBoxTree({
+                url: top.contentPath + "/BaseManage/Department/GetTreeJson?organizeId=" + value,
+                description: "==请选择==",
+                allowSearch: true
+            });
+            //加载岗位
+            $("#DutyId").ComboBox({
+                url: top.contentPath + "/BaseManage/Post/GetListJson?organizeId=" + value + '&isOrg=true',
+                id: "RoleId",
+                text: "FullName",
+                description: "==请选择=="
+                , allowSearch: true
+            })
+        });
+        //部门
+        $("#DepartmentId").ComboBoxTree({
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        }).bind("change", function () {
+            if ($(this).attr('data-isdept')=="0") {
+                dialogAlert("该部门无法选择！");
+                $(this).removeAttr('data-text'); $(this).removeAttr('data-value'); $(this).removeAttr('data-code');
+                $(this).find(".ui-select-text").html("==请选择==");
+                return false;
+            }
+            ClearValue();
+            var value = $(this).attr('data-value');
+            var isorg = $(this).attr('data-isorg');
+            //如果是厂级部门的话，在角色那会自动赋值 “厂级部门用户”
+            if (isorg == "1") {
+                $.ajax({
+                    url: '../../BaseManage/Post/GetListByCode',
+                    data: { code: "100103" },
+                    dataType: "JSON",
+                    success: function (result) {
+                        $("#RoleName").val(result.FullName);
+                        $("#RoleId").val(result.RoleId);
+                    }
+                });
+            }
+            //加载岗位
+            $("#DutyId").ComboBox({
+                url: top.contentPath + "/BaseManage/Post/GetListJson?organizeId=" + $("#OrganizeId").attr('data-value') + '&isOrg=' + value,
+                id: "RoleId",
+                text: "FullName",
+                description: "==请选择=="
+                , allowSearch: true
+            });
+            //外包工程
+            $("#ProjectId").ComboBox({
+                url: "../../OutsourcingProject/Outsouringengineer/GetEngineerByDeptId?deptId=" + $("#DepartmentId").attr('data-value'),
+                id: "ID",
+                text: "ENGINEERNAME",
+                description: "==请选择==",
+                height: "200px",
+                allowSearch: true
+            });
+            //加载职务
+            IntiPost(value);
+        });
+
+        //岗位
+        $("#DutyId").ComboBox({
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //主管
+        $("#ManagerId").ComboBox({
+            description: "==请选择==",
+            height: "200px",
+            allowSearch: true
+        });
+        //性别
+        $("#Gender").ComboBox({
+            description: "==请选择==",
+        });
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: top.contentPath + "/BaseManage/User/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    data = data.data;
+                    //人员类型需要手动填写 不读取历史内容
+                    data.UserType = "";
+                    data.DepartmentId = "";//清空部门数据
+                    $("#form1").formDeserialize(data);
+                    //获取人员证书信息
+                    getCerts(keyValue);
+                    $("#OrganizeId").trigger("change");
+                    if (!!$("#DepartmentId").attr('data-value')) {
+                        IntiDuty($("#OrganizeId").attr('data-value'), $("#DepartmentId").attr('data-value'));
+                        IntiPost($("#DepartmentId").attr('data-value'));
+                        //外包工程
+                        //$("#ProjectId").ComboBox({
+                        //    url: "../../OutsourcingProject/Outsouringengineer/GetEngineerByDeptId?deptId=" + $("#DepartmentId").attr('data-value'),
+                        //    id: "ID",
+                        //    text: "ENGINEERNAME",
+                        //    description: "==请选择==",
+                        //    height: "200px",
+                        //    allowSearch: true
+                        //});
+                    } else {
+                        IntiDuty($("#OrganizeId").attr('data-value'), "true");
+                        IntiPost($("#OrganizeId").attr('data-value'));
+                    }
+                    if (data.ProjectId != null) {
+                        //$("#ProjectId").ComboBoxSetValue(data.ProjectId);
+                    }
+
+                    if (data.FOURPERSONTYPE != null && data.FOURPERSONTYPE != undefined) {
+                        // $(".filter-option").html(data.FOURPERSONTYPE);
+                        $("#FourPersonType").find("option").each(function (i, dom) {
+                            if (data.FOURPERSONTYPE.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                                $(dom).attr("selected", "selected");
+                            }
+                        });
+                    }
+                    if (data.ISFOURPERSON == "是") {
+                        $("#IsFourPerson1").attr("checked", true);
+                    }
+                    else {
+                        $("#IsFourPerson2").attr("checked", true);
+                    }
+                    //$("#DepartmentId").ComboBoxTreeSetValue(data.DepartmentId);
+                    //入场岗位不读取 需要重新选取
+                    //$("#DutyId").ComboBoxSetValue(data.DutyId);
+                    //二维码
+                    $("#code").attr("src", "../../Utility/BuilderImage?keyValue=" + keyValue);
+                    //照片
+                    if (data.HeadIcon) {
+                        document.getElementById('uploadPreview').src = top.contentPath + data.HeadIcon;
+                    }
+                    //签名图片
+                    if (data.SignImg) {
+                        document.getElementById('signPreview').src = top.contentPath + data.SignImg;
+                    }
+                    //性别
+                    if (data.Gender == "男") {
+                        $("#man").attr("checked", true);
+                    }
+                    else {
+                        $("#woman").attr("checked", true);
+                    }
+                    //是否特种作业人员
+                    if (data.IsSpecial == "是") {
+                        $("#IsSpecial1").attr("checked", true);
+                    }
+                    else {
+                        $("#IsSpecial0").attr("checked", true);
+                    }
+                    //是否特种设备作业人员
+                    if (data.IsSpecialEqu == "是") {
+                        $("#IsSpecialEqu1").attr("checked", true);
+                    }
+                    else {
+                        $("#IsSpecialEqu0").attr("checked", true);
+                    }
+                    $("#DegreesID").ComboBoxSetValue(data.DegreesID);
+                    $("#ManagerId").ComboBoxSetValue(data.ManagerId);
+                    $("#Birthday").val(formatDate(data.Birthday, "yyyy-MM-dd"));
+                    $("#Password").val("******").attr('disabled', 'disabled');
+                    $("#Account").attr('disabled', 'disabled');
+                    if (rqaction == "view") {
+                        parent.$(".layui-layer-btn").css("display", "none");
+                    }
+                    //这里由于会有change事件再一次进行赋值角色
+                    $("#RoleName").val(data.RoleName);
+                    $("#RoleId").val(data.RoleId);
+                    $("#OrganizeId").attr('readonly', 'readonly');
+                    ////是否外包
+                    //if (data.IsEpiboly == "1") {
+                    //    $("input[name='IsEpiboly']:eq(0)").prop("checked", "checked");
+                    //    $("#ProjectId").show();
+                    //    $("#ProjectId").attr("isvalid", "yes");
+                    //}
+                    //else {
+                    //    $("input[name='IsEpiboly']:eq(1)").prop("checked", "checked");
+                    //    $("#ProjectId").show();
+                    //    $("#ProjectId").attr("isvalid", "yes");
+                    //}
+                    ////是否在场
+                    //if (data.IsPresence == "0") {
+                    //    $("input[name='IsPresence']:eq(1)").prop("checked", "checked");
+                    //    //$(".form tr:eq(12) td").each(function (index, ele) {
+                    //    //    if (index > 1) {
+                    //    //        $(this).removeAttr("style");
+                    //    //    }
+                    //    //});
+                    //    $("#DepartureTime").show();
+                    //    $("#DepartureTime").parent().prev().show();
+                    //    $("#DepartureTime").attr("isvalid", "yes");
+
+                    //}
+                    //else {
+                    //    $("input[name='IsPresence']:eq(0)").prop("checked", "checked");
+                    //    $("#DepartureTime").hide();
+                    //    $("#DepartureTime").parent().prev().hide();
+                    //    $("#DepartureTime").removeAttr("isvalid");
+                    //    //$(".form tr:eq(12) td").each(function (index, ele) {
+                    //    //    if (index > 1) {
+                    //    //        $(this).css("display", "none");
+                    //    //        $("#DepartureTime").removeAttr("isvalid");
+                    //    //    }
+                    //    //});
+                    //}
+                    $("#EnterTime").val("");
+                    $("#DepartureTime").val(formatDate(data.DepartureTime, "yyyy-MM-dd"));
+                }
+            });
+            isEnadble();
+        } else {
+            keyValue = newGuid();
+            $("#tdCode").hide();
+            $("#tdCode").prev().attr("colspan", "2");
+            IntiDuty('-1', '-1');//如果是新增进来的时候
+            IntiPost('-1');
+            var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+            if (isSystem == "False") {
+                var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+                $("#OrganizeId").ComboBoxSetValue(orgId);
+                $("#OrganizeId").trigger("change");
+                $("#OrganizeId").attr('readonly', 'readonly');
+                $("#RoleName").attr('disabled', 'disabled');
+            }
+        }
+
+        $('.icheck input').iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '20%'
+        });
+        $("input[name='IsEpiboly']").on('ifChecked', function (event) {
+            var checkValue = $(this).val();
+            if (checkValue == "1") {
+                $(".project").show();
+                $("#ProjectId").attr("isvalid", "yes");
+            }
+            else {
+                $(".project").hide();
+                $("#ProjectId").removeAttr("isvalid");
+            }
+        });
+        //选择是否为四种人
+        $("input[name='IsFourPerson']").on('ifChecked', function (event) {
+            var checkValue = $(this).val();
+            if (checkValue == "1") {
+                $(".four").show();
+                $("#FourPersonType").attr("isvalid", "yes");
+            }
+            else {
+                $(".four").hide();
+                $("#FourPersonType").removeAttr("isvalid");
+            }
+        });
+
+        var IsFourPerson = $("input[name='IsFourPerson']:checked").val();
+
+        if (IsFourPerson == "1") {
+            $(".four").show();
+            $("#FourPersonType").attr("isvalid", "yes");
+        }
+        else {
+            $(".four").hide();
+            $("#FourPersonType").removeAttr("isvalid");
+        }
+
+        //var IsFourPerson = $("input[name='IsFourPerson']:checked").val();
+        //if (IsFourPerson == "是") {
+        //    $("#FourPersonType").parent().prev().show();
+        //    $("#FourPersonType").show();
+        //    $("#FourPersonType").attr("isvalid", "yes");
+        //}
+        //else {
+        //    $("#FourPersonType").parent().prev().hide();
+        //    $("#FourPersonType").hide();
+        //    $("#FourPersonType").removeAttr("isvalid");
+        //}
+
+        if (top.currUserRoleName.indexOf("省级") >= 0 || top.currUserRoleName.indexOf("集团") >= 0) {
+            $("#FourPersonType").removeAttr("isvalid");
+        }
+
+        $("input[name='IsPresence']").on('ifChecked', function (event) {
+            var checkValue = $(this).val();
+            if (checkValue == "0") {
+                $("#DepartureTime").show();
+                $("#DepartureTime").parent().show();
+                $("#DepartureTime").parent().prev().show();
+                $("#DepartureTime").attr("isvalid", "yes");
+            }
+            else {
+                $("#DepartureTime").parent().prev().hide();
+                $("#DepartureTime").hide();
+                $("#DepartureTime").parent().hide();
+                $("#DepartureTime").removeAttr("isvalid");
+            }
+        });
+
+        //var isPresence = $("input[name='IsPresence']:checked").val();
+        //if (isPresence == "0") {
+        //    $("#DepartureTime").parent().prev().show();
+        //    $("#DepartureTime").show();
+        //    $("#DepartureTime").attr("isvalid", "yes");
+        //}
+        //else {
+        //    $("#DepartureTime").parent().prev().hide();
+        //    $("#DepartureTime").hide();
+        //     $("#DepartureTime").removeAttr("isvalid");
+
+        //}
+
+    }
+
+
+    //绑定职务方法
+    function IntiPost(organizeId) {
+        $.ajax({
+            url: top.contentPath + "/BaseManage/Job/NewGetListJson?organizeId=" + organizeId,
+            type: "GET",
+            async: false,
+            dataType: "text",
+            success: function (data) {
+               
+                $("#PostId").html("");
+                $("#PostId").append(data);
+                $("#PostId").selectpicker('refresh');
+                //$("#PostId").html(data);
+            }
+        });
+    }
+
+    function isEnadble() {
+        var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+        if (isSystem == "False") { $("#RoleName").attr('disabled', 'disabled'); }
+    }
+    //按钮操作
+    function buttonOperation() {
+        var $finish = $("#btn_finish");
+        var $close = $("#btn_close");
+        //完成提交保存
+        $finish.click(function () {
+            AcceptClick();
+        });
+
+        $close.click(function () {
+            dialogClose();
+        })
+    }
+    //加载表格
+    function GetGrid() {
+        var queryJson = {
+            keyword: keyValue
+        };
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 136.5,
+            autowidth: true,
+            url: "../../HiddenTroubleManage/HTBaseInfo/GetRulerPageListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', hidden: true },
+                 {
+                     label: '违章日期', name: 'checkdate', index: 'checkdate', width: 150, align: 'left', sortable: true,
+                     formatter: function (cellvalue, options, rowObject) {
+                         return formatDate(cellvalue, 'yyyy-MM-dd');
+                     }
+                 },
+                {
+                    label: '违章描述', name: 'hiddescribe', index: 'hiddescribe', width: 250, align: 'left', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:funcLoadOpen('" + rowObject.id + "') style='color:blue; text-decoration:underline'>" + cellvalue + "</a>";
+                        return html;
+                    }
+                },
+                { label: '处理措施', name: 'changemeasure', index: 'changemeasure', width: 300, align: 'left', sortable: true }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'checkdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: false,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+    }
+    //保存表单
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+
+        var postData = $("#form1").formSerialize(keyValue);
+        postData.Birthday = postData.Birthday == "&nbsp;" ? null : postData.Birthday;
+        postData["DutyName"] = $("#DutyId").attr('data-text');
+
+
+        var postids = $("#PostId").selectpicker('val');
+        var postid = "";
+        if (postids != null && postids != "") {
+            for (var i = 0; i < postids.length; i++) {
+                if (i == 0) {
+                    postid = postids[i];
+                } else {
+                    postid += "," + postids[i];
+                }
+            }
+            postData["PostName"] = $("button[data-id='PostId']").attr("title").replace(/\s+/, "");
+        } else {
+            postData["PostName"] = "";
+        }
+        postData["PostId"] = postid;
+
+        postData["Manager"] = $("#ManagerId").attr('data-text');
+        postData["Degrees"] = $("#DegreesID").attr('data-text');
+        postData["LateDegrees"] = $("#LateDegreesID").attr('data-text');
+        postData["Political"] = $("#Political").attr('data-text');
+        //性别
+        if (document.getElementById("man").checked) {
+            postData["Gender"] = "男";
+        }
+        if (document.getElementById("woman").checked) {
+            postData["Gender"] = "女";
+        }
+        //特种作业人员
+        if (document.getElementById("IsSpecial1").checked) {
+            postData["IsSpecial"] = "是";
+        }
+        if (document.getElementById("IsSpecial0").checked) {
+            postData["IsSpecial"] = "否";
+        }
+        //特种设备操作人员
+        if (document.getElementById("IsSpecialEqu1").checked) {
+            postData["IsSpecialEqu"] = "是";
+        }
+        if (document.getElementById("IsSpecialEqu0").checked) {
+            postData["IsSpecialEqu"] = "否";
+        }
+        //是否四种人
+        if (document.getElementById("IsFourPerson1").checked) {
+            postData["ISFOURPERSON"] = "是";
+        }
+        else {
+            postData["ISFOURPERSON"] = "否";
+        }
+        //是否是三种人
+        var fourtypes = $("#FourPersonType").selectpicker('val');
+        if (fourtypes != null && fourtypes != "") {
+            postData["FourPersonType"] = $("button[data-id='FourPersonType']").attr("title").replace(/\s+/, "");
+        } else {
+            postData["FourPersonType"] = "";
+        }
+        //是否外包
+        var isEpiboly = $("input[name='IsEpiboly']:checked").val();
+        postData["IsEpiboly"] = isEpiboly;
+
+        postData.DepartureTime = postData.DepartureTime == "&nbsp;" ? null : postData.DepartureTime;
+        //是否在场
+        var isPresence = $("input[name='IsPresence']:checked").val();
+        postData["IsPresence"] = isPresence;
+        if (!!$("#OrganizeId").attr('data-value')) {
+            //处理得到组织code
+            $.ajax({
+                url: '../../BaseManage/User/GetOrganizeCode',
+                data: { orgid: $("#OrganizeId").attr('data-value') },
+                type: "GET",
+                async: false,
+                dataType: "JSON",
+                success: function (result) {
+
+                    postData["OrganizeCode"] = result.EnCode;
+                }
+            });
+        }
+        if (!!$("#DepartmentId").attr('data-value') == false) {
+            postData["DepartmentCode"] = $("#OrganizeId").attr('data-code');
+        } else {
+            postData["DepartmentCode"] = $("#DepartmentId").attr('data-code');
+        }
+        $.SaveForm({
+            url: top.contentPath + "/PersonManage/Person/Enter",
+            param: { "keyValue": keyValue, "strUserEntity": JSON.stringify(postData), deptName: $("#DepartmentId").attr('data-text') },
+            loading: "正在保存数据...",
+            success: function (data) {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+
+
+    //离开事件增加生日生成
+    function IdCardonblur() {
+        $.ExistField('IdentifyID', '../../BaseManage/User/ExistIdentifyID');
+        var idc = $("#IdentifyID").val();
+        var year = idc.substring(6, 10);
+        var month = idc.substring(10, 12);
+        var day = idc.substring(12, 14);
+        //如果没有填写生日则自动生成生日
+        //if ($("#Birthday").val() == "") {
+
+        if (IsDate(year + "-" + Number(month) + "-" + Number(day)))
+            $("#Birthday").val(year + "-" + month + "-" + day);
+        //}
+        if (IsDate(year + "-" + Number(month) + "-" + Number(day))) {
+            //如果没有填写年龄 则自动生成年龄
+            var Age = GetAge(year + "-" + month + "-" + day);
+            $("#Age").val(Age);
+        }
+    }
+
+    function IsDate(sBirthday) {
+        var d = new Date(sBirthday.replace(/-/g, "/"));
+        var newday = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+        if (sBirthday != (d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate())) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    function GetAge(strBirthday) {
+        var returnAge;
+        var strBirthdayArr = strBirthday.split("-");
+        var birthYear = strBirthdayArr[0];
+        var birthMonth = strBirthdayArr[1];
+        var birthDay = strBirthdayArr[2];
+        if (birthYear == "") {
+            return "";
+        }
+        d = new Date();
+        var nowYear = d.getFullYear();
+        var nowMonth = d.getMonth()+1;
+        var nowDay = d.getDate();
+
+        if (nowYear == birthYear) { //出生日期和当前同一年
+            returnAge = 0;
+        } else {
+            var ageDiff = nowYear - birthYear;
+            if (ageDiff > 0) {
+                if (nowMonth == birthMonth) {
+                    var dayDiff = nowDay - birthDay;
+                    if (dayDiff < 0) {
+                        returnAge = ageDiff - 1;
+                    } else {
+                        returnAge = ageDiff;
+                    }
+                } else {
+                    var monthDiff = nowMonth - birthMonth;
+                    if (monthDiff < 0) {
+                        returnAge = ageDiff - 1;
+                    } else {
+                        returnAge = ageDiff;
+                    }
+                }
+            } else {
+                returnAge = -1;
+            }
+        }
+        return returnAge;
+    }
+</script>
+<div style="margin-left: 10px; margin-right: 10px;">
+
+    <div class="tab-content" style="padding-top: 15px;">
+        <div id="BaseInfo" class="tab-pane active" style="padding-right: 30px;">
+            <table class="form">
+                <tr>
+                    <td class="formTitle" style="width:130px;">姓名<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="RealName" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" readonly="readonly" />
+                    </td>
+                    <td align="right" rowspan="4">
+                        <div style="margin-top: 10px; text-align: right;">
+                            <div class="file" title="点击上传照片">
+                                <img id="uploadPreview" style="width: 115px; height: 115px;" src="~/Content/images/App.png" />
+                                <input type="file" name="uploadFile" id="uploadFile">
+                                <input type="hidden" id="HeadIcon" />
+                            </div>
+                            <div style="line-height: 14px; color: #75777A; text-align: right;">
+                                点击图片可上传新的照片
+                            </div>
+                        </div>
+
+                    </td>
+                    <td align="center" rowspan="5" valign="top" id="tdCode">
+                        <div style="margin-top: 10px; ">
+                            <img src="" id="code" />
+                        </div>
+                        <div style="line-height: 14px; color: #75777A; text-align: center;">
+                            二维码
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width:130px;">账号<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="text" id="Account" name="Accunt" isvalid="yes" checkexpession="NotNull" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle" style="width:130px;">性别<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="男" id="man" name="Gender" />&nbsp;<label for="man">男</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="女" id="woman" name="Gender" />&nbsp;<label for="woman">女</label>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">单位<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="OrganizeId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+                <tr>
+
+
+                    <td class="formTitle">部门<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="DepartmentId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                </tr>
+
+
+                <tr>
+                    <td class="formTitle">岗位<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="DutyId" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+                    </td>
+                    <td class="formTitle">职务</td>
+                    <td class="formValue">
+                        <select id="PostId" class="selectpicker show-menu-arrow form-control" multiple placeholder="请选择职务"></select>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="formTitle">人员类型<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <div id="UserType" type="select" class="ui-select" multiple isvalid="yes" checkexpession="NotNull">
+                            <ul>
+                                <li data-value="" class="" style="padding: 0px 5px;">==请选择==</li>
+                                <li data-value="公司领导" title="" class="" style="padding: 0px 5px;">公司领导</li>
+                                <li data-value="部门负责人" title="" class="" style="padding: 0px 5px;">部门负责人</li>
+                                <li data-value="专业负责人" title="" class="" style="padding: 0px 5px;">专业负责人</li>
+                                <li data-value="一般管理人员" title="" style="padding: 0px 5px;" class="">一般管理人员</li>
+                                <li data-value="班组负责人" title="" class="" style="padding: 0px 5px;">班组负责人</li>
+                                <li data-value="安全管理人员" title="" class="" style="padding: 0px 5px;">安全管理人员</li>
+                                <li data-value="普通员工" title="" class="" style="padding: 0px 5px;">普通员工</li>
+                                <li data-value="项目负责人" title="" style="padding: 0px 5px;" class="">项目负责人</li>
+                                <li data-value="项目负责人" title="" style="padding: 0px 5px;" class="">现场负责人</li>
+                                <li data-value="一般作业人员" title="" style="padding: 0px 5px;" class="">一般作业人员</li>
+                            </ul>
+                        </div>
+                    </td>
+                    <td class="formTitle">政治面貌</td>
+                    <td class="formValue">
+                        <div id="Political" type="select" class="ui-select"></div>
+                    </td>
+
+
+                </tr>
+
+                <tr>
+                    <td class="formTitle">身份证号<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="IdentifyID" length="18" type="text" class="form-control" isvalid="yes" checkexpession="IDCard" onblur="IdCardonblur()" />
+                    </td>
+                    <td class="formTitle">手机号码</td>
+                    <td class="formValue">
+                        <input id="Mobile" type="text" class="form-control" isvalid="yes" checkexpession="MobileOrNull" />
+                    </td>
+
+                </tr>
+
+                <tr id="isTZ">
+                    <td class="formTitle">是否为特种作业人员<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="是" id="IsSpecial1" name="IsSpecial" />&nbsp;<label for="IsSpecial1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="否" id="IsSpecial0" name="IsSpecial" checked="checked" />&nbsp;<label for="IsSpecial0">否</label>
+                    </td>
+                    <td class="formTitle">是否为特种设备作业人员<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="是" id="IsSpecialEqu1" name="IsSpecialEqu" />&nbsp;<label for="IsSpecialEqu1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="否" id="IsSpecialEqu0" name="IsSpecialEqu" checked="checked" />&nbsp;<label for="IsSpecialEqu0">否</label>
+                    </td>
+                </tr>
+
+                <tr id="idFour">
+                    <td class="formTitle">是否为三种人<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="1" id="IsFourPerson1" name="IsFourPerson" />&nbsp;<label for="IsFourPerson1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="0" id="IsFourPerson2" name="IsFourPerson" />&nbsp;<label for="IsFourPerson2">否</label>
+                    </td>
+                    <td class="formTitle four">三种人类别<font face="宋体">*</font></td>
+                    <td class="formValue four">
+                        <select class="selectpicker show-menu-arrow form-control" multiple placeholder="请选择类别" id="FourPersonType" checkexpession="NotNull">
+                            <option value="工作负责人">工作负责人</option>
+                            <option value="工作许可人">工作许可人</option>
+                            <option value="工作票签发人">工作票签发人</option>
+                        </select>
+
+                    </td>
+                </tr>
+
+
+                <tr>
+                    <td class="formTitle">出生日期</td>
+                    <td class="formValue">
+                        <input id="Birthday" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({readOnly:true})" />
+                    </td>
+                    <td class="formTitle">年龄<font face="宋体"></font></td>
+                    <td class="formValue">
+                        <input id="Age" type="text" class="form-control" isvalid="yes" checkexpession="NumOrNull" maxlength="2" />
+                    </td>
+
+                </tr>
+
+
+
+                <tr>
+                    <td class="formTitle">民族</td>
+                    <td class="formValue">
+                        <div id="Nation" type="select" class="ui-select"></div>
+                    </td>
+                    <td class="formTitle">籍贯</td>
+                    <td class="formValue">
+                        <div id="Native" type="select" class="ui-select"></div>
+                    </td>
+
+                </tr>
+
+                <tr>
+                    <td class="formTitle">工种</td>
+                    <td class="formValue">
+                        <select id="Craft" class="form-control">
+                            <option value="">请选择或者输入</option>
+                            @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetDataItemListOption("PersonWrokType"))
+                        </select>
+                        @*<input id="Craft" type="text" class="form-control" />*@
+                    </td>
+                    <td class="formTitle">技术等级</td>
+                    <td class="formValue">
+                        <div id="TechnicalGrade" type="select" class="ui-select"></div>
+                    </td>
+
+
+
+                </tr>
+
+                <tr>
+
+                    <td class="formTitle">工种工龄</td>
+                    <td class="formValue">
+                        <input id="CraftAge" type="text" class="form-control" isvalid="yes" checkexpession="NumOrNull" maxlength="2" />
+                    </td>
+
+                    <td class="formTitle">职称</td>
+                    <td class="formValue">
+                        <div id="JobTitle" type="select" class="ui-select"></div>
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle">原始学历</td>
+                    <td class="formValue">
+                        <div id="DegreesID" type="select" class="ui-select"></div>
+                    </td>
+                    <td class="formTitle">后期学历</td>
+                    <td class="formValue">
+                        <div id="LateDegreesID" type="select" class="ui-select"></div>
+                    </td>
+
+                </tr>
+                <tr>
+                    <td class="formTitle">工号</td>
+                    <td class="formValue">
+                        <input id="EnCode" type="text" class="form-control" />
+                    </td>
+                    <td class="formTitle">健康状况</td>
+                    <td class="formValue">
+                        <select id="HealthStatus" class="form-control">
+                            <option value="">请选择或者输入</option>
+                            @Html.Raw(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetDataItemListOption("HealthStatus"))
+                        </select>
+                        @*<input id="Craft" type="text" class="form-control" />*@
+                    </td>
+                </tr>
+
+
+
+                <tr>
+                    <td class="formTitle">座机电话</td>
+                    <td class="formValue">
+                        <input id="Telephone" type="text" class="form-control" isvalid="yes" checkexpession="PhoneOrNull" placeholder="格式区号-电话号码" />
+                    </td>
+                    <td class="formTitle">入厂(职)时间<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="EnterTime" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker()" isvalid="yes" checkexpession="NotNull" />
+                    </td>
+
+                </tr>
+
+
+                <tr id="isOut">
+                    <td class="formTitle">是否外包<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+                        <input type="radio" value="1" id="IsEpiboly1" name="IsEpiboly" />&nbsp;<label for="IsEpiboly1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="0" id="IsEpiboly2" name="IsEpiboly" checked="checked" />&nbsp;<label for="IsEpiboly2">否</label>
+                    </td>
+                    <td class="formTitle project" style="display:none;">外包工程名称</td>
+                    <td class="formValue project" style="display:none;">
+                        <div id="ProjectId" type="select" class="ui-select"></div>
+                    </td>
+                </tr>
+
+                <tr style="display:none;">
+                    <td class="formTitle">是否在厂(职)<font face="宋体">*</font></td>
+                    <td class="formValue icheck">
+
+                        <input type="radio" value="1" id="IsPresence1" name="IsPresence" checked="checked" />&nbsp;<label for="IsPresence1">是</label>&nbsp;&nbsp;&nbsp;
+                        <input type="radio" value="0" id="IsPresence2" name="IsPresence" />&nbsp;<label for="IsPresence2">否</label>
+                    </td>
+                    <td class="formTitle" style="display:none;">离厂(职)时间</td>
+                    <td class="formValue" style="display:none;">
+                        <input id="DepartureTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" />
+                    </td>
+                </tr>
+                <tr>
+                    <th class="formTitle" valign="top" style="padding-top: 4px;">
+                        签名
+                    </th>
+                    <td class="formValue" colspan="3">
+                        <div style="margin-top: 10px; ">
+                            <div class="file" title="点击上传照片">
+                                <img id="signPreview" style="width: 200px; height: 115px;" src="~/Content/images/no.png" />
+                                <input type="file" name="signFile" id="signFile">
+                                <input type="hidden" id="SignImg" />
+                            </div>
+                            <div style="line-height: 14px; color: #75777A; text-align: right;" id="divTips">
+                                @*点击图片可上传新的照片*@
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+
+                <!--以下信息隐藏不显示-->
+                <tr style="display:none;">
+                    <td class="formTitle">账户<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="Account" type="text" onblur="$.ExistField(this.id,top.contentPath + '/BaseManage/User/ExistAccount')" class="form-control" />
+                    </td>
+                    <td class="formTitle">密码<font face="宋体">*</font></td>
+                    <td class="formValue">
+                        <input id="Password" type="text" class="form-control" placeholder="请输入密码" />
+                    </td>
+                </tr>
+                <tr style="display:none;">
+                    <td class="formTitle">角色<font face="宋体">*</font></td>
+                    <td class="formValue" colspan="3">
+                        <input id="RoleName" type="text" class="form-control" placeholder="请选择角色" readonly onclick="if (!!$('#OrganizeId').attr('data-value') == true) { selectRole($('#RoleId').val(), $('#OrganizeId').attr('data-value'), 1, 2, window.document.body, 'RoleName,RoleId'); } else { dialogMsg('请先选择所属公司！', 0); }" />
+                        <input id="RoleId" type="hidden" /><input id="DeptId" type="hidden" />
+                    </td>
+                </tr>
+                <tr style="display:none;">
+                    <td class="formTitle">邮箱</td>
+                    <td class="formValue">
+                        <input id="Email" type="text" class="form-control" isvalid="yes" checkexpession="EmailOrNull" />
+                    </td>
+
+                    <td class="formTitle">微信</td>
+                    <td class="formValue">
+                        <input id="WeChat" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr style="display:none;">
+                    <td class="formTitle">QQ</td>
+                    <td class="formValue">
+                        <input id="OICQ" type="text" class="form-control" />
+                    </td>
+                    <td class="formTitle">MSN</td>
+                    <td class="formValue">
+                        <input id="MSN" type="text" class="form-control" />
+                    </td>
+                </tr>
+
+            </table>
+        </div>
+
+    </div>
+</div>
+

@@ -1,0 +1,202 @@
+﻿@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>Grouping</title>
+
+
+    <script>
+        var keyValue = request('keyValue');
+        var state = request('state');
+        var engineerid = request('engineerid');
+        var typeAction = "";
+        var arr = [];//临时数组 
+        var updatearr = [];
+        $(function () {
+            getGrid();
+
+        });
+
+        //动态添加行
+        function addExamine() {
+            var ids = "";
+            if (typeAction == "") {
+                ids = $("#gridTable").jqGrid('getRowData').length;
+            }
+            else {
+                ids = $("#gridTable").getDataIDs();
+                ids = parseInt(ids[0].toString()) + 1;
+            }
+            typeAction = "add";
+            var rowId = $("#gridTable").jqGrid('getRowData').length;
+            var check = 0;
+            var row = $('#gridTable').jqGrid('getRowData');
+            var id = "";
+            $("#gridTable").addRowData(ids, {
+                id: ids, state: 1, groupsname: "", examinebasis: ""
+            }, 'first');
+        }
+        //删除行
+        function delExamine(rowId) {
+            var jqTable = $("#gridTable");
+            var rowLength = $("#gridTable").jqGrid('getRowData').length;
+            if (rowId.length < 10) {
+                rowId = jqTable.jqGrid("getGridParam", "selrow");
+                $('#gridTable').jqGrid('delRowData', rowId);
+                if ($('#gridTable').find("input").length == 0) {
+                    typeAction = "";
+                }
+            } else {
+                var url = '../../PersonManage/PersonNew/GroupUserCount';
+                $.post(url, { groupId: rowId, type: 1 }, function (data) {
+                    if (data != "0") {
+                        dialogMsg("该组中有临时人员不能进行删除！", 2);
+                    }
+                    else {
+                        $.RemoveForm({
+                            url: '../../PersonManage/PersonNew/RemoveForm',
+                            param: { keyValue: rowId },
+                            success: function (data) {
+                                $('#gridTable').trigger('reloadGrid');
+                                $.currentIframe().GetUserTree();
+                            }
+                        })
+                    }
+                });
+            }
+        }
+
+        //数据集绑定
+        function getGrid() {
+            var queryJson = {
+                ///  ProjectId: proid,
+                //SafetymoneyId: safeid
+            }
+            var selectedRowIndex = 0;
+            var $gridTable = $('#gridTable');
+            $gridTable.jqGrid({
+                autowidth: true,
+                height: 300,
+                url: '../../PersonManage/PersonNew/GetPageListJson',
+                postData: { queryJson: JSON.stringify(queryJson) },
+                datatype: "json",
+                colModel: [
+                    { label: '主键', name: 'id', hidden: true },
+                    { label: '状态', name: 'state', hidden: true },
+                    {
+                        label: '操作', name: 'oper', width: 100, align: 'center', sortable: false,
+                        formatter: function (cellvalue, options, rowObject) {
+                            var html = "";
+                            html += "<a href=javascript:delExamine('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                            return html;
+                        }
+                    },
+                    {
+                        label: '当前分组', name: 'groupsname', align: 'center', sortable: false,
+                        formatter: function (cellvalue, options, rowObject) {
+
+                            var html = "";
+                            if (cellvalue == "") {
+                                html += '<textarea type="text" name="groupsname" role="textbox" style="width: 100%;height:48px;" class="form-control" >' + "" + '</textarea>';
+                                return html;
+                            } else {
+                                var name = rowObject.groupsname == null ? "" : rowObject.groupsname;
+                                html += '<textarea type="text" name="groupsname" role="textbox" style="width: 100%;height:48px;" class="form-control" >' + name + '</textarea>';
+                                return html;
+                            }
+                        }
+                    },
+                    {
+                        label: '当前人数', name: 'examinebasis', align: 'center', sortable: false,
+                        formatter: function (cellvalue, options, rowObject) {
+                            return (rowObject.ucount == null ? "" : rowObject.ucount);
+                        }
+                    }
+                ],
+                onSelectRow: function () {
+                    selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                },
+                gridComplete: function () {
+                    $('#' + this.id).setSelection(selectedRowIndex, false);
+                },
+                viewrecords: true,
+                rowNum: 30,
+                rowList: [15, 30, 50],
+                sortname: 'createdate',
+                sortorder: 'desc',
+                rownumbers: true,
+                shrinkToFit: true,
+                gridview: true,
+                footerrow: true
+            });
+        }
+
+        //表单提交
+        function AcceptClick() {
+            var flag = false;
+            var measures = $("#gridTable").jqGrid('getRowData');
+            if (measures.length > 0) {
+                for (var i = 0; i < measures.length; i++) {
+                    var dom = measures[i];
+                    if (dom.state == undefined) continue;
+                    if (dom.state == 0) {//修改组名
+                        updatearr.push({
+                            groupsname: $("#gridTable").find("textarea[name='groupsname']").eq(i).val(), ID: dom.id
+                        });
+                    }
+                    else {
+                        if ($.trim($("#gridTable").find("textarea[name='groupsname']").eq(i).val()).length == 0 && !flag) {
+                            flag = true;
+                        } else {
+                            if ($("#gridTable").find("textarea[name='groupsname']").eq(i).val() != undefined) {
+                                if ($("#gridTable").find("input[name='groupsname']").eq(i).val() != "") {
+                                    arr.push({
+                                        groupsname: $("#gridTable").find("textarea[name='groupsname']").eq(i).val()
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (flag) {
+                dialogMsg("不能有空行且部门名称不能为空！", 2);
+                return false;
+            }
+            $.SaveForm({
+                url: '../../PersonManage/PersonNew/SaveForm',
+                param: { ArrList: arr, Updatelist: updatearr },
+                loading: "正在保存数据...",
+                success: function () {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                    $.currentIframe().GetUserTree();
+                }
+            });
+
+        }
+
+    </script>
+
+</head>
+<body>
+    <div class="center-Panel">
+        <div class="panel panel-default" id="panel3">
+            <div class="panel-heading">
+                <strong>&nbsp;&nbsp;分组信息</strong>
+                <span class="tools pull-right">
+                    <a href="javascript:addExamine(this)" id="addExamine" class="btn btn-primary btn-xs">新增</a>&nbsp;&nbsp;&nbsp;&nbsp;<a class="fa fa-chevron-down" title="展开/收起"></a>
+                </span>
+            </div>
+            <div class="panel-body">
+                <table id="gridTable"></table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

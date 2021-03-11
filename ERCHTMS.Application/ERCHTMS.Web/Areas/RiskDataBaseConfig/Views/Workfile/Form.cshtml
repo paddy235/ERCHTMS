@@ -1,0 +1,133 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/plugins/ckeditor/ckeditor.js"></script>
+<script src="~/Content/scripts/plugins/simditor/js/module.min.js"></script>
+<script src="~/Content/scripts/plugins/simditor/js/uploader.min.js"></script>
+<script src="~/Content/scripts/plugins/simditor/js/hotkeys.min.js"></script>
+<link href="~/Content/scripts/plugins/cxColor/css/jquery.cxcolor.css" rel="stylesheet" />
+<script src="~/Content/scripts/plugins/cxColor/js/jquery.cxcolor.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var issend = request('issend');
+    var editor = null;
+    $(function () {
+        CKEDITOR.replace('FileExplain', { startupMode: "source" });
+        initControl();
+        if (issend == "1") {
+            $("#btn_Save").hide();
+        } else {
+            $("#btn_Save").show();
+        }
+    });
+    //初始化控件
+    function initControl() {
+        if (actiontype == "view") {
+            $("input").attr("readonly", "readonly");
+            $(".form-button").css("display", "none");
+            $("#div1").css("display", "none");
+        }
+
+        //获取表单
+        if (!!keyValue) {
+            editor = CKEDITOR.instances.FileExplain;
+            $.SetForm({
+                url: "../../RiskDataBaseConfig/Workfile/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data != null)
+                        editor.setData(data.FileExplain);
+                }
+            })
+        }
+        //保存
+        $("#btn_Save").click(function () {
+            $("#IsSend").val("0");
+            AcceptClick();
+        });
+        //发送
+        $("#btn_Submit").click(function () {
+            $("#IsSend").val("1");
+            AcceptClick();
+        });
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        editor = CKEDITOR.instances.FileExplain;
+        if (editor.getData().length <= 0) {
+            dialogMsg('请填写动态内容！', 0);
+            return false;
+        }
+        var postData = {
+            Title: $("#Title").val(),
+            IsSend: $("#IsSend").val(),
+            CreateUserId: $("#CreateUserId").val(),
+            CreateUserName: $("#CreateUserName").val(),
+            SendTime: $("#SendTime").val(),
+            FileExplain: editor.getData(),
+            DeptName: $("#DeptName").val(),
+            DeptCode: $("#DeptCode").val(),
+            DeptId: $("#DeptId").val()
+        }
+        $.SaveForm({
+            url: "../../RiskDataBaseConfig/Workfile/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <div id="div1" style="margin-top: 50px;"></div>
+    <table class="form">
+        <tr>
+            <td class="formTitle">标题<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="Title" type="text" class="form-control" isvalid="yes" checkexpession="NotNull" />
+                <input id="IsSend" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">发布时间<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="SendTime" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.ToString("yyyy-MM-dd")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" isvalid="yes" checkexpession="NotNull" />
+            </td>
+            <td class="formTitle">发布人<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="CreateUserName" type="text" class="form-control" readonly value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName" />
+                <input id="CreateUserId" type="hidden" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">所属电厂<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DeptId" type="hidden" class="form-control" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId" />
+                <input id="DeptCode" type="hidden" class="form-control" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode" />
+                <input id="DeptName" type="text" class="form-control" isvalid="yes" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeName" checkexpession="NotNull" onclick="selectDept('', 0, 13, '所属部门', document.body, 'DeptName,DeptCode,DeptId')" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">工作任务清单说明<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <textarea id="FileExplain" class="form-control" ></textarea>
+            </td>
+        </tr> 
+    </table>
+</div>
+<div class="form-button" style=" top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+        <a id="btn_Submit" class="btn btn-primary" style="background-color: #2e99d4; border-color: #2e99d4; "><i class="fa fa-mail-forward"></i>&nbsp;发&nbsp;&nbsp;送</a>
+        &nbsp; &nbsp;
+    </div>
+</div>

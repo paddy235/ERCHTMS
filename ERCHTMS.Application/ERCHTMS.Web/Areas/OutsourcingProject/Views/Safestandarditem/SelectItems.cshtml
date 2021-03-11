@@ -1,0 +1,281 @@
+﻿@{;
+    ViewBag.Title = "安全考核标准列表";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var dtree, gtree;
+    var enCode = "";
+    var parentId = "";
+    var pType = request("pType");
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+        //GetGrpTree();
+    });
+    //初始化页面
+    function InitialPage() {
+       
+        //layout布局
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        if (pType == '0') {
+            $('#xzstandar').show();
+        } else {
+            $('#xzstandar').hide();
+        }
+        //resize重设(表格、树形)宽高
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width() - 100));
+                $("#gridTable").setGridHeight($(window).height() - 170);
+                $("#deptTree").setTreeHeight($(window).height() - 61);
+                $("#grpTree").setTreeHeight($(window).height() - 61);
+                $("#tab1").height($(window).height() - 61);
+                $("#grpTreePanel").height($(window).height() - 61);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        
+    }
+
+    //加载树
+
+    function GetTree(id) {
+        var arr = [];
+
+        //arr = [
+        //    {
+        //        title: "新增",
+        //        text: '<i class="fa fa-file-text-o"  name="toolbtn"></i>', callback: "add"
+        //    },
+        //    {
+        //        title: "修改",
+        //        text: '<i class="fa fa-pencil-square-o toolbtn" name="toolbtn"></i>', callback: "edit"
+
+        //    },
+        //    {
+        //        title: "删除",
+        //        text: '<i class="fa fa-trash-o toolbtn" name="toolbtn"></i>', callback: "del"
+
+        //    }];
+        var url = "../../OutsourcingProject/Safestandarditem/GetStandardTreeJson";
+        if (id!=undefined) {
+            url += "?tid="+id;
+        }
+        //加载组织机构树
+        var item = {
+            height: $(window).height() - 61,
+            url: url,
+            onnodeclick: function (item) {
+                enCode = item.Code.split('|')[0];
+                if (enCode == "00") enCode = "0";
+                parentId = item.id;
+                var $gridTable = $("#gridTable");
+                $gridTable.jqGrid('setGridParam', {
+                    url: "../../OutsourcingProject/Safestandarditem/GetPageListJson",
+                    postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+                }).trigger('reloadGrid');
+                $("#add").css("display", "");
+                //$("#export").css("display", "");
+            }
+            ,isTool: true
+            //自定义工具栏
+            , nodeTools: arr
+        };
+        //初始化部门树
+        dtree=$("#deptTree").treeview(item);
+        $("#tab1").height($(window).height() - 61);
+        $("div[title='标准分类']").find("span[title='删除']").remove();
+        $("div[title='标准分类']").find("span[title='修改']").remove();
+        if (id != undefined) {
+            var node = $("span[data-value='" + id + "']");
+            if (node != undefined && node != null) {
+                node.css({ "background-color": "#ccc" });
+                var h = node.position().top;
+                $("#deptTree").animate({ scrollTop: h });
+            }
+        }
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $("#gridTable");
+        $gridTable.jqGrid({
+            url: "../../OutsourcingProject/Safestandarditem/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify({ enCode: enCode }) },
+            height: $(window).height() - 170,
+            autowidth: true,
+            colModel: [
+               { label: '主键', name: 'id', hidden: true },
+               //{
+               //    label: '操作', name: 'Oper', index: 'Oper', width: 120, align: 'center',
+               //    formatter: function (cellvalue, options, rowObject) {
+               //        var html = "";
+               //        if (!$("#grpTreePanel").hasClass("active")) {
+               //            html = "&nbsp;&nbsp;&nbsp;<a href=javascript:editItem('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+               //            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:delItem('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+               //        }
+               //        return html;
+               //    }
+               //},
+                {
+                    label: '操作', name: 'Oper', index: 'name', width: 60, align: 'center', hidden: (pType!="0"), sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var ischked = "";
+                        //if (userIds.indexOf(rowObject.UserId) >= 0) {
+                        //    ischked = "checked='checked'";
+                        //}
+                        var html = "";
+                        //var mobile = rowObject.Mobile == undefined || rowObject.Mobile == null ? "" : rowObject.Mobile;
+                        html = "<input type='checkbox'" + ischked + " onclick=selRow(this,'" + rowObject.id+"','" + encodeURIComponent(rowObject.dname) + "','" + encodeURIComponent(rowObject.typename) + "','" + encodeURIComponent(rowObject.content) + "') />";
+                        return html;
+                    }
+                },
+                {
+                    label: '考核条款', name: 'name', width: 400, align: 'center' },
+                { label: '考核内容', name: 'content', width: 450, align: 'center' },
+                { label: 'dname', name: 'dname', hidden: true },
+                { label: 'typename', name: 'typename', hidden: true }
+
+            ],
+            pager: "#gridPager",
+            viewrecords: true,
+            rowNum: 20,
+            rowList: [20, 50, 100],
+            rownumbers: true,
+            sortname:'a.createdate',
+            sortorder: 'desc',
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+
+            },
+            gridComplete: function () {
+                //if (!(top.currUserRoleName.indexOf("超级管理员") >= 0 || top.currUserRoleName.indexOf("公司管理员") >= 0 || top.currUserRoleName.indexOf("厂级部门用户") >= 0 || top.currUserRoleName.indexOf("省级用户") >= 0)) {
+                //    $gridTable.hideCol(["Oper"]);
+                //    $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                //}
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: $("#txtKeyword").val(), enCode: enCode }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+        $("#btn_SearchAll").click(function () {
+            $("#txtKeyword").val("");
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify({ keyWord: "", enCode: enCode }) }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    function selRow(obj, id, dname, typename, content) {
+        if (obj.checked) {
+            if (document.getElementById("div" + id) == null) {
+                $("#users").append("<div id='div" + id + "'  data-value='user'><input type='checkbox' value='" + id + "' id='" + id + "' checked='checked' title='" + decodeURIComponent(dname) + "'  dname='" + decodeURIComponent(dname) + "'  typename='" + decodeURIComponent(typename) + "'  content='" + decodeURIComponent(content) + "' ><label for='" + id + "'>" + decodeURIComponent(dname) + "</label></div>");
+            }
+        } else {
+            if (document.getElementById("div" + id) != null) {
+                $("#div" + id).remove();
+            }
+        }
+    }
+
+    //选择标准并返回
+    function AcceptClick(options) {
+
+        var arr = $("#users").find("input:checked");
+        //if (arr.length == 0) {
+        //    dialogAlert("请选择用户！", 2);
+        //    return;
+        //}
+        if (arr.length == 0) {
+            dialogMsg("请至少选择一条数据！", 0);
+            return;
+        } else {
+            var arrresult = new Array();
+            arr.each(function (i, dom) {
+                arrresult.push({
+                    id: $(dom).attr("id"),
+                    content: $(dom).attr("content"),
+                    dname: $(dom).attr("dname"),
+                    typename: $(dom).attr("typename")
+                });
+            });
+            top.Form.fillItems(arrresult);
+        }
+        if (options != undefined) {
+            if (options.callBack) {
+                options.callBack();
+            }
+
+        }
+        dialogClose();
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <ul class="nav nav-tabs" id="ulTabs">
+                <li class="active" onclick="selectTree('deptTree')">
+                    <a data-toggle="tab" href="#tab1">安全考核标准分类</a>
+                </li>
+                @*<li id="liGrpTree" style="display:none;" onclick="selectTree('grpTree')"><a href="#grpTreePanel" data-toggle="tab">集团隐患排查标准分类</a></li>*@
+            </ul>
+            <div class="tab-content">
+                <div id="tab1" class="tab-pane active" style="height:300px;">
+                    <div id="deptTree"></div>
+                </div>
+                <div id="grpTreePanel" class="tab-pane" style="display:none;">
+                    <div id="grpTree"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="panel-Title" id="pelTitle">安全考核标准</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td width="10"></td>
+                            <td>
+                                <input id="txtKeyword" type="text" class="form-control" placeholder="请输入考核内容进行搜索" style="width: 300px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-east" style="margin-left: 0px;width:200px;" id="xzstandar" >
+        <div class="west-Panel" style="margin-left: 0px; width: 200px;">
+            <div class="panel-Title">
+                <lable id="lblselect">已选中的考核标准</lable>
+            </div>
+            <div id="users" style="overflow: auto; height: 450px; margin-left: 5px;">
+            </div>
+        </div>
+    </div>
+</div>

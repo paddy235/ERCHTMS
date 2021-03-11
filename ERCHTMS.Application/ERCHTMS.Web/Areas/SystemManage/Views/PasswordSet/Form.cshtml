@@ -1,0 +1,130 @@
+﻿@{
+    ViewBag.Title = "区域管理";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    $(function () {
+        initControl();
+    })
+    //初始化控件
+    function initControl() {
+        if (!IsAdmin()) {
+            $("#OrgName").val(top.currUserOrgName);
+            $("#OrgCode").val(top.currUserOrgCode);
+            $("#OrgName").removeAttr("onclick");
+            $("#OrgName").attr("readonly", "readonly");
+        }
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../SystemManage/PasswordSet/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if(data.Rule!=null){
+                        var arr = data.Rule.split(';');
+                        $(arr).each(function (j,item) {
+                            if ($.trim(item).length>0) {
+                                $("#rule").find("input:checkbox").eq(j).get(0).checked = true;
+                            }
+                        });
+                    }
+                }
+            });
+        } 
+    }
+    //保存表单
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var postData = $("#form1").formSerialize(keyValue);
+        if(document.getElementById("Status").checked){
+            postData["Status"] = 1;
+        }else{
+            postData["Status"] = 0;
+        }
+        var rule = " ";
+        var remark = " ";
+        $("#rule").find("input:checkbox").each(function (j,chk) {
+          
+            if (chk.checked)
+            {
+                rule += $(this).val() + ";";
+                remark += $(this).attr("title")+ "、";
+            }
+            else {
+                rule +=";";
+            }
+        });
+      
+        if ($.trim(remark).length == 0 && postData["Status"] == 1) {
+            dialogMsg("请选择密码组成规则！", 0);
+            return false;
+        } else {
+            postData["Rule"] = rule.substring(0, rule.length-1);
+        }
+        if ($.trim($("#Len").val()).length == 0) {
+            dialogMsg("请填写密码长度！", 0);
+            return false;
+        } else {
+            postData["Len"] = $("#Len").val();
+        }
+        if ($.trim(remark).length>0) {
+            remark = remark.substring(0, remark.length - 1);
+            postData["Remark"] = remark;
+        } else {
+            postData["Remark"] = remark;
+        }
+        $.SaveForm({
+            url: "../../SystemManage/PasswordSet/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+            }
+        })
+    }
+</script>
+<div style="margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">单位<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="OrgCode" type="hidden" />
+                <input id="OrgName" type="text" class="form-control" placeholder="请选择单位" onclick="selectDept('', 1, 13, '选择单位', this.parentNode, 'OrgName,OrgCode');"  isvalid="yes" checkexpession="NotNull" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">组成规则</td>
+            <td class="formValue" id="rule">
+                <input type="checkbox" id="rule1" value="[A-Z]" title="大写字母" /><label for="rule1">[A-Z]（大写字母）</label>
+                <input type="checkbox" id="rule2" value="[a-z]" title="小写字母" /><label for="rule2">[a-z]（小写字母）</label>
+                <input type="checkbox" id="rule3" value="[0-9]" title="数字" /><label for="rule3">[0-9]（数字）</label>
+                <input type="checkbox" id="rule4" value="[@Html.Raw("!@#$%^&*")]"  title="特殊符号" /><label for="rule4">[@Html.Raw("!@#$%^&*")]（特殊符号）</label>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">密码长度</td>
+            <td class="formValue">
+                <input id="Len" type="text" class="form-control" placeholder="请填写密码长度" isvalid="yes" checkexpession="NumOrNull" value="8" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">密码错误次数限制<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="Num" type="text" class="form-control" placeholder="密码连续错误多少次则禁用此账号，0表示不作限制" isvalid="yes" checkexpession="PositiveNumNotNull" />
+                <div style="color:red;">注:密码连续错误多少次则禁用此账号，0表示不作限制</div>
+            </td>
+        </tr>
+        <tr>
+            <th class="formTitle">启用<font face="宋体">*</font></th>
+            <td class="formValue">
+                <input type="checkbox" id="Status" value="1" />
+            </td>
+        </tr>
+        
+    </table>
+</div>

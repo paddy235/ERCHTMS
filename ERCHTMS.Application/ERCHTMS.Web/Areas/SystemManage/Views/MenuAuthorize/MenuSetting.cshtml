@@ -1,0 +1,218 @@
+﻿@{
+    ViewBag.Title = "APP菜单设置";
+    Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script>
+    var deptId = request("DepartId");
+    var departCode = request("DepartCode");
+    var departName = request("DepartName");
+    var themeCode = 0;
+    var platform = request("platform");
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        //resize重设(表格、树形)宽高
+        //$(window).resize(function (e) {
+        //    window.setTimeout(function () {
+        //        $('#gridTable').setGridWidth(($('.gridPanel').width()));
+        //        $("#gridTable").setGridHeight($(window).height() - 108.5);
+        //    }, 200);
+        //    e.stopPropagation();
+        //});
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridMenuTable');
+        $gridTable.jqGridEx({
+            url: "../../SystemManage/MenuAuthorize/GetAPPMenuSetting",
+            datatype: "json",
+            postData: { deptId: deptId, themeCode: themeCode, platform: platform},
+            height: $(window).height() - 120,
+            autowidth: true,
+            colModel: [
+                { label: "ColumnId", name: "ColumnId", index: "ColumnId", width: 50, hidden: true },
+                { label: 'ParentId', name: 'ParentId', hidden: true },
+                { label: 'Id', name: 'Id', hidden: true },
+                { label: 'DataSouceType', name: 'DataSouceType', hidden: true },
+                { label: 'HasChild', name: 'HasChild', hidden: true },
+                { label: "名称", name: "Name", index:"Name",width: 300, align: "center", sortable: false },
+                { label: "备注", name: "Remark", width: 300, align: "left", sortable: false },
+                { label: "排序", name: "Sort", index: "Sort", width: 50, align: "left", sortable: false },
+     
+            ],
+            treeGrid: true,
+            treeGridModel: "nested",
+            ExpandColumn: "Remark",
+
+            rowNum: "all",
+            rownumbers: true,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询条件设置
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("input[type=radio]").click(function () {
+            var elem = $(this);
+            themeCode = elem.val();
+            $gridTable.jqGrid('setGridParam', {
+                postData: {
+                    themeType: elem.val(),
+                    deptId: deptId,
+                    platform: platform
+                }
+            }).trigger('reloadGrid');
+        });
+        //查询回车事件
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btnSearch').trigger("click");
+            }
+        });
+    }
+    //编辑
+    function edit() {
+        var keyValue = $("#gridMenuTable").jqGridRowValue("Id");
+        if (keyValue) {
+            var dataSouceType = $("#gridMenuTable").jqGridRowValue("DataSouceType");
+            var url = '/SystemManage/MenuAuthorize/MenuSettingForm?keyValue=' + keyValue;
+            if (dataSouceType == 1) {
+                var parentId = $("#gridMenuTable").jqGridRowValue("ColumnId");
+                url = '/SystemManage/MenuAuthorize/EditAssociationFrom?keyValue=' + keyValue + "&ColumnId=" + parentId + "&platform=" + platform;//注意：此处keyValue是ModuleId菜单Id
+            }
+                dialogOpen({
+                    id: "Form",
+                    title: '编辑信息',
+                    url: url ,
+                    width: "600px",
+                    height: "500px",
+                    callBack: function (iframeId) {
+                        top.document.getElementById(iframeId).contentWindow.AcceptClick($("#gridMenuTable"));
+                    }
+                });
+        } else {
+            dialogMsg('请选择需要编辑的数据！', 0);
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $("#gridMenuTable").jqGridRowValue("Id");
+        if (keyValue) {
+            var dataSouceType = $("#gridMenuTable").jqGridRowValue("DataSouceType");
+            var url = '../../SystemManage/MenuAuthorize/RemoveMenuSetting' ;//删除栏目
+            var parame = { keyValue: keyValue}
+            if (dataSouceType == 1) {
+                var parentId = $("#gridMenuTable").jqGridRowValue("ColumnId");
+                url = '../../SystemManage/MenuAuthorize/RemoveAssociation';  //删除栏目与菜单的关联 注意：此处keyValue是ModuleId菜单Id
+                parame = { ModuleId: keyValue, ColumnId: parentId };
+            }
+            $.RemoveForm({
+                url: url,
+                param: parame,
+                success: function (data) {
+                    $('#gridMenuTable').trigger("reloadGrid");
+                }
+            })
+
+        } else {
+            dialogMsg('请选择需要删除的部门！', 0);
+        }
+    }
+
+    function addColum() {
+        var themeType = $("input[type=radio]:checked").val();
+        var parameter = "?themeType=" + themeType + "&DepartId=" + deptId + "&DepartName=" + departName + "&DepartCode=" + departCode + "&platform=" + platform;
+        dialogOpen({
+            id: "AuthForm",
+            title: '新增',
+            url: '/SystemManage/MenuAuthorize/MenuSettingForm' + parameter,
+            width: "600px",
+            height: "500px",
+            //btn: null,
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick($("#gridMenuTable"));
+            }
+        });
+
+    }
+
+    function addMenu() {
+  
+        var keyValue = $("#gridMenuTable").jqGridRowValue("Id");
+        var dataSourceType = $("#gridMenuTable").jqGridRowValue("DataSouceType");// 数据来源  0 栏目  1 菜单
+        var parentName = $("#gridMenuTable").jqGridRowValue("Name");//上级名称
+        if (!!dataSourceType && dataSourceType == 0) {
+            var url = "/SystemManage/MenuAuthorize/AssociationFrom?dataSourceType=" + dataSourceType + "&platform=" + platform + "&ColumnId=" + keyValue + "&DepartId=" + deptId + "&DepartName=" + departName + "&DepartCode=" + departCode + "&ParentName=" + $(parentName).text() + "&themeType=" + themeCode ;
+            console.log(url)
+            dialogOpen({
+                id: "AsscionForm",
+                title: '编辑信息',
+                url: url,
+                width: "600px",
+                height: "500px",
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick($("#gridMenuTable"));
+                }
+            });
+            //dialogOpen({
+            //    id: "AssociationForm",
+            //    title: '新增',
+            //    url: url,
+            //    width: "600px",
+            //    height: "300px",
+            //    //btn: null,
+            //    callBack: function (iframeId) {
+            //        top.document.getElementById(iframeId).contentWindow.AcceptClick($("#gridMenuTable"));
+            //    }
+            //});
+        } else {
+            dialogMsg('请选择要添加菜单的栏目！', 0);
+        }
+    }
+
+    function AcceptClick() {
+        dialogClose();
+    }
+
+
+</script>
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            <tr>
+                <td>
+                    <div id="queryCondition" class="btn-group">
+                        <input type="radio" name="rad_theme" value="0" checked="checked" />默认工作栏
+                        <input type="radio" name="rad_theme" value="1" />第二套工作栏
+                        <input type="radio" name="rad_theme" value="2" />第三套工作栏
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="toolbar">
+        <div class="btn-group">
+            <a class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+            <a id="add" class="btn btn-default" onclick="addColum()"><i class="fa fa-plus"></i>&nbsp;新增栏目</a>
+            <a id="add" class="btn btn-default" onclick="addMenu()"><i class="fa fa-plus"></i>&nbsp;添加菜单</a>
+            <a id="edit" class="btn btn-default" onclick="edit()"><i class="fa fa-pencil-square-o"></i>&nbsp;编辑</a>
+            <a id="delete" class="btn btn-default" onclick="del()"><i class="fa fa-trash-o"></i>&nbsp;删除</a>
+        </div>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridMenuTable"></table>
+</div>

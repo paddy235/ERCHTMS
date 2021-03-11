@@ -1,0 +1,274 @@
+@{;
+  ViewBag.Title = "列表页面";
+  Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var selectedRowIndex = 0;
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 120);
+
+            }, 200);
+            e.stopPropagation();
+        });
+
+    }
+    //加载表格
+    function GetGrid() {
+
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGridEx({
+            autowidth: true,
+            height: $(window).height() - 120,
+            autowidth: true,
+            url: "../../BaseManage/District/GetPageListJson",
+            multiselect: true,
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'DistrictID', hidden: true }, { label: '管控部门', name: 'ChargeDeptCode', hidden: true }, { label: '', name: 'LinkMail', hidden: true },
+                { label: '区域名称', name: 'DistrictName', index: 'DistrictName', width: 250, align: 'center', sortable: false },
+                { label: '区域编码', name: 'DistrictCode', index: 'DistrictCode', width: 150, align: 'center', sortable: false },
+                { label: '责任部门', name: 'ChargeDept', index: 'ChargeDept', width: 150, align: 'center', sortable: false },
+                { label: '安全监察部门区域负责人', name: 'SafetyDeptChargePerson', index: 'SafetyDeptChargePerson', width: 150, align: 'center', sortable: false },
+                { label: '责任部门区域负责人', name: 'DisreictChargePerson', index: 'DisreictChargePerson', width: 150, align: 'center', sortable: false },
+                { label: '所属公司', name: 'BelongCompany', index: 'BelongCompany', width: 200, align: 'center', sortable: false },
+                { label: '联系电话', name: 'LinkTel', index: 'LinkTel', align: 'center', sortable: false }
+            ],
+            treeGrid: true,
+            treeGridModel: "nested",
+            ExpandColumn: "DistrictCode",
+            shrinkToFit: true,
+            rowNum: "all",
+            rownumbers: true,
+            rownumWidth:60,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value)
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            var queryJson = {
+                condition: $("#queryCondition").find('.dropdown-text').attr('data-value'),
+                keyword: $("#txt_Keyword").val()
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: queryJson, page: 1
+            }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+        //查询全部
+        $("#btn_SearchAll").click(function () {
+            $("#txt_Keyword").val("");
+            $("#queryCondition .dropdown-text").html("选择条件").attr("data-value", "");
+            var queryJson = {
+                condition: '',
+                keyword: '',
+            }
+            $gridTable.jqGrid('setGridParam', {
+                postData: queryJson, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+
+    //新增
+    function add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加区域设置',
+            url: '/BaseManage/District/Form',
+            width: "750px",
+            height: "500px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function edit() {
+        var $jgrid = $('#gridTable');
+        var keyValue = $jgrid.jqGridRowValue('DistrictID');
+        if (checkedRow(keyValue)) {
+            var deptCode = $jgrid.find("td[aria-describedby='gridTable_ChargeDeptCode']").eq(selectedRowIndex).text();
+            dialogOpen({
+                id: 'Form',
+                title: '编辑区域设置',
+                url: '/BaseManage/District/Form?keyValue=' + keyValue + "&deptCode=" + deptCode,
+                width: "750px",
+                height: "500px",
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //删除
+    function del() {
+        var keyValue = $('#gridTable').jqGridRowValue('DistrictID');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../BaseManage/District/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的区域设置！', 0);
+        }
+    }
+    //生成二维码
+    function builderImg() {
+        var ids = $("#gridTable").jqGridRowValue("DistrictID");
+        //if (ids.length == 0) {
+        //    dialogMsg("请选择至少一条记录！", 0);
+        //    return false;
+        //} else {
+            idx = dialogOpen({
+                id: "Builder",
+                title: '生成二维码',
+                url: '/BaseManage/District/BuilderImage',
+                width: "800px",
+                height: ($(window).height() - 80) + "px",
+                btn: ["导出", "关闭"],
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                }
+            });
+            //$.SaveForm({
+            //    url: "../../PersonManage/Person/BuilderImg",
+            //    param: { userId: ids, userName: $("#gridTable").jqGridRowValue("realname") },
+            //    loading: "正在生成……",
+            //    success: function (data) {
+            //        //$.currentIframe().window.$("#gridTable").trigger("reloadGrid");
+            //    }
+            //})
+        //}
+    }    //预览区域效果图    function previewMap() {
+        var url = '/BaseManage/District/Mark';
+        top.window.dlgIndex = dialogOpen({
+            id: 'Mark',
+            title: '预览区域分布图',
+            url: url,
+            width: ($(top.window).width()) + "px",
+            height: ($(top.window).height()) + "px",
+            btn:["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(top.window.dlgIndex);
+            }
+        });
+    }
+    //上传区域图
+    function uploadMap() {
+        var url = '/BaseManage/District/Upload?keyValue=' + top.currUserOrgId;
+            top.window.dlgIndex = dialogOpen({
+                id: 'Upload',
+                title: '上传区域分布图',
+                url: url,
+                width: "600px",
+                height: "400px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(top.window.dlgIndex);
+                }
+            });
+    }
+    //导入
+    var idx;
+    var isImport = false;
+    function importData() {
+        idx = dialogOpen({
+            id: "ImportArea",
+            title: '导入区域',
+            url: '/BaseManage/District/Import',
+            width: "500px",
+            height: "450px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                    $("#gridTable").jqGrid('setGridParam', {
+                        postData: { keyWord: "" }
+                    }).trigger('reloadGrid');
+                }
+
+            }
+        });
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>
+                                <div id="queryCondition" class="btn-group">
+                                    <a class="btn btn-default dropdown-text" data-toggle="dropdown">选择条件</a>
+                                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown"><span class="caret"></span></a>
+                                    <ul class="dropdown-menu">
+                                        <li><a data-value="DistrictCode">编码</a></li>
+                                        <li><a data-value="DistrictName">名称</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                            <td style="padding-left: 2px;">
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
+                                <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;全部</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+                        <a id="edit" class="btn btn-default" onclick="edit()"><i class="fa fa-pencil-square-o"></i>&nbsp;编辑</a>
+                        <a id="delete" class="btn btn-default" onclick="del()"><i class="fa fa-trash-o"></i>&nbsp;删除</a>
+                        <a class="btn btn-default" onclick="builderImg()"> <i class="fa fa-copyright"></i> &nbsp;生成二维码</a>
+                        <a id="upload" class="btn btn-default" onclick="uploadMap()"> <i class="fa fa fa-search-plus"></i> &nbsp;上传区域图</a>
+                        <a id="view" class="btn btn-default" onclick="previewMap()"> <i class="fa fa fa-search-plus"></i> &nbsp;预览区域图</a>
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+               
+            </div>
+        </div>
+    </div>
+</div>

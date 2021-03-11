@@ -1,0 +1,783 @@
+﻿@{;
+  ViewBag.Title = "列表页面";
+  Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var _belongcode = "";//所属部门
+    var _isOrg = "";//是否点击的是机构
+    var _belongdeptid = "";//所属部门ID
+    var ctype = request('ctype');//检查表类型
+    var cname = request('cname');//检查表类型名称
+
+    var indexData = request('indexData');//是否首页跳转
+    var mode = request('mode');
+    var dataType = request('dataType');//待办中的我0，全部1
+    var ts = "专项安全检查";
+    $(function () {
+        InitialPage();
+        //GetTree();
+        GetGrid();
+        if (indexData == "1") {
+            $("#lr-add,#btn_export").attr("style", "display:none");
+        }
+    });
+    //初始化页面
+    function InitialPage() {
+        //被检查单位
+        $("#CheckedDepartID").ComboBox({
+            url: "../../SaftyCheck/SaftyCheckDataRecord/GetCheckedDepart",
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        //安全检查类型
+        $("#CheckDataType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "SaftyCheckType" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        $("#CheckDataType-option").find("li").eq(1).remove();
+        dataType = !!dataType ? dataType : 10;
+        //设置title
+        if (cname != "") ts = cname;
+       
+        var sct = $("#CheckDataType-option");
+        var lis = sct.find("li");
+        lis.each(function (i) {
+            var it = $(this);
+            if (it.text() == "其他安全检查") {
+                it.remove();
+                //it.text("其他安全检查");
+                //$(lis[lis.length - 1]).after(it);
+            }
+        });
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $("#gridTable").setGridHeight($(window).height() - 160);
+                //$("#itemTree").setTreeHeight($(window).height() - 50);
+            }, 200);
+            e.stopPropagation();
+        });
+      
+    }
+    //加载组织机构树
+    function GetTree() {
+        var roleName = top.currUserRoleName;
+        var mode = 0;
+        if (roleName.indexOf("集团用户") >= 0 || roleName.indexOf("分子公司用户")>=0 || roleName.indexOf("省级用户") >= 0) {
+            mode = 9;
+            $("#lr-add,#btn_Defind").css("display", "none");
+        }
+        var json = JSON.stringify(
+             {
+                 SelectMode: 0,
+                 Mode: mode
+             }
+           );
+        _belongdeptid = top.currUserOrgId;
+        var item = {
+            height: $(window).height() - 50,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _belongcode = item.Code;//用户所属部门编码
+                _isOrg = item.Sort;
+                _belongdeptid = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+        if ($("#itemTree").html().length == 0) {
+            $(".ui-layout-west").hide();
+            $('.ui-layout-center').css({ "padding-left": "5px" });
+            $('#gridTable').setGridWidth(($('.gridPanel').width()));
+            $("#gridTable").setGridHeight($(window).height() - 200);
+        } else {
+            $('#layout').layout({
+                applyDemoStyles: false,
+                onresize: function () {
+                    $(window).resize()
+                }
+            });
+        }
+    }
+    //查看登记的问题
+    function showWt(objId) {
+        var url = '/QuestionManage/QuestionInfo/SdIndex?pfrom=0&safetycheck=0&checkid=' + objId + '& relevanceid =';
+        var idx = dialogOpen({
+            id: 'Details',
+            title: '问题信息',
+            url: url,
+            width: ($(top.window).width() - 80) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //查看登记的违章
+    function showWz(objId,code) {
+        var url = '/LllegalManage/LllegalRegister/SdIndex?pfrom=0&safetycheck=0&reseverone=' + objId;
+        var idx = dialogOpen({
+            id: 'Details',
+            title: '违章信息',
+            url: url,
+            width: ($(top.window).width() - 300) + "px",
+            btns: 1,
+            btn: ["关闭"],
+            height: ($(top.window).height() - 100) + "px",
+            callBack: function (iframeId) {
+                top.layer.close(idx);
+            }
+        });
+    }
+    //加载表格
+    function GetGrid() {
+       
+        var queryJson = {
+            ctype: ctype,
+            indexData: indexData,
+            mode: mode,
+            dataType: dataType,
+            chkDept: $("#CheckedDepartID").attr("data-value"),
+            ctype: $("#CheckDataType").attr("data-value"),
+            pall: 0
+        }
+        var isShow = true;
+        if (!!ctype)
+            isShow = false;
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            postData: { queryJson: JSON.stringify(queryJson) },
+            height: $(window).height() - 170,
+            url: "../../SaftyCheck/SaftyCheckDataRecord/GetCheckTaskList",
+            datatype: "json",
+            colModel: [
+                 { label: '主键', name: 'id', hidden: true }, { label: '', name: 'status', hidden: true }, { label: '', name: 'issubmit', hidden: true }, { label: '', name: 'rid', hidden: true },
+                 { label: '', name: 'checkdeptcode', hidden: true }, { label: '', name: 'datatype', hidden: true }, { label: '', name: 'dutydept', hidden: true },
+                 {
+                     label: '操作', name: 'Oper', index: 'ID', width: 150, align: 'center',
+                     formatter: function (cellvalue, options, rowObject) {
+                         var html = "<a href=javascript:funcAction('view','" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                         if (rowObject.status == 2 && rowObject.dutydept == top.currUserDeptCode) {
+                             html += "<a href=javascript:funcAction('forResult','" + rowObject.id + "')  title='查看检查记录'><i class='fa fa-comment-o'></i></a>";
+                         }else{
+                             html += "<a href=javascript:funcAction('look','" + rowObject.id + "')  title='查看检查记录'><i class='fa fa-comment-o'></i></a>";
+                         }
+                      
+                         if (!IsAdmin()) {
+                             if (rowObject.createuserid == top.currUserId) {
+                                 html += "<a href=javascript:funcAction('copy','" + rowObject.id + "')  title='快速创建任务'><i class='fa fa-file-text-o'></i></a>";
+                                 if ( rowObject.issubmit==0 && (rowObject.status==0 && rowObject.solvecount==0) ) {
+                                     
+                                     html += "<a href=javascript:funcAction('edit','" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                                 }
+                                 if (rowObject.issubmit == 0) {
+                                      html += "<a href=javascript:funcAction('del','" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                                 }
+                                
+                             }
+                         }
+                         else {
+                               html += "<a href=javascript:funcAction('copy','" + rowObject.id + "')  title='快速创建任务'><i class='fa fa-file-text-o'></i></a>";
+                               html += "<a href=javascript:funcAction('edit','" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                               html += "<a href=javascript:funcAction('del','" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         }
+                      
+                         return html;
+                     }
+                 },
+               
+                { label: '检查名称', name: 'checkdatarecordname', index: 'CheckDataRecordName', width: 200, align: 'center', sortable: true },
+
+                { label: '检查单位', name: 'checkeddepart', index: 'CheckedDepart', width: 200, align: 'center', sortable: true },
+                 
+                {
+                       label: '要求检查时间', name: 'checkbegintime', index: 'CheckBeginTime', width: 180, align: 'center', sortable: true,
+                       formatter: function (cellvalue, options, rowObject) {
+                           return formatDate(cellvalue, 'yyyy-MM-dd') + "至" + formatDate(rowObject.checkendtime, 'yyyy-MM-dd');
+                       }
+                }
+                 //,{
+                 //    label: '实际检查时间', name: 'startdate', index: 'StartDate', width: 180, align: 'center', sortable: true,
+                 //    formatter: function (cellvalue, options, rowObject) {
+                 //        if (!!cellvalue) {
+                 //            return formatDate(cellvalue, 'yyyy-MM-dd') + "至" + formatDate(rowObject.EndDate, 'yyyy-MM-dd');
+                 //        } else {
+                 //            return "";
+                 //        }      
+                         
+                 //    }
+                 //}
+              
+                ,{
+                    label: '不符合项', name: 'count', index: 'Count', width: 110, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var innerText ="";
+                        if (cellvalue > 0) {
+                            innerText = "隐患数量：<a href=javascript:funcAction('count','" + rowObject.id + "') style='color:blue; text-decoration:underline;color:red;'  title='查看隐患'>" + cellvalue + "项</a><br />";
+                        } else {
+                            innerText += "隐患数量：" + cellvalue + "项<br />";
+                        }
+                        if (top.window.isWz == "1") {
+                            if (rowObject.wzcount > 0) {
+                                innerText += "违章数量：<a onclick=\"showWz('" + rowObject.id + "')\" style='text-decoration:underline;cursor:pointer;color:red;'>" + rowObject.wzcount + "项</a><br />";
+                            } else {
+                                innerText += "违章数量：" + rowObject.wzcount + "项<br />";
+                            }
+                        }
+                        if (top.window.isWt == "1") {
+                            if (rowObject.wtcount > 0) {
+                                innerText += "问题数量：<a onclick=\"showWt('" + rowObject.id + "')\" style='text-decoration:underline;cursor:pointer;color:red;'>" + rowObject.wtcount + "项</a>";
+                            } else {
+                                innerText += "问题数量：" + rowObject.wtcount + "项";
+                            }
+                        }
+                        return innerText;
+                    }
+                }, {
+                    label: '处理进度', name: 'count1', index: 'Count', align: 'left', sortable: true, headerAlign: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+
+                        var innerText = "";
+                        if (cellvalue > 0) {
+                            innerText = "<div style='width: " + (rowObject.count1) + "%; background-color:green;color:black;'>隐患处理进度：" + rowObject.count1 + "%" + "</div>";
+                        } else {
+                            if (rowObject.count == 0) {
+                                innerText += "隐患处理进度：-<br />";
+                            } else {
+                                innerText += "隐患处理进度：" + cellvalue + "%<br />";
+                            }
+
+                        }
+                        if (top.window.isWz == "1") {
+                            if (rowObject.wzcount1 > 0) {
+                                innerText += "<div style='width: " + (rowObject.wzcount1) + "%; background-color:green;color:black;margin-top:2px;'>违章处理进度：" + rowObject.wzcount1 + "%" + "</div>";
+                            } else {
+                                if (rowObject.wzcount == 0) {
+                                    innerText += "违章处理进度：-<br />";
+                                } else {
+                                    innerText += "违章处理进度：" + rowObject.wzcount1 + "%<br />";
+                                }
+
+                            }
+                        }
+                        if (top.window.isWt == "1") {
+                            if (rowObject.wtcount1 > 0) {
+                                innerText += "<div style='width: " + (rowObject.wtcount1) + "%; background-color:green;color:black;'>问题处理进度：" + rowObject.wtcount1 + "%" + "</div>";
+                            } else {
+                                if (rowObject.wtcount == 0) {
+                                    innerText += "问题处理进度：-<br />";
+                                } else {
+                                    innerText += "问题处理进度：" + rowObject.wtcount1 + "%";
+                                }
+
+
+                            }
+                        }
+
+                        return innerText;
+                    }
+                }
+                 ,{ label: '创建人', name: 'createusername', index: 'createusername', width: 70, align: 'center', sortable: true }
+                , { label: '创建时间', name: 'createdate', index: 'createdate', width: 150, align: 'center', sortable: true }
+                , { label: '创建单位', name: 'deptname', index: 'deptname', align: 'center', sortable: true }
+                // ,{
+                //     label: '检查完成情况', name: 'EndDate', index: 'EndDate', width: 180, align: 'center', sortable: true,
+                //     formatter: function (cellvalue, options, rowObject) {
+                //         if (!!cellvalue) {
+                //             var t1 = new Date(rowObject.CheckBeginTime);
+                //             var t2 = new Date(rowObject.CheckEndTime);
+                //             var t3 = new Date(rowObject.StartDate);
+                //             var t4 = new Date(rowObject.EndDate);
+                //             if (t2.getTime() >= t4.getTime()) {
+                //                 return "已完成";
+                //             } else {
+                //                 return "逾期";
+                //             }
+                //         } else {
+                //             return "未完成";
+                //         }
+                //     }
+                // }
+                //,{
+                //    label: '查看登记结果', name: 'Oper', index: 'ID', align: 'center',
+                //    formatter: function (cellvalue, options, rowObject) {
+                //        var html = "<a href=javascript:funcAction('forResult','" + rowObject.ID + "') style='color:blue; text-decoration:underline'  title='查看登记结果'>查看登记结果</a>";
+                //        return html;
+                //    }
+                //}
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'CreateDate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true 
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            ////隐藏搜索框
+            if ($(".ui-filter-list").attr("style").indexOf("block") >= 0) {
+                ////隐藏搜索框
+                var title = $(".ui-filter-text");
+                title.trigger("click");
+            }
+                 var queryJson = {
+                     code: _belongcode,
+                     ctype: $("#CheckDataType").attr("data-value"),
+                     stm: $("#StartTime").val(),
+                     etm: $("#EndTime").val(),
+                     keyword: $("#txt_Keyword").val(),
+                     indexData: indexData,
+                     mode: mode,
+                     dataType: dataType,
+                     chkDept: $("#CheckedDepartID").attr("data-value")
+                   
+                 }
+                
+                 $gridTable.jqGrid('setGridParam', {
+                     postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+                 }).trigger('reloadGrid');
+             });
+        //查询回车
+             $('#txt_Keyword').bind('keypress', function (event) {
+                 if (event.keyCode == "13") {
+                     $('#btn_Search').trigger("click");
+                 }
+             });
+         }
+      
+         //导出结果
+         function btn_exportResult() {
+             var stm = "";
+             var etm = "";
+             if ($("#see").val() == "1") {
+                 stm = $("#StartTime").val();
+                 etm = $("#EndTime").val();
+             }
+             //查询条件
+             var queryJson = JSON.stringify({
+                 code: _belongcode,
+                 ctype: $("#CheckDataType").attr("data-value"),
+                 stm: stm,
+                 etm: etm,
+                 keyword: $("#txt_Keyword").val(),
+                 indexData: indexData,
+                 mode: mode,
+                 pall: 0,
+                 dataType:10
+             })
+
+             location.href = "../../SaftyCheck/SaftyCheckDataRecord/ExportTask?queryJson=" + queryJson;
+         }
+         function alertBox(zj) {
+
+             if (zj == "0") {
+                 dialogOpen({
+                     id: 'Details',
+                     title: '添加' + ts + '计划',
+                     url: '/SaftyCheck/SaftyCheckDataRecord/ZXForm?belongdeptid=' + _belongdeptid + '&ctype=' + ctype + '&zj=' + zj + '&cname=' + cname+"&action=add",
+                     width: ($(top.window).width() - 200) + "px",
+                     height: ($(top.window).height() - 100) + "px",
+                     callBack: function (iframeId) {
+                         if (top.frames[iframeId].AcceptClick()) {
+                             reload();
+                         }
+                     }
+                 });
+             } else {
+                 var keyValue = $("#gridTable").jqGridRowValue("ID");
+                 var userAccount = "";
+                 var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+                 if (isSystem == "False") {
+                     userAccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+                 }
+                 var key = $("#gridTable").jqGridRowValue("ID");
+                 $.ajax({
+                     url: "../../SaftyCheck/SaftyCheckDataRecord/CheckInfo",
+                     type: "post",
+                     data: { recid: key},
+                     success: function (data) {
+                         if (data == "true") {
+                             dialogOpen({
+                                 id: 'Details',
+                                 title: '登记检查结果',
+                                 url: '/SaftyCheck/SaftyCheckDataRecord/Details?recid=' + keyValue + '&ctype=' + ctype + '&userAccount=' + userAccount+"&mode="+mode,
+                                 width: ($(top.window).width() - 50) + "px",
+                                 height: ($(top.window).height() - 100) + "px",
+                                 callBack: function (iframeId) {
+                                     top.frames[iframeId].AcceptClick();
+                                 }
+                             });
+                         }
+                         else {
+                             dialogMsg('此条记录您已经登记结果或者没有权限登记！', 0);
+                         }
+                     }
+                 });
+
+             }
+         }
+    function add() {
+        var url = '/SaftyCheck/SaftyCheckDataRecord/PlanForm?action=add';
+            dialogOpen({
+                id: 'Details',
+                title: "新增检查任务",
+                url: url,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 100) + "px",
+                btn:["提交","保存","关闭"],
+                callBack: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick(1);
+                }
+                , btn2: function (iframeId) {
+                    top.document.getElementById(iframeId).contentWindow.AcceptClick(0);
+                }
+            });
+    }
+         //操作显示
+         function funcAction(action, val) {
+             //编辑及查看
+             if (action == "edit") {
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/PlanForm?recid=' + val+"&action=edit";
+                 if (checkedRow(val)) {
+                     dialogOpen({
+                         id: 'Details',
+                         title: "修改检查任务",
+                         url: url,
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         btn: ["提交", "保存", "关闭"],
+                         callBack: function (iframeId) {
+                             top.document.getElementById(iframeId).contentWindow.AcceptClick(1);
+                         }
+                       , btn2: function (iframeId) {
+                           top.document.getElementById(iframeId).contentWindow.AcceptClick(0);
+                         }
+                     });
+                 }
+             }
+             else if (action == "copy") {
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/PlanForm?recid=' + val + "&action=copy";
+                 if (checkedRow(val)) {
+                     dialogOpen({
+                         id: 'Details',
+                         title: "快速新建检查任务",
+                         url: url,
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         btn: ["提交", "保存", "关闭"],
+                         callBack: function (iframeId) {
+                             top.document.getElementById(iframeId).contentWindow.AcceptClick(1);
+                         }
+                       , btn2: function (iframeId) {
+                           top.document.getElementById(iframeId).contentWindow.AcceptClick(0);
+                       }
+                     });
+                 }
+             }
+             else if (action == "look") {
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/PlanDetails?rId=' + val;
+                 if (checkedRow(val)) {
+                     dialogOpen({
+                         id: 'Look',
+                         title: "查看检查记录",
+                         url: url,
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         btn: null
+                       
+                     });
+                 }
+             }
+             else if (action == "view") {
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/PlanForm?recid=' + val + "&action=view";
+                 var idx = dialogOpen({
+                     id: "win0",
+                     title: "查看检查任务",
+                     url: url,
+                     width: ($(top.window).width() - 200) + "px",
+                     height: ($(top.window).height() - 100) + "px",
+                     btns: 1,
+                     btn: ["关闭"],
+                     callBack: function (iframeId) {
+                         top.layer.close(idx);
+                     }
+                 });
+             }
+                 //删除
+             else if (action == "del") {
+                 if (val) {
+                     $.RemoveForm({
+                         url: '../../SaftyCheck/SaftyCheckDataRecord/RemoveForm',
+                         param: { keyValue: val },
+                         success: function (data) {
+                             $("#gridTable").trigger("reloadGrid");
+                         }
+                     })
+                 } else {
+                     dialogMsg('请选择需要删除的' + ts + '！', 0);
+                 }
+             } else if (action == "count") {
+                 var url = '/HiddenTroubleManage/HTBaseInfo/Index?mode=0&pfrom=0&SAFETYCHECKOBJECTID=' + val;
+                 if (checkedRow(val)) {
+                     var idx = dialogOpen({
+                         id: 'HTWindow',
+                         title: '隐患列表',
+                         url: url,
+                         btns: 1,
+                         btn: ["关闭"],
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         callBack: function (iframeId) {
+                             top.layer.close(idx);
+                         }
+                     });
+                 }
+             } else if (action == "forResult") {
+                 //查看登记结果
+                 var url = '/SaftyCheck/SaftyCheckDataRecord/ZXDetails?recid=' + val + '&zj=0' + '&cname=' + cname;
+
+                 if (checkedRow(val)) {
+                     dialogOpen({
+                         id: 'ZJDetails',
+                         title: '查看安全检查结果',
+                         url: url,
+                         width: ($(top.window).width() - 200) + "px",
+                         height: ($(top.window).height() - 100) + "px",
+                         btn: null,
+                         callBack: function (iframeId) {
+                             top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                         }
+                     });
+                 }
+             }
+         }
+         //任务分配
+         function allot() {
+             var status = $("#gridTable").jqGridRowValue("status");
+             var dataType = $("#gridTable").jqGridRowValue("datatype");
+             var issubmit = $("#gridTable").jqGridRowValue("issubmit");
+             var rid = $("#gridTable").jqGridRowValue("rid");
+             if (issubmit == 0 && rid.length==0) {
+                 dialogMsg("该条检查任务未提交无法分配！", 0);
+                 return false;
+             }
+             if (status==1) {
+                 dialogMsg("该条检查任务已经分配过，无法再分配！", 0);
+                 return false;
+             }
+             if (dataType == 2) {
+                 dialogMsg("该条检查任务已完善过，无法再分配！", 0);
+                 return false;
+             }
+             var id = $("#gridTable").jqGridRowValue("id");
+             if (id.length == 0) {
+                 dialogMsg("请选择一条记录！", 0);
+                 return false;
+             } else {
+                 $.get("GetCount", { recId: id }, function (data) {
+                     var json = eval("(" + data + ")");
+                     if (json.resultdata>0) {
+                         dialogMsg("该记录已安排相关检查项目，无法再分配！");
+                         return false;
+                     } else {
+                         dialogOpen({
+                             id: "TaskForm",
+                             title: "检查任务分配",
+                             url: '/SaftyCheck/SaftyCheckDataRecord/PlanAllot?action=Allot&keyValue=' + id,
+                             width: ($(top.window).width() - 200) + "px",
+                             height: ($(top.window).height() - 100) + "px",
+                             callBack: function (iframeId) {
+                                 top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                             }
+                         });
+                     }
+             
+                 });
+                    
+             }
+         }
+         //完善任务
+         function supply() {
+             var dataType = $("#gridTable").jqGridRowValue("datatype");
+             var status = $("#gridTable").jqGridRowValue("status");
+             var issubmit = $("#gridTable").jqGridRowValue("issubmit");
+             var rid = $("#gridTable").jqGridRowValue("rid");
+             if (issubmit == 0 && rid.length == 0) {
+                 dialogMsg("该条检查任务未提交无法完善！", 0);
+                 return false;
+             }
+             if (status>0) {
+                     dialogMsg("该条检查任务已分配过，无法再修改！", 0);
+                     return false;
+             }
+             if (dataType==2) {
+                     dialogMsg("该条检查任务已完善过，无法再完善！", 0);
+                     return false;
+             }
+            // else {
+                 var id = $("#gridTable").jqGridRowValue("id");
+                 if (id.length == 0) {
+                     dialogMsg("请选择一条记录！", 0);
+                     return false;
+                 } else {
+                     $.get("GetCount", { recId: id }, function (data) {
+                         var json = eval("(" + data + ")");
+                         if (json.resultdata > 0) {
+                             dialogMsg("该记录已安排相关检查项目，无法再修改！");
+                             return false;
+                         } else {
+                             var url = '/SaftyCheck/SaftyCheckDataRecord/PlanForm?recid=' + id + "&action=update";
+                             dialogOpen({
+                                 id: 'Details',
+                                 title: "完善检查任务",
+                                 url: url,
+                                 width: ($(top.window).width() - 200) + "px",
+                                 height: ($(top.window).height() - 100) + "px",
+                                 callBack: function (iframeId) {
+                                     top.document.getElementById(iframeId).contentWindow.AcceptClick(2);
+                                 }
+                             });
+                         }
+
+                     });
+                 }
+             //}
+         }
+         function make() {
+             var keyValue = $("#gridTable").jqGridRowValue("id");
+             if (keyValue) {
+                 dialogOpen({
+                     id: 'Make',
+                     title: '生成安全检查公示表',
+                     url: "/SaftyCheck/SaftyCheckDataRecord/MakeNotice?keyValue=" + keyValue,
+                     width: "600px",
+                     height: "300px",
+                     callBack: function (iframeId) {
+                         top.document.getElementById(iframeId).contentWindow.AcceptClick();
+                     }
+                 });
+             } else {
+                 dialogMsg('请选择生成的记录！', 0);
+             }
+
+         }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;  padding-left:5px;">
+    @*<div class="ui-layout-west" style="display:none;">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <a href="javascript:selectAll();">组织机构树</a>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>*@
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 200px;">
+                                    <div class="ui-filter-text">
+                                      @*  <strong id="SelectedStartTime">@DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd")</strong> 至 <strong id="SelectedEndTime">@DateTime.Now.ToString("yyyy-MM-dd")</strong>*@
+                                        <input id="see" type="hidden" />
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px;">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <th class="formTitle">检查时间：</th>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="StartTime" readonly type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="EndTime" readonly type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker()">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                             <tr>
+                                                <td class="formTitle">检查名称：</td>
+                                                <td class="formValue">
+                                                    <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">检查类型：</td>
+                                                <td class="formValue">
+                                                    <div id="CheckDataType" type="select" class="ui-select readonly1" ></div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">检查单位：</td>
+                                                <td class="formValue">
+                                                    <div id="CheckedDepartID" type="select" class="ui-select readonly1"></div>
+                                                </td>
+                                            </tr>
+                                            <tr style="display:none;">
+                                                <td class="formTitle">完成情况：</td>
+                                                <td class="formValue">
+                                                   <select id="status" class="form-control">
+                                                       <option value=""></option>
+                                                       <option value="0">未完成</option>
+                                                       <option value="1">已完成</option>
+                                                       <option value="2">逾期</option>
+                                                   </select>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a  class="btn btn-default" onclick="reload();"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        @*<a class="btn btn-default" onclick="make();"><i class="fa fa-refresh"></i>&nbsp;生成公示表</a>*@
+                    </div>
+                    <script>$('.toolbar').authorizeButton()</script>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

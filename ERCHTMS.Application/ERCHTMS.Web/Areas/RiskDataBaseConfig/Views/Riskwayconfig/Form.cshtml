@@ -1,0 +1,312 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var IsCommit = request('IsCommit');
+
+    $(function () {
+        initControl();
+        if (IsCommit == "1") {
+            $("#btn_Save").hide();
+        } else {
+            $("#btn_Save").show();
+        }
+        if (actiontype == "view") {
+            $("input").attr("readonly", "readonly");
+            $("textarea").attr("disabled", "disabled");
+            
+            $("select").attr("disabled", "disabled");
+            $(".ui-select").attr("disabled", "disabled");
+            $(".form-button").css("display", "none");
+        }
+    });
+    //初始化控件
+    function initControl() {
+        $("#RiskType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "RiskDataBaseConfig" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        })
+        var data = [{ ItemName: "LEC", ItemValue: "LEC" }, { ItemName: "风险矩阵法", ItemValue: "风险矩阵法" }, { ItemName: "PSE", ItemValue: "PSE" }];
+        $("#WayType").ComboBox({
+            data: data,
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        });
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../RiskDataBaseConfig/Riskwayconfig/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    if (data.RiskTypeCode != undefined || data.RiskTypeCode != "") {
+                        $("#RiskType").ComboBoxSetValue(data.RiskTypeCode);
+                        $("#RiskType").trigger("change");
+                    }
+                    if (data.DetaileList.length > 0) {
+                        var str = 0;
+                        for (var i = 0; i < data.DetaileList.length; i++) {
+                            switch (data.DetaileList[i].RiskLevel) {
+                                case "重大风险":
+                                    str = 1;
+                                    break;
+                                case "较大风险":
+                                    str =2;
+                                    break;
+                                case "一般风险":
+                                    str = 3;
+                                    break;
+                                case "低风险":
+                                    str = 4;
+                                    break;
+                                default:
+
+                            }
+                            $("#RiskLevel" + str).val(data.DetaileList[i].RiskLevel);
+                            $("#MinSymbol" + str).val(data.DetaileList[i].MinSymbol);
+                            $("#MaxSymbol" + str).val(data.DetaileList[i].MaxSymbol);
+                            $("#MinValue" + str).val(data.DetaileList[i].MinValue);
+                            $("#MaxValue" + str).val(data.DetaileList[i].MaxValue);
+                        }
+                    }
+                }
+            })
+        }
+        //保存
+        $("#btn_Save").click(function () {
+            $("#IsCommit").val("0");
+            AcceptClick();
+        });
+        //发送
+        $("#btn_Submit").click(function () {
+            $("#IsCommit").val("1");
+            AcceptClick();
+        });
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var wayconfigArray = new Array();
+        for (var i = 1; i <= 4; i++) {
+            wayconfigArray.push({
+                RiskLevel: $("#RiskLevel" + i).val(),
+                MinValue: $("#MinValue" + i).val() == "" ? 0 : $("#MinValue" + i).val(),
+                MinSymbol: $("#MinSymbol" + i).val(),
+                MaxSymbol: $("#MaxSymbol" + i).val(),
+                MaxValue: $("#MaxValue" + i).val() == "" ? 0 : $("#MaxValue" + i).val()
+            })
+        }
+
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["IsCommit"] = $("#IsCommit").val();
+        postData["wayconfigArray"] = JSON.stringify(wayconfigArray);
+        postData["RiskType"] = $("#RiskType").attr("data-text");
+        postData["RiskTypeCode"] = $("#RiskType").attr("data-value")
+
+        postData["WayType"] = $("#WayType").attr("data-text");
+        postData["WayTypeCode"] = $("#WayType").attr("data-value")
+        if (actiontype == "add" || actiontype == "create") {
+            $.SetForm({
+                url: "../../RiskDataBaseConfig/Riskwayconfig/IsExistDataByType",
+                param: { RiskType: $("#RiskType").attr("data-text"), WayType: $("#WayType").attr("data-text") },
+                success: function (data) {
+                    if (!data) {
+                        dialogMsg('该类型的安全风险取值配置已经存在,不能重复添加！', 0);
+                        return false;
+                    } else {
+                        $.SaveForm({
+                            url: "../../RiskDataBaseConfig/Riskwayconfig/SaveForm?keyValue=" + keyValue,
+                            param: postData,
+                            loading: "正在保存数据...",
+                            success: function () {
+                                $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                            }
+                        })
+                    }
+                }
+            })
+        } else {
+            $.SaveForm({
+                url: "../../RiskDataBaseConfig/Riskwayconfig/SaveForm?keyValue=" + keyValue,
+                param: postData,
+                loading: "正在保存数据...",
+                success: function () {
+                    $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                }
+            })
+        }
+       
+    }
+</script>
+<div style="margin-top: 70px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">所属单位<font face="宋体">*</font></td>
+            <td class="formValue" colspan="3">
+                <input id="IsCommit" type="hidden" />
+                <input id="DeptId" type="hidden" class="form-control" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId" />
+                <input id="DeptCode" type="hidden" class="form-control" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode" />
+                <input id="DeptName" type="text" class="form-control" isvalid="yes" value="@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeName" checkexpession="NotNull" onclick="selectDept('', 0, 13, '所属部门', document.body, 'DeptName,DeptCode,DeptId')" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">风险类别<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="RiskType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+            <td class="formTitle">取值类别<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="WayType" type="select" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+        </tr>
+
+    </table>
+    <div style="margin-left:50px;margin-top:40px;">
+        <table class="form" style="width: 70%;text-align:center;">
+            <thead>
+                <tr>
+                    <th>风险等级</th>
+                    <th>风险值</th>
+                    <th>整改期限</th>
+                </tr>
+            </thead>
+            <tr>
+
+                <td class="formValue">
+                    <input id="RiskLevel1" style="width:160px;text-align:center; background-color:red" type="text" class="form-control" value="重大风险" readonly  />
+                </td>
+
+                <td class="formValue">
+                    <input id="MinValue1" class="form-control" isvalid="yes" checkexpession="PositiveDoubleOrNull" style="float:left;width:30%" type="text" />
+                    <select id="MinSymbol1" class="form-control" style="float: left; width: 18%">
+                        <option value="0"><</option>
+                        <option value="1">></option>
+                        <option value="2">=</option>
+                        <option value="3"><=</option>
+                        <option value="4">>=</option>
+                    </select>
+                    <span style="float:left;width:3%">R</span>
+                    <select id="MaxSymbol1" class="form-control" style="float: left; width: 18%">
+                        <option value="0"><</option>
+                        <option value="1">></option>
+                        <option value="2">=</option>
+                        <option value="3"><=</option>
+                        <option value="4">>=</option>
+                    </select>
+                    <input id="MaxValue1" class="form-control" isvalid="yes" checkexpession="PositiveDoubleOrNull" type="text" style="float:left;width:30%" />
+                </td>
+                <td class="formValue">
+                    <label>立即整改</label>
+                </td>
+            </tr>
+            <tr>
+
+                <td class="formValue">
+                    <input id="RiskLevel2" style="width: 160px; text-align: center; background-color: orange" type="text" class="form-control" readonly value="较大风险" />
+                </td>
+
+                <td class="formValue">
+                    <input id="MinValue2" class="form-control" style="float:left;width:30%" type="text" isvalid="yes" checkexpession="PositiveDouble" />
+                    <select id="MinSymbol2" class="form-control" style="float: left; width: 18%">
+                        <option value="0"><</option>
+                        <option value="1">></option>
+                        <option value="2">=</option>
+                        <option value="3"><=</option>
+                        <option value="4">>=</option>
+                    </select>
+                    <span style="float:left;width:3%">R</span>
+                    <select id="MaxSymbol2" class="form-control" style="float: left; width: 18%">
+                        <option value="0"><</option>
+                        <option value="1">></option>
+                        <option value="2">=</option>
+                        <option value="3"><=</option>
+                        <option value="4">>=</option>
+                    </select>
+                    <input id="MaxValue2" class="form-control" type="text" isvalid="yes" checkexpession="PositiveDouble" style="float:left;width:30%" isvalid="yes" checkexpession="NotNull" />
+                </td>
+                <td class="formValue">
+                    <label>及时整改</label>
+                </td>
+            </tr>
+            <tr>
+
+                <td class="formValue">
+                    <input id="RiskLevel3" type="text" style="width: 160px; text-align: center; background-color: yellow; " class="form-control" value="一般风险" readonly />
+                </td>
+
+                <td class="formValue">
+                    <input id="MinValue3" class="form-control" style="float:left;width:30%" type="text" isvalid="yes" checkexpession="PositiveDouble" />
+                    <select id="MinSymbol3" class="form-control" style="float: left; width: 18%">
+                        <option value="0"><</option>
+                        <option value="1">></option>
+                        <option value="2">=</option>
+                        <option value="3"><=</option>
+                        <option value="4">>=</option>
+                    </select>
+                    <span style="float:left;width:3%">R</span>
+                    <select id="MaxSymbol3" class="form-control" style="float: left; width: 18%">
+                        <option value="0"><</option>
+                        <option value="1">></option>
+                        <option value="2">=</option>
+                        <option value="3"><=</option>
+                        <option value="4">>=</option>
+                    </select>
+                    <input id="MaxValue3" class="form-control" type="text" style="float:left;width:30%" isvalid="yes" checkexpession="PositiveDouble" />
+                </td>
+                <td class="formValue">
+                    <label>按计划整改</label>
+                </td>
+            </tr>
+            <tr>
+
+                <td class="formValue">
+                    <input id="RiskLevel4" style="width: 160px; text-align: center; background-color: dodgerblue;" type="text" class="form-control" value="低风险" readonly />
+                </td>
+
+                <td class="formValue">
+                    <input id="MinValue4" class="form-control" style="float:left;width:30%" type="text" isvalid="yes" checkexpession="PositiveDoubleOrNull" />
+                    <select id="MinSymbol4" class="form-control" style="float: left; width: 18%">
+                        <option value="0"><</option>
+                        <option value="1">></option>
+                        <option value="2">=</option>
+                        <option value="3"><=</option>
+                        <option value="4">>=</option>
+                    </select>
+                    <span style="float:left;width:3%">R</span>
+                    <select id="MaxSymbol4" class="form-control" style="float: left; width: 18%">
+                        <option value="0"><</option>
+                        <option value="1">></option>
+                        <option value="2">=</option>
+                        <option value="3"><=</option>
+                        <option value="4">>=</option>
+                    </select>
+                    <input id="MaxValue4" class="form-control" type="text" style="float:left;width:30%" isvalid="yes" checkexpession="PositiveDoubleOrNull" />
+                </td>
+                <td class="formValue">
+                  <label>条件具备时整改</label>
+                </td>
+            </tr>
+        </table>
+    </div>
+   
+
+</div>
+
+  <div id="btngroup" class="form-button" style=" top:40px;  text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <a id="btn_Save" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;确&nbsp;&nbsp;认</a>
+    &nbsp;&nbsp;
+    <a id="btn_Submit" class="btn btn-primary"><i class="fa fa-mail-forward"></i>&nbsp;提&nbsp;&nbsp;交</a>
+    &nbsp;&nbsp;
+</div>

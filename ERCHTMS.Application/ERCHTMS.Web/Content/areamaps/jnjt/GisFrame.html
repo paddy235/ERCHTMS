@@ -1,0 +1,85 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<script src="../../scripts/jquery/jquery-1.8.2.min.js"></script>
+    <title>三维地图</title>
+	<script>
+	window.onload = function(){
+      Auto();
+	}
+	function Auto()
+	{
+	  $("#frm").height($(window).height());
+	}
+        var loadType = "HiddenDanger";
+        var areaCodes = [];
+
+        $(function () {
+            console.log($(".accident-item"));
+            InitIframe();
+            //三维地图功能切换
+            $(".distributeNav li").click(function () {
+                $(this).addClass("active").siblings().removeClass("active");
+                loadType = $(this).children("a").first().attr("name");
+            })
+
+
+        });
+
+
+        /**初始化 三维地图，并监听信息交互 */
+        var InitIframe = () => {
+            window.addEventListener('message', receiveMessage, false)
+        }
+
+        /**
+         * 处理三维地图的交互数据
+         * @@param {Object} event 事件主体
+         */
+        var receiveMessage = (event) => {
+            console.log("接收到三维传过来的数据")
+            //不需要告诉三维地图我当前点击的是什么功能模块，在返回的消息再告诉三维数据是什么类型的 
+            if (event.data.name == "getHiddenDanger") {//点击区域返回 的消息
+                areaCode = event.data.data;
+                LoadData(loadType);//加载三维地图所需要的数据
+            } else if (event.data.name == "getDangerInfo") {//点击卡片返回的消息
+                //调用父页面的页面跳转方法
+                window.parent.RedirctPage(event.data.type);
+            }
+
+        }
+        /**
+         * 加载三维地图要展示的数据，并推送给三维地图
+         * @@param {string} loadType 数据类型 RiskColor  HiddenDanger  FireDevice HighRisk 
+         */
+        var LoadData = (loadType) => {
+            $.ajax({
+                url: "../../login/LoadData",
+                data: { areaCodes: areaCodes, loadType: loadType },
+                type: "POST",
+                success: function (data) {
+                    var frame = document.getElementById('frm');
+                    var sendData = {
+                        "name": "PostData",
+                        "data": { loadType: loadType, dataList: data }
+                    }
+                    console.log("给三维地图发送数据" + JSON.stringify(sendData));
+                    frame.contentWindow.postMessage(sendData, "*");
+                },
+                error: function (error) {
+                    console.error(error);
+                }
+            });
+        }
+       
+	</script>
+</head>
+
+<body>
+    <iframe src="http://10.39.29.213:8081/gisbcdl/index.html#/fxse" frameborder="0" width="100%" height="400px;" id="frm"></iframe>
+</body>
+
+</html>

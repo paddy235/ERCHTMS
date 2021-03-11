@@ -1,0 +1,281 @@
+@{;
+  ViewBag.Title = "表单页面";
+  Layout = "~/Views/Shared/_Form.cshtml";
+}
+<link rel="stylesheet" href="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.css" type="text/css" />
+<script type="text/javascript" src="~/content/scripts/plugins/bootstrap-select/bootstrap-select.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/common.js"></script>
+<script>
+    var keyValue = request('keyValue');
+    var deptCode = request('deptCode');
+    $(function () {
+        initControl();
+    });
+    //初始化控件
+    function initControl() {
+        //所属公司
+        $("#OrganizeId").ComboBoxTree({
+            url: "../../BaseManage/Organize/GetTreeJson",
+            description: "==请选择==",
+            height: "200px"
+        }).bind("change", function () {
+            var value = $(this).attr('data-value');
+
+            //上级区域
+            $("#ParentID").ComboBoxTree({
+                url: top.contentPath + "/BaseManage/District/GetTreeJson?orgID=" + value,
+                description: "==请选择==",
+                height: "180px"
+            });
+        });
+
+        $("#ParentID").ComboBoxTree({
+            description: "==请选择==",
+            height: "200px"
+        });
+        //获取表单
+        if (!!keyValue) {
+            $.SetForm({
+                url: "../../BaseManage/District/GetFormJson",
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $("#form1").formDeserialize(data);
+                    $("#OrganizeId").trigger("change");
+                    $("#ParentID").ComboBoxSetValue(data.ParentID);
+                    $("#OrganizeId").attr('readonly', 'readonly');
+                    $("#ParentID").attr('readonly', 'readonly');
+                   
+                    var deptCode = $("#ChargeDeptCode").val();
+                    deptCode = deptCode.length == 0 ? "-1" : deptCode;
+                    $.ajax({
+                        url: "../../RiskDatabase/DangerSource/GetInitAreaTreeJson",
+                        data: { parentId: "0", orgCode: deptCode },
+                        type: "post",
+                        dataType: "html",
+                        async: false,
+                        success: function (result) {
+                            $("#SaftyCheckType").html('<option value="" disabled="disabled">请选择</option>');
+                            $("#SaftyCheckType").append(result);
+
+                            if (data.LinkToCompanyID != null && data.LinkToCompanyID != undefined) {
+                                if (data.LinkToCompanyID.length > 0) {
+                                    var areaId = data.LinkToCompanyID.substring(0, data.LinkToCompanyID.length - 1);
+
+                                    $("#SaftyCheckType").val(areaId);
+                                    $("#SaftyCheckType").find("option").each(function (i, dom) {
+                                        if (areaId.indexOf(dom.value) >= 0 && dom.value.length > 0) {
+                                            $(dom).attr("selected", "selected");
+                                            $("#tdArea").find("li").eq(i).attr("class", "selected");
+                                        }
+                                    });
+                                }
+
+                            }
+
+                        },
+                        error: function (XMLHttpRequest, textStatus, errorThrown) {
+
+                        }
+                    });
+                }
+            })
+        }
+       
+        var isSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+        if (isSystem == "False") {
+            var orgId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";
+            $("#OrganizeId").ComboBoxSetValue(orgId);
+            $("#OrganizeId").trigger("change");
+            $("#OrganizeId").attr('readonly', 'readonly');
+
+        }
+    }
+    //保存表单;
+    function AcceptClick() {
+        if (!$('#form1').Validform()) {
+            return false;
+        }
+        var str = "";
+        $("li[class='selected']").each(function (i, dom) {
+            str += $("#SaftyCheckType").find("option").eq($(dom).attr("data-original-index")).attr("value") + ",";
+        });
+        var postData = $("#form1").formSerialize(keyValue);
+        postData["BelongCompany"] = $("#OrganizeId").attr('data-text');
+        postData["LinkToCompany"] = $("button[data-id='SaftyCheckType']").find(".filter-option").text().replace("请选择", "");
+        postData["LinkToCompanyID"] = str;
+        if (!!$("#ParentID").attr('data-value')) {
+            postData["ParentID"] = $("#ParentID").attr('data-value');
+        } else {
+
+            postData["ParentID"] = "0";
+        }
+        $.SaveForm({
+            url: "../../BaseManage/District/SaveForm?keyValue=" + keyValue,
+            param: postData,
+            loading: "正在保存数据...",
+            success: function () {
+                 $.currentIframe().$("#gridTable").trigger("reloadGrid");
+                //$.currentIframe().window.reload();
+            }
+        })
+    }
+    function setValue() {
+        if (!!$('#OrganizeId').attr('data-value') == true) {
+            selectUser({ deptId: "", checkMode: 1, mode: 2, callBack: setPer, winObject: document.body, domId: 'DisreictChargePerson,DisreictChargePersonID,DeptId,,,,LinkTel' });
+        }
+        else { dialogMsg('请先选择所属公司！', 0); }
+    }
+    //回调函数  //当区域负责人改变,自动赋值管控部门和部门负责人
+
+    function setPer() {
+        $.ajax({
+            url: '../../BaseManage/District/GetDept',
+            data: { userId: $("#DeptId").val().split(',')[0] },
+            dataType: "JSON",
+            success: function (vr) {
+                //管控部门
+                $("#ChargeDept").val(vr.FullName);
+                $("#ChargeDeptID").val(vr.DepartmentId);
+                $("#ChargeDeptCode").val(vr.EnCode);
+                //部门负责人
+                $("#DeptChargePerson").val(vr.Manager);
+                $("#DeptChargePersonID").val(vr.ManagerId);
+
+                setArea();
+            }
+        });
+    }
+    function setArea() {
+        if ($("#ChargeDeptCode").val().length==0) {  
+            dialogMsg("请先选择管控部门！", 2);
+           
+        } else {
+            var deptCode = $("#ChargeDeptCode").val();
+            $.ajax({
+                url: "../../RiskDatabase/DangerSource/GetOptionsStringForArea",
+                data: { deptCode: deptCode },
+                type: "post",
+                dataType: "html",
+                async: false,
+                success: function (data) {
+                    $("#SaftyCheckType").html('<option value="">请选择</option>');
+                    $("#SaftyCheckType").append(data);
+                    $("#SaftyCheckType").selectpicker('refresh');
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+
+                }
+            });
+        }
+        
+    }
+    //标注区域坐标
+    function mark() {
+        var url = '/BaseManage/District/Mark?keyValue=' + keyValue;
+        top.window.dlgIndex = dialogOpen({
+            id: 'Mark',
+            title: '标注区域坐标',
+            url: url,
+            width: ($(top.window).width()) + "px",
+            height: ($(top.window).height()) + "px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //删除区域标注
+    function delMark() {
+        $.post("ClearMark", { keyValue: keyValue }, function (data) {
+                 $("#LatLng").val("");
+        });
+    }
+</script>
+<div style="margin-left: 10px; margin-top: 20px; margin-right: 30px;">
+    <table class="form">
+        <tr>
+            <td class="formTitle">所属公司<font face="宋体">*</font></td>
+            <td class="formValue">
+                <div id="OrganizeId" type="selectTree" class="ui-select" isvalid="yes" checkexpession="NotNull"></div>
+            </td>
+            <td class="formTitle">上级区域</td>
+            <td class="formValue">
+                <div id="ParentID" type="selectTree" class="ui-select"></div>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">区域名称<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DistrictName" type="text" class="form-control" placeholder="区域名称" isvalid="yes" checkexpession="NotNull" />
+            </td>
+            <td class="formTitle">区域编码<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DistrictCode" type="text" class="form-control" placeholder="区域编码后台自动生成" readonly="readonly" />
+            </td>
+        </tr>
+
+        <tr>
+
+            <td class="formTitle">责任部门区域负责人<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="DisreictChargePerson" type="text" class="form-control" placeholder="请选择负责人" readonly onclick="setValue()" isvalid="yes" checkexpession="NotNull" />
+                <input id="DisreictChargePersonID" type="hidden" /><input id="DeptId" type="hidden" /><input id="actionValue" type="hidden" />
+            </td>
+            <td class="formTitle">联系电话</td>
+            <td class="formValue">
+                <input id="LinkTel" type="text" class="form-control" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">责任部门<font face="宋体">*</font></td>
+            <td class="formValue">
+                <input id="ChargeDept" type="text" class="form-control" placeholder="管控部门自动关联" readonly="readonly" isvalid="yes" checkexpession="NotNull" onclick="selectDept('', 0, 2, '选择部门', document.body, 'ChargeDept,ChargeDeptCode,ChargeDeptID,DeptChargePerson,DeptChargePersonID');" />
+                <input id="ChargeDeptID" type="hidden" /><input id="ChargeDeptCode" type="hidden" />
+            </td>
+            @*<td class="formTitle">部门负责人</td>
+            <td class="formValue">
+                <input id="DeptChargePerson" type="text" class="form-control" placeholder="部门负责人自动关联" readonly="readonly" onclick="selectUser({ deptId: $('#ChargeDeptID').val(), deptCode: $('#ChargeDeptCode').val(), checkMode: 0, mode: 2, winObject: this.parentNode, domId: 'DeptChargePerson,DeptChargePersonID' });" />
+                <input id="DeptChargePersonID" type="hidden" />
+            </td>*@
+            <td class="formTitle">安全监察部门区域负责人</td>
+            <td class="formValue">
+                <input id="SafetyDeptChargePerson" type="text" class="form-control"  readonly="readonly" onclick="selectUser({ deptId: '', checkMode: 1, mode: 2, winObject: document.body, domId: 'SafetyDeptChargePerson,,SafetyDeptChargePersonID,,,,SafetyLinkTel' });" />
+                <input id="SafetyDeptChargePersonID" type="hidden" />
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">关联标准区域</td>
+            <td colspan="3" class="formValue"  id="tdArea">
+                <select id="SaftyCheckType" class="selectpicker show-menu-arrow form-control" multiple>
+                    <option value="" disabled="disabled">请选择</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td class="formTitle">联系电话</td>
+            <td class="formValue">
+                <input id="SafetyLinkTel" type="text" class="form-control" />
+            </td>
+            <td class="formTitle">排序</td>
+            <td class="formValue">
+                <input id="SortCode" type="text" class="form-control" />
+        </tr>
+        <tr>
+            <td class="formTitle">区域图编码</td>
+            <td colspan="3" class="formValue" >
+                <textarea id="Description" class="form-control"></textarea><br />
+                <font color="red">注：此配置关联首页风险隐患分布图中对应的区域关系，请勿随意修改</font>
+            </td>
+        </tr>
+        <tr style="display:none;">
+            <td class="formTitle">区域坐标</td>
+            <td colspan="3" class="formValue">
+                <div class="input-group">
+                    <input id="LatLng" type="text" class="form-control" style="width:500px;">
+                    <span class="input-group-addon" ><i class="fa fa-flag" title="标注" onclick="mark()"></i>&nbsp;|&nbsp;<i class="fa fa-times-circle" title="删除标注" onclick="delMark()"></i></span>
+                    
+                </div>
+                <div><font color="red">注：IE9以下版本不支持此功能,推荐使用谷歌或360极速模式</font></div>
+            </td>
+        </tr>
+    </table>
+</div>

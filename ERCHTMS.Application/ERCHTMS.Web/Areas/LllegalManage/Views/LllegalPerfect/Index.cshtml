@@ -1,0 +1,319 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<script>
+    var curUserAccount = "";
+    //违章核准列表页
+    $(function () {
+        //获取当前用户
+        curUserAccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account" + ",";
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //初始化数据
+        $.SetForm({
+            url: "../../LllegalManage/LllegalRegister/GetQueryConditionJson",
+            success: function (data) {
+                //违章类型
+                $("#LllegalType").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.LllegalType
+                });
+
+                //违章级别
+                $("#LllegalLevel").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.LllegalLevel
+                });
+
+                //流程状态
+                $("#FlowState").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.FlowState
+                });
+
+                //数据范围
+                var dataScope = new Array();
+
+                dataScope = data.DataScope.concat();
+                dataScope = dataScope.filter(function (x) { return ['本人登记', '本人完善', '本部门完善'].indexOf(x.ItemName) >= 0; })
+                //dataScope.splice(1, 6);
+                //数据范围
+                $("#DataScope").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: dataScope
+                });
+
+                var curDataValue = $("#DataScope-option li:eq(2)").attr("data-value");
+                var curDataText = $("#DataScope-option li:eq(2)").text();
+                $("#DataScope").ComboBoxSetValue(curDataValue);
+                $("#DataScope").attr("data-text", curDataText);
+                $("#DataScope").attr("data-value", curDataValue);
+            }
+        });
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        //违章核准
+        var queryJson = {
+            action: "Perfect",
+            lllegaltype: $("#LllegalType").attr("data-value"), //违章类型
+            lllegallevel: $("#LllegalLevel").attr("data-value"), //违章级别
+            lllegaldescribe: $("#LllegalDescribe").val(), //违章描述
+            datascope: $("#DataScope").attr("data-text") == "===全部===" ? "" : $("#DataScope").attr("data-text") //数据范围
+        };
+
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../LllegalManage/LllegalRegister/GetListJson",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            datatype: "json",
+            colModel: [
+               { label: '主键', name: 'id', index: 'id', width: 100, align: 'center', hidden: true },
+                  {
+                      label: '操作', name: 'oper', index: 'id', width: 120, align: 'center',
+                      formatter: function (cellvalue, options, rowObject) {
+                          var html = "<a href=javascript:view('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+
+                          var participant = rowObject.participant + ","; //增加 ","防止多个字符串对象包含在其他对象里，导致程序Bug  如 admin,admin123, .....  用户 admin, 可以更好区分
+
+                          if (participant.indexOf(curUserAccount) >= 0 && rowObject.flowstate == "违章完善") {
+                              html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" + rowObject.id + "')  title='违章完善'><i class='fa fa-pencil-square-o'></i></a>";
+                          }
+                          return html;
+                      }
+                  },
+                { label: '登记类型', name: 'addtype', index: 'addtype', width: 100, align: 'center', hidden: true },
+                {
+                    label: '流程状态', name: 'flowstate', index: 'flowstate', width: 100, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!rowObject.flowstate) {
+                            html = "<a href=javascript:OpenViewFlow('" + rowObject.id + "')  style='text-decoration:underline;'  title='违章流程'>" + rowObject.flowstate + "</a>";
+                            //if (rowObject.flowstate != "整改结束") {
+                            //    html = rowObject.flowstate;
+                            //}
+                        }
+                        return html;
+                    }
+                },
+                { label: '违章编号', name: 'lllegalnumber', index: 'lllegalnumber', width: 150, align: 'center', sortable: true },
+                { label: '违章类型', name: 'lllegaltypename', index: 'lllegaltypename', width: 120, align: 'center', sortable: true },
+                { label: '违章级别', name: 'lllegallevelname', index: 'lllegallevelname', width: 120, align: 'center', sortable: true },
+                { label: '登记人', name: 'createusername', index: 'createusername', width: 120, align: 'center', sortable: true },
+                { label: '整改责任人', name: 'reformpeople', index: 'reformpeople', width: 120, align: 'center', sortable: true },
+                { label: '验收人', name: 'acceptpeople', index: 'acceptpeople', width: 120, align: 'center', sortable: false },
+                {
+                    label: '违章描述', name: 'lllegaldescribe', index: 'lllegaldescribe', align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var lllegaldescribe = rowObject.lllegaldescribe;
+
+                        if (lllegaldescribe.length > 20) {
+                            lllegaldescribe = lllegaldescribe.substring(0, 20) + "......";
+                        }
+                        return "<div title=" + rowObject.lllegaldescribe + ">" + lllegaldescribe + "</div>";
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'ordernumber asc ,createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            //违章核准
+            var queryJson = {
+                action: "Perfect",
+                lllegaltype: $("#LllegalType").attr("data-value"), //违章类型
+                lllegallevel: $("#LllegalLevel").attr("data-value"), //违章级别
+                lllegaldescribe: $("#LllegalDescribe").val(), //违章描述
+                datascope: $("#DataScope").attr("data-text") == "===全部===" ? "" : $("#DataScope").attr("data-text") //数据范围
+            };
+
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+            }).trigger('reloadGrid');
+
+            $(".ui-filter-list").css("display", "none");
+            $(".ui-filter-text ").removeClass("active");
+            $(".ui-filter-text ").removeAttr("style");
+        });
+
+    }
+
+    //查看视图
+    function view(obj) {
+        dialogOpen({
+            id: 'LllegalForm',
+            title: '违章完善',
+            url: '/LllegalManage/LllegalPerfect/Form?keyValue=' + obj + '&actiontype=view',
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //编辑视图
+    function edit(obj) {
+        dialogOpen({
+            id: 'LllegalForm',
+            title: '违章完善',
+            url: '/LllegalManage/LllegalPerfect/Form?keyValue=' + obj + '&actiontype=edit&callFormId=LllegalForm',
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //违章流程图
+    function OpenViewFlow(keyValue) {
+        var title = "违章流程图";
+        var rqUrl = "/SystemManage/WorkFlow/Detail?keyValue=" + keyValue;
+        dialogOpen({
+            id: 'LllegalFlowForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() / 2 + 200) + "px",
+            height: ($(top.window).height() / 2 + 300) + "px",
+            btn: null
+        });
+    }
+
+    //重置所有查询条件
+    function ResetCondition() {
+        //违章类型
+        $("#LllegalType").attr("data-text", "===全部===");
+        $("#LllegalType").attr("data-value", "");
+        $("#LllegalType div:eq(0)").text("===全部===");
+
+        //流程级别
+        $("#LllegalLevel").attr("data-text", "===全部===");
+        $("#LllegalLevel").attr("data-value", "");
+        $("#LllegalLevel div:eq(0)").text("===全部===");
+
+        //数据范围
+        $("#DataScope").attr("data-text", "===全部===");
+        $("#DataScope").attr("data-value", "");
+        $("#DataScope div:eq(0)").text("===全部===");
+
+        //违章描述
+        $("#LllegalDescribe").val("");
+    }
+
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title"></div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件:</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 350px;">
+                                    <div class="ui-filter-text">
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 350px; ">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <td class="formTitle">数据范围：</td>
+                                                <td class="formValue">
+                                                    <div id="DataScope" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">违章类型：</td>
+                                                <td class="formValue">
+                                                    <div id="LllegalType" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">违章级别：</td>
+                                                <td class="formValue">
+                                                    <div id="LllegalLevel" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+
+                                            <tr>
+                                                <td class="formTitle">违章描述：</td>
+                                                <td class="formValue">
+                                                    <input id="LllegalDescribe" type="text" class="form-control" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

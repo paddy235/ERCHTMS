@@ -1,0 +1,204 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    ;
+    var deptcode = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("AccreditDept"))";//化环专业部门编码
+    var ehsDeptCode = "@ViewBag.ehsDepartCode";//EHS部门Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 150);
+            }, 200);
+            e.stopPropagation();
+        });
+        if (deptcode.replace('|', '') == top.currUserDeptCode || ehsDeptCode == top.currUserDeptCode) {
+            $("#add").show();
+        }
+        else {
+            $("#add").hide();
+        }
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 150,
+            url: "../../EnvironmentalManage/Owncheck/GetPageListJson",
+            datatype: "json",
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            colModel: [
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'oper', index: 'id', width: 150, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:btn_show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if (deptcode.replace('|', '') == top.currUserDeptCode || ehsDeptCode == top.currUserDeptCode) {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:btn_edit('" + rowObject.id + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                        }
+                        if (deptcode.replace('|', '') == top.currUserDeptCode || ehsDeptCode == top.currUserDeptCode || rolename.indexOf("公司级用户") >= 0) {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '资料名称', name: 'dataname', index: 'dataname', width: 300, align: 'center', sortable: true },
+                { label: '编码', name: 'checkcode', index: 'CheckCode', width: 150, align: 'center', sortable: true },
+                { label: '上传时间', name: 'uploadtime', index: 'UploadTime', width: 200, align: 'center', sortable: true },
+                { label: '上传人员姓名', name: 'uploadpersonname', index: 'UploadPersonName', width: 200, align: 'center', sortable: true }],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+    }
+    //新增
+    function btn_add() {
+        dialogOpen({
+            id: 'Form',
+            title: '添加自行检测',
+            url: '/EnvironmentalManage/Owncheck/Form',
+            width: ($(window).width() - 300) + 'px',
+            height: ($(window).height() - 150) + 'px',
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_edit() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            dialogOpen({
+                id: 'Form',
+                title: '编辑自行检测',
+                url: '/EnvironmentalManage/Owncheck/Form?actiontype=edit&keyValue=' + keyValue,
+                width: ($(window).width() - 300) + 'px',
+                height: ($(window).height() - 150) + 'px',
+                callBack: function (iframeId) {
+                    top.frames[iframeId].AcceptClick();
+                }
+            })
+        }
+    }
+    //查看
+    function btn_show() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看自行检测',
+                btns: 1,
+                btn: ["关闭"],
+                url: '/EnvironmentalManage/Owncheck/Form?actiontype=view&keyValue=' + keyValue,
+                width: ($(window).width() - 300) + 'px',
+                height: ($(window).height() - 150) + 'px',
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            });
+        }
+    }
+    //删除
+    function btn_delete() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../EnvironmentalManage/Owncheck/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的自行检测！', 0);
+        }
+    }
+
+    //查询
+    function btn_search() {
+        var queryJson = {
+            dataname: $("#txt_Keyword").val(),
+            stime: $("#sTime").val(),
+            etime: $("#eTime").val()
+        };
+
+        $("#gridTable").jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        }).trigger('reloadGrid');
+    }
+
+    //导出
+    function exportResult() {
+        var queryJson = {
+            dataname: $("#txt_Keyword").val(),
+            stime: $("#sTime").val(),
+            etime: $("#eTime").val()
+        };
+        location.href = "../../EnvironmentalManage/Owncheck/ExportData?queryJson=" + JSON.stringify(queryJson);
+    }
+</script>
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%; ">
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left:10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td style="float: right;">资料名称：</td>
+                            <td>
+                                <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入要查询关键字" style="width: 200px;" />
+                            </td>
+                            <td>
+                                上传时间&nbsp;&nbsp;
+                            </td>
+                            <td>
+                                <input id="sTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', maxDate: '#F{$dp.$D(\'eTime\')}' })">
+                            </td>
+                            <td style="padding-left: 5px;">至</td>
+                            <td style="padding-left: 5px;">
+                                <input id="eTime" type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd', minDate: '#F{$dp.$D(\'sTime\')}' })">
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Search" class="btn btn-primary" onclick="btn_search()"><i class="fa fa-search"></i>查询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download"></i>导出</a>
+                    </div>
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,228 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_Index.cshtml";
+}
+<script>
+    ;
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户ID
+    var role = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//获取当前用户权限集合
+    var IsSystem = "@ERCHTMS.Code.OperatorProvider.Provider.Current().IsSystem";
+
+    $(function () {
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $("#RiskType").ComboBox({
+            url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+            param: { EnCode: "RiskDataBaseConfig" },
+            id: "ItemValue",
+            text: "ItemName",
+            description: "==请选择==",
+            height: "200px"
+        }).bind("change", function () {
+            var value = $(this).attr("data-value");
+            if (value == "" || value == undefined) return;
+            $("#ConfigType").ComboBox({
+                url: "../../SystemManage/DataItemDetail/GetDataItemListJson",
+                param: { EnCode: value, Remark: "001" },
+                id: "ItemValue",
+                text: "ItemName",
+                description: "==请选择==",
+                height: "200px"
+            })
+        });
+        $("#ConfigType").ComboBox({
+            description: "==请选择==",
+            height: "200px"
+        });
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 136.5);
+            }, 200);
+            e.stopPropagation();
+        });
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            DataType:"2"
+        }
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 190,
+            url: "../../RiskDataBaseConfig/Riskdatabaseconfig/GetPageListJson",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colModel: [
+                   { label: 'id', name: 'id', hidden: true },
+                  { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                 { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                 { label: 'createuserid', name: 'createuserid', hidden: true },
+                 {
+                     label: '操作', name: 'oper', width: 120, align: 'center', sortable: false,
+                     formatter: function (cellvalue, options, rowObject) {
+
+                         var html = "<a href=javascript:show('" + rowObject.id + "')  title='查看'><i class='fa fa-eye'></i></a>";
+
+                         html += "<a href=javascript:create('" + rowObject.id + "')  title='快速创建'><i class='fa fa-file-text-o'></i></a>";
+
+                         if ((rowObject.createuserid == UserId && rowObject.iscommit != 1) || IsSystem == "True") {
+                             html += "<a href=javascript:edit('" + rowObject.id + "','" + rowObject.iscommit + "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                             html += "<a href=javascript:delExplain('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                         }
+                         return html;
+                     }
+                 },
+                { label: '所属电厂', name: 'deptname', index: 'deptname', width: 180, align: 'center', sortable: true },
+                 { label: '风险类别', name: 'risktype', index: 'risktype', align: 'center', sortable: true },
+                { label: '配置类别', name: 'configtype', index: 'configtype', align: 'center', sortable: true },
+                { label: '类别', name: 'itemtype', index: 'itemtype', align: 'center', sortable: true },
+
+                { label: '创建电厂Code', name: 'createuserorgcode', hidden: true }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: {
+                    queryJson: JSON.stringify({
+                        RiskType: $("#RiskType").attr("data-value"),
+                        ConfigType: $("#ConfigType").attr("data-value"),
+                        DataType: "2"
+                    })
+                }, page: 1
+            }).trigger('reloadGrid');
+        });
+    }
+    //快速新建
+    function create(id) {
+        var keyValue = id;
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '快速新建安全风险管控配置',
+            url: '/RiskDataBaseConfig/Riskdatabaseconfig/Create?keyValue=' + keyValue + '&actiontype=create&IsCommit=0',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 300) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        })
+
+    }
+    //新增
+    function btn_add() {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '添加安全风险管控配置表',
+            url: '/RiskDataBaseConfig/Riskdatabaseconfig/Form?actiontype=add',
+            width: ($(top.window).width() - 200) + "px",
+            height: ($(top.window).height() - 300) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+    }
+    function show(id) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '查看安全风险管控配置表',
+                url: '/RiskDataBaseConfig/Riskdatabaseconfig/Form?keyValue=' + keyValue + '&actiontype=view',
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 300) + "px",
+                btn: ["关闭"],
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+    //编辑
+    function edit(id, iscommit) {
+        var keyValue = id;
+        if (checkedRow(keyValue)) {
+            var dlg = dialogOpen({
+                id: 'Form',
+                title: '编辑安全风险管控配置表',
+                url: '/RiskDataBaseConfig/Riskdatabaseconfig/Form?keyValue=' + keyValue + '&actiontype=edit&IsCommit=' + iscommit,
+                width: ($(top.window).width() - 200) + "px",
+                height: ($(top.window).height() - 300) + "px",
+                btn: null,
+                callBack: function (iframeId) {
+                    top.layer.close(dlg);
+                }
+            })
+        }
+    }
+    //删除
+    function delExplain(id) {
+        var keyValue = id;
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../RiskDataBaseConfig/Riskdatabaseconfig/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除的安全风险管控配置表！', 0);
+        }
+    }
+</script>
+<div class="titlePanel">
+    <div class="title-search">
+        <table>
+            <tr>
+                <td>风险类别&nbsp;&nbsp;</td>
+                <td>
+                    <div id="RiskType" type="select" class="ui-select" style="width: 200px;"></div>
+                </td>
+                <td>&nbsp;&nbsp;配置类别&nbsp;&nbsp;</td>
+                <td>
+                    <div id="ConfigType" type="select" class="ui-select" style="width: 200px;"></div>
+                </td>
+                <td style="padding-left: 5px;">
+                    <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="toolbar">
+        <div class="btn-group">
+            <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+            <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+            @*<a id="edit" class="btn btn-default" onclick="btn_edit()"><i class="fa fa-pencil-square-o"></i>编辑</a>
+            <a id="delete" class="btn btn-default" onclick="btn_delete()"><i class="fa fa-trash-o"></i>删除</a>*@
+        </div>
+    </div>
+</div>
+<div class="gridPanel">
+    <table id="gridTable"></table>
+    <div id="gridPager"></div>
+</div>

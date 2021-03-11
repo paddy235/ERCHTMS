@@ -1,0 +1,211 @@
+﻿@{;
+ViewBag.Title = "考核汇总列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script>
+    var UserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";//当前用户id
+    var roleNames = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var orgid = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeId";//当前用户所属机构id
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";  //部门信息
+
+    var examinetodeptid = request('examinetodeptid');
+    var sTime = request('sTime');
+    var eTime = request('eTime');
+    var examinetype = request('examinetype');
+    var examinecontent = request('examinecontent');
+   
+
+
+    $(function () {
+        InitialPage();
+        GetTree();
+        GetGrid();
+       
+    })
+
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: false,
+            onresize: function () {
+                $(window).resize()
+            }
+        });
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+              {
+                  SelectMode: 0,
+                  Mode: 1,
+                  Ids: orgid
+              }
+            );
+        var item = {
+            height: $(window).height() - 48,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                examinetodeptid = item.id;
+                secrch();
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            sTime: sTime,
+            eTime: eTime,
+            examinetype: examinetype,
+            examinecontent: examinecontent,
+            examinetodeptid: examinetodeptid
+        };
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 170,
+            url: "../../OutsourcingProject/Dailyexamine/GetExamineCollent",
+            datatype: "json",
+            postData: { queryJson: JSON.stringify(queryJson) },
+            colNames: ["被考核单位", "id", "考核金额", "考核类别", "考核人", "考核时间"],
+            colModel: [
+                { name: 'examinetodept', width: 100, align: 'center', sortable: true },
+                { name: 'id', hidden: true },
+                { name: 'examinemoney', index: 'examinemoney', width: 150, align: 'center' },
+                { name: 'examinetype', index: 'examinetype', width: 300, align: 'center' },
+                { name: 'examineperson', index: 'examineperson', width: 150, align: 'center' },
+                { name: 'examinetime', index: 'examinetime', width: 150, align: 'center' }
+            ],
+           
+            jsonReader: {
+                root: "rows",
+                repeatitems:false
+            },
+            treeGrid:true,
+            treeGridModel: "adjacency",
+            ExpandCloumn: "examinetodept",
+            ExpandColClick: true,
+            treeReader: {
+                level_field: "level",
+                parent_id_field: "parent",
+                leaf_field: "isLeaf"
+            },
+            rowNum: "all",
+            rownumbers: true,
+            rownumWidth:70,
+            sortname: 'createdate',
+            sortorder: 'desc',
+            shrinkToFit: false,
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+        secrch();
+    }
+    function secrch() {
+        var $gridTable = $('#gridTable');
+        var queryJson = {
+            examinetodeptid: examinetodeptid
+        }
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: JSON.stringify(queryJson) }, page: 1
+        }).trigger('reloadGrid');
+    }
+    function ExportData() {
+        var queryJson = JSON.stringify({
+            sTime: sTime,
+            eTime: eTime,
+            examinetype: examinetype,
+            examinecontent: examinecontent,
+            examinetodeptid: examinetodeptid
+        })
+        //location.href = "../../OutsourcingProject/Dailyexamine/ExportExamineData?queryJson=" + JSON.stringify(queryJson);
+        $.ajax({
+            url: '../../OutsourcingProject/Dailyexamine/ExportExamineData?queryJson=' + queryJson + '&fileName=日常考核汇总',
+            dataType: "JSON",
+            success: function (result) {
+                window.location.href = "../../Utility/DownloadFile?filePath=~/Resource/Temp/" + result.resultdata;
+                Loading(false);
+            }
+        });
+    }
+
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right: 8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor: pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px;">
+            <div class="titlePanel">
+                <div class="title-search">
+                    @*<table>
+                            <tr>
+                                <td style="text-align:right;">
+                                    考核时间：
+                                </td>
+                                <td style="width:200px">
+                                    <input id="sTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                                </td>
+                                <td style="width: 40px; text-align: right;">至：</td>
+                                <td>
+                                    <input id="eTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd' })" />
+                                </td>
+                                <td style="width:80px; text-align:right;">考核类别：</td>
+                                <td style="width:180px">
+                                    <select id="examinetype" class="form-control">
+                                        <option value="">请选择</option>
+                                        <option value="安全管理">安全管理</option>
+                                        <option value="文明生产">文明生产</option>
+                                        <option value="生产管理">生产管理</option>
+                                        <option value="技术监督">技术监督</option>
+                                        <option value="缺陷管理">缺陷管理</option>
+                                        <option value="其他">其他</option>
+                                    </select>
+                                </td>
+                                <td style="width:80px; text-align:right;">考核内容：</td>
+                                <td style="width:200px">
+                                    <input id="examinecontent" type="text" class="form-control" placeholder="请输入搜索关键字" />
+                                </td>
+                                <td style="padding-left:5px">
+                                    <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                </td>
+                                <td style="padding-left:5px">
+                                    <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                </td>
+                            </tr>
+                        </table>*@
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a class="btn btn-default" onclick="ExportData()"><i class="fa fa-plus"></i>导出</a>
+                    </div>
+                    
+                </div>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

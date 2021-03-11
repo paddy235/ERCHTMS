@@ -1,0 +1,485 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<link href="~/content/scripts/plugins/magicsuggest/magicsuggest-min.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/magicsuggest/magicsuggest-min.js"></script>
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script>
+    var currUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var useraccount = "@ERCHTMS.Code.OperatorProvider.Provider.Current().Account";
+    var deptcode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";
+    var type = 0;
+    var ms = null;
+    $(function () {
+
+        ms = $("#Name").magicSuggest({
+            allowFreeEntries: false,
+            autoSelect: true,
+            maxSelection: 1,
+            placeholder: "请输入关键字",
+            ajaxConfig: { type: "get" },
+            data: "GetNameData",
+            noSuggestionText: "没有相应数据。",
+            dataUrlParams: {
+                type: type
+            }
+        });
+        $(ms).on("selectionchange", function () {
+            $("#Name").val(this.getValue());
+        });
+        InitialPage();
+        GetGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 230);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        var StatusList = [{ ItemValue: 0, ItemName: '已评价' }, { ItemValue: 1, ItemName: '未评价' }];
+        //状态
+        $("#Status").ComboBox({
+            data: StatusList,
+            description: "======请选择======",
+            id: "ItemValue",
+            text: "ItemName",
+            height: "230px",
+            width:"200px"
+        });
+
+        //作业活动申请
+        $("#tab1").click(function () {
+            type = 0;
+
+            $("#divTitle").html("作业活动清单");
+            ChangeTab();
+            $(".ms-sel-ctn").find("input").eq(0).attr("placeholder", "按作业活动名称进行关键字搜索");
+        });
+        //设备设施清单
+        $("#tab2").click(function () {
+            type = 1;
+
+            $("#divTitle").html("设备设施清单");
+            ChangeTab();
+            $(".ms-sel-ctn").find("input").eq(0).attr("placeholder", "按设备名称进行关键字搜索");
+        });
+
+
+        $("#btn_Search").click(function () {
+            $('#gridTable').jqGrid('setGridParam', {
+                postData: { queryJson: getQueryJson() }, page: 1
+            }).trigger('reloadGrid');
+        });
+
+    }
+    //切换选项卡调用
+    function ChangeTab() {
+        ////清空当前条件
+        //ResetCondition();
+        ms.clear();
+        ms.setDataUrlParams({ type: type });
+        var $gridTable = $('#gridTable');
+
+        $gridTable.setGridWidth(($('.gridPanel').width()));
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: getQueryJson() }, page: 1
+        }).trigger('reloadGrid');
+    }
+    //得到查询条件
+    function getQueryJson() {
+        var query = {
+            type: type,
+            name: ms.getValue()[0],
+            status: $("#Status").attr("data-value")
+        }
+        return JSON.stringify(query);
+    }
+    //重置所有查询条件
+    function ResetCondition() {
+        //搭设类型
+        $("#Status").attr("data-text", "======请选择======");
+        $("#Status").attr("data-value", "");
+        $("#Status div:eq(0)").text("======请选择======");
+        ms.clear();
+        if (type == 0) {
+            $(".ms-sel-ctn").find("input").eq(0).attr("placeholder", "按作业活动名称进行关键字搜索");
+        }
+        else if (type == 1) {
+            $(".ms-sel-ctn").find("input").eq(0).attr("placeholder", "按设备名称进行关键字搜索");
+        }
+        var $gridTable = $('#gridTable');
+        $gridTable.setGridWidth(($('.gridPanel').width()));
+        $gridTable.jqGrid('setGridParam', {
+            postData: { queryJson: getQueryJson() }, page: 1
+        }).trigger('reloadGrid');
+    }
+    var selectAll = false;
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 230,
+            url: "../../RiskDatabase/BaseListing/GetPageListJson",
+            postData: { queryJson: getQueryJson() },
+            datatype: "json",
+            colModel: [
+                { label: 'ID', name: 'id', index: 'id', align: 'left', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', index: 'createuserdeptcode', align: 'left', hidden: true },
+                {
+                    label: '操作', name: 'Oper', width: 120, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:btn_view('"+rowObject.id+"')  title='查看'><i class='fa fa-eye'></i></a>";
+
+                        if (rowObject.createuserdeptcode == deptcode) {
+                            html += "<a href=javascript:btn_edit('" + rowObject.id + "') title='编辑'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "<a href=javascript:btn_delete('" + rowObject.id + "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        html += "<a href=javascript:f_evaluate('" + rowObject.id + "')  title='评价'><i class='fa fa-check'></i></a>";
+                        return html;
+                    }
+                },
+                { label: '岗位（工种）', name: 'post', index: 'post', width: 500, align: 'center' },
+                { label: '作业活动', name: 'name', index: 'name', width: 500, align: 'center' },
+                { label: '设备名称', name: 'equname', index: 'equname', width: 500, align: 'center' },
+                { label: '活动步骤', name: 'activitystep', index: 'activitystep', width: 500, align: 'center' },
+                { label: '所在地点', name: 'areaname', index: 'areaname', width: 500, align: 'center' },
+                   {
+                       label: '常规/非常规', name: 'isconventional', index: 'isconventional', width: 150, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                           if (cellvalue == 0) {
+                               return "常规";
+                           }
+                           else {
+                               return "非常规";
+                           }
+                       }
+                   },
+                {
+                    label: '是否特种设备', name: 'isspecialequ', index: 'isspecialequ', width: 150, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == 0) {
+                            return "是";
+                        }
+                        else {
+                            return "否";
+                        }
+                    }
+                },
+                { label: '其他', name: 'others', index: 'others', width: 180, align: 'center', sortable: false },
+                {
+                    label: '评价状态', name: 'status', index: 'status', width: 110, align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue == 0) {
+                            return "已评价";
+                        }
+                        else {
+                            return "未评价";
+                        }
+                        return "";
+                    }
+
+                },
+                {
+                    label: '评价数', name: 'evaluatenum', index: 'evaluatenum',align: 'center', sortable: false, formatter: function (cellvalue, options, rowObject) {
+                        if (cellvalue) {
+                            return '<a onclick="javascript:f_risklist(\'' + rowObject.id + '\')" style="text-decoration:underline;color:blue">' + cellvalue + '项</a>';
+                        }
+                        return "";
+                    }
+
+                },
+                { label: '创建单位', name: 'createuserdeptname', index: 'createuserdeptname', width: 180, align: 'center', sortable: false },
+                {
+                    label: '创建时间', name: 'createdate', index: 'createdate', width: 180, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        return formatDate(cellvalue, 'yyyy-MM-dd');
+                    }
+                }
+            ],
+            viewrecords: true,
+            rowNum: 30,
+            rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'a.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            multiselect: true,
+            onSelectRow: function (rowid) {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+                var objData = $gridTable.getRowData(rowid);
+                if (objData.createuserdeptcode != deptcode) {
+                    $('#gridTable').jqGrid("setSelection", rowid, false);
+                }
+            },
+            onSelectAll: function () {
+                var rowIds = $("#gridTable").jqGrid("getDataIDs");
+                if (selectAll) {
+                    for (var k = 0; k < rowIds.length; k++) {
+                        var curRowData = $("#gridTable").getRowData(rowIds[k]);
+                        if (curRowData.createuserdeptcode != deptcode) {
+                            $('#gridTable').jqGrid("setSelection", rowIds[k], false);
+                        }
+                    }
+                }
+                else {
+                    for (var k = 0; k < rowIds.length; k++) {
+                        $('#gridTable').jqGrid("setSelection", rowIds[k], false);
+                    }
+                }
+                selectAll = !selectAll;
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                if (type == 0) {
+                    $gridTable.showCol(["post","name", "activitystep", "isconventional"]);
+                    $gridTable.hideCol(["equname", "areaname", "isspecialequ"]);
+                }
+                else
+                {
+                    $gridTable.showCol(["equname", "areaname", "isspecialequ"]);
+                    $gridTable.hideCol(["post","name", "activitystep", "isconventional"]);
+
+                }
+                $gridTable.setGridWidth(($('.gridPanel').width()));
+                var rowIds = $("#gridTable").jqGrid("getDataIDs");
+                for (var k = 0; k < rowIds.length; k++) {
+                    var curRowData = $("#gridTable").getRowData(rowIds[k]);
+                    if (curRowData.createuserdeptcode != deptcode) {
+                        $("#jqg_gridTable_" + rowIds[k]).hide();
+                    }
+                }
+
+            }
+        });
+
+    }
+
+    //查看
+    function btn_view(id) {
+        var title = "";
+        if (type == 0) {
+            title = "作业活动";
+        }
+        if (type == 1) {
+            title = "设备设施";
+        }
+
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '查看' + title + '清单',
+            url: '/RiskDatabase/BaseListing/Form?action=show&keyvalue=' + id + '&type=' + type,
+            width: "600px",
+            height: "400px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            },
+        });
+    }
+    //新增
+    function btn_add() {
+        var title = "";
+        if (type == 0) {
+            title = "作业活动";
+        }
+        if (type == 1) {
+            title = "设备设施";
+        }
+
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '新增' + title + '清单',
+            url: '/RiskDatabase/BaseListing/Form?action=add&type=' + type,
+            width: "600px",
+            height: "400px",
+            btn: ["继续添加", "提交"],
+            callBack:function (iframeId) {
+                top.frames[iframeId].AcceptClick(false);
+            },
+            btn2: function (iframeId) {
+                top.frames[iframeId].AcceptClick(true);
+            }
+            //callBack: function (iframeId) {
+            //    top.frames[iframeId].AcceptClick();
+            //}
+        });
+    }
+    function f_evaluate(id) {
+        dialogOpen({
+            id: "win",
+            title: "风险辨识评估",
+            url: '/RiskDatabase/RiskAssess/GXHSDetails?action=add&keyValue=&ListingId='+id,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 80) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+    //编辑
+    function btn_edit(id) {
+        var title = "";
+        if (type == 0) {
+            title = "作业活动";
+        }
+        if (type == 1) {
+            title = "设备设施";
+        }
+
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '编辑' + title + '清单',
+            url: '/RiskDatabase/BaseListing/Form?action=edit&keyvalue=' + id + '&type=' + type,
+            width: "600px",
+            height: "400px",
+            btn: ["继续添加", "提交"],
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick(false);
+            },
+            btn2: function (iframeId) {
+                top.frames[iframeId].AcceptClick(true);
+            }
+            //callBack: function (iframeId) {
+            //    top.frames[iframeId].AcceptClick();
+            //}
+        });
+    }
+    //删除
+    function btn_delete(id) {
+        if (id) {
+            $.RemoveForm({
+                url: '../../RiskDatabase/BaseListing/RemoveForm',
+                param: { keyValue: id },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除行！', 0);
+        }
+    }
+    //批量删除
+    function btn_multipledelete() {
+        var keyValue = $('#gridTable').jqGridRowValue('id');
+        if (keyValue) {
+            $.RemoveForm({
+                url: '../../RiskDatabase/BaseListing/RemoveForm',
+                param: { keyValue: keyValue },
+                success: function (data) {
+                    $('#gridTable').trigger('reloadGrid');
+                }
+            })
+        } else {
+            dialogMsg('请选择需要删除行！', 0);
+        }
+    }
+    //导出
+    function exportResult() {
+        location.href = "../../RiskDatabase/BaseListing/ExportExcel?queryJson=" + JSON.stringify({
+            name: ms.getValue()[0],
+            status: $("#Status").attr("data-value")
+        });
+    }
+    function f_risklist(id) {
+        var dlg = dialogOpen({
+            id: 'List',
+            title: '风险评估清单',
+            url: "/RiskDatabase/RiskAssess/GXHSList?moduleid='da0b5cf2-ab80-4870-882b-414a8ec58bc8'&ListingId=" + id+"&redirectType="+type,
+            width: ($(top.window).width() - 80) + "px",
+            height: ($(top.window).height() - 20) + "px",
+            btn: null,
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            },
+        });
+    }
+    function btn_import() {
+        var dlg = dialogOpen({
+            id: 'Import',
+            title: '导入',
+            url: '/RiskDatabase/BaseListing/Import',
+            width: "600px",
+            height: "400px",
+            callBack: function (iframeId) {
+                top.frames[iframeId].AcceptClick();
+            },
+            cancel: function () {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        });
+    }
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    @*<div class="ui-layout-west" id="divTree">
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10" id="divTreeTitle">
+                    作业活动清单
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                    <i class="fa fa-arrow-left" onclick="setBar(this)" style="cursor:pointer;" title="展开/收起"></i>
+                </div>
+            </div>
+            <div id="itemTree"></div>
+        </div>
+    </div>*@
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+            <div class="panel-Title" id="divTitle">作业活动清单</div>
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td class="formTitle">状态：</td>
+                            <td class="formValue">
+                                <div id="Status" type="select" class="ui-select" style="width:180px"></div>
+                            </td>
+                            <td class="formValue" style="padding-left:10px">
+                                <input type="text" class="form-control" style="width:400px" id="Name" name="Name" placeholder="按作业活动名称进行关键字搜索" />
+                            </td>
+                            <td style="padding-left: 5px;">
+                                <a id="btn_Reset" class="btn btn-primary" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
+                        <a id="add" class="btn btn-default" onclick="btn_add()"><i class="fa fa-plus"></i>新增</a>
+                        <a id="multipledelete" class="btn btn-default" onclick="btn_multipledelete()"><i class="fa fa-remove"></i>批量删除</a>
+                        <a id="import" class="btn btn-default" onclick="btn_import()"><i class="fa fa-exclamation-circle"></i>导入</a>
+                        <a id="export" class="btn btn-default" onclick="exportResult()"><i class="fa fa-download">导出</i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="titlePanel">
+                <ul class="nav nav-tabs">
+                    <li class="active"><a id="tab1" data-toggle="tab">作业活动清单</a></li>
+                    <li><a id="tab2" data-toggle="tab">设备设施清单</a></li>
+                </ul>
+            </div>
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+

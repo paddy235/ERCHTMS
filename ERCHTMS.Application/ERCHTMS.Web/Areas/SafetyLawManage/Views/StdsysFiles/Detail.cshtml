@@ -1,0 +1,252 @@
+@{;
+    ViewBag.Title = "表单页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<!--webUploader文件上传组件-->
+<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+<link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+<script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
+<script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script src="~/Content/scripts/business/detailAgency.js"></script>
+<script>
+    //=================
+    //用户信息
+    //=================
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户ID
+    var userName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserName"; //当前用户姓名
+    var deptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";//当前用户所属部门Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var deptName = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptName";//当前用户所属部门名称
+    //页面请求参数
+    var keyValue = request('keyValue');
+    var actiontype = request('actiontype');
+    var refid = request("refid");
+    refid = !!refid ? refid : "";
+    var refname = request("refname");
+    $(function () {
+        keyValue = !!keyValue ? keyValue : newGuid();
+        //
+        //加载资料类别
+        //
+        GetTypeTree();
+        //
+        //创建代理
+        //
+        var detailAgc = new detailAgency({
+            keyValue: keyValue,
+            actiontype: actiontype,
+            saveParam: {
+                url: '../../SafetyLawManage/StdsysFiles/SaveForm'
+            }
+        });
+        //
+        //绑定页面控件
+        //
+        detailAgc.bindPageControls({
+            saveId: "btn_Save"
+        });
+        //
+        //初始化数据
+        //
+        detailAgc.initialPage([
+            {
+                url: '../../SafetyLawManage/StdsysFiles/GetFormJson',
+                param: { keyValue: keyValue },
+                callBack: setPageData,
+                forms: [{ Id: 'form1', dataProName: 'data.data', extData: { PubUserId: userId, PubUserName: userName, PubDepartId: deptId, PubDepartName: deptName, RefId: refid, RefName: refname } }],
+                upfiles: [{ Id: 'uploader', extensions: 'txt,doc,docx,pdf,xls,xlsx,rar,zip,ppt,pptx', actiontype: actiontype, isImage: false, fileDir: 'StdSysFiles', multiple: true }]
+            }
+        ]);
+        //
+        //定义并添加规则
+        //
+        detailAgc.addRule(new pageRule({ ruleId: 'valFile', ruleType: 'validate', onExecute: validateFile }));
+        detailAgc.addRule(new pageRule({ ruleId: 'valSameFile', ruleType: 'validate', onExecute: validateSameFile }));
+    })
+    //
+    //加载分类树
+    //
+    function GetTypeTree() {
+        $("#RefId").ComboBoxTree({
+            url: "../../SafetyLawManage/StdsysType/GetTypeTreeJson",
+            height: "300px",
+            description: "==请选择==",
+            allowSearch: false
+        }).bind("change", function () {
+            var self = $(this);
+            var id = self.attr("data-value");
+            var text = self.attr('data-text');
+            var dept = self.attr('data-dept');
+            var bCanSelect = true;
+            if (rolename.indexOf("公司管理员") >= 0 || rolename.indexOf("厂级部门用户") >= 0) {//所有操作权限
+                bCanSelect = true;
+            }
+            else if (rolename.indexOf("部门级用户") >= 0) {
+                if (!dept || new RegExp("^" + deptCode).test(dept) == false) {
+                    bCanSelect = false;
+                }
+            }
+            else if (rolename.indexOf("班组级用户") >= 0 && rolename.indexOf("负责人") >= 0) {
+                if (!dept || new RegExp("^" + deptCode).test(dept) == false) {
+                    bCanSelect = false;
+                }
+            }
+            else {
+                bCanSelect = false;
+            }
+            if (bCanSelect == false) {
+                dialogMsg("选择无效，只能选择本单位的下级节点，请重新选择。", 0);
+                if(!!refid)
+                    $("#RefId").ComboBoxTreeSetValue(refid);
+                else
+                    $("#RefId").ComboBoxTreeSetText("==请选择==");
+                var treeId = $(".bbit-tree").attr("id");
+                $("#" + treeId + "_" + id.replace(/-/g, "_")).removeClass("bbit-tree-selected");
+                return false;
+            }
+            else {
+                $("#RefName").val(text);
+            }
+        });
+    }
+    //
+    //设置页面数据
+    //
+    function setPageData(data) {
+        if (!!data.data) {
+            refid = data.data.RefId;
+            refname = data.data.RefName;
+        }
+    }
+    //
+    //验证上传文件
+    //
+    function validateFile() {
+        var r = true;
+
+        if ($("#uploader table tr:gt(0)").find(".filename,.state-complete").length == 0) {
+            dialogMsg('缺少文件！', 5);
+            r = false;
+        }
+        return r;
+    }
+    //
+    //验证同名文件
+    //
+    function validateSameFile() {
+        var r = false;
+
+        var filename = $("#FileName").val();
+        $.ajax({
+            url: "ExistSameFile",
+            type: "get",
+            dataType: "json",
+            async: false,
+            data: { keyValue: keyValue, FileName: filename },
+            success: function (data) {
+                if (!!data && data.resultdata == false) {
+                    r = true;
+                } else {
+                    dialogMsg("存在相同的文件名称，请校正。", -1);
+                }
+            },
+            error: function (XMLHttpRequest, textStatus, errorThrown) {
+                dialogMsg(errorThrown, -1);
+            }
+        });
+
+        return r;
+    }
+</script>
+<style type="text/css">
+    .form .formTitle{width:120px;}    
+    .ui-select .ui-select-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:25px;}
+</style>
+<div class="center-Panel" style="margin-top:42px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;基本信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <div style="margin-right: 30px;">
+                <table class="form">
+                    <tr>
+                        <td class="formTitle">文件名<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="FileName" type="text" class="form-control" errormsg="文件名不能为空，" isvalid="yes" checkexpession="LenStr" length="200" />
+                        </td>
+                        <td class="formTitle">文件编号<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <input id="FileNo" type="text" class="form-control" errormsg="文件编号不能为空，" isvalid="yes" checkexpession="LenStr" length="50" />     
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">文件类型<span style="color:red;">*</span></td>
+                        <td class="formValue">
+                            <div id="RefId" type="selectTree" class="ui-select" isvalid="yes" errormsg="文件类型" checkexpession="NotNull"></div>
+                            <input id="RefName" type="hidden" />
+                        </td>
+                        <td class="formTitle">发布时间</td>
+                        <td class="formValue">
+                            <input id="PubDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="no" checkexpession="NotNull" errormsg="发布时间" style="width:120px;" />
+                        </td>
+                    </tr>
+                    <tr>                        
+                        <td class="formTitle">修订时间</td>
+                        <td class="formValue">
+                            <input id="ReviseDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="no" checkexpession="NotNull" errormsg="修订时间" style="width:120px;" />
+                        </td>
+                        <td class="formTitle">实施时间</td>
+                        <td class="formValue">
+                            <input id="UseDate" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker()" isvalid="no" checkexpession="NotNull" errormsg="实施时间" style="width:120px;" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="formTitle">发布单位（部门）</td>
+                        <td class="formValue" colspan="3">
+                            <input id="PubDepartName" type="text" class="form-control" isvalid="no" checkexpession="NotNull" errormsg="发布单位（部门）" />
+                        </td>
+                    </tr>                    
+                    <tr>
+                        <td class="formTitle">备注</td>
+                        <td class="formValue" colspan="3">
+                            <textarea id="Remark" type="text" class="form-control" errormsg="备注" checkexpession="NotNull" style="height:80px;"></textarea>
+                        </td>
+                    </tr>  
+                    <tr>
+                        <td class="formTitle">文件</td>
+                        <td class="formValue" colspan="3">
+                            <div id="uploader" class="uploader" style="border:1px solid #ccc; margin-top:10px; min-height:120px; margin-bottom:10px;">
+                                <div class="queueList">
+                                    <div id="file_place" class="placeholder">
+                                        <div class="filePicker" style="margin-left:25px; margin-top:10px;"></div>
+                                    </div>
+                                </div>
+                                <div class="statusBar" style="display:none;">
+                                    <div class="progress">
+                                        <span class="text">0%</span>
+                                        <span class="percentage"></span>
+                                    </div>
+                                    <div class="info"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="form-button" style="top: 40px; text-align: left; padding-left: 20px; position: fixed; bottom: auto; z-index: 1000;">
+    <div style="float:left;">
+        <a id="btn_Save" class="btn btn-primary"><i class="fa fa-check"></i>&nbsp;保&nbsp;&nbsp;存</a>
+        &nbsp; &nbsp;
+    </div>
+    <div id="HidMessage" style="width:360px; margin-left:20px; float:left;"></div>
+</div>

@@ -1,0 +1,254 @@
+@{;
+ViewBag.Title = "表单页面";
+Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script>
+    var UserId = request('userId');
+    var index = 0;
+    var userlist;
+    var IsTakePictures = false;//是否拍照，拍照才能保存
+    var MaxLength = 0;
+    $(function () {
+        $("#Image").hide();
+        $.ajax({
+            url: '../../PersonManage/Acesscontrolinfo/GetUserList?userids=' + UserId,
+            type: "GET",
+            async: false,
+            dataType: "Json",
+            success: function (result) {
+                userlist = result;
+                MaxLength = result.length;
+                ChangeUser();
+
+            }
+        });
+    });
+
+    function ChangeUser() {
+        $("#Name").val(userlist[index].realname);
+        $("#Phone").val(userlist[index].mobile);
+        if (userlist[index].isface == null || userlist[index].isface == 0) {
+            $("#IsFace").val("否");
+        } else {
+            $("#IsFace").val("是");
+        }
+    }
+
+
+    function Submit() {
+        if (IsTakePictures) {
+            var canvas = document.getElementById('canvas1');
+            var imgData = canvas.toDataURL("image/png");
+            var KeyValue = "";
+            if (userlist[index].tid != null) {
+                KeyValue = userlist[index].tid;
+            }
+            //$.ajax({
+            //    url: '../../PersonManage/Acesscontrolinfo/SaveForm?keyValue=' + KeyValue,
+            //    data: { userid: userlist[index].userid, imgData: encodeURIComponent(imgData), type: 1 },
+            //    type: "Post",
+            //    async: false,
+            //    dataType: "Json",
+            //    success: function (result) {
+            //        if (MaxLength > index + 1) {
+            //            dialogMsg("录制成功请录制下一个用户！", 0);
+            //            index++;
+            //            ChangeUser();
+            //            Cancel();
+
+            //        } else {
+            //            dialogMsg("已全部录制完成！", 0);
+            //        }
+            //    }
+            //});
+            $.SaveForm({
+                url: "../../PersonManage/Acesscontrolinfo/SaveForm?keyValue=" + KeyValue,
+                param: { userid: userlist[index].userid, imgData: encodeURIComponent(imgData), type: 1 },
+                loading: "正在保存数据...",
+                close: false,
+                success: function() {
+                    if (MaxLength > index + 1) {
+                        dialogMsg("录制成功请录制下一个用户！", 1);
+                        index++;
+                        ChangeUser();
+                        Cancel();
+
+                    } else {
+                        dialogMsg("已全部录制完成！", 1);
+                        $("#sub").hide();
+                        $("#cancel").hide();
+                        $("#getPhoto").hide();
+                    }
+                }
+            });
+        } else {
+            dialogMsg("请先进行拍照！", 2);
+           
+        }
+
+    }
+
+    function Cancel() {
+        IsTakePictures = false;
+        $("#play").show();
+        $("#Image").hide();
+    }
+</script>
+
+<div style="margin-top: 20px; margin-right: 30px;">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;人员信息</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="form">
+                <tr>
+                    <td class="formTitle">姓名</td>
+                    <td class="formValue">
+                        <input id="Name" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">手机号</td>
+                    <td class="formValue">
+                        <input id="Phone" type="text" class="form-control" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="formTitle">是否有人脸数据</td>
+                    <td class="formValue">
+                        <input id="IsFace" type="text" class="form-control" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div id="gr" class="panel panel-default">
+        <div class="panel-heading">
+            <strong>&nbsp;&nbsp;录制人脸</strong>
+            <span class="tools pull-right">
+                <a class="fa fa-chevron-down" title="展开/收起"></a>
+            </span>
+        </div>
+        <div class="panel-body">
+            <a class="btn btn-default" onclick="getMedia()">开启摄像头</a> <a id="getPhoto" class="btn btn-default" onclick="getPhoto()">拍照</a><br />
+            <div style="width: 400px; height: 300px;" id="play">
+                <video width="300px" height="300px" autoplay="autoplay"></video>
+            </div>
+            <div style="width: 400px; height: 300px;" id="Image">
+                <canvas id="canvas1" height="300px"></canvas>
+            </div>
+            <div>
+                <a id="sub" class="btn btn-default" onclick="Submit()">确定</a><a id="cancel" class="btn btn-default" onclick="Cancel()">取消</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var video = document.querySelector('video');
+    var audio, audioType;
+
+    var canvas1 = document.getElementById('canvas1');
+    var context1 = canvas1.getContext('2d');
+
+    //var canvas2 = document.getElementById('canvas2');
+    //var context2 = canvas2.getContext('2d');
+
+    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+    window.URL = window.URL || window.webkitURL || window.mozURL || window.msURL;
+
+    var exArray = []; //存储设备源ID  
+    MediaStreamTrack.getSources(function (sourceInfos) {
+        for (var i = 0; i != sourceInfos.length; ++i) {
+            var sourceInfo = sourceInfos[i];
+            //这里会遍历audio,video，所以要加以区分  
+            if (sourceInfo.kind === 'video') {
+                exArray.push(sourceInfo.id);
+            }
+        }
+    });
+
+    function getMedia() {
+        if (navigator.getUserMedia) {
+            navigator.getUserMedia({
+                'video': {
+                    'optional': [{
+                        'sourceId': exArray[1] //0为前置摄像头，1为后置
+                    }]
+                },
+                'audio': true
+            }, successFunc, errorFunc);    //success是获取成功的回调函数
+        }
+        else {
+            alert('Native device media streaming (getUserMedia) not supported in this browser.');
+        }
+    }
+
+    function successFunc(stream) {
+        //alert('Succeed to get media!');
+        if (video.mozSrcObject !== undefined) {
+            //Firefox中，video.mozSrcObject最初为null，而不是未定义的，我们可以靠这个来检测Firefox的支持
+            video.mozSrcObject = stream;
+        }
+        else {
+            video.src = window.URL && window.URL.createObjectURL(stream) || stream;
+        }
+
+        //video.play();
+
+        // 音频
+        audio = new Audio();
+        audioType = getAudioType(audio);
+        if (audioType) {
+            audio.src = 'polaroid.' + audioType;
+            audio.play();
+        }
+    }
+    function errorFunc(e) {
+        alert('Error！' + e);
+    }
+
+
+    // 将视频帧绘制到Canvas对象上,Canvas每60ms切换帧，形成肉眼视频效果
+    function drawVideoAtCanvas(video, context) {
+        window.setInterval(function () {
+            context.drawImage(video, 0, 0, 90, 120);
+        }, 60);
+    }
+
+    //获取音频格式
+    function getAudioType(element) {
+        if (element.canPlayType) {
+            if (element.canPlayType('audio/mp4; codecs="mp4a.40.5"') !== '') {
+                return ('aac');
+            } else if (element.canPlayType('audio/ogg; codecs="vorbis"') !== '') {
+                return ("ogg");
+            }
+        }
+        return false;
+    }
+
+    // vedio播放时触发，绘制vedio帧图像到canvas
+    //        video.addEventListener('play', function () {
+    //            drawVideoAtCanvas(video, context2);
+    //        }, false);
+
+    //拍照
+    function getPhoto() {
+        context1.drawImage(video, 0, 0, 300, 400); //将video对象内指定的区域捕捉绘制到画布上指定的区域，实现拍照。
+        IsTakePictures = true;
+        $("#play").hide();
+        $("#Image").show();
+    }
+
+    //视频
+    function getVedio() {
+        drawVideoAtCanvas(video, context2);
+    }
+
+</script>

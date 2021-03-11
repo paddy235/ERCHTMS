@@ -1,0 +1,240 @@
+@{;
+ViewBag.Title = "列表页面";
+Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/scripts/business/Common.js" type="text/javascript"></script>
+<script src="~/Content/scripts/business/listAgency.js"></script>
+<script>
+    //
+    //用户信息及请求参数
+    //
+    var userId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId"; //当前用户Id
+    var deptCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptCode";//当前用户所属部门Code
+    var orgCode = "@ERCHTMS.Code.OperatorProvider.Provider.Current().OrganizeCode";//当前用户所属机构Code
+    var rolename = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";//当前用户角色
+    var ehsDeptCode = "@ViewBag.ehsDepartCode"; //EHS部门Code
+    //导入刷新用
+    var isImport = false;
+    //页面代理
+    var lagc = null;
+    var isupdate = false;
+    $(function () {
+
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth(($('.gridPanel').width()));
+                $('#gridTable').setGridHeight($(window).height() - 170);
+            }, 200);
+            e.stopPropagation();
+        });
+        //
+        //创建页面代理
+        //
+        GetIsUpdate();
+        lagc = new listAgency({
+            hasPowerOper: true,
+            userInfo: {
+                userId: userId,
+                deptCode: deptCode,
+                orgCode: orgCode
+            },
+            gridId: "gridTable",
+            gridJustHeight: 170,
+            gridOptions: {
+                height: $(window).height() - 170,
+                url: "../../NosaManage/Nosaarea/GetListJson",
+                datatype: "json",
+                pager: "#gridPager",
+                sortname: 'no',
+                sortorder: 'asc'
+            },
+            gridColumns: [
+                { label: 'createuserid', name: 'createuserid', hidden: true },
+                { label: 'createuserdeptcode', name: 'createuserdeptcode', hidden: true },
+                { label: 'createuserorgcode', name: 'createuserorgcode', hidden: true },
+                { label: '主键', name: 'id', hidden: true },
+                {
+                    label: '操作',
+                    name: 'Oper',
+                    width: 120,
+                    align: 'center',
+                    sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "<a href=javascript:detail('" +
+                            rowObject.id +
+                            "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        //if (rolename.indexOf("公司管理员") >= 0 || (rowObject.createuserdeptcode == ehsDeptCode && rolename.indexOf("安全管理员") >= 0)) {
+                        if (rolename.indexOf("公司管理员") >= 0 ||isupdate == true) {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:edit('" +
+                                rowObject.id +
+                                "')  title='修改'><i class='fa fa-pencil-square-o'></i></a>";
+                            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:del('" +
+                                rowObject.id +
+                                "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                        return html;
+                    }
+                },
+                { label: '区域编号', name: 'no', index: 'no', width: 200, align: 'center', sortable: true },
+                
+            { label: '区域名称', name: 'name', index: 'name', width: 300, align: 'center', sortable: true },
+                     { label: '区域范围', name: 'arearange', index: 'arearange', width: 350, align: 'center', sortable: false },
+                {
+                    label: '区域责任部门',
+                    name: 'dutydepartname',
+                    index: 'dutydepartname',
+                    width: 300,
+                    align: 'center',
+                    sortable: true
+                },
+                {
+                    label: '区域负责人',
+                    name: 'dutyusername',
+                    index: 'dutyusername',
+                    width: 120,
+                    align: 'center',
+                    sortable: true
+                }
+            ]
+        });
+        //
+        //绑定页面控件
+        //
+        lagc.bindPageControls({
+            searchId: "btn_Search",
+            resetId: "btn_Reset",
+            refreshId: "refresh",
+            addId: "add",
+            impId: "imp"
+        });
+        //
+        //绑定页面事件
+        //
+        lagc.addPageEvents({ onSetPowerOper: setPower });
+        //
+        //初始化
+        //
+        lagc.initialPage();
+        //
+        //页面跳转
+        //
+        lagc.addPageGotoUrl({
+            addArg: {
+                title: '添加区域负责人',
+                url: '/NosaManage/NosaArea/Form',
+                width: ($(top.window).width() - 400) + "px",
+                btn: null
+            },
+            editArg: {
+                title: '编辑区域负责人',
+                url: '/NosaManage/NosaArea/Form',
+                width: ($(top.window).width() - 400) + "px",
+                btn: null
+            },
+            delArg: {
+                url: '../..//NosaManage/NosaArea/RemoveForm',
+                msg: "<div style='color:#ff0000;'><strong>确定删除吗？</strong></div>",
+            },
+            detailArg: {
+                title: '查看区域负责人',
+                url: '/NosaManage/NosaArea/Form',
+                width: ($(top.window).width() - 400) + "px",
+                btn: null
+            },
+            impArg: {
+                id: "Import",
+                title: '导入',
+                url: '/NosaManage/NosaArea/Import',
+                cancel: function () {
+                    if (isImport) {
+                        isImport = false;
+                        lagc.queryData();
+                    }
+                },
+                end: function () {
+                    if (isImport) {
+                        isImport = false;
+                        lagc.queryData();
+                    }
+                }
+            }
+        })
+    });
+
+    //
+    //权限设置
+    //
+    function setPower() {
+        //if (rolename.indexOf("公司管理员") >= 0 || (deptCode == ehsDeptCode && rolename.indexOf("安全管理员") >= 0)) {
+        if (rolename.indexOf("公司管理员") >= 0 || isupdate == true) {
+            $("#add,#imp").css("display", "");
+        }
+        //}
+    }
+
+    function GetIsUpdate() {
+        $.ajax({
+            url: "GetIsUpdate",
+            type: "get",
+            dataType: "text",
+            async: false,
+            success: function (data) {
+                if (data == "true") {
+                    isupdate = true;
+                } else {
+                    isupdate = false;
+                }
+            }
+        });
+    }
+</script>
+<style type="text/css">
+    .titlePanel, .gridPanel {
+        min-width: 780px;
+    }
+</style>
+<div class="center-Panel" style="margin-left: 10px; margin-right: 10px;">
+    <div class="panel-Title" style="height:10px;"></div>
+    <div class="titlePanel">
+        <div class="title-search">
+            <table class="queryform" id="queryArea">
+                <tr>
+                    <td class="formTitle">&nbsp;区域编号：</td>
+                    <td class="formValue">
+                        <input id="No" type="text" class="form-control" querypro="no" style="width: 120px;" />
+                    </td>
+                    <td class="formTitle">&nbsp;区域名称：</td>
+                    <td class="formValue">
+                        <input id="Name" type="text" class="form-control" querypro="name" style="width: 200px;" />
+                    </td>
+                    <td class="formTitle">&nbsp;区域负责人：</td>
+                    <td class="formValue">
+                        <input id="DutyName" type="text" class="form-control" querypro="DutyName" style="width: 200px;" />
+                    </td>
+                    <td class="formTitle">&nbsp;区域责任部门：</td>
+                    <td class="formValue">
+                        <input id="DutyDept" type="text" class="form-control" querypro="DutyDept" style="width: 200px;" />
+                    </td>
+                    <td style="padding-left: 5px;">
+                        <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>查询</a>
+                        <a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="toolbar">
+            <div class="btn-group">
+                <a id="refresh" class="btn btn-default"><i class="fa fa-refresh"></i>刷新</a>
+                <a id="add" class="btn btn-default" style="display:none;"><i class="fa fa-plus"></i>新增</a>
+                <a id="imp" class="btn btn-default" style="display:none;"><i class="fa fa-file-excel-o"></i>导入</a>
+            </div>
+        </div>
+    </div>
+    <div class="gridPanel">
+        <table id="gridTable"></table>
+        <div id="gridPager"></div>
+        <div><span style="color:red;font-size:16px;">【注：在用户管理或人员档案中修改部门结构或删除人员后，请在本页面重新选择人员所属部门或新增区域负责人】</span></div>
+    </div>
+</div>
