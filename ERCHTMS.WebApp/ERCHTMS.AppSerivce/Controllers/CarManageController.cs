@@ -3553,6 +3553,282 @@ left join V_USERINFO b on a.USERID = b.USERID where b.DEPTNAME is not null and a
                 return new { Code = -1, Count = 0, Info = ex.Message };
             }
         }
+
+
+        #region 京泰人员车辆事件回调接口
+        /// <summary>
+        /// 门禁回调接口 人脸通过事件
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        public object JNJTUserAccess()
+        {
+            string json = "";
+            try
+            {
+                Stream s = System.Web.HttpContext.Current.Request.InputStream;
+                StreamReader reader = new StreamReader(s, Encoding.UTF8);
+                json = reader.ReadToEnd();
+                #region 进入方法记录日志
+                WriteLog.AddLog("接收数据\r\n" + json, "UserInOut_JNJTAccessBack");
+
+                #endregion
+                HikBack hi = JsonConvert.DeserializeObject<HikBack>(json);
+                HikinoutlogEntity inuser = null;
+                if (hi.Params.Events.Count > 0)
+                {
+                    //获取到所有部门集合
+                    var deptlist = departmentBLL.GetList();
+
+                    DataItemDetailBLL pdata = new DataItemDetailBLL();
+                    var pitem = pdata.GetItemValue("Hikappkey");//海康服务器密钥
+                    var url = pdata.GetItemValue("HikBaseUrl");//海康服务器地址
+                    var HikHttpsIP = pdata.GetItemValue("HikHttpsIP");//海康平台访问IP
+                    var imgPath = pdata.GetItemValue("imgPath");//图片存放路径
+
+                    string key = string.Empty;// "21049470";
+                    string sign = string.Empty;// "4gZkNoh3W92X6C66Rb6X";
+                    if (!string.IsNullOrEmpty(pitem))
+                    {
+                        key = pitem.Split('|')[0];
+                        sign = pitem.Split('|')[1];
+                    }
+
+                    #region 根据回调事件获取的人员卡号信息查询人员信息
+                    string UserUrl = "/artemis/api/resource/v2/person/advance/personList";
+                    // 中途还可以设置平台信息，后续的请求都以此信息为准
+                    SocketHelper.SetPlatformInfo(key, sign, HikHttpsIP, 443, true);
+                    for (int i = 0; i < hi.Params.Events.Count; i++)
+                    {
+                        var UserModel = new
+                        {
+                            pageNo = 1,
+                            pageSize = 1000,
+                            cardNo = hi.Params.Events[i].data.ExtEventCardNo
+                        };
+                        string UserMsg = string.Empty;
+                        UserMsg = SocketHelper.LoadCameraList(UserModel, url, UserUrl, key, sign);
+                        UserSearch user = JsonConvert.DeserializeObject<UserSearch>(UserMsg);
+                        if (user.code == "0" && user.data.list.Count > 0)
+                        {
+                            string personid = user.data.list[0].personId;
+                            TemporaryUserEntity TemporaryUser = Tempbll.HikGetUserEntity(personid);
+                            int USERTYPE = 0;
+                            if (TemporaryUser == null)
+                            {
+                                USERTYPE = 2;
+                            }
+                            else
+                            {
+                                if (TemporaryUser.Istemporary == 0)
+                                {
+                                    USERTYPE = TemporaryUser.Istemporary;
+                                }
+                                else
+                                {
+                                    USERTYPE = 2;
+                                }
+                            }
+                            #region 根据设备ID查询平台中配置的设备信息
+
+                            HikdeviceEntity device = devicebll.GetDeviceEntity(hi.Params.Events[i].srcParentIndex);
+                            if (device != null)
+                            {
+
+                                HikinoutlogEntity Hik = new HikinoutlogEntity();
+                                Hik.AreaName = device.AreaName;
+                                if (USERTYPE == 0)
+                                {
+                                    Hik.DeptId = user.data.list[0].orgIndexCode;
+                                    string[] deptname = user.data.list[0].orgPathName.Split('/');
+                                    Hik.DeptName = deptname[deptname.Length - 1];
+                                    var dept = deptlist.FirstOrDefault(it => it.DepartmentId == Hik.DeptId);
+                                    if (dept.Nature == "承包商")
+                                        USERTYPE = 1;
+                                }
+                                else
+                                {
+                                    Hik.DeptId = user.data.list[0].orgIndexCode;
+                                    Hik.DeptName = "临时人员";
+                                }
+
+                                Hik.CreateDate = Convert.ToDateTime(hi.Params.Events[i].happenTime);
+                                Hik.CreateUserId = "System";
+                                Hik.CreateUserDeptCode = "00";
+                                Hik.CreateUserOrgCode = "00";
+                                Hik.DeviceName = device.DeviceName;
+                                Hik.DeviceType = 0;
+                                Hik.EventType = 1;
+                                Hik.ID = Guid.NewGuid().ToString();
+                                Hik.InOut = device.OutType;
+                                Hik.UserId = user.data.list[0].personId;
+                                Hik.UserName = user.data.list[0].personName;
+                                Hik.UserType = USERTYPE;
+                                Hik.ScreenShot = hi.Params.Events[i].data.ExtEventPictureURL;
+                                Hik.DeviceHikID = device.HikID;
+                                if (device.OutType == 0)
+                                    Hik.IsOut = 0;
+                                else
+                                {
+                                    Hik.IsOut = 1;
+
+                                }
+                                inoutbll.UserAisleSave(Hik, inuser);
+                            }
+                            else
+                            {
+                                WriteLog.AddLog("找不到设备\r\n" + json, "UserInOut_JNJTAccessBack");
+                            }
+                            #endregion
+                        }
+                        else
+                        {
+                            WriteLog.AddLog("海康平台找不到人\r\n" + json, "UserInOut_JNJTAccessBack");
+                        }
+                    }
+                    #endregion 
+                }
+                return new { Code = 0, Count = 1, Info = "接受数据成功", data = "" };
+            }
+            catch (Exception e)
+            {
+                WriteLog.AddLog("发生错误：" + e.Message + "\r\n" + JsonConvert.SerializeObject(e), "UserInOut_JNJTAccessBack");
+                return new { Code = -1, Count = 0, Info = e.Message, data = "" };
+            }
+        }
+
+        /// <summary>
+        /// 设备间门禁回调接口 按钮开门（出门事件）
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        public object JNJTUserOutAccess()
+        {
+            string json = "";
+            try
+            {
+
+                Stream s = System.Web.HttpContext.Current.Request.InputStream;
+                StreamReader reader = new StreamReader(s, Encoding.UTF8);
+                json = reader.ReadToEnd();
+                WriteLog.AddLog("接收数据\r\n" + json, "UserInOut_JNJTAccessOutBack");
+                HikBack hi = JsonConvert.DeserializeObject<HikBack>(json);
+                HikinoutlogEntity inuser = null;
+                if (hi.Params.Events.Count > 0)
+                {
+
+                    DataItemDetailBLL pdata = new DataItemDetailBLL();
+                    var pitem = pdata.GetItemValue("Hikappkey");//海康服务器密钥
+                    var url = pdata.GetItemValue("HikBaseUrl");//海康服务器地址
+
+                    string key = string.Empty;// "21049470";
+                    string sign = string.Empty;// "4gZkNoh3W92X6C66Rb6X";
+                    if (!string.IsNullOrEmpty(pitem))
+                    {
+                        key = pitem.Split('|')[0];
+                        sign = pitem.Split('|')[1];
+                    }
+
+
+
+                    #region 根据回调事件获取的人员卡号信息查询人员信息
+                    for (int i = 0; i < hi.Params.Events.Count; i++)
+                    {
+                        //根据此设备id找到进门记录
+                        inuser = inoutbll.DeviceGetLog(hi.Params.Events[i].srcIndex);
+                        //将最近一条进门记录状态改为出门
+                        inuser.IsOut = 1;
+                        inuser.OutTime = Convert.ToDateTime(hi.Params.Events[i].happenTime);
+
+                        HikinoutlogEntity Hik = new HikinoutlogEntity();
+                        Hik.DeviceHikID = hi.Params.Events[i].srcIndex;
+                        Hik.IsOut = 1;
+                        Hik.AreaName = inuser.AreaName;
+                        Hik.OutTime = Convert.ToDateTime(hi.Params.Events[i].happenTime);
+                        Hik.DeptId = inuser.DeptId;
+                        Hik.DeptName = inuser.DeptName;
+                        Hik.DeviceName = inuser.DeviceName;
+                        Hik.DeviceType = 2;
+                        Hik.EventType = 3;
+                        Hik.InId = inuser.ID;
+                        Hik.InOut = 1;
+                        Hik.UserId = inuser.UserId;
+                        Hik.UserName = inuser.UserName;
+                        Hik.UserType = inuser.UserType;
+
+                        inoutbll.UserAisleSave(Hik, inuser);
+
+
+                        #endregion
+
+                    }
+                }
+
+                return new { Code = 0, Count = 1, Info = "接受数据成功", data = "" };
+            }
+            catch (Exception e)
+            {
+                WriteLog.AddLog("发生错误：" + e.Message + "\r\n" + JsonConvert.SerializeObject(e), "UserInOut_JNJTAccessOutBack");
+                return new { Code = -1, Count = 0, Info = e.Message, data = "" };
+            }
+
+        }
+
+        /// <summary>
+        /// 车辆入场出厂回调
+        /// </summary>
+        /// <returns></returns>
+        public object JNJTCarInOutRelease()
+        {
+            string json = "";
+            try
+            {
+                Stream s = System.Web.HttpContext.Current.Request.InputStream;
+                StreamReader reader = new StreamReader(s, Encoding.UTF8);
+                json = reader.ReadToEnd();
+                WriteLog.AddLog("接收数据\r\n" + json, "CarIn_JNJTCarInRelease");
+                HikCarBack hi = JsonConvert.DeserializeObject<HikCarBack>(json);
+
+                foreach (var events in hi.Params.Events)
+                {
+                    string deviceCode = events.srcIndex;
+                    HikdeviceEntity device = devicebll.GetDeviceEntity(deviceCode);
+                    string CarNo = events.data.plateNo;
+                    string CarImg = CacheFactory.Cache().GetCache<string>(events.eventId);
+                    CarinfoEntity car = carbll.GetCar(CarNo);
+                    CarinlogEntity carlog = new CarinlogEntity();
+                    carlog.Address = device.AreaName;
+                    carlog.ID = Guid.NewGuid().ToString();
+                    carlog.CarNo = CarNo;
+                    carlog.CreateDate = Convert.ToDateTime(events.happenTime);
+                    carlog.CreateUserDeptCode = "00";
+                    carlog.CreateUserId = "System";
+                    carlog.CreateUserOrgCode = "00";
+                    carlog.IsOut = 0;
+                    carlog.Status = hi.Params.Events[0].data.inoutType;
+                    //是否离场默认状态跟进出场一致  如果是出厂数据是否离场默认为是
+                    carlog.IsLeave = hi.Params.Events[0].data.inoutType;
+                    if (car != null)
+                    {
+                        carlog.CID = car.ID;
+                        carlog.Type = car.Type;
+                        carlog.DriverName = car.Dirver;
+                        carlog.Phone = car.Phone;
+                        carlog.DriverID = car.CreateUserId;
+                    }
+                    carinbll.SaveForm(string.Empty, carlog);
+                }
+                return new { Code = 0, Count = 1, Info = "接受数据成功", data = "" };
+            }
+            catch (Exception e)
+            {
+                WriteLog.AddLog("发生错误：" + e.Message + "\r\n" + JsonConvert.SerializeObject(e), "CarIn_JNJTCarInRelease");
+                return new { Code = -1, Count = 0, Info = e.Message, data = "" };
+            }
+        }
+
+
+        #endregion
     }
 }
 
