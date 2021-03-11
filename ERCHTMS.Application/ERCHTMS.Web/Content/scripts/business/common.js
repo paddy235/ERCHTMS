@@ -411,6 +411,15 @@ function selectMuchUser(options) {
     var actionArgs = "";
     var controlObj = "";
     var pfrom = options.pfrom;
+    var containdept = "";
+    if (!!options.containdept)
+    {
+        containdept = options.containdept;
+    }
+    var istree = "1";
+    if (!!options.istree) {
+        istree = options.istree;
+    }
     if (!!options.controlObj) {
         controlObj = options.controlObj; //
     }
@@ -421,7 +430,7 @@ function selectMuchUser(options) {
     return dialogOpen({
         id: "User",
         title: "选择用户",
-        url: '/BaseManage/User/Select?deptId=' + deptId + "&checkMode=" + checkMode + "&mode=" + mode + "&userIds=" + options.userIds + "&rolename=" + options.rolename + "&controlObj=" + controlObj + "&clearObj=" + clearObj + "&pfrom=" + pfrom,
+        url: '/BaseManage/User/Select?deptId=' + deptId + "&checkMode=" + checkMode + "&mode=" + mode + "&userIds=" + options.userIds + "&rolename=" + options.rolename + "&controlObj=" + controlObj + "&clearObj=" + clearObj + "&pfrom=" + pfrom + "&containdept=" + containdept + "&istree=" + istree,
         width: ($(top.window).width() - 100) + "px",
         height: "600px",
         callBack: function (iframeId) {

@@ -15,10 +15,15 @@
     <script src="../js/up.js"></script>
     <script src="../scripts/utils/framework-ui.js"></script>
     <!--webUploader文件上传组件-->
-    <link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+    <!--<link href="~/content/scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
     <link href="~/content/scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
     <script type="text/javascript" src="~/content/scripts/plugins/webuploader/webuploader.min.js"></script>
-    <script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>
+    <script type="text/javascript" src="~/content/scripts/business/fileupload.js"></script>-->
+
+    <link href="../scripts/plugins/webuploader/webuploader.css" rel="stylesheet" />
+    <script src="../scripts/plugins/webuploader/webuploader.min.js"></script>
+    <link href="../scripts/plugins/webuploader/webuploader-demo.css" rel="stylesheet" />
+    <script src="../scripts/business/fileupload.js"></script>
     <!--<script src="~/Content/scripts/plugins/uploadify/ajaxfileupload.js"></script>-->
     <script src="../scripts/plugins/uploadify/ajaxfileupload.js"></script>
     <script src="~/Content/scripts/plugins/dialog/mobile/layer.js"></script>
@@ -685,6 +690,26 @@
         .aui-form-input .tips_false {
             color: #F45858;
         }
+
+        .webuploader-pick {
+            background: none;
+        }
+
+        .imgDelete {
+            float: right;
+            margin-right: 40%;
+            color: blue;
+        }
+
+        .tbimgclass {
+            margin-left: 40px;
+        }
+
+            .tbimgclass img {
+                margin-left: 40px;
+                width: 70px;
+                height: 70px;
+            }
     </style>
 
     <script>
@@ -701,9 +726,11 @@
             if (!doc.addEventListener) return;
             win.addEventListener(resizeEvt, recalc, false);
             doc.addEventListener('DOMContentLoaded', recalc, false);
+
         })(document, window);
         var contentPath = "";
         var BaseId = "";
+        var uploader = [];
         function getrequest(name) {
             var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)");
             var r = window.location.search.substr(1).match(reg);
@@ -749,7 +776,6 @@
 
         $(function () {
             InitUpload();
-
             var res = "";
             for (var i = 0; i < 12; i++) {
                 res += "<option>" + i + "</option>";
@@ -775,6 +801,7 @@
                 dataType: "text",
                 success: function (result) {
                     contentPath = result;
+                    filePicker();
                 }
             });
 
@@ -831,7 +858,7 @@
                     dialogMsgapp("拜访对象手机号不能为空！");
                     return false;
                 }
-        
+
                 if ($("#DrivingLicenseUrl").val() == "") {
                     dialogMsgapp('请上传身份证照片！');
                     return false;
@@ -858,17 +885,46 @@
 
                 //随行人员
                 var num = $("#TogetherUserNumber").val();
-                UserList.push({ ID: "-1", UserName: $("#AccompanyingPerson").val(), UserImg: $("#DriverLicenseUrl").val(), OrderNum: 0 });//申请人信息
-                for (var i = 1; i < parseInt(Number(num) + 1) ; i++) {
+                //防疫行程卡（健康码 / 核酸检测证明）路径数组
+                var FileItems1 = [];
+                var imgList = document.getElementById('tblImg');
+                var divNode = imgList.getElementsByTagName('img');
+                var itemsCount = divNode.length;
+                if (itemsCount == 0) {
+                    dialogMsgapp("请上传防疫行程卡（健康码 / 核酸检测证明）！");
+                    return false;
+                } else {
+                    for (var j = 0; j < itemsCount; j++) {
+                        var jdsrc = divNode[j].src;
+                        var xdsrc = jdsrc.substring(jdsrc.indexOf("/Resource"));
+                        FileItems1.push({ ID: "-1", ImgPath: xdsrc });
+                    }
+                }
+                UserList.push({ ID: "-1", UserName: $("#AccompanyingPerson").val(), UserImg: $("#DriverLicenseUrl").val(), OrderNum: 0, FileItems: FileItems1 });//申请人信息
+                for (var i = 1; i < parseInt(Number(num) + 1); i++) {
                     if ($("#AccompanyingPerson" + Number(i + 1) + "").val() == "") {
                         dialogMsgapp('随行人员姓名不能为空！');
                         return false;
                     }
                     else {
-                        UserList.push({ ID: "-1", UserName: $("#AccompanyingPerson" + Number(i + 1) + "").val(), UserImg: $("#DriverLicenseUrl" + Number(i + 1) + "").val(), OrderNum: i });//随行人员
+                        //防疫行程卡（健康码 / 核酸检测证明）路径数组
+                        var FileItems2 = [];
+                        var imgList = document.getElementById('tblImg' + Number(i + 1));
+                        var divNode = imgList.getElementsByTagName('img');
+                        var itemsCount = divNode.length;
+                        if (itemsCount == 0) {
+                            dialogMsgapp("请上传防疫行程卡（健康码 / 核酸检测证明）！");
+                            return false;
+                        } else {
+                            for (var z = 0; z < itemsCount; z++) {
+                                var jdsrc = divNode[z].src;
+                                var xdsrc = jdsrc.substring(jdsrc.indexOf("/Resource"));
+                                FileItems2.push({ ID: "-1", ImgPath: xdsrc });
+                            }
+                        }
+                        UserList.push({ ID: "-1", UserName: $("#AccompanyingPerson" + Number(i + 1) + "").val(), UserImg: $("#DriverLicenseUrl" + Number(i + 1) + "").val(), OrderNum: i, FileItems: FileItems2 });//随行人员
                     }
                 }
-
                 AcceptClick();
                 $('#carEditDialog').hide();
                 $('#submitDialog').show();
@@ -938,7 +994,7 @@
             $.post(url, {
                 keyValue: BaseId, Dirver: $("#Dirver").val(), Identitynum: $("#Identitynum").val(), CarNo: $("#CarNo").val(), VisitUser: $("#VisitUser").val(), VisitUserPhone: $("#VisitUserPhone").val(),
                 Phone: $("#Phone").val(), AccompanyingNumber: $("#TogetherUserNumber").val(), AccompanyingPerson: $("#AccompanyingPerson").val(), VisitDept: $("#VisitDept").val(),
-                DrivingLicenseUrl: $("#DrivingLicenseUrl").val(),ApplyDate:$("#ApplyDate").val(), userjson: UserList
+                DrivingLicenseUrl: $("#DrivingLicenseUrl").val(), ApplyDate: $("#ApplyDate").val(), userjson: UserList
             }, function () {
                 BinInitControl(BaseId);
             });
@@ -963,6 +1019,15 @@
                 var html = "";
                 for (var i = 0; i < ulist.length; i++) {
                     html += "<div style='margin-left: 128px;' class=\"car_form_item msg_con\><label for=\"userName\">随行人员" + Number(i + 1) + ":</label><p id=\"RVisitUserPhone\">" + ulist[i].username + "</p></div>";
+                    html += "<label>防疫行程卡（健康码/核酸检测证明）:</label><br/>";
+                    html += "<div>";
+                    if (ulist[i].strimgpath != null && ulist[i].strimgpath != "") {
+                        var StrImgPathArry = ulist[i].strimgpath.split(',');
+                        for (var j = 0; j < StrImgPathArry.length; j++) {
+                            html += "<img style='width: 70px;height:70px;margin-left: 50px;' src=" + contentPath + StrImgPathArry[j] +">";
+                        }
+                    }
+                    html += "</div>";
                     html += "<div class=\"car_form_item msg_con\"> <label>人脸录入:</label>";
                     html += " <ul class=\"imgbox clearfix\"><li> <img id=\"RDrivingLicenseUrl\" src=" + contentPath + ulist[i].userimg + " alt=\"\"></li>  </ul> </div>";
                 }
@@ -986,8 +1051,25 @@
                 var list = eval("(" + data + ")");
                 var html = "";
                 for (var i = 0; i < list.length; i++) {
-                    html += "<li class='record_item clearfix' onclick=\"TzDetail('" + list[i].ID + "')\"><div class='record_left fl'> <h3>提交的人员出入申报</h3> <p>申请人姓名: <span class='record_i'>" + list[i].Dirver + "</span></p> <p>出入类型: <span class='record_i'>拜访</span></p></div>";
-                    html += "<div class='record_right'><p>" + list[i].CreateDate + "</p><p></p> </div> </li>";
+                    if (list[i].AppStatue == 0 && list[i].State != 88) {//判断是否显示撤销按钮
+                        html += "<li class='record_item clearfix' onclick=\"TzDetail('" + list[i].ID + "')\"><div class='record_left fl'> <h3>提交的人员出入申报</h3><button style=\"background-color: #30b0f9;color: white; width: 55px; margin-left: 40%; margin-top: -44px;\" onclick=\"CancelVisit('" + list[i].ID + "')\" type = \"button\"> 撤销</button> <p>申请人姓名: <span class='record_i'>" + list[i].Dirver + "</span></p> <p>出入类型: <span class='record_i'>拜访</span></p></div>";
+                    } else {
+                        html += "<li class='record_item clearfix' onclick=\"TzDetail('" + list[i].ID + "')\"><div class='record_left fl'> <h3>提交的人员出入申报</h3> <p>申请人姓名: <span class='record_i'>" + list[i].Dirver + "</span></p> <p>出入类型: <span class='record_i'>拜访</span></p></div>";
+                    }
+                    var stausName = "";
+                    if (list[i].State == 88) {
+                        stausName = "已撤销";
+                    } else {
+                        if (list[i].AppStatue == 0) {
+                            stausName = "【被拜访人】审核中";
+                        } else if (list[i].AppStatue == 1) {
+                            stausName = "准许入厂";
+                        } else if (list[i].AppStatue == 99) {
+                            stausName = "拒绝入厂";
+                        }
+                    }
+                    html += "<div class='record_right'><p>" + list[i].CreateDate + "</p></br>  ";
+                    html += "<p>申报结果: <span class='record_i'>" + stausName + "</span></p><p></p></div></li>";
                 }
                 $("#ShenPiHiml").html(html);
             });
@@ -1002,6 +1084,7 @@
                 Upload2($(this));
             });
         }
+
 
         //申请人身份证号码上传
         function Upload2(self) {
@@ -1071,9 +1154,11 @@
         function f_Usercheck(obj) {
             var num = $("#TogetherUserNumber").val();
             var html = "";
-            for (var i = 1; i < Number(num) + 1 ; i++) {
+            for (var i = 1; i < Number(num) + 1; i++) {
                 html += "<div class=\"car_form_item\"> <label for=\"AccompanyingPerson\">随行人员" + Number(i + 1) + ":<em>*</em></label>";
                 html += " <input class=\"AccompanyingPerson_inp\" type=\"text\" id=\"AccompanyingPerson" + Number(i + 1) + "\" maxlength=\"50\" placeholder=\"\"></div>";
+                html += " <div class=\"car_form_item aui-form-group clear\"><label class=\"aui-label-control\">防疫行程卡（健康码 / 核酸检测证明）: <em>*</em></label ><button  style=\"width: 70px; height: 70px; background: url(../images/upload2.png) no-repeat; background-size: 100% 100%;\" id=\"filePicker" + Number(i + 1) + "\"></button></div >";
+                html += "<table class=\"tbimgclass\"  id=\"tblImg" + Number(i + 1) + "\" ><tr></tr><tr></tr><tr><td> </td></tr></table>";
                 html += "\<div class=\"car_form_item aui-form-group clear\"><label class=\"aui-label-control\"> 人脸录入: <em></em> </label>";
                 html += " <div class=\"aui-form-input\"> <div class=\"aui-content-img-box aui-content-full\"> <div class=\"aui-photo aui-up-img clear\">";
                 html += " <div class=\"file\" title=\"点击上传照片\"><img id=\"uploadPreview" + Number(i + 1) + "\" style=\"width: 115px; height: 115px;\" src=\"../images/App.png\" />";
@@ -1082,9 +1167,11 @@
             }
             $("#UserImgUpload").html(html);
 
-            for (var i = 0; i < Number(num) + 1 ; i++) {
+            for (var i = 0; i < Number(num) + 1; i++) {
                 InitUpload1(Number(i + 1));
+                filePicker("#filePicker" + Number(i + 1), "#tblImg" + Number(i + 1), Number(i + 1));
             }
+
         }
 
         //随行人员上传图片
@@ -1143,7 +1230,120 @@
             });
         }
 
+        //防疫行程卡（健康码/核酸检测证明）图片上传
+        function filePicker(fileId, tblImgId, num) {
+            if (!fileId) {
+                fileId = "#filePicker";
+            }
+            if (!tblImgId) {
+                tblImgId = "#tblImg";
+            }
+            if (!num) {
+                num = "0"
+            }
+            var $list = $(tblImgId + " tr:eq(0)");
+            uploader[num] = WebUploader.create({
+                // 选完文件后，是否自动上传。
+                auto: true,
+                // swf文件路径
+                swf: '../scripts/plugins/webuploader/Uploader.swf',
+                // 文件接收服务端。
+                server: contentPath + "/Utility/UploadUserFile?type=Driver",
+                fileNumLimit: 3,//文件数量限制
+                fileSingleSizeLimit: 1024 * 1024 * 10,  //文件大小限制
+                // 选择文件的按钮。可选。
+                // 内部根据当前运行是创建，可能是input元素，也可能是flash.
+                duplicate: true,
+                pick: {
+                    id: fileId,
+                    multiple: false,
+                    fileNumLimit: 1
+                },
+                // 只允许选择图片文件。
+                accept: {
+                    title: 'Images',
+                    extensions: 'gif,jpg,jpeg,bmp,png',
+                    mimeTypes: 'image/*'
+                }
+            });
+            uploader[num].on('uploadSuccess', function (file, response) {
 
+                if (response.message == "-1") {
+                    dialogMsgapp(response.resultdata, 1);
+                }
+                else {
+                    if ($(tblImgId + " tr:eq(0) td").length >= 5) $list = $(tblImgId + " tr:eq(1)");
+                    else $list = $(tblImgId + " tr:eq(0)");
+                    var $li = $(
+                        '<td width="100" style="text-align:center;"><a href= #><img></a><a id="' + file.id + '" onclick="deleteImg(this,' + num + ')" class="imgDelete">删除</a></td>'
+                    )
+                    $img = $li.find('img');
+                    // $list为容器jQuery实例
+                    $list.append($li);
+                    // 创建缩略图
+                    // 如果为非图片文件，可以不用调用此方法。
+                    // thumbnailWidth x thumbnailHeight 为 100 x 100
+                    uploader[num].makeThumb(file, function (error, src) {
+                        if (error) {
+                            $img.replaceWith('<span>不能预览</span>');
+                            return;
+                        }
+                        $img.attr('src', contentPath + response.resultdata);
+                    }, 100, 100);
+                    //dialogMsgapp(data.message, 1);
+                }
+            });
+            //uploader.on('uploadFinished', function (file) {
+            //    btnCancel(true);
+            //});
+            uploader[num].on('error', function (e) {
+                console.log(1234)
+                console.log(e);
+                //超出文件数量
+                if (e == "Q_EXCEED_NUM_LIMIT") {
+                    alert("最多可上传3张图片！");
+                    return;
+                }
+                //超出文件大小
+                if (e == "F_EXCEED_SIZE") {
+                    alert("文件过大，请上传小于10M的文件！");
+                    return;
+                }
+            });
+            // 当有文件添加进来的时候
+            uploader[num].on('fileQueued', function (file) {
+                console.log(12345)
+            });
+        }
+        function deleteImg(e, num) {
+            console.log(num)
+            var $a = $(e);
+            var id = $a.attr("id");
+            $a.parent().remove();
+            var files = uploader[num].getFiles();
+            console.log(files)
+            for (var i = 0; i < files.length; i++) {
+                if (files[i].id = id) {
+                    uploader[num].removeFile(files[i]);
+                    $a.parent().remove();
+                }
+            }
+        }
+
+        //撤销拜访
+        function CancelVisit(id) {
+            var url = "../../Utility/CancelVisit";
+            $.post(url, { keyvalue: id, type: 3 }, function (data) {
+                var result = JSON.parse(data);
+                if (result.errorcode == 0) {
+                    dialogMsgapp("撤销成功");
+                    return true;
+                } else {
+                    dialogMsgapp("撤销失败");
+                    return false;
+                }
+            });
+        }
     </script>
 
 </head>
@@ -1222,6 +1422,28 @@
                         <input class="AccompanyingPerson_inp" type="text" id="AccompanyingPerson" maxlength="50" placeholder="">
                     </div>
 
+                    <div class="car_form_item aui-form-group clear">
+                        <label class="aui-label-control">
+                            防疫行程卡（健康码/核酸检测证明）: <em>*</em>
+                        </label>
+                        <button id="filePicker" style="width: 70px;height: 70px;background: url(../images/upload2.png) no-repeat;background-size: 100% 100%;"></button>
+                    </div>
+                    <table class="tbimgclass" id="tblImg">
+                        <tr></tr>
+                        <tr></tr>
+                        <tr>
+                            <td></td>
+                        </tr>
+                    </table>
+
+                    <!--<div class="imgsBox" style="width: 100%;">
+
+                        <div class="img-item file" style="width: 33%;height: 60px;padding: 0 15px;margin-bottom: 10px;float:left;box-sizing:border-box;">
+                            <img id="uploadPreview3" style="height: 100%;margin: 0 auto;display: block;" src="../images/upload2.png" alt="Alternate Text" />
+                            <input type="file" name="uploadFile" id="uploadFile3" style="width: 115px; height: 115px;">
+                            <input type="hidden" id="DriverLicenseUrl" />
+                        </div>
+                    </div>-->
                     <div class="car_form_item aui-form-group clear">
                         <label class="aui-label-control">
                             人脸录入: <!--<em>*</em>-->
@@ -1324,8 +1546,7 @@
                 <span class="goBack goBack2"></span>
                 <h3 class="header_tit">人员出入申报记录</h3>
             </div>
-            <ul id="ShenPiHiml" class="record_content">
-            </ul>
+            <ul id="ShenPiHiml" class="record_content"></ul>
         </div>
 
     </div>
@@ -1333,7 +1554,7 @@
     <div class="aui-mask-content">
         <i class="aui-ico"></i>
         <p class="aui-delete-text">确定要删除你上传的资料？</p>
-     </div>
+    </div>
     <!-- mask end -->
 </body>
 </html>

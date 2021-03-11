@@ -54,26 +54,30 @@ namespace ERCHTMS.Service.CarManage
             //            select ID,Createdate,carno,CONCAT(CONCAT(CONCAT('Î£»¯Æ·-',thecompany),'-'),hazardousname) as purpose,dirver
             //            ,phone,note,accompanyingnumber anumber,driverlicenseurl,drivinglicenseurl,state,'2' type from bis_hazardouscar where state>0 and state<4
             //            ) a1 order by Createdate desc");
-
-            string sql = string.Format(@"  select * from (
+            
+            string sql = string.Format(@"  select a1.*, F.StrImgPath from (
              select ID,Createdate,carno,CONCAT('°İ·Ã-',visitdept) as purpose,dirver,accompanyingperson as CyName
-            ,phone,VisitUser as note,accompanyingnumber anumber,VisitUserPhone as driverlicenseurl,drivinglicenseurl,state,appstatue,3 type from BIS_USERCAR where state>0 and state<4
+            ,phone,VisitUser as note,accompanyingnumber anumber,VisitUserPhone ,(select userimg from bis_usercarfileimg b where BIS_USERCAR.id=b.baseid and rownum=1 ) as driverlicenseurl,drivinglicenseurl,state,appstatue,3 type from BIS_USERCAR where state>0 and state<4
              union
             
             select ID,Createdate,carno,CONCAT(CONCAT(CONCAT('°İ·Ã-',visitdept),'-'),visituser) as purpose,dirver,MODIFYUSERID as CyName
-            ,phone,note,accompanyingnumber anumber,driverlicenseurl,drivinglicenseurl,state,appstatue, 0 type from bis_visitcar where state>0 and state<4
+            ,phone,note,accompanyingnumber anumber,null as VisitUserPhone ,driverlicenseurl,drivinglicenseurl,state,appstatue, 0 type from bis_visitcar where state>0 and state<4
 
             union 
 
             select ID,Createdate,platenumber carno,CONCAT(CONCAT(CONCAT(CONCAT(dress,'-'),transporttype),'-'),PRODUCTTYPE) as purpose,DriverName dirver,MODIFYUSERID as CyName
-            ,DriverTel phone,Supplyname note,0 anumber,JsImgpath driverlicenseurl,XsImgpath drivinglicenseurl,examinestatus state,1 appstatue,1 type 
+            ,DriverTel phone,Supplyname note,0 anumber,null as VisitUserPhone ,JsImgpath driverlicenseurl,XsImgpath drivinglicenseurl,examinestatus state,1 appstatue,1 type 
             from WL_OPERTICKETMANAGER where isdelete=1 and examinestatus<4 and examinestatus>0
 
             union 
             
             select ID,Createdate,carno,CONCAT(CONCAT(CONCAT('Î£»¯Æ·-',thecompany),'-'),hazardousname) as purpose,dirver,MODIFYUSERID as CyName
-            ,phone,note,accompanyingnumber anumber,driverlicenseurl,drivinglicenseurl,state,1 appstatue,2 type from bis_hazardouscar where state>0 and state<4
-            ) a1 order by Createdate desc");
+            ,phone,note,accompanyingnumber anumber,null as VisitUserPhone ,driverlicenseurl,drivinglicenseurl,state,1 appstatue,2 type from bis_hazardouscar where state>0 and state<4
+            ) a1 
+
+						left JOIN (		SELECT WM_CONCAT(TO_CHAR(IMGPATH)) StrImgPath ,BASEID FROM BIS_USERCARFILE_MULTIPLE  
+						GROUP BY BASEID) f on a1.ID=f.BASEID
+order by Createdate desc");
 
             return BaseRepository().FindTable(sql);
         }
@@ -396,6 +400,7 @@ namespace ERCHTMS.Service.CarManage
             try
             {
                 List<CarUserFileImgEntity> list = new List<CarUserFileImgEntity>();
+                List<UserCarFileMultipleEntity> FileItems = new List<UserCarFileMultipleEntity>();
                 for (int i = 0; i < userjson.Count; i++)
                 {
                     CarUserFileImgEntity uentity = new CarUserFileImgEntity();
@@ -411,10 +416,23 @@ namespace ERCHTMS.Service.CarManage
                         uentity.OrderNum = i;
                         entity.AccompanyingPerson = entity.AccompanyingPerson + userjson[i].Username + ",";
                         list.Add(uentity);
+                        if (userjson[i].FileItems != null && userjson[i].FileItems.Count > 0)
+                        {
+                            for (int j = 0; j < userjson[i].FileItems.Count; j++)
+                            {
+                                userjson[i].FileItems[j].Create();
+                                userjson[i].FileItems[j].ID = Guid.NewGuid().ToString();
+                                userjson[i].FileItems[j].BaseId = entity.ID;
+                                userjson[i].FileItems[j].UserCarFileId = uentity.ID;
+                                userjson[i].FileItems[j].CreateDate = DateTime.Now;
+                            }
+                            FileItems.AddRange(userjson[i].FileItems);
+                        }
                     }
                 }
                 entity.AccompanyingNumber = userjson.Count;
                 entity.AccompanyingPerson = entity.AccompanyingPerson.TrimEnd(',');
+                res.Insert<UserCarFileMultipleEntity>(FileItems);
                 res.Insert<CarUserFileImgEntity>(list);
                 res.Insert(entity);
                 res.Commit();

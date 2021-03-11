@@ -92,7 +92,7 @@ namespace ERCHTMS.Service.CarManage
             if (!queryParam["EndTime"].IsEmpty())
             {
                 string EndTime = queryParam["EndTime"].ToString();
-                pagination.conditionJson += string.Format(" and CREATEDATE<=TO_DATE('{0}','yyyy-MM-dd hh24:mi:ss')>", EndTime);
+                pagination.conditionJson += string.Format(" and CREATEDATE<=TO_DATE('{0}','yyyy-MM-dd hh24:mi:ss')", EndTime);
             }
             //用户类型
             if (!queryParam["UserType"].IsEmpty())
@@ -364,9 +364,14 @@ namespace ERCHTMS.Service.CarManage
         /// <returns></returns>
         public DataTable GetAttendanceWarningPageList(Pagination pagination, string queryJson)
         {
-            StringBuilder sb = new StringBuilder(@"SELECT  v.FULLNAME,v.DEPARTMENTID,v.DEPARTMENTCODE, v.REALNAME,v.DUTYID,v.DUTYNAME,
-                                                                        v.REMARK ,v.DEPTTYPE,v.dkremark,v.DEPTSORT , v.SORTCODE,1 as personcount FROM V_ATTENDANCEWARNING v
-                                                                        WHERE v.DEPARTMENTID not in ('0') ");
+            StringBuilder sb = new StringBuilder(@"select v.FULLNAME,v.DEPARTMENTID,v.DEPARTMENTCODE, v.REALNAME,v.DUTYID,v.DUTYNAME,
+                                                                        v.REMARK ,v.DEPTTYPE,v.dkremark,v.DEPTSORT , v.SORTCODE,1 as personcount from ( SELECT  u.USERID,
+case when u.nature = '班组' then u.parentname else u.DEPTNAME end as FULLNAME,u.DEPARTMENTID,u.DEPARTMENTCODE, u.REALNAME,u.DUTYID,u.DUTYNAME,u.DEPTTYPE
+,listagg( bh.CREATEDATE, ',') WITHIN GROUP(ORDER BY bh.CREATEDATE,u.USERID ) as REMARK,u.ORGANIZECODE,u.NICKNAME,u.DEPTCODE,u.ENCODE,'' dkremark,u.ROLENAME,u.DEPTNAME,u.DEPTSORT,u.SORTCODE,u.PARENTNAME,case when (length(u.deptcode)>20) then (select d.SORTCODE from base_department d where d.deptcode = substr(u.deptcode,1,20)) else u.DEPTSORT end as DEPTSORTss
+FROM
+ V_USERINFO u
+LEFT JOIN  (SELECT DISTINCT  TO_CHAR(CREATEDATE, 'yyyy-MM-dd')  as CREATEDATE ,USERID  FROM  BIS_HIKINOUTLOG) bh on  bh.USERID = u.USERID
+WHERE   u.DEPARTMENTID not in ('0') ");
             var param = new List<DbParameter>();
 
             var curuser = OperatorProvider.Provider.Current();
@@ -375,6 +380,15 @@ namespace ERCHTMS.Service.CarManage
 
             var queryParam = queryJson.ToJObject();
 
+            DateTime DKStartTime = Convert.ToDateTime(queryParam["StartTime"].ToString());//开始日期
+            DateTime DKEndTime = Convert.ToDateTime(queryParam["EndTime"].ToString());//结束日期
+            sb.AppendFormat(@" AND  bh.CREATEDATE >= @DKStartTime and 
+bh.CREATEDATE <= @DKEndTime  
+GROUP BY u.USERID,u.nature,u.DEPARTMENTID,u.DEPARTMENTCODE, u.REALNAME,u.DUTYID,u.DUTYNAME,u.DEPTTYPE,
+u.ORGANIZECODE,u.NICKNAME,u.DEPTCODE,u.ENCODE,u.ROLENAME,u.DEPTNAME,u.DEPTSORT,u.SORTCODE,u.PARENTNAME) v where 1=1 ");
+
+            param.Add(DbParameters.CreateDbParameter("@DKStartTime", queryParam["StartTime"].ToString()));
+            param.Add(DbParameters.CreateDbParameter("@DKEndTime", queryParam["EndTime"].ToString()));
             //姓名
             if (!queryParam["RealName"].IsEmpty())
             {
@@ -519,8 +533,6 @@ namespace ERCHTMS.Service.CarManage
             }
             //pagination.sord = "desc";
             //pagination.sidx = "v.DEPTSORT asc, v.SORTCODE asc ,v.USERID";
-            DateTime DKStartTime = Convert.ToDateTime(queryParam["StartTime"].ToString());//开始日期
-            DateTime DKEndTime = Convert.ToDateTime(queryParam["EndTime"].ToString());//结束日期
             int DayCount = Convert.ToInt32(queryParam["DayCount"]);//要查询的连续未打卡天数
 
 
@@ -530,6 +542,7 @@ namespace ERCHTMS.Service.CarManage
             pagination.page = 1;
             pagination.rows = 1000000000;
 
+            
             DataTable result = this.BaseRepository().FindTable(sb.ToString(), param.ToArray(), pagination);
             //DataTable result = this.BaseRepository().FindTableByProcPager(pagination, dataType);
 
@@ -1306,7 +1319,6 @@ namespace ERCHTMS.Service.CarManage
                     }
                     else
                     {
-                        
                         pagination.p_fields += string.Format(@",(select COUNT(a.USERID) as num from (select DISTINCT userid,inout,devicename,CREATEDATE from bis_hikinoutlog) a left join V_USERINFO b on a.USERID = b.USERID where b.DEPTNAME is not null and a.INOUT = 0 and 
                             a.CREATEDATE >= to_date('{0}','yyyy-MM-dd hh24:mi:ss') and a.CREATEDATE <= to_date('{1}','yyyy-MM-dd hh24:mi:ss') and (case when b.depttype is null then '内部' else b.depttype end) != '内部' 
                             and (case when (b.ISEPIBOLY = '否' and b.DEPTTYPE is null and length(b.deptcode)>20) then (select fullname from base_department d where d.deptcode = substr(b.deptcode,1,20)) else b.DEPTNAME end) = '{2}' {3}) as allintnum,
@@ -1393,6 +1405,7 @@ namespace ERCHTMS.Service.CarManage
 
         /// <summary>
         /// 根据用户ID获取部门名称
+        /// 0-+ ct69
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
@@ -1474,14 +1487,31 @@ namespace ERCHTMS.Service.CarManage
             var queryParam = queryJson.ToJObject();
             if (!queryParam["StartTime"].IsEmpty())
             {
-                string sTime = queryParam["StartTime"].ToString();
-                pagination.conditionJson += string.Format(@" and CREATEDATE >= to_date('{0}','yyyy-MM-dd hh24:mi:ss')", sTime);
+                string sttime = queryParam["StartTime"].ToString();
+                pagination.conditionJson += string.Format(" and TO_CHAR(CREATEDATE,'yyyy-MM-dd HH:mm:ss') >= '{0}'  ", sttime);
             }
             if (!queryParam["EndTime"].IsEmpty())
             {
                 string eTime = queryParam["EndTime"].ToString();
-                pagination.conditionJson += string.Format(@" and CREATEDATE <= to_date('{0}','yyyy-MM-dd hh24:mi:ss')", eTime);
+                //pagination.conditionJson += string.Format(@" and CREATEDATE <= to_date('{0}','yyyy-MM-dd hh24:mi:ss')", eTime);
+                pagination.conditionJson += string.Format(" and TO_CHAR(CREATEDATE,'yyyy-MM-dd HH:mm:ss') <= '{0}'  ", eTime);
             }
+
+            //安全帽预警
+            if (!queryParam["sttime"].IsEmpty())
+            {
+                string sttime = queryParam["sttime"].ToString() + " 00:00:00";
+                pagination.conditionJson += string.Format(" and TO_CHAR(CREATEDATE,'yyyy-MM-dd HH:mm:ss') >= '{0}'  ", sttime);
+            }
+            if (!queryParam["endtime"].IsEmpty())
+            {
+                string endtime = queryParam["endtime"].ToString() + "23:59:59";
+                pagination.conditionJson += string.Format(" and TO_CHAR(CREATEDATE,'yyyy-MM-dd HH:mm:ss') <= '{0}' ", endtime);
+            }
+
+
+
+
             if (!queryParam["txt_Keyword"].IsEmpty())
             {
                 string type = queryParam["type"].ToString();

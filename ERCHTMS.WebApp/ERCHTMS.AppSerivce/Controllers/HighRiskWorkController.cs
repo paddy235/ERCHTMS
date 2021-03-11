@@ -4614,6 +4614,71 @@ namespace ERCHTMS.AppSerivce.Controllers
         }
         #endregion
 
+        #region 获取今天还在处理中的高风险作业（包含审核中、审核通过的数据）
+        [HttpPost]
+        public object GetTodayWorkingData(string orgcode)
+        {
+            try
+            {
+                //string res = json.Value<string>("json");
+                //dynamic dy = JsonConvert.DeserializeObject<ExpandoObject>(res);
+                //string orgcode = dy.orgcode;
+                List<DutyDeptWork> tempData = new List<DutyDeptWork>();
+                var totalProNum = 0;
+                var totalPersonNum = 0;
+                string sql = string.Format(@"select t.id,b.itemname as risktypename,t.risktype as risktypevalue,t.workdeptname,t.workplace,t.workcontent,t.worktypename,t.WorkUserNames,t.WorkDutyUserName,t.WorkTutelageUserName,t.auditusername,t.workdepttype,t.statusname
+                                      from V_DOINGHIGHWORK t
+                                      left join base_dataitemdetail b
+                                        on t.risktype = b.itemvalue
+                                       and b.itemid =
+                                           (select itemid from base_dataitem where itemcode = 'CommonRiskType')
+                                     where t.createuserorgcode='{0}' order by risktype asc", orgcode);
+
+                DutyDeptWork itemData = new DutyDeptWork();
+                List<TodayWorkEntity> ProList = new List<TodayWorkEntity>();
+                DataTable dt = highriskcommonapplybll.GetTable(sql);
+                itemData.WorkNum = dt.Rows.Count;
+                foreach (DataRow item in dt.Rows)
+                {
+                    TodayWorkEntity pro = new TodayWorkEntity();
+                    pro.WorkDept = item["workdeptname"].ToString();
+                    pro.WorkType = item["worktypename"].ToString();
+                    pro.RiskType = item["risktypename"].ToString();
+                    pro.RiskTypeValue = item["risktypevalue"].ToString();
+                    pro.WorkTutelagePerson = item["worktutelageusername"].ToString();
+                    pro.AuditUserName = item["auditusername"].ToString();
+                    pro.WorkContent = item["workcontent"].ToString();
+                    pro.WorkPlace = item["workplace"].ToString();
+                    pro.WorkDeptType = item["workdepttype"].ToString();
+                    pro.StatusName = item["statusname"].ToString();
+                    pro.id = item["id"].ToString();
+                    ProList.Add(pro);
+                    itemData.WorkPersonNum += string.IsNullOrEmpty(item["WorkUserNames"].ToString()) ? 0 : item["WorkUserNames"].ToString().Split(',').Length;
+                    itemData.WorkPersonNum += string.IsNullOrEmpty(item["WorkDutyUserName"].ToString()) ? 0 : 1;
+                    itemData.WorkPersonNum += string.IsNullOrEmpty(item["WorkTutelageUserName"].ToString()) ? 0 : 1;
+                }
+                itemData.TodayWorkList = ProList;
+                totalProNum += itemData.WorkNum;
+                totalPersonNum += itemData.WorkPersonNum;
+                tempData.Add(itemData);
+
+                var jsonData = new
+                {
+                    tempData = tempData,
+                    totalProNum = totalProNum,
+                    totalPersonNum = totalPersonNum
+                };
+                return new { code = 0, count = tempData.Count, info = "获取数据成功", data = jsonData };
+            }
+            catch (Exception ex)
+            {
+
+                return new { code = -1, count = 0, info = "获取数据失败：" + ex.Message, data = new object() };
+            }
+
+        }
+        #endregion
+
         #region 审核审批转交
         [HttpPost]
         public object SaveTransferRecord([FromBody]JObject json)
@@ -4701,6 +4766,7 @@ namespace ERCHTMS.AppSerivce.Controllers
         public string WorkContent; //作业内容
         public string AuditUserName; //审批人
         public string WorkDeptType; //作业单位类型
+        public string StatusName; //作业状态
     }
     #endregion
 }

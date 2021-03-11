@@ -152,6 +152,11 @@ namespace ERCHTMS.Entity.SystemManage
         /// </summary>
         [Column("INDEXURL")]
         public string IndexUrl { get; set; }
+        /// <summary>
+        /// 视频等级
+        /// </summary>
+        [Column("VEDIOLEVEL")]
+        public string VedioLevel { get; set; }
 
 
         #endregion

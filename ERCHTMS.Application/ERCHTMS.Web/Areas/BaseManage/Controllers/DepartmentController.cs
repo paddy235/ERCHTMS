@@ -176,7 +176,7 @@ namespace ERCHTMS.Web.Areas.BaseManage.Controllers
                 {
                     var parameter = new List<DbParameter>() { DbParameters.CreateDbParameter("@deptname", deptname) }.ToArray();
 
-                    dtDept = departmentBLL.GetDataTableByParams(@"select a.departmentid ,a.encode  deptcode  ,a.fullname deptname ,b.fullname parentname from BASE_DEPARTMENT a left join base_department b on a.parentid = b.departmentid where a.fullname like  '%'|| @deptname ||'%' ", parameter);
+                    dtDept = departmentBLL.GetDataTableByParams(@"select a.departmentid ,a.encode  deptcode  ,a.fullname deptname ,(case when a.Nature ='承包商' then to_char(a.DeptType) ||'外包单位'  else  b.fullname end)  parentname from BASE_DEPARTMENT a left join base_department b on a.parentid = b.departmentid where a.fullname like  '%'|| @deptname ||'%' ", parameter);
                 }
                 return Content(dtDept.ToJson());
             }
@@ -3396,6 +3396,48 @@ namespace ERCHTMS.Web.Areas.BaseManage.Controllers
                         if (data.Count() > 0)
                         {
                             parentId = data.FirstOrDefault().ParentId;
+                        }
+                        break;
+                    case 28://获取当前用户所在单位下的所有子部门
+                        if (!string.IsNullOrEmpty(Ids))
+                        {
+                            data = new List<DepartmentEntity>() {
+                                departmentBLL.GetEntity(Ids)
+                             };
+                            parentId = Ids;
+                        }
+                        else
+                        {
+                            if (user.RoleName.Contains("承包商"))
+                            {
+                                data = departmentBLL.GetList().Where(t => t.EnCode.StartsWith(user.OrganizeCode) && (t.Description == "外包工程承包商" || t.Nature == "承包商" || t.Nature == "分包商"));
+                                if (data.Count() > 0)
+                                {
+                                    parentId = user.OrganizeId;
+                                }
+                            }
+                            else
+                            {
+                                data = departmentBLL.GetList().Where(t => t.EnCode.StartsWith(user.OrganizeCode) && t.Description != "外包工程承包商" && t.Nature != "承包商" && t.Nature != "分包商");
+                                if (data.Count() > 0)
+                                {
+                                    parentId = user.OrganizeId;
+                                }
+                            }
+                        }
+                        break;
+                    case 29://获取当前登录人所在电厂下所有的承包商
+                        data = departmentBLL.GetList().Where(t => t.EnCode.StartsWith(user.OrganizeCode) && (t.Description == "外包工程承包商" || t.Nature == "承包商" || t.Nature == "分包商"));
+                        if (data.Count() > 0)
+                        {
+                            parentId = user.OrganizeId;
+                        }
+                        if (!string.IsNullOrEmpty(Ids))
+                        {
+                            data = new List<DepartmentEntity>() {
+                                departmentBLL.GetEntity(Ids)
+                             };
+                            parentId = Ids;
                         }
                         break;
                     case 88://获取当前登录人所在电厂下所有的单位(不包含承包商)

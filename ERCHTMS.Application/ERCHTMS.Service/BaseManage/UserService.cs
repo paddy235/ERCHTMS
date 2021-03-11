@@ -75,7 +75,7 @@ namespace ERCHTMS.Service.BaseManage
             var strSql = new StringBuilder();
             string sql = string.Join(",", userids).Replace(",", "','");
             strSql.Append(string.Format(@"SELECT  USERID,
-                            REALNAME, MOBILE, OrganizeName, ORGANIZEID, DEPTNAME, DEPTCODE, DEPARTMENTID, DEPARTMENTCODE, DUTYNAME, POSTNAME, ROLENAME, ROLEID, MANAGER, ENABLEDMARK, ENCODE, ACCOUNT, NICKNAME, HEADICON, GENDER, EMAIL, OrganizeCode, identifyid,SignImg
+                            REALNAME, MOBILE, OrganizeName, ORGANIZEID, DEPTNAME, DEPTCODE, DEPARTMENTID, DEPARTMENTCODE, DUTYNAME, POSTNAME, ROLENAME, ROLEID, MANAGER, ENABLEDMARK, ENCODE, ACCOUNT, NICKNAME, HEADICON, GENDER, EMAIL, Telephone,OrganizeCode, identifyid,SignImg
                             FROM V_USERINFO u WHERE Account!='System' and ispresence='是' and (userid in('{0}') or account in('{0}'))", sql));
 
             //DbParameter[] dp = new DbParameter[userids.Length];
@@ -1187,10 +1187,22 @@ namespace ERCHTMS.Service.BaseManage
         /// <param name="account">账户值</param>
         /// <param name="keyValue">主键</param>
         /// <returns></returns>
-        public bool ExistAccount(string account, string keyValue)
+        public bool ExistAccount(string account,string encode,string mobile, string keyValue)
         {
             var expression = LinqExtensions.True<UserEntity>();
-            expression = expression.And(t => t.Account.ToUpper() == account.ToUpper());
+            if (!string.IsNullOrWhiteSpace(account))
+            {
+                expression = expression.And(t => t.Account.ToUpper() == account.ToUpper() || t.EnCode.ToUpper() == account.ToUpper() || t.Mobile.ToUpper() == account.ToUpper());
+            }
+            if (!string.IsNullOrWhiteSpace(encode))
+            {
+                expression = expression.Or(t => t.Account.ToUpper() == encode.ToUpper() || t.EnCode.ToUpper() == encode.ToUpper() || t.Mobile.ToUpper() == encode.ToUpper());
+            }
+            if (!string.IsNullOrWhiteSpace(mobile))
+            {
+                expression = expression.Or(t => t.Account.ToUpper() == mobile.ToUpper() || t.EnCode.ToUpper() == mobile.ToUpper() || t.Mobile.ToUpper() == mobile.ToUpper());
+            }
+           
             if (!string.IsNullOrEmpty(keyValue))
             {
                 expression = expression.And(t => t.UserId != keyValue);
@@ -1346,7 +1358,7 @@ namespace ERCHTMS.Service.BaseManage
 
                     if (user == null)
                     {
-                        if (ExistAccount(userEntity.Account, keyValue))
+                        if (ExistAccount(userEntity.Account,userEntity.EnCode,userEntity.Mobile, keyValue))
                         {
                             if (ExistIdentifyID(userEntity.IdentifyID, ""))
                             {
@@ -1378,7 +1390,7 @@ namespace ERCHTMS.Service.BaseManage
                 {
                     userEntity.Create();
                     keyValue = userEntity.UserId;
-                    if (ExistAccount(userEntity.Account, keyValue))
+                    if (ExistAccount(userEntity.Account,userEntity.EnCode,userEntity.Mobile, keyValue))
                     {
                         if (ExistIdentifyID(userEntity.IdentifyID, ""))
                         {

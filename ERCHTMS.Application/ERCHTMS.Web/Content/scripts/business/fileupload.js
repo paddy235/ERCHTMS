@@ -376,6 +376,8 @@ var file_upload = {
             fileSizeLimit: 100 * 1024 * 1024, //上传文件总大小（KB）
             fileSingleSizeLimit: 50 * 1024 * 1024, //允许单个上传文件的大小（KB）
             multiple: false, //是否可以同时选择多个文件
+            width: 0,
+            height:0
         };
         $.extend(options, defaults);
         if (options.extensions == '') {
@@ -461,10 +463,10 @@ var file_upload = {
 
         // 当有文件添加进来时执行，负责view的创建
         function addFile(file) {
+            
             var $li;
             var $imgWrap;
             if (options.isImage) {
-
                 $li = $('<li>' +
                '<p class="title">' + file.name + '</p>' +
                '<p class="imgWrap" id="' + file.id + '" title="点击查看大图" alt="点击查看大图"  ><span class="imgName" style="display:none;">' + file.name + '</span></p>' +
@@ -510,6 +512,7 @@ var file_upload = {
             }
 
             file.on('statuschange', function (cur, prev) {
+               
                 if (prev === 'progress') {
                     $prgress.hide().width(0);
                 } else if (prev === 'queued') {
@@ -764,6 +767,17 @@ var file_upload = {
             updateTotalProgress();
         };
         uploader.onUploadSuccess = function (file, response) {
+            if (options.isImage) {
+                if (response.type == 3) {
+                    //alert(response.message);
+
+                    uploader.removeFile(file);
+                    $(options.el).find(".filelist li:last").remove();
+                    dialogMsg(response.message, 0);
+
+                    return false;
+                }
+            }
             if (response.resultdata != null && response.resultdata.length>0) {
                 $(options.el).find("tr[fid='" + file.id + "']").show();
                 $(options.el).find("tr[fid='" + file.id + "']").attr("path", response.resultdata);
@@ -955,7 +969,6 @@ var file_upload = {
             var $li;
             var $imgWrap;
             if (options.isImage) {
-
                 $li = $('<li>' +
                     '<p class="title">' + file.name + '</p>' +
                     '<p class="imgWrap" id="' + file.id + '" title="点击查看大图" alt="点击查看大图"  ><span class="imgName" style="display:none;">' + file.name + '</span></p>' +

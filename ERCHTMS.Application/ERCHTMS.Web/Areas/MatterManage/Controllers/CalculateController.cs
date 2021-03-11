@@ -164,6 +164,24 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
             return View();
         }
 
+        /// <summary>
+        /// 物供部开票信息
+        /// </summary>
+        /// <returns></returns>
+        public ActionResult Orders()
+        {
+            return View();
+        }
+
+        /// <summary>
+        /// 未出厂物料开票单
+        /// </summary>
+        /// <returns></returns>
+        public ActionResult TicketSelect()
+        {
+            return View();
+        }
+
         #endregion
 
         #region 获取数据
@@ -300,7 +318,7 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
                 etime = queryParam["Etime"].ToString().Trim();
                 DateTime dst = Convert.ToDateTime(etime).AddDays(1);
                 strwhere += string.Format(" and roughtime <= to_date('{0}', 'yyyy-MM-dd HH24:mi:ss') ", dst);
-            }   
+            }
 
             pagination.p_kid = "takegoodsname";
             pagination.p_fields = " transporttype,goodsname,netwneight,vehicleCount,roughtime ";
@@ -323,62 +341,59 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
         /// <summary>
         /// 物料统计明细查看
         /// </summary>
-        /// <param name="pagination"></param>
-        /// <param name="queryJson"></param>
+        /// <param name="queryJson">数据过滤筛选参数</param>
         /// <returns></returns>
         [HttpPost]
         public ActionResult GetCointDetailList(string queryJson)
         {
             // Pagination pagination = new Pagination();
-            string strwhere = " 1=1 and f.isdelete='1' and f.datatype='4' ";
+            string strwhere = " 1=1 and t.isdelete='1' ";
             string stime = string.Empty; string etime = string.Empty;
             var queryParam = queryJson.ToJObject();
-            if (!queryParam["keyword"].IsEmpty())
-            {//车牌号
-                string PlateNumber = queryParam["keyword"].ToString().Trim();
-                strwhere += string.Format(" and f.PlateNumber like '%{0}%'", PlateNumber);
-            }
-            if (!queryParam["Takegoodsname"].IsEmpty() && queryParam["Takegoodsname"].ToString().Trim() != "全部")
+            if (!queryParam["Takegoodsname"].IsEmpty() )
             {//提货方
                 string Transporttype = queryParam["Takegoodsname"].ToString().Trim();
-                strwhere += string.Format(" and f.Takegoodsname='{0}'", Transporttype);
+                strwhere += string.Format(" and t.Takegoodsname='{0}'", Transporttype);
             }
-            if (!queryParam["Transporttype"].IsEmpty() && queryParam["Transporttype"].ToString().Trim() != "全部")
+            if (!queryParam["Transporttype"].IsEmpty())
             {//运输类型
                 string Transporttype = queryParam["Transporttype"].ToString().Trim();
-                strwhere += string.Format(" and f.Transporttype like '%{0}%'", Transporttype);
+                strwhere += string.Format(" and t.Transporttype='{0}'", Transporttype);
             }
-            if (!queryParam["Goodsname"].IsEmpty() && queryParam["Goodsname"].ToString().Trim() != "全部")
+            if (!queryParam["Goodsname"].IsEmpty() )
             {//副产品类型
                 string Goodsname = queryParam["Goodsname"].ToString().Trim();
-                strwhere += string.Format(" and f.Goodsname like '%{0}%'", Goodsname);
+                strwhere += string.Format(" and t.Goodsname='{0}'", Goodsname);
             }
-            if (!queryParam["Stime"].IsEmpty() && !queryParam["Etime"].IsEmpty())
+            if (!queryParam["RoughDate"].IsEmpty() )
             {//打印时间起
-                stime = queryParam["Stime"].ToString().Trim();
-                strwhere += string.Format(" and f.createdate >  to_date('{0}', 'yyyy-MM-dd HH24:mi:ss') ", Convert.ToDateTime(stime));
-                //打印时间止
-                etime = queryParam["Etime"].ToString().Trim();
-                DateTime dst = Convert.ToDateTime(etime).AddDays(1);
-                strwhere += string.Format(" and f.createdate < to_date('{0}', 'yyyy-MM-dd HH24:mi:ss') ", dst);
-            }
+                string RoughDate = queryParam["RoughDate"].ToString().Trim();
+                strwhere += string.Format(" and to_char(t.roughtime,'yyyy-MM-dd')='{0}' ", RoughDate);
+                           }
             else
-            {//默认本月
-                stime = DateTime.Now.ToString("yyyy-MM-01");
-                strwhere += string.Format(" and f.createdate >  to_date('{0}', 'yyyy-MM-dd HH24:mi:ss') ", Convert.ToDateTime(stime));
-                strwhere += string.Format(" and f.createdate < to_date('{0}', 'yyyy-MM-dd HH24:mi:ss') ", Convert.ToDateTime(DateTime.Now.AddDays(1).ToString("yyyy-MM-dd")));
+            {//默认本月                 
+                strwhere += string.Format(" and to_char(t.roughtime,'yyyy-MM-dd')='{0}' ", DateTime.Now.ToString("yyyy-MM-dd"));
             }
 
-            string sql = string.Format(@"  select to_char(d.Getdata,'MM-dd') as rctime,to_char(d.Getdata,' hh24:mi') as rctime1，
-  to_char(d.BalanceTime,' hh24:mi') as BalanceTime,
-  to_char(f.roughtime,'MM-dd') as mztime,to_char(f.roughtime,' hh24:mi') as mztime1,
-  to_char(d.outdate,' hh24:mi') as outdate,
-  d.Takegoodsname,d.platenumber,d.Transporttype,d.Numbers as Numbers1 ,f.numbers,f.tare,f.tareusername,
-  f.rough,f.roughusername,f.netwneight,d.Opername,d.LetMan,d.status,d.PassRemark,
-  d.Getdata,d.BalanceTime as balancetime1,d.outdate as outdate1
-  from wl_operticketmanager d
-  join wl_calculate t on d.id = t.baseid
-  join wl_calculatedetailed f on t.id = f.baseid where {0}  ", strwhere);
+            string sql = string.Format(@"select to_char(d.Getdata,'MM-dd') as rctime,to_char(d.Getdata,'hh24:mi') as rctime1，
+                                          to_char(t.taretime,' hh24:mi') as BalanceTime,
+                                          to_char(t.roughtime,'MM-dd') as mztime,to_char(t.roughtime,' hh24:mi') as mztime1,
+                                          to_char(d.outdate,' hh24:mi') as outdate,
+                                          d.Takegoodsname,d.platenumber,d.Transporttype,d.Numbers as Numbers1 ,t.numbers,t.tare,t.tareusername,
+                                          t.rough,t.roughusername,t.netwneight,d.Opername,d.LetMan,d.status,d.PassRemark,
+                                          d.Getdata,d.BalanceTime as balancetime1,d.outdate as outdate1
+                                          from wl_operticketmanager d
+                                          join wl_calculate t on d.id = t.baseid where {0}	
+	                                        union 
+                                          select to_char(f.createdate,'MM-dd') as rctime,null as rctime1，
+                                          to_char(t.taretime,' hh24:mi') as BalanceTime,
+                                          to_char(t.roughtime,'MM-dd') as mztime,to_char(t.roughtime,' hh24:mi') as mztime1,
+                                          null as outdate,
+                                          f.Takegoodsname,f.platenumber, null as Transporttype,f.Numbers as Numbers1 ,f.numbers,t.tare,t.tareusername,
+                                          t.rough,t.roughusername,t.netwneight,null Opername, null LetMan,null status,f.remark as PassRemark,
+                                          null as Getdata,null balancetime1,null as outdate1
+                                          from wl_calculatedetailed f
+	                                      join  wl_calculate t on f.id = t.baseid where {0}", strwhere);
 
             DataTable data = Opertickebll.GetDataTable(sql);
             data.Columns.Add("num1", typeof(double));
@@ -394,13 +409,27 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
             return Content(data.ToJson());
         }
 
+
         /// <summary>
-        /// 未出厂物料开票单
-        /// </summary>
+        /// 获取地磅室开票信息
+        /// </summary>                       
+        /// <param name="pagination">分页筛选参数</param>
+        /// <param name="queryJson">数据过滤筛选参数</param>
         /// <returns></returns>
-        public ActionResult TicketSelect()
+        public ActionResult GetPoundOrderList(Pagination pagination, string queryJson)
         {
-            return View();
+
+            var watch = CommonHelper.TimerStart();
+            var data = calculatebll.GetPoundOrderList(pagination, queryJson);
+            var JsonData = new
+            {
+                rows = data,
+                total = pagination.total,
+                page = pagination.page,
+                records = pagination.records,
+                costtime = CommonHelper.TimerEnd(watch)
+            };
+            return Content(JsonData.ToJson());
         }
 
         #region 数据导出
@@ -751,18 +780,18 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
             {
                 entity.Taretime = DateTime.Now;
                 entity.Tareusername = entity.Roughusername;
-                if(!entity.Roughtime.HasValue)
+                if (!entity.Roughtime.HasValue)
                     entity.Roughusername = null;
-            } 
+            }
             if (entity.Rough.HasValue && !entity.Roughtime.HasValue)
             {
                 entity.Roughtime = DateTime.Now;
                 entity.Stamptime = DateTime.Now;
             }
-               
+
             var data = Opertickebll.GetEntity(entity.BaseId);
             if (data != null)
-            {                  
+            {
                 if (string.IsNullOrWhiteSpace(entity.Transporttype))
                     entity.Transporttype = data.Transporttype;
                 if (data.ShipLoading == 1 && !data.Getdata.HasValue)
@@ -792,7 +821,7 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
                     {
                         data.OutDate = entity.Roughtime;
                         data.ExamineStatus = 4;
-                    }                       
+                    }
                 }
                 Opertickebll.SaveForm(data.ID, data);
             }
@@ -828,6 +857,7 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
             calculatebll.SaveForm(keyValue, entity);
             if (entity.DataType == "0" && entity.IsOut == 1)
                 RemoveCarpermission(entity.Platenumber);
+
             if (string.IsNullOrEmpty(keyValue))
                 this.SaveDailyRecord(entity, "新增数据");
             else this.SaveDailyRecord(entity, "修改数据");
@@ -948,59 +978,73 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
         /// <summary>
         /// 移除车辆识别后自动抬杆放行权限
         /// </summary>
-        /// <param name="CarNo"></param>
-        public void RemoveCarpermission(string CarNo)
+        /// <param name="carNo">车牌号</param>
+        /// <param name="key">主键</param>
+        [HttpGet]
+        public ActionResult RemoveCarpermission(string carNo)
         {
-            #region 删除车辆进出权限
 
-            string key = CacheFactory.Cache().GetCache<string>("Hik:key");// "21049470";
-            string sign = CacheFactory.Cache().GetCache<string>("Hik:sign");// "4gZkNoh3W92X6C66Rb6X";
-            string baseUrl = CacheFactory.Cache().GetCache<string>("Hik:baseUrl");
-            if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(key))
+            try
             {
-                var pitem = dataItemDetailBLL.GetItemValue("Hikappkey");//海康服务器密钥                    
-                if (!string.IsNullOrEmpty(pitem))
+                try
                 {
-                    key = pitem.Split('|')[0];
-                    sign = pitem.Split('|')[1];
-                    CacheFactory.Cache().WriteCache<string>(key, "Hik:key");
-                    CacheFactory.Cache().WriteCache<string>(sign, "Hik:sign");
-                }
-            }
-            if (string.IsNullOrEmpty(baseUrl))
-            {
-                baseUrl = dataItemDetailBLL.GetItemValue("HikBaseUrl");//海康服务器地址
-                CacheFactory.Cache().WriteCache<string>(baseUrl, "Hik:baseUrl");
-            }
-
-            if (!string.IsNullOrEmpty(CarNo))
-            {
-                var selectmodel = new
-                {
-                    pageNo = 1,
-                    pageSize = 1,
-                    plateNo = CarNo
-                };
-                var existsVehicleStr = SocketHelper.LoadCameraList(selectmodel, baseUrl, "/artemis/api/resource/v1/vehicle/advance/vehicleList", key, sign);
-                dynamic existsVehicle = JsonConvert.DeserializeObject<dynamic>(existsVehicleStr);
-                List<dynamic> vechileList = new List<dynamic>();
-
-                if (existsVehicle.code == "0" && existsVehicle.data.total > 0)
-                {
-                    foreach (dynamic obj in existsVehicle.data.list)
+                    #region 删除车辆进出权限  
+                    string key = CacheFactory.Cache().GetCache<string>("Hik:key");// "21049470";
+                    string sign = CacheFactory.Cache().GetCache<string>("Hik:sign");// "4gZkNoh3W92X6C66Rb6X";
+                    string baseUrl = CacheFactory.Cache().GetCache<string>("Hik:baseUrl");
+                    if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(key))
                     {
-                        vechileList.Add(obj.vehicleId);
-                        break;
+                        var pitem = dataItemDetailBLL.GetItemValue("Hikappkey");//海康服务器密钥                    
+                        if (!string.IsNullOrEmpty(pitem))
+                        {
+                            key = pitem.Split('|')[0];
+                            sign = pitem.Split('|')[1];
+                            CacheFactory.Cache().WriteCache<string>(key, "Hik:key");
+                            CacheFactory.Cache().WriteCache<string>(sign, "Hik:sign");
+                        }
                     }
-                    var delModel = new
+                    if (string.IsNullOrEmpty(baseUrl))
                     {
-                        vehicleIds = vechileList
-                    };
-                    SocketHelper.LoadCameraList(delModel, baseUrl, "/artemis/api/resource/v1/vehicle/batch/delete", key, sign);
-                }
-            }
-            #endregion
+                        baseUrl = dataItemDetailBLL.GetItemValue("HikBaseUrl");//海康服务器地址
+                        CacheFactory.Cache().WriteCache<string>(baseUrl, "Hik:baseUrl");
+                    }
 
+                    if (!string.IsNullOrEmpty(carNo))
+                    {
+                        var selectmodel = new
+                        {
+                            pageNo = 1,
+                            pageSize = 1,
+                            plateNo = carNo
+                        };
+                        var existsVehicleStr = SocketHelper.LoadCameraList(selectmodel, baseUrl, "/artemis/api/resource/v1/vehicle/advance/vehicleList", key, sign);
+                        dynamic existsVehicle = JsonConvert.DeserializeObject<dynamic>(existsVehicleStr);
+                        List<dynamic> vechileList = new List<dynamic>();
+
+                        if (existsVehicle.code == "0" && existsVehicle.data.total > 0)
+                        {
+                            foreach (dynamic obj in existsVehicle.data.list)
+                            {
+                                vechileList.Add(obj.vehicleId);
+                                break;
+                            }
+                            var delModel = new
+                            {
+                                vehicleIds = vechileList
+                            };
+                            SocketHelper.LoadCameraList(delModel, baseUrl, "/artemis/api/resource/v1/vehicle/batch/delete", key, sign);
+                        }
+                    }
+                }
+                catch (Exception) { }
+                calculatebll.UpdateCalculateDetailTime(carNo);
+                #endregion
+                return Success("操作成功！");
+            }
+            catch (Exception)
+            {
+                return Success("操作失败！");
+            }
         }
         /// <summary>
         ///净重超载75T(抬杠放行)
@@ -1122,7 +1166,9 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
                 data.IsDelete = 0;
                 data.DeleteContent = entity.DeleteContent;
                 calculatebll.SaveForm(keyValue, data);
-                string sql = string.Format("update WL_CALCULATEDetailed d set d.isdelete='0',d.deletecontent='{1}' where d.baseid='{0}'", keyValue, entity.DeleteContent);
+                string sql = string.Format("update WL_CALCULATEDetailed d set d.isdelete='0',d.deletecontent='{1}' where d.id='{0}'", keyValue, entity.DeleteContent);
+                if (data.DataType == "4")
+                    sql = string.Format("update wl_operticketmanager d set d.isdelete='0',d.deletecontent='{1}' where d.id='{0}'", keyValue, entity.DeleteContent);
                 Opertickebll.GetDataTable(sql);//同步修改子记录状态
                 SaveDailyRecord(data, "删除数据");
             }
@@ -1141,8 +1187,8 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
             var data = calculatebll.GetEntity(keyValue);
             if (data != null)
             {
-                if (data.Stamptime == null)                   
-                    data.Stamptime = DateTime.Now;                  
+                if (data.Stamptime == null)
+                    data.Stamptime = DateTime.Now;
                 calculatebll.SaveForm(keyValue, data);
                 SaveDailyRecord(data, "打印称重单");
             }
@@ -1175,7 +1221,7 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
         /// <param name="Remark">备注</param>
         /// <returns></returns>
         [HttpPost]
-        public ActionResult SaveDetailedFrom(string keyValue, string Takegoodsname, string Goodsname, string Rough, string Tare, string Remark)
+        public ActionResult SaveDetailedFrom(string keyValue, string Takegoodsname, string Goodsname, string Rough, string RoughTime, string Tare, string TareTime, string Remark)
         {
             var data = calculatebll.GetEntity(keyValue);
             if (data != null)
@@ -1191,6 +1237,8 @@ namespace ERCHTMS.Web.Areas.MatterManage.Controllers
                     weightIsChange = true;
                 }
 
+                data.Roughtime = DateTime.Parse(RoughTime);
+                data.Taretime = DateTime.Parse(TareTime);
                 data.Takegoodsname = Takegoodsname;
                 data.Goodsname = Goodsname;
                 data.Remark = Remark;

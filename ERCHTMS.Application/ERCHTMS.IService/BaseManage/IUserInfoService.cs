@@ -21,7 +21,7 @@ namespace ERCHTMS.IService.BaseManage
         /// 获取用户集合
         /// </summary>
         /// <returns></returns>
-        IList<UserInfoEntity> GetAllUserInfoList();
+        IList<UserInfoEntity> GetAllUserInfoList(string userids="");
         /// <summary>
         /// 用户列表
         /// </summary>

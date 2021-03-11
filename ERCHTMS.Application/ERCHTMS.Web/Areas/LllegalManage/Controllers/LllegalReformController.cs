@@ -123,6 +123,13 @@ namespace ERCHTMS.Web.Areas.LllegalManage.Controllers
             rEntity.MODIFYUSERNAME = curUser.UserName;
             rEntity.REFORMPIC = entity.REFORMPIC;
             rEntity.REFORMATTACHMENT = entity.REFORMATTACHMENT;
+
+            rEntity.REFORMPEOPLE = entity.REFORMPEOPLE;
+            rEntity.REFORMPEOPLEID = entity.REFORMPEOPLEID;
+            rEntity.REFORMDEPTNAME = entity.REFORMDEPTNAME;
+            rEntity.REFORMDEPTCODE = entity.REFORMDEPTCODE;
+            rEntity.REFORMTEL = entity.REFORMTEL;
+
             lllegalreformbll.SaveForm(rEntity.ID, rEntity);
             return Success("²Ù×÷³É¹¦¡£");
         }
@@ -268,6 +275,12 @@ namespace ERCHTMS.Web.Areas.LllegalManage.Controllers
                 rfEntity.MODIFYUSERNAME = curUser.UserName;
                 rfEntity.REFORMPIC = rEntity.REFORMPIC;
                 rfEntity.REFORMATTACHMENT = rEntity.REFORMATTACHMENT;
+
+                rfEntity.REFORMPEOPLE = rEntity.REFORMPEOPLE;
+                rfEntity.REFORMPEOPLEID = rEntity.REFORMPEOPLEID;
+                rfEntity.REFORMDEPTNAME = rEntity.REFORMDEPTNAME;
+                rfEntity.REFORMDEPTCODE = rEntity.REFORMDEPTCODE;
+                rfEntity.REFORMTEL = rEntity.REFORMTEL;
                 lllegalreformbll.SaveForm(rfEntity.ID, rfEntity);
 
 

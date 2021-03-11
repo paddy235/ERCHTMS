@@ -803,24 +803,14 @@ namespace ERCHTMS.AppSerivce.Controllers
                 var tasklist = safeworkcontrolBll.GetDistrictLevel();
                 for (int i = 0; i < arealist.Count; i++)
                 {
-                    var risk = risklist.Where(it => arealist[i].DistrictCode.Contains(it.areacode)).OrderBy(it => it.gradeval).ToList();
-                    if (risk.Count > 0)
-                    {
-                        arealist[i].Level = risk[0].gradeval;
-                    }
-                    var hidden = hiddenlist.Where(it => arealist[i].DistrictCode.Contains(it.areacode)).ToList();
-                    if (hidden.Count > 0)
-                    {
-                        arealist[i].HtNum = hidden.Sum(it => it.htcount);
-                    }
-                    var tasks = tasklist.Where(x => x.DistrictId.StartsWith(arealist[i].DistrictCode));
-                    if (tasks != null && tasks.Count() > 0)
-                        arealist[i].Level2 = tasks.Min(x => x.GradeVal.Value);
-                }
-
-                return new { Code = 1, Count = arealist.Count, Info = "获取数据成功", data = arealist };
-
-
+                    arealist[i].Level = risklist.Where(it => it.areacode.StartsWith(arealist[i].DistrictCode)).Min(it => it.gradeval);
+                    arealist[i].HtNum = hiddenlist.Where(it => it.areacode.StartsWith(arealist[i].DistrictCode)).Sum(it => it.htcount);
+                    arealist[i].Level2 = arealist[i].Level;
+                    var level2 = tasklist.Where(it => it.DistrictId.StartsWith(arealist[i].DistrictCode)).Min(it => it.GradeVal);
+                    if (level2.HasValue && level2 < arealist[i].Level)
+                        arealist[i].Level2 = level2.Value; 
+                } 
+                return new { Code = 1, Count = arealist.Count, Info = "获取数据成功", data = arealist }; 
             }
             catch (Exception ex)
             {
@@ -1362,8 +1352,6 @@ namespace ERCHTMS.AppSerivce.Controllers
             var base64 = Convert.ToBase64String(bytes);
             return new ListModel<PersonPhotoModel> { Success = true, data = new List<PersonPhotoModel> { new PersonPhotoModel { UserId = user.UserId, Base64Image = base64 } } };
         }
-
-
 
 
         /// <summary>

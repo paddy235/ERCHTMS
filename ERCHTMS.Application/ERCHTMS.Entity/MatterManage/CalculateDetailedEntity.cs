@@ -144,6 +144,12 @@ namespace ERCHTMS.Entity.MatterManage
         [Column("SHIPUNLOADING")]
         public int ShipUnloading { get; set; }
 
+        /// <summary>
+        /// 地磅放行时间
+        /// </summary>
+        [Column("OUTTIME")]
+        public DateTime? OutTime { get; set; }
+
         #endregion
 
         #region 扩展操作

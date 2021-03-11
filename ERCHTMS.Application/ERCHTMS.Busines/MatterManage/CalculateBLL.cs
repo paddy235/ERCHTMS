@@ -1,10 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using BSFramework.Util.WebControl;
 using ERCHTMS.Entity.MatterManage;
 using ERCHTMS.IService.MatterManage;
 using ERCHTMS.Service.MatterManage;
-using BSFramework.Util.WebControl;
-using System.Collections.Generic;
-using System;
-using System.Data;
 
 namespace ERCHTMS.Busines.MatterManage
 {
@@ -60,14 +60,25 @@ namespace ERCHTMS.Busines.MatterManage
         }
 
         /// <summary>
+        /// 获取地磅室开票信息
+        /// </summary>                       
+        /// <param name="pagination">分页筛选参数</param>
+        /// <param name="queryJson">数据过滤筛选参数</param>
+        /// <returns></returns>
+        public DataTable GetPoundOrderList(Pagination pagination, string queryJson)
+        {
+            return service.GetPoundOrderList(pagination, queryJson);
+        }
+
+        /// <summary>
         /// 获取地磅员列表
         /// </summary>
         /// <param name="pagination">分页</param>
         /// <param name="queryJson">查询参数</param>
         /// <returns></returns>
-        public DataTable GetPageUserList(Pagination pagination, string queryJson,string res)
+        public DataTable GetPageUserList(Pagination pagination, string queryJson, string res)
         {
-            return service.GetPageUserList(pagination, queryJson,res);
+            return service.GetPageUserList(pagination, queryJson, res);
         }
 
         /// <summary>
@@ -119,12 +130,12 @@ namespace ERCHTMS.Busines.MatterManage
         }
 
 
-    /// <summary>
-    /// 获取记录管理详情记录实体
-    /// </summary>
-    /// <param name="keyValue">主键值</param>
-    /// <returns></returns>
-    public CalculateDetailedEntity GetAppDetailedEntity(string keyValue)
+        /// <summary>
+        /// 获取记录管理详情记录实体
+        /// </summary>
+        /// <param name="keyValue">主键值</param>
+        /// <returns></returns>
+        public CalculateDetailedEntity GetAppDetailedEntity(string keyValue)
         {
             return service.GetAppDetailedEntity(keyValue);
         }
@@ -194,7 +205,23 @@ namespace ERCHTMS.Busines.MatterManage
             {
                 service.SaveWeightBridgeDetail(keyValue, entity);
             }
-            catch (Exception ex)
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 更新地磅开单车辆出厂时间
+        /// </summary>
+        /// <param name="plateNumber">车牌号</param>
+        public void UpdateCalculateDetailTime(string plateNumber)
+        {
+            try
+            {
+                service.UpdateCalculateDetailTime(plateNumber);
+            }
+            catch (Exception)
             {
                 throw;
             }
@@ -220,7 +247,7 @@ namespace ERCHTMS.Busines.MatterManage
             }
         }
 
-      
+
 
 
 

@@ -1,7 +1,7 @@
-using ERCHTMS.Entity.MatterManage;
-using BSFramework.Util.WebControl;
 using System.Collections.Generic;
 using System.Data;
+using BSFramework.Util.WebControl;
+using ERCHTMS.Entity.MatterManage;
 
 namespace ERCHTMS.IService.MatterManage
 {
@@ -49,7 +49,7 @@ namespace ERCHTMS.IService.MatterManage
 
 
 
-        
+
         /// <summary>
         /// 获取记录管理详情记录实体
         /// </summary>
@@ -64,6 +64,14 @@ namespace ERCHTMS.IService.MatterManage
         /// <param name="queryJson">查询参数</param>
         /// <returns></returns>
         DataTable GetPageList(Pagination pagination, string queryJson);
+
+        /// <summary>
+        /// 获取地磅室开票信息
+        /// </summary>                       
+        /// <param name="pagination">分页筛选参数</param>
+        /// <param name="queryJson">数据过滤筛选参数</param>
+        /// <returns></returns>
+        DataTable GetPoundOrderList(Pagination pagination, string queryJson);
 
         /// <summary>
         /// 列表分页称重
@@ -109,6 +117,11 @@ namespace ERCHTMS.IService.MatterManage
         void SaveWeightBridgeDetail(string keyValue, CalculateDetailedEntity entity);
 
         /// <summary>
+        /// 更新地磅开单车辆出厂时间
+        /// </summary>
+        /// <param name="plateNumber">车牌号</param>
+        void UpdateCalculateDetailTime(string plateNumber);
+        /// <summary>
         /// 保存用户授权信息
         /// </summary>
         /// <param name="keyValue">主键值</param>
@@ -116,7 +129,7 @@ namespace ERCHTMS.IService.MatterManage
         /// <returns></returns>
         void SaveUserForm(string keyValue, UserEmpowerRecordEntity entity);
 
-      
+
 
         #endregion
     }

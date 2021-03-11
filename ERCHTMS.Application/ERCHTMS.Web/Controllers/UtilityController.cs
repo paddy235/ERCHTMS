@@ -33,6 +33,7 @@ using ERCHTMS.Entity.BaseManage;
 using BSFramework.Cache.Factory;
 using Microsoft.AspNet.SignalR.Client;
 using ERCHTMS.Cache;
+using System.Drawing.Drawing2D;
 
 namespace ERCHTMS.Web.Controllers
 {
@@ -208,6 +209,8 @@ namespace ERCHTMS.Web.Controllers
             }
             string newFilePath = "";
             string message = "";
+            bool flag = false;
+            var message1 = "";
             if (Request.Files.Count > 0)
             {
                 foreach (string key in Request.Files.Keys)
@@ -224,20 +227,49 @@ namespace ERCHTMS.Web.Controllers
                         message += fileName + ",";
                         continue;
                     }
+                    
                     string uploadDate = DateTime.Now.ToString("yyyyMMdd");
                     string dir = isDate == 0 ? string.Format("~/Resource/{0}", filePath) : string.Format("~/Resource/{0}/{1}", filePath, uploadDate);
                     string newFileName = fileGuid + FileEextension;
                     newFilePath = dir + "/" + newFileName;
+
+                    
+
                     if (!Directory.Exists(Server.MapPath(dir)))
                     {
                         Directory.CreateDirectory(Server.MapPath(dir));
                     }
-
                     FileInfoEntity fileInfoEntity = new FileInfoEntity();
                     if (!System.IO.File.Exists(Server.MapPath(newFilePath)))
                     {
                         //保存文件
                         file.SaveAs(Server.MapPath(newFilePath));
+
+                        #region 指定目录压缩处理
+                        //if (filePath == "ht/images1")
+                        //{
+                        //    string newFilePath2 = "";
+                        //    string fileGuid2 = Guid.NewGuid().ToString();
+                        //    string newFileName2 = fileGuid2 + FileEextension;
+                        //    newFilePath2 = dir + "/" + newFileName2;
+                        //    if (GetPicThumbnail(Server.MapPath(newFilePath), Server.MapPath(newFilePath2), 930, 1316, 20))
+                        //    {
+                        //        newFilePath = newFilePath2;
+                        //        newFileName = newFileName2;
+                        //    }
+                        //}
+                        #endregion
+                        #region 指定目录高宽判断
+                        message1 = checkSize(Server.MapPath(newFilePath));
+                        
+                        if (message1.Length > 0) {
+                            flag = true;
+                            //System.IO.File.Delete(Server.MapPath(newFilePath));
+                            newFilePath = "";
+                            continue;
+                        }
+                        #endregion
+
                         //文件信息写入数据库
                         if (!string.IsNullOrEmpty(recId))
                         {
@@ -265,10 +297,113 @@ namespace ERCHTMS.Web.Controllers
                 }
             }
             message = message.Length == 0 ? "上传成功" : string.Format("不允许上传以下类型文件:{0}", message.Trim(','));
-            return Content(new AjaxResult { type = ResultType.success, message = message, resultdata = newFilePath }.ToJson());
+            if (flag)
+            {
+                message = message1;
+                return Content(new AjaxResult { type = ResultType.error, message = message, resultdata = newFilePath }.ToJson());
+            }
+            else
+            {
+                return Content(new AjaxResult { type = ResultType.success, message = message, resultdata = newFilePath }.ToJson());
+            }
+        }
+        /// 无损压缩图片  
+        /// <param name="sFile">原图片</param>  
+        /// <param name="dFile">压缩后保存位置</param>  
+        /// <param name="dHeight">高度</param>  
+        /// <param name="dWidth"></param>  
+        /// <param name="flag">压缩质量(数字越小压缩率越高) 1-100</param>  
+        /// <returns></returns>  
+
+        public static bool GetPicThumbnail(string sFile, string dFile, int dHeight, int dWidth, int flag)
+        {
+            System.Drawing.Image iSource = System.Drawing.Image.FromFile(sFile);
+            ImageFormat tFormat = iSource.RawFormat;
+            int sW = 0, sH = 0;
+
+            //按比例缩放
+            Size tem_size = new Size(iSource.Width, iSource.Height);
+
+            if (tem_size.Width > dHeight || tem_size.Width > dWidth)
+            {
+                if ((tem_size.Width * dHeight) > (tem_size.Width * dWidth))
+                {
+                    sW = dWidth;
+                    sH = (dWidth * tem_size.Height) / tem_size.Width;
+                }
+                else
+                {
+                    sH = dHeight;
+                    sW = (tem_size.Width * dHeight) / tem_size.Height;
+                }
+            }
+            else
+            {
+                sW = tem_size.Width;
+                sH = tem_size.Height;
+            }
+
+            Bitmap ob = new Bitmap(dWidth, dHeight);
+            Graphics g = Graphics.FromImage(ob);
+
+            g.Clear(System.Drawing.Color.WhiteSmoke);
+            g.CompositingQuality = CompositingQuality.HighQuality;
+            g.SmoothingMode = SmoothingMode.HighQuality;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+
+            g.DrawImage(iSource, new Rectangle((dWidth - sW) / 2, (dHeight - sH) / 2, sW, sH), 0, 0, iSource.Width, iSource.Height, GraphicsUnit.Pixel);
+
+            g.Dispose();
+            //以下代码为保存图片时，设置压缩质量  
+            EncoderParameters ep = new EncoderParameters();
+            long[] qy = new long[1];
+            qy[0] = flag;//设置压缩的比例1-100  
+            EncoderParameter eParam = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, qy);
+            ep.Param[0] = eParam;
+            try
+            {
+                ImageCodecInfo[] arrayICI = ImageCodecInfo.GetImageEncoders();
+                ImageCodecInfo jpegICIinfo = null;
+                for (int x = 0; x < arrayICI.Length; x++)
+                {
+                    if (arrayICI[x].FormatDescription.Equals("JPEG"))
+                    {
+                        jpegICIinfo = arrayICI[x];
+                        break;
+                    }
+                }
+                if (jpegICIinfo != null)
+                {
+                    ob.Save(dFile, jpegICIinfo, ep);//dFile是压缩后的新路径  
+                }
+                else
+                {
+                    ob.Save(dFile, tFormat);
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                iSource.Dispose();
+                ob.Dispose();
+            }
         }
 
 
+        public string checkSize(string File)
+        {
+            string message = "";
+            System.Drawing.Image iSource = System.Drawing.Image.FromFile(File);
+            
+            if (iSource.Width < 930 && iSource.Height < 1316) {
+                message = "对不起，上传图片大小为930*1316！";
+            }
+            return message;
+        }
         /// <summary>
         /// FileDrop组件以流的方式实现文件上传
         /// </summary>
@@ -811,6 +946,93 @@ namespace ERCHTMS.Web.Controllers
                     //wb.Worksheets[1].Cells.ImportDataTable(dtItems, true, 0, 2, false);
                     SetCellOptions(wb.Worksheets[0], dtItems, "三种人类别", 2, 2, 1000, 2);
                 }
+                //其他消防设施
+                if (mode == 11)
+                {
+                    DataTable dtItems = new DataTable();
+
+                    dtItems = deptBll.GetDataTable(string.Format("select a.itemname as 名称 from base_dataitemdetail a where a.itemid=(select itemid from base_dataitem  b where b.itemcode='EquipmentName') and a.itemvalue<>'MHQ' and a.itemvalue<>'SWXHS' and a.itemvalue<>'SNXHS' order by a.sortcode asc"));
+                    SetCellOptions(wb.Worksheets[0], dtItems, "名称", 1, 0, 1000, 0);
+                    
+                }
+                //重点防火部位
+                if (mode == 12)
+                {
+                    DataTable dtItems = new DataTable();
+
+                    dtItems = deptBll.GetDataTable(string.Format("select a.itemname as 重点防火部位 from base_dataitemdetail a where a.itemid=(select itemid from base_dataitem  b where b.itemcode='PartName') order by a.sortcode asc"));
+                    //SetCellOptions(wb.Worksheets[0], dtItems, "重点防火部位", 1, 0, 1000, 0);
+                    int index = wb.Worksheets.Add();
+                    wb.Worksheets[index].Name = "重点防火部位名称";
+                    wb.Worksheets[index].Cells.ImportDataTable(dtItems, true, 0, 0);
+
+                }
+                //灭火器（京泰改文字）
+                if (mode == 13)
+                {
+                    if (new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("CustomerName") == "京泰电厂")
+                    {
+                        wb.Worksheets[0].Cells[0, 10].PutValue("检测/更换周期*（天）");
+                        wb.Worksheets[0].Cells[0, 11].PutValue("上次检测/更换时间*（年月日）");
+                        wb.Worksheets[0].Cells[0, 12].PutValue("下次检测/更换时间*（年月日）");
+                    }
+                }
+                //违章
+                if (mode == 14)
+                {
+                    try
+                    {
+                        DataTable dtItems = new DataTable();
+                        dtItems = deptBll.GetDataTable(string.Format("select a.itemname 违章分类 from base_dataitemdetail a where a.itemid=(select itemid from base_dataitem  b where b.itemcode='LllegalType')"));
+                        SetCellOptions(wb.Worksheets[0], dtItems, "违章分类", 2, 6, 1000, 6);
+
+                        Worksheet sheet = wb.Worksheets[1] as Aspose.Cells.Worksheet;
+                        string orgId = string.Empty;
+                        PostCache postCache = new PostCache();
+                        IList<RoleEntity> rlist = new List<RoleEntity>();
+                        DataTable dlist = deptBll.GetDataTable(string.Format("select *  from base_department where organizeid in (select departmentid from base_department where nature = '厂级' ) order by encode "));
+                        if (dlist.Rows.Count > 0)
+                        {
+                            orgId = dlist.Rows[0]["organizeid"].ToString();
+                            rlist = postCache.GetList(orgId).OrderBy(x => x.SortCode).ToList();
+                            int indexRow = 1;
+                            foreach (DataRow dentity in dlist.Rows)
+                            {
+                                Aspose.Cells.Cell cell = sheet.Cells[indexRow, 0];
+                                if (!string.IsNullOrEmpty(dentity["fullname"].ToString()))
+                                {
+                                    cell.PutValue(dentity["fullname"].ToString()); //填报单位
+                                }
+                                var templist = rlist.Where(p => p.DeptId == dentity["departmentid"].ToString()).Select(p => p.FullName).ToList();
+                                if (templist.Count() > 0)
+                                {
+                                    int roleIndex = 0;
+                                    foreach (string rolename in templist)
+                                    {
+                                        Aspose.Cells.Cell rolecell = sheet.Cells[indexRow + roleIndex, 1];
+                                        if (!string.IsNullOrEmpty(rolename))
+                                        {
+                                            rolecell.PutValue(rolename); //填报单位
+                                        }
+                                        roleIndex++;
+                                    }
+                                    //合并单位格
+                                    Aspose.Cells.Cells cells = sheet.Cells;
+                                    cells.Merge(indexRow, 0, templist.Count(), 1);
+                                    indexRow += templist.Count();
+                                }
+                                else
+                                {
+                                    indexRow++;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        throw;
+                    }
+                }
                 filePath = Server.MapPath("~/Resource/Temp/" + DateTime.Now.ToString("yyyy-MMddHHmmss") + "_" + fileName);
                 if (wb.Worksheets.Count == 2)
                 {
@@ -909,7 +1131,7 @@ namespace ERCHTMS.Web.Controllers
                     }
 
                 }
-                catch
+                catch(Exception ex)
                 {
                     ret = false;
                 }
@@ -919,7 +1141,7 @@ namespace ERCHTMS.Web.Controllers
                     myFile.Close();
                 }
             }
-            catch
+            catch(Exception ex)
             {
                 ret = false;
             }
@@ -1402,7 +1624,10 @@ in(select attachment_id from ex_law_attachment t where t.law_id='{0}' and t.law_
         public string GetVisitJson(string keyValue)
         {
             VisitcarEntity visitcar = visitcarbll.GetEntity(keyValue);
-            string sql = string.Format("select d.username,d.userimg from bis_usercarfileimg d where d.baseid='{0}' order by d.ordernum asc", keyValue);
+            string sql = string.Format(@"SELECT a1.*, F.StrImgPath FROM ( select d.username,d.userimg,d.baseid,d.ID from bis_usercarfileimg d where d.baseid='{0}' order by d.ordernum asc) a1
+left JOIN(SELECT WM_CONCAT(TO_CHAR(IMGPATH)) StrImgPath, BASEID, USERCARFILEID
+FROM BIS_USERCARFILE_MULTIPLE GROUP BY BASEID, USERCARFILEID) f on a1.baseid = f.BASEID AND  a1.ID = f.USERCARFILEID
+", keyValue);
             var dt = new OperticketmanagerBLL().GetDataTable(sql);
             if (dt.Rows.Count > 0)
             {//随行人员信息
@@ -1420,7 +1645,11 @@ in(select attachment_id from ex_law_attachment t where t.law_id='{0}' and t.law_
         public string GetUserJson(string keyValue)
         {
             CarUserEntity visitcar = CarUserbll.GetEntity(keyValue);
-            string sql = string.Format("select d.username,d.userimg from bis_usercarfileimg d where d.baseid='{0}' order by d.ordernum asc", keyValue);
+            string sql = string.Format(@"SELECT a1.*, F.StrImgPath FROM (
+select d.username, d.userimg, d.baseid, d.ID from bis_usercarfileimg d where d.baseid = '{0}' order by d.ordernum asc) a1
+     left JOIN(SELECT WM_CONCAT(TO_CHAR(IMGPATH)) StrImgPath, BASEID, USERCARFILEID
+     FROM BIS_USERCARFILE_MULTIPLE
+                             GROUP BY BASEID, USERCARFILEID) f on a1.baseid = f.BASEID AND a1.ID = f.USERCARFILEID", keyValue);
             var dt = new OperticketmanagerBLL().GetDataTable(sql);
             if (dt.Rows.Count > 0)
             {//随行人员信息
@@ -1685,6 +1914,19 @@ in(select attachment_id from ex_law_attachment t where t.law_id='{0}' and t.law_
                     var base64 = Convert.ToBase64String(System.IO.File.ReadAllBytes(srcPath));
                     userjson[i].Imgdata = base64;
                 }
+                if (userjson[i].FileItems != null && userjson[i].FileItems.Count > 0)
+                {
+                    for (int j = 0; j < userjson[i].FileItems.Count; j++)
+                    {
+                        string j_srcPath = Server.MapPath("~" + userjson[i].FileItems[j].ImgPath);
+                        if (System.IO.File.Exists(j_srcPath))
+                        {
+                            //读图片转为Base64String
+                            var base64 = Convert.ToBase64String(System.IO.File.ReadAllBytes(j_srcPath));
+                            userjson[i].FileItems[j].ImgData = base64;
+                        }
+                    }
+                }
             }
             visitcarbll.SaveFaceUserForm("", visitcar, userjson);
             //CarinfoBLL carinfobll = new CarinfoBLL();
@@ -1752,6 +1994,19 @@ in(select attachment_id from ex_law_attachment t where t.law_id='{0}' and t.law_
                     //读图片转为Base64String
                     var base64 = Convert.ToBase64String(System.IO.File.ReadAllBytes(srcPath));
                     userjson[i].Imgdata = base64;
+                }
+                if (userjson[i].FileItems != null&& userjson[i].FileItems.Count>0)
+                {
+                    for (int j = 0; j < userjson[i].FileItems.Count; j++)
+                    {
+                        string j_srcPath = Server.MapPath("~" + userjson[i].FileItems[j].ImgPath);
+                        if (System.IO.File.Exists(j_srcPath))
+                        {
+                            //读图片转为Base64String
+                            var base64 = Convert.ToBase64String(System.IO.File.ReadAllBytes(j_srcPath));
+                            userjson[i].FileItems[j].ImgData = base64;
+                        }
+                    }
                 }
             }
             CarUserbll.SaveForm("", visitcar, userjson);
@@ -1953,8 +2208,38 @@ in(select attachment_id from ex_law_attachment t where t.law_id='{0}' and t.law_
             }
             return entity.ToJson();
         }
+        /// <summary>
+        /// 撤销拜访
+        /// </summary>
+        /// <param name="keyvalue">主键标识</param>
+        /// <param name="type">拜访类型（0：拜访车辆（有车），3：拜访人员）</param>
+        /// <returns></returns>
+        [HttpPost]
+        public ActionResult CancelVisit(string keyvalue, int type)
+        {
+            var deptBll = new ERCHTMS.Busines.BaseManage.DepartmentBLL();
+            if (type == 0)
+            {//拜访车辆（有车）
+                VisitcarEntity car = visitcarbll.GetEntity(keyvalue);
+                if (car.AppStatue != 0 || car.State == 88)
+                    return Content(new AjaxResult { type = ResultType.error, message = "撤销失败,只有审核中的数据才能撤销！" }.ToJson());
 
-
+                deptBll.GetDataTable(string.Format("update BIS_VISITCAR SET State=88 where ID='{0}' ", keyvalue));
+               //car.State = 88;//撤销状态
+               // visitcarbll.SaveForm(keyvalue, car);
+              
+            }
+            else if (type == 3)
+            {//拜访人员
+                CarUserEntity car = CarUserbll.GetEntity(keyvalue);
+                if (car.AppStatue!= 0|| car.State==88)
+                    return Content(new AjaxResult { type = ResultType.error, message = "撤销失败,只有审核中的数据才能撤销！" }.ToJson());
+                deptBll.GetDataTable(string.Format("update BIS_USERCAR SET State=88 where ID='{0}' ", keyvalue));
+                //car.State = 88;//撤销状态
+                //CarUserbll.SaveForm(keyvalue, car, null);
+            }
+            return Content(new AjaxResult { type = ResultType.success, message = "撤销成功" }.ToJson());
+        }
         #endregion
 
 

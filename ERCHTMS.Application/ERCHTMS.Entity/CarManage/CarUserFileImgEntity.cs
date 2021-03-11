@@ -80,6 +80,10 @@ namespace ERCHTMS.Entity.CarManage
         [Column("IMGDATA")]
         public string Imgdata { get; set; }
 
+        /// <summary>
+        /// 随行人员附件集合（防疫行程卡（健康码/核酸检测证明））
+        /// </summary>
+        public List<UserCarFileMultipleEntity> FileItems { get; set; }
         #endregion
 
         #region 扩展操作

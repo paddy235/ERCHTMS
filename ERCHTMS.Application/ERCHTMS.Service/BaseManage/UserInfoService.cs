@@ -49,11 +49,15 @@ namespace ERCHTMS.Service.BaseManage
         /// 获取用户集合
         /// </summary>
         /// <returns></returns>
-        public IList<UserInfoEntity> GetAllUserInfoList()
+        public IList<UserInfoEntity> GetAllUserInfoList(string userids="")
         {
-            var sql = new StringBuilder();
+            string sql = @"select a.* from  v_userinfo a";
 
-            sql.Append(@"select a.* from  v_userinfo a");
+            if (!string.IsNullOrEmpty(userids))
+            {
+                string userkey = "'" + userids.Replace(",", "','") + "'";
+                sql += string.Format(" where userid in ({0})", userkey);
+            }
 
             var list = this.BaseRepository().FindList(sql.ToString()).ToList();
 

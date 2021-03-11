@@ -517,7 +517,7 @@ namespace ERCHTMS.Web.Areas.BaseManage.Controllers
             try
             {
                 pagination.p_kid = "USERID";
-                pagination.p_fields = "REALNAME,MOBILE,OrganizeName,ORGANIZEID,DEPTNAME,DEPTCODE,DEPARTMENTID,DEPARTMENTCODE,DUTYNAME,POSTNAME,ROLENAME,ROLEID,MANAGER,ENABLEDMARK,ENCODE,ACCOUNT,NICKNAME,HEADICON,GENDER,EMAIL,OrganizeCode,identifyid,SIGNIMG,PARENTNAME";
+                pagination.p_fields = "REALNAME,MOBILE,OrganizeName,ORGANIZEID,DEPTNAME,DEPTCODE,DEPARTMENTID,DEPARTMENTCODE,DUTYNAME,POSTNAME,ROLENAME,ROLEID,MANAGER,ENABLEDMARK,ENCODE,ACCOUNT,NICKNAME,HEADICON,GENDER,EMAIL,OrganizeCode,identifyid,SIGNIMG,PARENTNAME,PARENTID,NATURE";
                 pagination.p_tablename = " V_USERINFO t";
                 pagination.conditionJson = "Account!='System' and ispresence='是'";
                 //Operator user = ERCHTMS.Code.OperatorProvider.Provider.Current();

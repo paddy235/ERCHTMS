@@ -79,7 +79,7 @@ namespace ERCHTMS.Web.Areas.SystemManage.Controllers
                 }
                 else
                 {
-                    pagination.conditionJson = string.Format(@" (t.userid like'%{0}%' or t.senduser = '{0}')", currUser.Account);
+                    pagination.conditionJson = string.Format(@" ((',' || t.userid || ',') like '%,{0},%' or t.senduser = '{0}')", currUser.Account);
                 }
                 var data = messagebll.GetPageList(pagination, queryJson);
                 var jsonData = new

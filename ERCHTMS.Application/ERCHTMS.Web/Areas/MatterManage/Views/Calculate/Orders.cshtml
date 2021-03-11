@@ -1,0 +1,180 @@
+﻿@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_Form.cshtml";
+}
+<script src="~/Content/scripts/business/gridhelper.js"></script>
+
+<script>
+
+    $(function () {
+        GetGrid();
+         //查询事件
+        $("#btn_Search").click(function () {
+            debugger
+            if (($("#Stime").val() != "" && $("#Etime").val() == "") || ($("#Etime").val() != "" && $("#Stime").val() == "") ) {
+                dialogMsg('起始时间和结束时间不能为空！', 0);
+                return false;
+            }
+            if ($("#Stime").val() != "" && $("#Etime").val() != "") {
+                var dt1 = new Date($("#Stime").val().replace(/\-/g, '\/'));
+                var dt2 = new Date($("#Etime").val().replace(/-/g, '\/'));
+                if (dt1 > dt2) {
+                    dialogMsg('起始时间不能大于结束时间！', 0);
+                    return false;
+                }
+            }
+
+             $('#gridTable').jqGrid('setGridParam', {
+                 postData: { queryJson: CreateParams()},
+                page: 1
+            }).trigger('reloadGrid');
+        });
+
+        $("#btn_SearchAll").click(function () {
+            $("#PlateNumber").val("");
+            $("#Stime").val("@DateTime.Now.Date.ToString("yyyy-MM-dd 00:00:00")" );
+            $("#Etime").val("@DateTime.Now.Date.ToString("yyyy-MM-dd 23:59:59")");
+            $("#Takegoodsname").val("");
+            $("#GoodsName").val("");
+            $('#btn_Search').trigger("click");
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress', function (event) {
+            if (event.keyCode == "13") {
+                $('#btn_Search').trigger("click");
+            }
+        });
+    });
+
+    function CreateParams() {
+        var queryJson = {
+            PlateNumber: $("#PlateNumber").val(),
+            Stime: $("#Stime").val(),
+            Etime: $("#Etime").val(),
+            TakegoodsName: $("#Takegoodsname").val(),
+            GoodsName: $("#GoodsName").val()
+        };
+        return JSON.stringify(queryJson)
+    }
+
+
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        $gridTable.jqGrid({
+            autowidth: true,
+            height: $(window).height() - 150,
+            url: '@Url.Action("GetPoundOrderList")',
+            datatype: "json",
+            postData: { queryJson: CreateParams() },
+            colModel: [
+                { label: 'Id', name: 'id', hidden: true },
+                {
+                    label: '操作', name: 'Oper', index: 'Oper', width: 80, align: 'center', formatter: function (cellvalue, options, rowObject) {
+                        if (rowObject.outtime)
+                            return "";
+                        else
+                            return "<a href='javascript:ReleaseCar()' title='放行'><i class='fa fa-truck'></i></a>";
+                    }
+                },
+                { label: '单号', name: 'numbers', index: 'numbers', width: 120, align: 'center' },
+                { label: '开票日期', name: 'createdate', index: 'createdate', width: 200, align: 'center', sortable: true},
+                { label: '车牌号', name: 'platenumber', index: 'platenumber', width: 150, align: 'center' },
+                { label: '产品类型', name: 'goodsname', index: 'goodsName', width: 200, align: 'center'},
+                { label: '运货单位', name: 'takegoodsname', index: 'takegoodsname', width: 230, align: 'center' },
+                { label: '是否卸船', name: 'shipunloading', index: 'shipunloading', width: 100, align: 'center' },
+                { label: '备注', name: 'remark', index: 'remark', width: 300, align: 'center' }
+            ],
+            onSelectRow: function () {
+                selectedRowIndex = $('#' + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $('#' + this.id).setSelection(selectedRowIndex, false);
+                //gridqx($gridTable);
+            },
+            viewrecords: true,
+            rowNum: 20,
+            // rowList: [30, 50, 100],
+            pager: "#gridPager",
+            sortname: 'a.createdate',
+            sortorder: 'desc',
+            rownumbers: true,
+            loadComplete: function () {
+            }
+        });
+
+    }
+
+    function ReleaseCar() {
+        var plateNumber = $('#gridTable').jqGridRowValue('platenumber');
+        if (plateNumber) {
+            jQuery.getJSON("../../MatterManage/Calculate/RemoveCarpermission", { carNo: plateNumber},
+                function (result) {
+                    $('#btn_Search').trigger("click");
+                    top.dialogMsg(result.message, 0);
+                }
+            );
+        }
+    }
+
+</script>
+
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-north">
+        <table class="form" id="filter-form">
+            <tr>
+                <td class="formTitle">
+                    车牌号：
+                </td>
+                <td class="formValue">
+                    <input id="PlateNumber" type="text" value="" class="form-control" />
+                </td>
+                <td class="formTitle">开票时间起：</td>
+                <td class="formValue">
+                    <input id="Category" type="hidden" value="1" />
+                    <div style="float: left; ">
+                        <input id="Stime" type="text" style="width:180px;" class="form-control input-wdatepicker" value="@DateTime.Now.Date.ToString("yyyy-MM-dd 00:00:00")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" />
+                    </div>
+
+                </td>
+
+                <td class="formTitle">开票时间止：</td>
+                <td class="formValue">
+                    <div style="float: left;">
+                        <input id="Etime" style="width:180px;" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.Date.ToString("yyyy-MM-dd 23:59:59")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" />
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="formTitle">
+                    运货单位：
+                </td>
+                <td class="formValue">
+                    <input id="Takegoodsname" type="text" value="" class="form-control" />
+                </td>
+                <td class="formTitle">
+                    产品类型：
+                </td>
+                <td class="formValue">
+                    <input id="GoodsName" type="text" value="" class="form-control" />
+                </td>
+                <td colspan="2" align="right" style="padding-right:30px;">
+                    <div class="ui-filter-list-bottom">
+                        <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                        <a id="btn_SearchAll" class="btn btn-primary"><i class="fa fa-search-plus"></i>&nbsp;重置</a>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel" style="margin-left: 10px;">
+            <div class="gridPanel">
+                <table id="gridTable"></table>
+                <div id="gridPager"></div>
+            </div>
+        </div>
+    </div>
+</div>

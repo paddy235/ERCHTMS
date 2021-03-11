@@ -289,7 +289,7 @@ namespace ERCHTMS.Service.HseToolManage
         public DataTable GetChartsData(string year, string month, string organizeCode)
         {
             string sql = @"select  DEPTCODE,COUNT(ID) AS COUNT, COUNT(DISTINCT CREATEUSERID) AS USERCOUNT  from HSE_SELFEVALUATE 
-                            WHERE 1=1  AND ISFILL=='1' ";
+                            WHERE 1=1  AND ISFILL='1' ";
             if (!string.IsNullOrEmpty(year))
             {
                 sql += " AND TO_CHAR(CREATEDATE,'YYYY')='" + year + "' ";

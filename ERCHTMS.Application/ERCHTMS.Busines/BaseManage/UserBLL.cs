@@ -118,11 +118,11 @@ namespace ERCHTMS.Busines.BaseManage
         /// 获取用户集合
         /// </summary>
         /// <returns></returns>
-        public IList<UserInfoEntity> GetAllUserInfoList() 
+        public IList<UserInfoEntity> GetAllUserInfoList(string userids="") 
         {
             try
             {
-                return service1.GetAllUserInfoList();
+                return service1.GetAllUserInfoList(userids);
             }
             catch (Exception)
             {
@@ -862,9 +862,9 @@ namespace ERCHTMS.Busines.BaseManage
         /// <param name="account">账户值</param>
         /// <param name="keyValue">主键</param>
         /// <returns></returns>
-        public bool ExistAccount(string account, string keyValue = "")
+        public bool ExistAccount(string account,  string keyValue = "", string encode = "", string mobile = "")
         {
-            return service.ExistAccount(account, keyValue);
+            return service.ExistAccount(account, encode, mobile, keyValue);
         }
         /// <summary>
         /// 校验手机号是否重复，没重复返回true

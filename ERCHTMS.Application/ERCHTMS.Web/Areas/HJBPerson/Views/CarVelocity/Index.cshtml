@@ -36,7 +36,7 @@
     var CarType = "";
     var InLog = "";
     var type = "0";
-    var KMHikImgIp = "@ViewBag.KMHikImgIp";//海康图片访问ip地址
+    var KMHikImgIp = "@ViewBag.KMHikImgIp";//海康图片访问ip地址 
      var softName = "@BSFramework.Util.Config.GetValue("SoftName").ToLower()";
     $(function () {
         InitialPage();
@@ -60,7 +60,18 @@
         if (mon < 10) {
             mon = '0' + mon;
         }
-
+        if (day < 10) {
+            day = '0' + day;
+        }
+        if (hour < 10) {
+            hour = '0' + hour;
+        }
+        if (mi < 10) {
+            mi = '0' + mi;
+        }
+        if (ss < 10) {
+            ss = '0' + ss;
+        }
         stime = (year - 1) + "-" + mon + "-" + day + " " + hour + ":" + mi + ":" + ss;
         etime = year + "-" + mon + "-" + day + " " + hour + ":" + mi + ":" + ss;
 
@@ -142,15 +153,37 @@
         });
     }
 
+    function getQueryJson() {
+        var st = $("#StartTime").val();
+        var et = $("#EndTime").val();
+        if (st > et && st != "" && et != "") {
+            dialogMsg('开始时间不能大于结束时间！', 2);
+            return false;
+        }
+        else if (st == et) {
+            dialogMsg('开始时间不能等于结束时间！', 2);
+            return false;
+        }
+        var queryJson = {
+            StartTime: $("#StartTime").val(),
+            EndTime: $("#EndTime").val(),
+            txt_Keyword: $("#txt_Keyword").val(),
+            type: type
+        }
+        return JSON.stringify(queryJson);
+    }
+
     //加载表格
     function GetGrid() {
         var selectedRowIndex = 0;
         var $gridTable = $('#gridTable');
+
         $gridTable.jqGrid({
             autowidth: true,
             height: $(window).height() - 200,
             url: "../../CarVelocity/GetListJson",
             datatype: "json",
+            postData: { queryJson: getQueryJson() },
             colModel: [
                 { label: '主键', name: 'id', hidden: true },
                 {
@@ -162,8 +195,8 @@
                 },
                 {
                     label: '车辆类型',
-                    name: 'vehicleTypeName',
-                    index: 'vehicleTypeName',
+                    name: 'vehicletypename',
+                    index: 'vehicletypename',
                     width: 200,
                     align: 'center'
                 },
@@ -217,11 +250,8 @@
                     align: 'center',
                     formatter: function (cellvalue, options, rowObject) {
                         var html = "";
-                        var picpath = GetHikImgUrl(cellvalue);
                         if (cellvalue) {
-                            html = "<img width='35'title='点击查看大图' height='35'  onclick=ShowImg('" + picpath +
-                                "') src='" + picpath +
-                                "'>";
+                            html = "<img width='35'title='点击查看图片' height='35'  onclick=ShowImg('" + cellvalue + "','" + rowObject.hikpicsvr+"') src=''>";
                         }
                         return html;
                     }
@@ -267,7 +297,7 @@
             }
             $gridTable.jqGrid('setGridParam',
                 {
-                    postData: { queryJson: JSON.stringify(queryJson) },
+                    postData: { queryJson: getQueryJson() },
                     page: 1
                 }).trigger('reloadGrid');
         });
@@ -282,7 +312,7 @@
             }
             $gridTable.jqGrid('setGridParam',
                 {
-                    postData: { queryJson: JSON.stringify(queryJson) },
+                    postData: { queryJson: getQueryJson() },
                     page: 1
                 }).trigger('reloadGrid');
         });
@@ -295,28 +325,27 @@
             });
     }
 
-    function ShowImg(url) {
-        ////查看图片
-        //var w = 1200;
-        //var h = 960;
-        //dialogOpen({
-        //    id: "DetailPrject",
-        //    title: "查看图片",
-        //    url: '/CarManage/Hikdevice/ImgShow?Url=' + url,
-        //    shade: 0.5,
-        //    btn: null,
-        //    width: w + "px",
-        //    height: h + "px",
-        //    callBack: function (iframeId) {
+    function ShowImg(url, picsvr) {       
+        if (softName == "gdhjb") {
+            $.get('@Url.Action("GetHikImagePath")', { picSvr: picsvr, picPath: url }, function (data) {
+                if (data) {
+                    $("#pop").show();
+                    $("#imgShow").attr("src", data);
+                }
 
-        //    }
-        //});
-        $("#pop").show();
-        $("#imgShow").attr("src", url);
+            });
+        } else {
+            var start = url.indexOf("/Resource");
+            if (start == 0) {//是
+                url = top.contentPath + url;
 
-
+            } else {//否
+                url = KMHikImgIp + url;
+            }
+            $("#pop").show();
+            $("#imgShow").attr("src", url);
+        }
     }
-
     //导出
     function exportResult() {
         var queryJson = JSON.stringify({
@@ -324,24 +353,10 @@
             EndTime: $("#EndTime").val(),
             txt_Keyword: $("#txt_Keyword").val(),
             type: type
-
         })
-        location.href = "../../HJBPerson/CarVelocity/ExportData?queryJson=" + queryJson;
+        location.href = "../../HJBPerson/CarVelocity/ExportData?queryJson=" + getQueryJson();
     }
-    //判读是否是海康的图片路径不是则返回我们自己存储路径
-    function GetHikImgUrl(url) {
-        if (url) {
-            var start = url.indexOf("/Resource");
-            if (start == 0) {//是
-                return  top.contentPath + url;
 
-            } else {//否
-                return KMHikImgIp + url;
-            }
-        } else {
-            return '';
-        }
-    }
 </script>
 <div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
     <div class="ui-layout-center">
@@ -377,7 +392,7 @@
                             <input id="txt_Keyword" type="text" class="form-control" placeholder="请输入关键字" style="width: 150px;" />
                         </td>
                         <td style="padding-left:10px;">
-                            <a id="btn_Search" class="btn btn-primary" onclick="query()"><i class="fa fa-search"></i>&nbsp;查询</a>
+                            <a id="btn_Search" class="btn btn-primary"><i class="fa fa-search"></i>&nbsp;查询</a>
                             &nbsp;@*<a id="btn_Reset" class="btn btn-primary" onclick="reset()"><i class="fa fa-undo"></i>&nbsp;重置</a>*@
                             <a id="export" class="btn btn-primary" onclick="exportResult()" style="margin-left:10px;margin-right:10px">导出</a>
                         </td>

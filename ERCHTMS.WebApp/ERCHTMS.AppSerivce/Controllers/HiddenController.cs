@@ -8086,7 +8086,7 @@ on t.id=t1.recid ", arg, where1);
                     break;
                 //个人处理-待整改列表
                 case "4":
-                    pagination.conditionJson += string.Format(@" and reformpeopleid  =  '{0}' and flowstate  = '违章整改'  ", curUser.UserId);
+                    pagination.conditionJson += string.Format(@" and reformpeopleid like '%{0}%' and flowstate  = '违章整改'  ", curUser.UserId);
                     break;
                 //个人处理-待延期审批列表
                 case "13":
@@ -8101,7 +8101,7 @@ on t.id=t1.recid ", arg, where1);
                     break;
                 //个人处理-逾期未整改列表
                 case "6":
-                    pagination.conditionJson += string.Format(@" and  reformpeopleid ='{0}' and flowstate  = '违章整改'  and  to_date('{1}','yyyy-mm-dd hh24:mi:ss') > (reformdeadline + 1)", curUser.UserId, DateTime.Now);
+                    pagination.conditionJson += string.Format(@" and  reformpeopleid like '%{0}%' and flowstate  = '违章整改'  and  to_date('{1}','yyyy-mm-dd hh24:mi:ss') > (reformdeadline + 1)", curUser.UserId, DateTime.Now);
                     break;
                 //违章曝光
                 case "7":
@@ -8141,7 +8141,7 @@ on t.id=t1.recid ", arg, where1);
                 case "14":
                     if (curUser.RoleName.Contains("安全管理员"))
                     {
-                        pagination.conditionJson += string.Format(@" and reformpeopleid != '{0}' and   reformdeptcode  =  '{1}' and flowstate  = '违章整改'  ", curUser.UserId, curUser.DeptCode);
+                        pagination.conditionJson += string.Format(@" and reformpeopleid not like '%{0}%' and   reformdeptcode  =  '{1}' and flowstate  = '违章整改'  ", curUser.UserId, curUser.DeptCode);
                     }
                     else
                     {
@@ -10802,14 +10802,54 @@ on t.id=t1.recid ", arg, where1);
                 if (postponeresult == "0") //不通过
                 {
                     centity.APPLICATIONSTATUS = "-1"; //延期申请失败
-                    UserEntity changeUser = userbll.GetEntity(centity.REFORMPEOPLEID); //延期失败保存整改人相关信息到result,用于极光推送
-                    if (null != changeUser)
+                    //UserEntity changeUser = userbll.GetEntity(centity.REFORMPEOPLEID); //延期失败保存整改人相关信息到result,用于极光推送
+                    //if (null != changeUser)
+                    //{
+                    //    result.actionperson = changeUser.Account;
+                    //    result.username = centity.REFORMPEOPLE;
+                    //    result.deptname = centity.REFORMDEPTNAME;
+                    //    result.deptid = changeUser.DepartmentId;
+                    //    result.deptcode = centity.REFORMDEPTCODE;
+                    //}
+                    string[] userids = centity.REFORMPEOPLEID.Split(',');
+                    DataTable userdt = userbll.GetUserTable(userids);
+                    foreach (DataRow row in userdt.Rows)
                     {
-                        result.actionperson = changeUser.Account;
-                        result.username = centity.REFORMPEOPLE;
-                        result.deptname = centity.REFORMDEPTNAME;
-                        result.deptid = changeUser.DepartmentId;
-                        result.deptcode = centity.REFORMDEPTCODE;
+                        result.actionperson += row["account"].ToString()+",";
+                        result.username += row["realname"].ToString() + ",";
+                        if (!result.deptname.Contains(row["deptname"].ToString()))
+                        {
+                            result.deptname += row["deptname"].ToString() + ",";
+                        }
+                        if (!result.deptid.Contains(row["departmentid"].ToString()))
+                        {
+                            result.deptid += row["departmentid"].ToString() + ",";
+                        }
+                        if (!result.deptcode.Contains(row["departmentcode"].ToString()))
+                        {
+                            result.deptcode += row["departmentcode"].ToString() + ",";
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(result.actionperson))
+                    {
+                        result.actionperson = result.actionperson.Substring(0, result.actionperson.Length - 1);
+                    }
+                    if (!string.IsNullOrEmpty(result.username))
+                    {
+                        result.username = result.username.Substring(0, result.username.Length - 1);
+                    }
+                    if (!string.IsNullOrEmpty(result.deptname))
+                    {
+                     
+                        result.deptname = result.deptname.Substring(0, result.deptname.Length - 1);
+                    }
+                    if (!string.IsNullOrEmpty(result.deptid))
+                    {
+                        result.deptid = result.deptid.Substring(0, result.deptid.Length - 1);
+                    }
+                    if (!string.IsNullOrEmpty(result.deptcode))
+                    {
+                        result.deptcode = result.deptcode.Substring(0, result.deptcode.Length - 1);
                     }
                 }
                 else   //通过，包括申请、审批

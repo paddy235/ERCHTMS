@@ -290,6 +290,21 @@ namespace ERCHTMS.Web.Areas.QuestionManage.Controllers
 
                     entity.BELONGDEPTNAME = userInfo.OrganizeName;
                 }
+                //安全检查
+                string safetycheckid = string.Empty;
+                string ctype = string.Empty;
+                if (null != Request.Form["SAFETYCHECKID"])
+                {
+                    safetycheckid = Request.Form["SAFETYCHECKID"].ToString();
+                }
+                if (null != Request.Form["CTYPE"])
+                {
+                    ctype = Request.Form["CTYPE"].ToString();//安全检查类型(从安全检查传递过来的)
+                }
+                if (!string.IsNullOrEmpty(entity.CHECKID) && string.IsNullOrEmpty(ctype) && string.IsNullOrEmpty(safetycheckid))
+                {
+                    entity.CORRELATIONID = new SaftyCheckDataRecordBLL().GetRecordFromHT(entity.CHECKID, userInfo);
+                }
                 questioninfobll.SaveForm(keyValue, entity);
 
                 //创建流程实例

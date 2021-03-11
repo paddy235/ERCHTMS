@@ -2997,7 +2997,7 @@ select engineerlevel,count(1) as num from epg_outsouringengineer t where t.creat
 
             count = BaseRepository().FindObject(string.Format(" select count(1) from v_lllegalallbaseinfo where (','|| substr(participant,2) ||',')  like  '%,{0},%' and flowstate  in ('违章核准','违章审核')", user.Account)).ToInt();
             list.Add(count);//待当前用户核准的数量
-            count = BaseRepository().FindObject(string.Format("select count(1) from v_lllegalallbaseinfo where  reformpeopleid = '{0}' and flowstate  = '违章整改'  ", user.UserId)).ToInt();
+            count = BaseRepository().FindObject(string.Format("select count(1) from v_lllegalallbaseinfo where  reformpeopleid like '%{0}%' and flowstate  = '违章整改'  ", user.UserId)).ToInt();
             list.Add(count);//待当前用户整改的数量
             count = BaseRepository().FindObject(string.Format("select count(1) from v_lllegalallbaseinfo where (','|| substr(participant,2) ||',')  like  '%,{0},%' and flowstate  = '违章验收'", user.Account)).ToInt();
             list.Add(count);//待当前用户验收的数量
@@ -3020,8 +3020,16 @@ select engineerlevel,count(1) as num from epg_outsouringengineer t where t.creat
             list.Add(count);//待整改延期申请审批
 
             //可门专属  违章整改确认
-            count = BaseRepository().FindObject(string.Format(" select count(1) from v_lllegalallbaseinfo where  reformpeopleid != '{0}' and reformdeptcode ='{1}' and flowstate  = '违章整改'", user.UserId, user.DeptCode)).ToInt();
+            count = BaseRepository().FindObject(string.Format(" select count(1) from v_lllegalallbaseinfo where  reformpeopleid not like '%{0}%' and reformdeptcode ='{1}' and flowstate  = '违章整改'", user.UserId, user.DeptCode)).ToInt();
             list.Add(count);//违章整改确认
+
+            //违章档案扣分待完善
+            count = 0;
+            if (user.RoleName.Contains("负责人") || user.RoleName.Contains("副管用户") || user.RoleName.Contains("安全管理员"))
+            {
+                count = BaseRepository().FindObject(string.Format(" select count(1) from v_lllegalrecordinfo  where deptid='{0}' and to_number(appsign) > 0 and userid is null", user.DeptId)).ToInt();
+            }
+            list.Add(count);//违章档案扣分待完善
             return list;
         }
         /// <summary>
@@ -4653,7 +4661,7 @@ union all select count(1) from v_basehiddeninfo t where changedutydepartcode='{0
                                   left join v_lllegalreforminfo c on a.id = c.lllegalid
                                   where b.acceptresult =1 and a.flowstate ='流程结束' and  to_char(b.accepttime,'yyyy-MM-dd')='{0}' group by c.reformpeopleid,b.accepttime
                                 ) a
-                                left join base_user b on a.reformpeopleid = b.userid 
+                                left join base_user b on instr(a.reformpeopleid,b.userid)>0 
                                 left join base_department c on b.departmentid = c.departmentid ", DateTime.Now.ToString("yyyy-MM-dd"));
             temp = DbFactory.Base().FindList<RealTimeWorkModel>(sql).ToList();
             data = data.AsEnumerable().Union(temp).ToList();

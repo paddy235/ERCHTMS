@@ -701,6 +701,7 @@ namespace ERCHTMS.Busines.Desktop
             data.Add("WZDYSQR", list[8]);//待验收确认违章
             data.Add("WZDZGYQSP", list[9]);//待整改延期申请审批
             data.Add("WZZGQR", list[10]);//违章整改确认
+            data.Add("WZDAKFDWS", list[11]);//违章档案扣分待完善
 
             list = GetJobSafetyCardNum(user);
             data.Add("DSPGCZY", list[0]);//待审批高处作业

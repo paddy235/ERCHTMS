@@ -572,7 +572,7 @@ namespace ERCHTMS.Service.LllegalManage
                         pagination.conditionJson += string.Format(@" and  id in  (select distinct lllegalid from v_lllegalapprovaldata where departmentcode ='{0}' and name ='违章审核')", departmentCode);
                         break;
                     case "本人整改":
-                        pagination.conditionJson += string.Format(@" and reformpeopleid  =  '{0}' and flowstate = '违章整改'", user.UserId);
+                        pagination.conditionJson += string.Format(@" and reformpeopleid like '%{0}%' and flowstate = '违章整改'", user.UserId);
                         break;
                     case "本人制定整改计划":
                         pagination.conditionJson += string.Format(@" and  participant||','  like  '%{0}%' and flowstate = '制定整改计划'", user.Account + ',');

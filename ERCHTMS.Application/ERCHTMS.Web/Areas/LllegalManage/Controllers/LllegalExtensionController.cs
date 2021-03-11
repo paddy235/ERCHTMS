@@ -13,6 +13,7 @@ using ERCHTMS.Busines.LllegalManage;
 using ERCHTMS.Busines.HiddenTroubleManage;
 using ERCHTMS.Entity.LllegalManage;
 using ERCHTMS.Entity.HiddenTroubleManage;
+using System.Data;
 
 namespace ERCHTMS.Web.Areas.LllegalManage.Controllers
 {
@@ -210,17 +211,56 @@ namespace ERCHTMS.Web.Areas.LllegalManage.Controllers
                  else
                  {
                      cEntity.APPLICATIONSTATUS = "3"; //延期申请失败
-                     //延期失败保存整改人相关信息到result,用于极光推送
-                     UserEntity changeUser = userbll.GetEntity(cEntity.REFORMPEOPLEID);
-                     if(null!=changeUser)
-                     {
-                         result.actionperson = changeUser.Account;
-                         result.username = cEntity.REFORMPEOPLE;
-                         result.deptname = cEntity.REFORMDEPTNAME;
-                         result.deptid = changeUser.DepartmentId;
-                         result.deptcode = cEntity.REFORMDEPTCODE;
-                     }
-                 }
+                    //延期失败保存整改人相关信息到result,用于极光推送
+                    //UserEntity changeUser = userbll.GetEntity(cEntity.REFORMPEOPLEID);
+                    //if(null!=changeUser)
+                    //{
+                    //    result.actionperson = changeUser.Account;
+                    //    result.username = cEntity.REFORMPEOPLE;
+                    //    result.deptname = cEntity.REFORMDEPTNAME;
+                    //    result.deptid = changeUser.DepartmentId;
+                    //    result.deptcode = cEntity.REFORMDEPTCODE;
+                    //}
+                    string[] userids = cEntity.REFORMPEOPLEID.Split(',');
+                    DataTable userdt = userbll.GetUserTable(userids);
+                    foreach (DataRow row in userdt.Rows)
+                    {
+                        result.actionperson += row["account"].ToString() + ",";
+                        result.username += row["realname"].ToString() + ",";
+                        if (!result.deptname.Contains(row["deptname"].ToString()))
+                        {
+                            result.deptname += row["deptname"].ToString() + ",";
+                        }
+                        if (!result.deptid.Contains(row["departmentid"].ToString()))
+                        {
+                            result.deptid += row["departmentid"].ToString() + ",";
+                        }
+                        if (!result.deptcode.Contains(row["departmentcode"].ToString()))
+                        {
+                            result.deptcode += row["departmentcode"].ToString() + ",";
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(result.actionperson))
+                    {
+                        result.actionperson = result.actionperson.Substring(0, result.actionperson.Length - 1);
+                    }
+                    if (!string.IsNullOrEmpty(result.username))
+                    {
+                        result.username = result.username.Substring(0, result.username.Length - 1);
+                    }
+                    if (!string.IsNullOrEmpty(result.deptname))
+                    {
+                        result.deptname = result.deptname.Substring(0, result.deptname.Length - 1);
+                    }
+                    if (!string.IsNullOrEmpty(result.deptid))
+                    {
+                        result.deptid = result.deptid.Substring(0, result.deptid.Length - 1);
+                    }
+                    if (!string.IsNullOrEmpty(result.deptcode))
+                    {
+                        result.deptcode = result.deptcode.Substring(0, result.deptcode.Length - 1);
+                    }
+                }
 
                  //延期成功 
                  if (wfFlag == "2" && postPoneResult == "1")

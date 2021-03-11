@@ -134,6 +134,31 @@ namespace ERCHTMS.Entity.HiddenTroubleManage.ViewModel
     }
 
 
+    public class ImportLllegalPunish
+    {
+        public int serialnumber { get; set; } //序号
+        public string username { get; set; } //用户
+        public string userid { get; set; } //用户
+        public string deptname { get; set; } //部门
+        public string deptid { get; set; } //部门
+
+        public string nature { get; set; } //部门
+        public string teamname { get; set; } //专业/班组
+        public string teamid { get; set; } //专业/班组
+
+        public string tnature { get; set; }
+        public string dutyname { get; set; } //岗位/职务 
+        public string dutyid { get; set; } //岗位/职务 
+        public string lllegaldescribe { get; set; } //违章过程描述
+        public string lllegaltype { get; set; } //违章分类
+        public string lllegaltypename { get; set; } //违章分类
+        public string punishdate { get; set; } //处罚时间
+        public int? punishresult { get; set; } //处罚结果
+        public int? punishpoint { get; set; } //处罚积分
+
+    }
+
+
     public class ImportQuantifyIndex
     {
         public string DeptId { get; set; }

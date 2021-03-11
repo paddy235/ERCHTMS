@@ -11,6 +11,7 @@
         background-color: transparent;
         text-decoration: none;
     }
+
     .Tj tr, .Tj td {
         border: 1px solid #000000;
     }
@@ -21,6 +22,11 @@
         line-height: 25px;
         text-align: center;
         border-collapse: collapse;
+    }
+
+    #Tj a {
+        color: rgb(51, 122, 183);
+        text-decoration:underline;
     }
 
     .pop {
@@ -55,6 +61,49 @@
         IniDownList();
         GetGrid();
         GetPersonNums();
+
+        //查询条件
+        $("#queryCondition .dropdown-menu li").click(function () {
+            var text = $(this).find('a').html();
+            var value = $(this).find('a').attr('data-value');
+            $("#queryCondition .dropdown-text").html(text).attr('data-value', value);
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+           
+            $("#gridTable").jqGrid('setGridParam',
+                {
+                    postData: { queryJson: CreateParams() },
+                    page: 1
+                }).trigger('reloadGrid');
+        });
+
+        $("#btn_Reset").click(function () {
+            $("#StartTime").val("");
+            $("#EndTime").val("");
+            $("#DeptName").val("");
+            $("#Name").val("");
+            $("#DeviceName").val("");
+            $("#AreaName").attr("data-text", "===全部===");
+            $("#AreaName").attr("data-value", "");
+            $("#AreaName div:eq(0)").text("===全部===");
+            $("#EventType").attr("data-text", "===全部===");
+            $("#EventType").attr("data-value", "");
+            $("#EventType div:eq(0)").text("===全部===");
+            $("#gridTable").jqGrid('setGridParam',
+                {
+                    postData: { queryJson: CreateParams() },
+                    page: 1
+                }).trigger('reloadGrid');
+        });
+        //查询回车
+        $('#txt_Keyword').bind('keypress',
+            function (event) {
+                if (event.keyCode == "13") {
+                    $('#btn_Search').trigger("click");
+                }
+            });
     });
 
     function IniDownList() {
@@ -106,7 +155,7 @@
                     area1 = area1 + data.PersonData[i].stationCount1;
                     area2 = area2 + data.PersonData[i].stationCount2;
                     area3 = area3 + data.PersonData[i].stationCount3;
-                    if (data.PersonData[i].userType == 0) {                        
+                    if (data.PersonData[i].userType == 0) {
                         html += "<tr><td>电厂（人）</td><td><a href=\"javascript:TodayPerson(\'一号岗\',0);\">" + data.PersonData[i].stationCount1 + "</a></td><td><a href=\"javascript:TodayPerson(\'三号岗\',0);\">" + data.PersonData[i].stationCount2 + "</a></td><td><a href=\"javascript:TodayPerson(\'码头岗\',0);\">" + data.PersonData[i].stationCount3 + "</a></td></tr>";
                     } else if (data.PersonData[i].userType == 1) {
                         html += "<tr><td>外委（人）</td><td><a href=\"javascript:TodayPerson(\'一号岗\',1);\">" + data.PersonData[i].stationCount1 + "</a></td><td><a href=\"javascript:TodayPerson(\'三号岗\',1);\">" + data.PersonData[i].stationCount2 + "</a></td><td><a href=\"javascript:TodayPerson(\'码头岗\',1);\">" + data.PersonData[i].stationCount3 + "</a></td></tr>";
@@ -116,11 +165,11 @@
                    // allNums += data.PersonData[i].sums;
                 }
 
-                html += "<tr><td>统计（人）</td><td>"+area1+"</td><td>"+area2+"</td><td>"+area3+"</td></tr>";
+                html += "<tr><td>统计（人）</td><td><a href=\"javascript:TodayPerson(\'一号岗\',\'\');\">" + area1 + "</a></td><td><a href=\"javascript:TodayPerson(\'三号岗\',\'\');\">" + area2 + "</a></td><td><a href=\"javascript:TodayPerson(\'码头岗\',\'\');\">" + area3 +"</a></td></tr>";
                 $("#Tj").html(html);
             }
         });
-        
+
     }
 
     function TodayPerson(area,type) {
@@ -141,6 +190,20 @@
         });
     }
 
+    function CreateParams() {
+        var queryJson = {
+            StartTime: $("#StartTime").val(),
+            EndTime: $("#EndTime").val(),
+            DeptName: $("#DeptName").val(),
+            Name: $("#Name").val(),
+            DeviceName: $("#DeviceName").val(),
+            AreaName: $("#AreaName").attr('data-value'),
+            EventType: $("#EventType").attr('data-value')
+
+        }
+        return JSON.stringify(queryJson);
+    }
+
     //加载表格
     function GetGrid() {
         var selectedRowIndex = 0;
@@ -150,6 +213,7 @@
             height: $(window).height() - 300,
             url: "../../CarManage/Hikinoutlog/GetListJson",
             datatype: "json",
+            postData: { queryJson: CreateParams() },
             colModel: [
                 { label: '主键', name: 'id', hidden: true },
                 {
@@ -228,11 +292,9 @@
                     align: 'center',
                     formatter: function (cellvalue, options, rowObject) {
                         var html = "";
-                        var picpath = GetHikImgUrl(cellvalue);
                         if (cellvalue) {
-                            html = "<img width='35'title='点击查看大图' height='35'  onclick=ShowImg('" + picpath +
-                                "') src='" + picpath +
-                                "'>";
+                            html = "<img width='35'title='点击查看大图' height='35'  onclick=ShowImg('" + cellvalue + "','" + rowObject.hikpicsvr+
+                                "') src=''>";
                         }
                         return html;
                     }
@@ -262,80 +324,33 @@
             gridComplete: function () {
                 $('#' + this.id).setSelection(selectedRowIndex, false);
             }
-        });
-        //查询条件
-        $("#queryCondition .dropdown-menu li").click(function () {
-            var text = $(this).find('a').html();
-            var value = $(this).find('a').attr('data-value');
-            $("#queryCondition .dropdown-text").html(text).attr('data-value', value);
-        });
-        //查询事件
-        $("#btn_Search").click(function () {
-            var queryJson = {
-                StartTime: $("#StartTime").val(),
-                EndTime: $("#EndTime").val(),
-                DeptName: $("#DeptName").val(),
-                Name: $("#Name").val(),
-                DeviceName: $("#DeviceName").val(),
-                AreaName: $("#AreaName").attr('data-value'),
-                EventType: $("#EventType").attr('data-value')
-
-            }
-            $gridTable.jqGrid('setGridParam',
-                {
-                    postData: { queryJson: JSON.stringify(queryJson) },
-                    page: 1
-                }).trigger('reloadGrid');
-        });
-        $("#btn_Reset").click(function () {
-            $("#StartTime").val("");
-            $("#EndTime").val("");
-            $("#DeptName").val("");
-            $("#Name").val("");
-            $("#DeviceName").val("");
-            $("#AreaName").attr("data-text", "===全部===");
-            $("#AreaName").attr("data-value", "");
-            $("#AreaName div:eq(0)").text("===全部===");
-            $("#EventType").attr("data-text", "===全部===");
-            $("#EventType").attr("data-value", "");
-            $("#EventType div:eq(0)").text("===全部===");
-            var queryJson = {
-                StartTime: "",
-                EndTime: ""
-            }
-            $gridTable.jqGrid('setGridParam',
-                {
-                    postData: { queryJson: JSON.stringify(queryJson) },
-                    page: 1
-                }).trigger('reloadGrid');
-        });
-        //查询回车
-        $('#txt_Keyword').bind('keypress',
-            function (event) {
-                if (event.keyCode == "13") {
-                    $('#btn_Search').trigger("click");
-                }
-            });
+        });       
     }
 
-    function ShowImg(url) {
-        ////查看图片
-        //var w = 1200;
-        //var h = 960;
-        //dialogOpen({
-        //    id: "DetailPrject",
-        //    title: "查看图片",
-        //    url: '/CarManage/Hikdevice/ImgShow?Url=' + url,
-        //    shade: 0.5,
-        //    btn: null,
-        //    width: w + "px",
-        //    height: h + "px",
-        //    callBack: function (iframeId) {
+    function ShowImg(url, picsvr) {
+        if (url) {
+            var start = url.indexOf("/Resource");
+            if (start == 0) {//是
+                $("#pop").show();
+                $("#imgShow").attr("src", top.contentPath + url);
+            } else {//否
+                if (softName == "gdhjb") {
+                    $.get('../../HJBPerson/CarVelocity/GetHikImagePath', { picSvr: picsvr, picPath: url }, function (data) {
+                        if (data) {
+                            $("#pop").show();
+                            $("#imgShow").attr("src", data);
+                        }
+                    });
+                }
+                else {
+                    $("#pop").show();
+                    $("#imgShow").attr("src", KMHikImgIp + url);
+                }
+            }
+        } else {
+            return '';
+        }
 
-        //    }
-        //});
-        $("#pop").show();
-        $("#imgShow").attr("src", url);
 
 
     }
@@ -356,13 +371,21 @@
         location.href = "../../CarManage/Hikinoutlog/ExportData?queryJson=" + queryJson;
     }
     //判读是否是海康的图片路径不是则返回我们自己存储路径
-    function GetHikImgUrl(url) {
+    function GetHikImgUrl(url, picsvr) {
         if (url) {
             var start = url.indexOf("/Resource");
             if (start == 0) {//是
                 return  top.contentPath + url;
 
             } else {//否
+                if (softName == "gdhjb") {
+                    $.get('../../HJBPerson/CarVelocity/GetHikImagePath', { picSvr: picsvr, picPath: url }, function (data) {
+                            if (data) {
+                                return data;
+                            }
+                      });
+                }
+                else
                 return KMHikImgIp + url;
             }
         } else {
@@ -425,8 +448,8 @@
                         </td>
 
                         <td align="right" style="width: 140px;">
-                            <a id="btn_Search" class="btn btn-primary" onclick="query()"><i class="fa fa-search"></i>&nbsp;查询</a>
-                            &nbsp;<a id="btn_Reset" class="btn btn-primary" onclick="reset()"><i class="fa fa-undo"></i>&nbsp;重置</a>
+                            <a id="btn_Search" class="btn btn-primary" ><i class="fa fa-search"></i>&nbsp;查询</a>
+                            &nbsp;<a id="btn_Reset" class="btn btn-primary"><i class="fa fa-undo"></i>&nbsp;重置</a>
                             &nbsp;<a id="export" class="btn btn-primary" onclick="exportResult()">导出</a>
                         </td>
 
@@ -434,11 +457,11 @@
                     <tr>
                         <td style="width: 65px; font-weight: bold;" align="right">进入开始时间：</td>
                         <td style="width: 90px;">
-                            <input id="StartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm:ss'})">
+                            <input id="StartTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({dateFmt:'yyyy-MM-dd HH:mm:ss'})" value="@DateTime.Today.ToString("yyyy-MM-dd HH:mm:ss")">
                         </td>
                         <td style="width: 10px; font-weight: bold;" align="center" class="area">-</td>
                         <td style="width: 90px;" class="area">
-                            <input id="EndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })">
+                            <input id="EndTime" type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" value="@DateTime.Today.ToString("yyyy-MM-dd 23:59:59")">
                         </td>
                         <td colspan="7"></td>
                     </tr>
@@ -462,35 +485,35 @@
                 <div class="row" style="margin:10px;">
                     <table class="Tj" id="Tj">
                         @*<tr>
-                            <td>人员/区域</td>
-                            <td>生产区</td>
-                            <td>办公区</td>
-                            <td>总计</td>
-                        </tr>
-                        <tr>
-                            <td>电厂（人）</td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>
-                        <tr>
-                            <td>外委（人）</td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>
-                        <tr>
-                            <td>临时（人）</td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>
-                        <tr>
-                            <td>统计（人）</td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>*@
+                                <td>人员/区域</td>
+                                <td>生产区</td>
+                                <td>办公区</td>
+                                <td>总计</td>
+                            </tr>
+                            <tr>
+                                <td>电厂（人）</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>外委（人）</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>临时（人）</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>统计（人）</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>*@
                     </table>
                 </div>
             </div>
@@ -500,8 +523,8 @@
 </div>
 
 <div class="pop" id="pop" style="display:none;" onclick="$('#pop').hide()">
-    <div class="pop-conetnt" >
-        <img id="imgShow" width="800" height="600"/>
+    <div class="pop-conetnt">
+        <img id="imgShow" style="width:432px;height:768px;" />
     </div>
 </div>
 

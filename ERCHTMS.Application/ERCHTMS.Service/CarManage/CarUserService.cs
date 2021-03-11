@@ -318,6 +318,7 @@ namespace ERCHTMS.Service.CarManage
             try
             {
                 // List<CarUserFileImgEntity> list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<CarUserFileImgEntity>>(userjson);
+                List<UserCarFileMultipleEntity> FileItems = new List<UserCarFileMultipleEntity>();
                 for (int i = 0; i < list.Count; i++)
                 {
                     if (list[i].ID == "-1")
@@ -328,15 +329,29 @@ namespace ERCHTMS.Service.CarManage
                         list[i].ID = Guid.NewGuid().ToString();
                         list[i].CreateDate = DateTime.Now;
                         entity.AccompanyingPerson = entity.AccompanyingPerson + list[i].Username + ",";
+                        if (list[i].FileItems != null && list[i].FileItems.Count > 0)
+                        {
+                            for (int j = 0; j < list[i].FileItems.Count; j++)
+                            {
+                                list[i].FileItems[j].Create();
+                                list[i].FileItems[j].ID = Guid.NewGuid().ToString();
+                                list[i].FileItems[j].BaseId = entity.ID;
+                                list[i].FileItems[j].UserCarFileId = list[i].ID;
+                                list[i].FileItems[j].CreateDate = DateTime.Now;
+                            }
+                            FileItems.AddRange(list[i].FileItems);
+                        }
+                           
                     }
                 }
                 entity.AccompanyingPerson = entity.AccompanyingPerson.TrimEnd(',');
+                res.Insert<UserCarFileMultipleEntity>(FileItems);
                 res.Insert<CarUserFileImgEntity>(list);
                 res.Insert(entity);
                 res.Commit();
                 UploadUserHiK(entity, list);//人员同步到海康平台
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 res.Rollback();
             }
@@ -905,7 +920,6 @@ namespace ERCHTMS.Service.CarManage
                 inlogdb.Update(old);
             }
         }
-
         #endregion
     }
 }

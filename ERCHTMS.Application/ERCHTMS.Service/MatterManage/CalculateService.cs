@@ -1,15 +1,14 @@
-using ERCHTMS.Entity.MatterManage;
-using ERCHTMS.IService.MatterManage;
-using BSFramework.Data.Repository;
-using BSFramework.Util.WebControl;
-using System.Collections.Generic;
-using System.Linq;
-using System.Data;
 using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using BSFramework.Data;
+using BSFramework.Data.Repository;
 using BSFramework.Util;
 using BSFramework.Util.Extension;
-using BSFramework.Data;
-using ERCHTMS.Service.SystemManage;
+using BSFramework.Util.WebControl;
+using ERCHTMS.Entity.MatterManage;
+using ERCHTMS.IService.MatterManage;
 
 namespace ERCHTMS.Service.MatterManage
 {
@@ -184,6 +183,52 @@ namespace ERCHTMS.Service.MatterManage
             return dt;
         }
 
+
+        /// <summary>
+        /// 获取地磅室开票信息
+        /// </summary>                       
+        /// <param name="pagination">分页筛选参数</param>
+        /// <param name="queryJson">数据过滤筛选参数</param>
+        /// <returns></returns>
+        public DataTable GetPoundOrderList(Pagination pagination, string queryJson)
+        {
+            pagination.conditionJson = " 1=1 ";
+            string stime = string.Empty;
+            string etime = string.Empty;
+            var queryParam = queryJson.ToJObject();
+            if (!queryParam["PlateNumber"].IsEmpty())
+            {//车牌号
+                string PlateNumber = queryParam["PlateNumber"].ToString().Trim();
+                pagination.conditionJson += string.Format(" and a.platenumber like '%{0}%'", PlateNumber);
+            }
+            if (!queryParam["TakegoodsName"].IsEmpty())
+            {//提货方
+                string takegoodsName = queryParam["TakegoodsName"].ToString().Trim();
+                pagination.conditionJson += string.Format(" and a.takegoodsname like '%{0}%'", takegoodsName);
+            }
+            if (!queryParam["GoodsName"].IsEmpty())
+            {//副产品类型
+                string goodsName = queryParam["GoodsName"].ToString().Trim();
+                pagination.conditionJson += string.Format(" and a.Goodsname like '%{0}%'", goodsName);
+            }
+            if (!queryParam["Stime"].IsEmpty())
+            {//开票时间起
+                stime = queryParam["Stime"].ToString().Trim();
+                pagination.conditionJson += string.Format(" and a.createdate >=  to_date('{0}', 'yyyy-MM-dd HH24:mi:ss') ", Convert.ToDateTime(stime));
+            }
+            if (!queryParam["Etime"].IsEmpty())
+            {
+                //开票时间止
+                etime = queryParam["Etime"].ToString().Trim();
+                pagination.conditionJson += string.Format(" and a.createdate <= to_date('{0}', 'yyyy-MM-dd HH24:mi:ss') ", etime);
+            }
+            pagination.p_kid = " a.id ";
+            pagination.p_fields = " a.createdate, a.numbers,a.platenumber,a.goodsname, a.takegoodsname,case a.shipunloading when 1 then '是' else '否' end shipunloading,a.outtime, b.tare,b.taretime,b.rough,b.roughtime ";
+            pagination.p_tablename = " wl_calculatedetailed a left join wl_calculate b on a.id=b.baseid ";
+            DataTable dt = this.BaseRepository().FindTableByProcPager(pagination, DbHelper.DbType);
+            return dt;
+        }
+
         /// <summary>
         /// 获取地磅员列表
         /// </summary>
@@ -323,7 +368,7 @@ namespace ERCHTMS.Service.MatterManage
         private CalculateEntity AutoGenerateTicket(OperticketmanagerEntity originalEntity)
         {
             OperticketmanagerEntity newEntity = new OperticketmanagerEntity()
-            {                 
+            {
                 CreateUserId = originalEntity.CreateUserId,
                 CreateUserName = originalEntity.CreateUserName,
                 Createuserdeptid = originalEntity.Createuserdeptid,
@@ -334,8 +379,8 @@ namespace ERCHTMS.Service.MatterManage
                 Producttype = originalEntity.Producttype,
                 ProducttypeId = originalEntity.ProducttypeId,
                 Platenumber = originalEntity.Platenumber,
-                DriverName=originalEntity.DriverName,
-                DriverTel=originalEntity.DriverTel,
+                DriverName = originalEntity.DriverName,
+                DriverTel = originalEntity.DriverTel,
                 Dress = originalEntity.Dress,
                 Takegoodsname = originalEntity.Takegoodsname,
                 Takegoodsid = originalEntity.Takegoodsid,
@@ -356,8 +401,8 @@ namespace ERCHTMS.Service.MatterManage
                 TemplateSort = originalEntity.TemplateSort,
                 ShipLoading = originalEntity.ShipLoading
             };
-             new OperticketmanagerService().SaveForm(string.Empty,newEntity);
-            
+            new OperticketmanagerService().SaveForm(string.Empty, newEntity);
+
 
             CalculateEntity returnEntity = new CalculateEntity()
             {
@@ -489,6 +534,18 @@ namespace ERCHTMS.Service.MatterManage
                 }
             }
         }
+
+        /// <summary>
+        /// 更新地磅开单车辆出厂时间
+        /// </summary>
+        /// <param name="plateNumber">车牌号</param>
+        public void UpdateCalculateDetailTime(string plateNumber)
+        {
+            Repository<CalculateDetailedEntity> Repository = new Repository<CalculateDetailedEntity>(DbFactory.Base());
+            string sql = string.Format("update wl_calculatedetailed set outtime=sysdate where platenumber ='{0}' and outtime is null", plateNumber);
+            Repository.ExecuteBySql(sql);
+        }
+
 
         /// <summary>
         /// 获取记录管理详情记录实体

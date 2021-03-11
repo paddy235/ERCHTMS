@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using ERCHTMS.Busines.BaseManage;
 
 namespace ERCHTMS.Web.Areas.PersonManage.Controllers
 {
@@ -26,6 +27,8 @@ namespace ERCHTMS.Web.Areas.PersonManage.Controllers
         private AcesscontrolinfoBLL acesscontrolinfobll = new AcesscontrolinfoBLL();
         private OperticketmanagerBLL Opertickebll = new OperticketmanagerBLL();
         private TemporaryGroupsBLL Tempbll = new TemporaryGroupsBLL();
+        private UserBLL userBLL = new UserBLL();
+        private DepartmentBLL departmentBLL = new DepartmentBLL();
 
         #region 视图功能
         /// <summary>
@@ -104,6 +107,42 @@ namespace ERCHTMS.Web.Areas.PersonManage.Controllers
                 {
                     userid += ",'" + users[i] + "'";
                 }
+                #region 临时人员判断
+                if (type == "1")
+                {
+                    var tempentity = new TemporaryGroupsBLL().GetEmptyUserEntity(users[i]);
+                    if (tempentity == null)
+                    {
+                        var Us = userBLL.GetEntity(users[i]);
+                        if (Us != null)
+                        {
+                            List<TemporaryUserEntity> list = new List<TemporaryUserEntity>();
+                            //如果不存在于临时列表则新增一条数据
+                            TemporaryUserEntity inserttuser = new TemporaryUserEntity();
+                            inserttuser.Tel = Us.Account;
+                            inserttuser.ComName = "";
+                            inserttuser.CreateDate = Us.CreateDate;
+                            inserttuser.CreateUserId = Us.CreateUserId;
+                            inserttuser.USERID = Us.UserId;
+                            inserttuser.Gender = Us.Gender;
+                            inserttuser.ISDebar = 0;
+                            inserttuser.Istemporary = 0;
+                            inserttuser.Identifyid = Us.IdentifyID;
+                            inserttuser.Postname = Us.DutyName;
+                            inserttuser.UserName = Us.RealName;
+                            inserttuser.Groupsid = Us.DepartmentId;
+                            inserttuser.startTime = Us.CreateDate;
+                            var dept1 = departmentBLL.GetEntity(Us.DepartmentId);
+                            if (dept1 != null)
+                            {
+                                inserttuser.GroupsName = dept1.FullName;
+                            }
+                            list.Add(inserttuser);
+                            new TemporaryGroupsBLL().SaveTemporaryList("", list);
+                        }
+                    }
+                }
+                #endregion
             }
             string sql = string.Empty;
             if (type == "1")
@@ -112,7 +151,7 @@ namespace ERCHTMS.Web.Areas.PersonManage.Controllers
             }
             else
             {
-                sql = string.Format(@" select d.id,d.userimg,d.username,d.baseid,d.imgdata from BIS_USERCARFILEIMG d   where d.id in ({0})", userid);
+                sql = string.Format(@" select d.id,d.userimg,d.username,d.baseid,d.imgdata from bis_usercarfileimg d   where d.id in ({0})", userid);
             }
 
             var data = Opertickebll.GetDataTable(sql);

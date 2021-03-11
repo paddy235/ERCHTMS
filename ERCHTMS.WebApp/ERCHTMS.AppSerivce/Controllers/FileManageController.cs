@@ -1,5 +1,6 @@
 ﻿using BSFramework.Util.WebControl;
 using ERCHTMS.AppSerivce.Model;
+using ERCHTMS.Busines.BaseManage;
 using ERCHTMS.Busines.PublicInfoManage;
 using ERCHTMS.Busines.RoutineSafetyWork;
 using ERCHTMS.Busines.SystemManage;
@@ -18,6 +19,7 @@ namespace ERCHTMS.AppSerivce.Controllers
 {
     public class FileManageController : BaseApiController
     {
+        private FileInformBLL FileInformbll = new FileInformBLL();
         public HttpContext ctx { get { return HttpContext.Current; } }
         private FileManageBLL FileManage = new FileManageBLL();
         private FileTreeManageBLL FileTreeManage = new FileTreeManageBLL();
@@ -145,6 +147,51 @@ namespace ERCHTMS.AppSerivce.Controllers
             var result = new { code = 0, info = "获取数据成功", count = data.Count, data = dataList };
 
             return JObject.Parse(JsonConvert.SerializeObject(result, Formatting.None, settings));
+        }
+
+        /// <summary>
+        /// 获取大屏展示数据
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost]
+        public object GetScrnEntity(string orgcode)
+        {
+            try
+            {
+                //Operator curUser = OperatorProvider.Provider.Current();
+                var list = FileInformbll.GetList("").Where(t => t.CreateUserOrgCode == orgcode && t.IsSend == "0").OrderByDescending(t => t.CreateDate).Take(2).ToList();
+                List<object> data = new List<object>();
+                foreach (var item in list)
+                { 
+                    IList<Entity.HighRiskWork.ViewModel.Photo> pList = new List<Entity.HighRiskWork.ViewModel.Photo>(); //附件
+                    DataTable file = fileInfoBLL.GetFiles(item.Id);
+                    foreach (DataRow dr in file.Rows)
+                    {
+                        Entity.HighRiskWork.ViewModel.Photo p = new Entity.HighRiskWork.ViewModel.Photo();
+                        p.fileid = dr["fileid"].ToString();
+                        p.filename = dr["filename"].ToString();
+                        p.fileurl = dataitemdetailbll.GetItemValue("imgUrl") + dr["filepath"].ToString().Substring(1);
+                        pList.Add(p);
+                    }
+                    var ReleaseDept = new DepartmentBLL().GetEntityByCode(item.CreateUserDeptCode).FullName;
+                    item.Content = item.Content == null ? "" : item.Content;
+                    data.Add(new
+                    {
+                        id = item.Id,
+                        title = item.Title,
+                        Publisher = item.Publisher,
+                        ReleaseTime = !Convert.IsDBNull(item.ReleaseTime) ? item.ReleaseTime.Value.ToString("yyyy年MM月dd日") : "",
+                        Content = item.Content.Length > 520 ? (item.Content.Substring(0,519) + "...") : item.Content,
+                        ReleaseDept = ReleaseDept,
+                        file = pList
+                    });
+                }
+                return new { Code = 0, Count = data.Count, data = Newtonsoft.Json.JsonConvert.SerializeObject(data) };
+            }
+            catch (Exception ex)
+            {
+                return new { Code = -1, Count = 0, Info = ex.Message };
+            }
         }
     }
 }

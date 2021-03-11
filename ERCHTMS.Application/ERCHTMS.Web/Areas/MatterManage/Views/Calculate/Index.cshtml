@@ -5,7 +5,7 @@
 <script src="~/Content/scripts/business/gridhelper.js"></script>
 <!--即时通信start-->
 <script src="~/Content/scripts/plugins/signalr/jquery.signalR-2.2.0.min.js"></script>
-<script src="@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("SignalRUrl", "MQConfig"))/hubs"></script>
+<script src="@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("SignalRUrl", "MQConfig" ))/hubs"></script>
 
 <style>
     .mztitle {
@@ -246,8 +246,6 @@
                         $("#Taretime").val(formatDate(data.Taretime, "yyyy-MM-dd hh:mm"));
                         $("#Roughtime").val(formatDate(data.Roughtime, "yyyy-MM-dd hh:mm"));
                         $("#Roughusername").val(data.Roughusername == null ? data.Tareusername : data.Roughusername);
-                        jQuery("#bit_OverLoad").hide();
-                        jQuery("#btn_Save").hide();
                     }
                 }
             })
@@ -294,8 +292,6 @@
             $("#Poundcode").val("1#");
             $("#Poundname").val("1#地磅");
             $("#Roughusername").val(currUserAccount);
-        } else {
-              jQuery("#btn_Save").hide();
         }
     }
 
@@ -439,10 +435,24 @@
             width: 500 + "px",
             height: 300 + "px",
             callBack: function (iframeId) {
-                top.layer.close(dlg);
-                $("#gridTable").trigger("reloadGrid");
+                top.frames[iframeId].AcceptClick();
             }
         });
+    }
+
+    function ShowOrders() {
+        var dlg = dialogOpen({
+            id: 'Form',
+            title: '地磅室开票信息',
+            url: '/MatterManage/Calculate/Orders',
+            width: 1100 + "px",
+            height: 600 + "px",
+            btn: ["关闭"],
+            callBack: function (iframeId) {
+                top.layer.close(dlg);
+            }
+        });
+
     }
 
     //保存表单;
@@ -463,13 +473,13 @@
             url: "../../MatterManage/Calculate/SaveForm?keyValue=" + keyValue,
             param: postData,
             loading: "正在保存数据...",
-            success: function (data) {               
-                var speakMsg = " 重量" + Weight + "，称重完成，";
+            success: function (data) {
+                var speakMsg = jQuery("#Platenumber").val()+"重量" + Weight + "，称重完成，";
                 if (parseInt(postData["Rough"]) > 0 && data.resultdata) {
                     speakMsg += "净重" + $("#Netwneight").val();
                     f_stamp(data.resultdata);
                 }
-                GetWorkRecord();                
+                GetWorkRecord();
                 speakText(speakMsg);
                 resetform();
                 $('#gridTable').jqGrid('setGridParam', { postData: { queryJson: JSON.stringify(CreateParams()) }, page: 1 }).trigger('reloadGrid');
@@ -509,7 +519,8 @@
                             jQuery("#Taretime").val(tickite.Taretime);
                             tareWeight = tickite.Tare;
                             keyValue = tickite.ID;
-                        }
+                        } else
+                            keyValue = "";
                     } else {
                         resetform();
                          dialogMsg("<span style='color:red;font-size:24px'>未查询到车辆【"+plateNo+"】的开票信息！请联系相关人员开票</span>", 0);
@@ -531,9 +542,9 @@
                 height: 450 + "px",
                 btn: null,
                callBack: function (iframeId) {
-                    $("#gridTable").trigger("reloadGrid");
                     GetWorkRecord();
                    top.layer.close(dlg);
+                   $("#gridTable").trigger("reloadGrid");
                 }
             });
         }
@@ -579,7 +590,7 @@
                 <tr>
                     <th class="formTitle" style=" font-size:16px;font-weight:bold;">重量：</th>
                     <td class="formValue">
-                        <input style="font-size: 65px; height: 120px; width: 335px;color: red;" id="Weight" type="text" name="name" readonly="readonly" class="form-control" value="0" />
+                        <input style="font-size: 65px; height: 120px; width: 100%;color: red;" id="Weight" type="text" name="name" readonly="readonly" class="form-control" value="0" />
                     </td>
                 </tr>
                 <tr>
@@ -627,10 +638,10 @@
                     </td>
                     <th class="formTitle">车牌号：</th>
                     <td class="formValue">
-                        @*<select id="Platenumber" isvalid="yes" checkexpession="isNotNullAndPlate" onchange="f_checktext()" class="form-control" ></select>*@
+                        @*<select id="Platenumber" isvalid="yes" checkexpession="isNotNullAndPlate" onchange="f_checktext()" class="form-control"></select>*@
                         <input id="Platenumber" readonly="readonly" type="text" isvalid="yes" checkexpession="NotNull" class="form-control" style="width:70%;float:left;" />
-                        <div class="ui-filter-list-bottom" style="float:left;height:26px; line-height:26px;">
-                            &nbsp;&nbsp;<a onclick="ChooseTickite()" id="btn_Select" class="btn btn-primary">输入车牌</a>
+                        <div class="ui-filter-list-bottom" style="float:left;height:26px; line-height:26px;width:30%;">
+                            <a onclick="ChooseTickite()" id="btn_Select" class="btn btn-primary">输入车牌</a>
                         </div>
                         <input id="BaseId" type="hidden" value="" />
                     </td>
@@ -676,7 +687,8 @@
                         <input type="hidden" id="DataType" value="" />
                     </td>
 
-                    @*<td class="formTitle">异常提醒：</td>
+                    @*
+                        <td class="formTitle">异常提醒：</td>
                         <td class="formValue">
                             <input id="Unusualremind" readonly="readonly" type="text" class="form-control" />
                         </td>*@
@@ -714,7 +726,7 @@
                                                 <td class="formValue">
                                                     <input id="Category" type="hidden" value="1" />
                                                     <div style="float: left; ">
-                                                        <input id="StartTime" type="text" style="width:180px;" class="form-control input-wdatepicker" value="@DateTime.Now.Date.ToString("yyyy-MM-dd HH:mm:ss")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" />
+                                                        <input id="StartTime" type="text" style="width:180px;" class="form-control input-wdatepicker" value="@DateTime.Now.Date.ToString(" yyyy-MM-dd HH:mm:ss")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" />
                                                     </div>
 
                                                 </td>
@@ -723,7 +735,7 @@
                                                 <td style="float:right; ">毛重时间止：</td>
                                                 <td class="formValue">
                                                     <div style="float: left;">
-                                                        <input id="EndTime" style="width:180px;" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.Date.ToString("yyyy-MM-dd 23:59:59")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" />
+                                                        <input id="EndTime" style="width:180px;" type="text" class="form-control input-wdatepicker" value="@DateTime.Now.Date.ToString(" yyyy-MM-dd 23:59:59")" onfocus="WdatePicker({ dateFmt: 'yyyy-MM-dd HH:mm:ss' })" />
                                                     </div>
                                                 </td>
                                             </tr>
@@ -735,7 +747,8 @@
                                                     <input id="Takegoodsname1" type="text" class="form-control" placeholder="请输入运货单位" style="width: 180px;" />
                                                 </td>
                                             </tr>
-                                            @*<tr>
+                                            @*
+                                                <tr>
                                                     <td style="float: right; ">
                                                         运输类型：
                                                     </td>
@@ -798,6 +811,9 @@
                     <div class="btn-group">
                         <a id="replace" class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>刷新</a>
                     </div>
+                    @*<div class="btn-group">
+                        <a id="btnOrder" class="btn btn-default" onclick="ShowOrder()"><i class="fa fa-refresh"></i>开票信息</a>
+                    </div>*@
                     <script>$('.toolbar').authorizeButton()</script>
                 </div>
             </div>
@@ -811,7 +827,6 @@
 
 
 <script>
-    var dlg = null;
     var signalRUrl = "@(new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("SignalRUrl", "MQConfig"))";
     var userid = "192.168.9.234";
     var tareWeight = -1;
@@ -835,7 +850,8 @@
                     var result = JSON.parse(msg);
                     //加载开票数据
                     if (result.DataType == 0) {
-                        if (jQuery("#Platenumber").val() == "" && jQuery("#Numbers").val() == "") {
+                        if (jQuery("#Platenumber").val() == "" && jQuery("#Numbers").val() == "")
+                        {
                             resetform();
                             if (result.Data) {
                                 var row = result.Data;
@@ -854,7 +870,8 @@
                                     jQuery("#Taretime").val(row.Taretime);
                                     tareWeight = row.Tare;
                                     keyValue = row.ID;
-                                 }
+                                } else
+                                    keyValue = "";
                             }
                         }
                     }
@@ -864,7 +881,6 @@
                         //第一次称重
                         if (tareWeight == -1) {
                             jQuery("#Tare").val(currentWeight);
-                            jQuery("#btn_Save").show();
                         }
                         else {//第二次称重
                             var netWeight = Math.abs(eval(currentWeight - tareWeight));
@@ -874,10 +890,8 @@
                                 jQuery("#Rough").val(tareWeight);
                                 jQuery("#Roughtime").val(jQuery("#Taretime").val());
                                 jQuery("#Taretime").val("");
-                                jQuery("#btn_Save").show();
                             } else {
                                 jQuery("#Rough").val(currentWeight);
-                                jQuery("#btn_Save").show();
                             }
                             jQuery("#Netwneight").val(netWeight);
                         }
@@ -914,7 +928,8 @@
 
     function resetform() {
         tareWeight = -1;
-        jQuery("#Weight").val("0");
+        keyValue = "";
+        jQuery("#Weight").val("");
         jQuery("#Numbers").val("");
         jQuery("#BaseId").val("");
         jQuery("#Takegoodsname").val("");
@@ -926,6 +941,5 @@
         jQuery("#Taretime").val("");
         jQuery("#Netwneight").val("");
         jQuery("#Unusualremind").val("");
-        jQuery("#btn_Save").hide();
     }
 </script>

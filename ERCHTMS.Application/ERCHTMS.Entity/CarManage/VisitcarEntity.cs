@@ -91,7 +91,7 @@ namespace ERCHTMS.Entity.CarManage
         [Column("CREATEUSERDEPTCODE")]
         public string CreateUserDeptCode { get; set; }
         /// <summary>
-        /// 记录状态 0为已开票 1为已提交待审批 2为已录入GPS数据 3为审批通过 4为已出厂 99为拒绝入场
+        /// 记录状态 0为已开票 1为已提交待审批 2为已录入GPS数据 3为审批通过 4为已出厂 88撤销 99为拒绝入场
         /// </summary>
         /// <returns></returns>
         [Column("STATE")]

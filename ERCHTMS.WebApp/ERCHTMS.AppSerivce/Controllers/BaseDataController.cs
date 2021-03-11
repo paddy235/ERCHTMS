@@ -2994,7 +2994,7 @@ namespace ERCHTMS.AppSerivce.Controllers
                                               select a.id,a.lllegaldescribe,a.flowstate,c.reformdeadline,c.reformpeopleid,c.reformpeople,
                                               c.reformdeptcode ,c.reformdeptname ,d.account from bis_lllegalregister a
                                               left join v_lllegalreforminfo c on a.id = c.lllegalid 
-                                              left join base_user d on c.reformpeopleid =d.userid 
+                                              left join base_user d on instr(c.reformpeopleid,d.userid)>0 
                                      ) a where  flowstate = '违章整改' and (reformdeadline - 3 <= to_date('{0}','yyyy-mm-dd hh24:mi:ss')  and to_date('{0}','yyyy-mm-dd hh24:mi:ss') <= reformdeadline + 1)", DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
                 var jjdqwzgDt = htbaseinfobll.GetGeneralQueryBySql(sql);
 
@@ -3044,7 +3044,7 @@ namespace ERCHTMS.AppSerivce.Controllers
                                              select a.id,a.lllegaldescribe,a.flowstate,c.reformdeadline,c.reformpeopleid,c.reformpeople,
                                               c.reformdeptcode ,c.reformdeptname ,d.account from bis_lllegalregister a
                                               left join v_lllegalreforminfo c on a.id = c.lllegalid 
-                                              left join base_user d on c.reformpeopleid =d.userid 
+                                              left join base_user d on instr(c.reformpeopleid,d.userid)>0 
                                      ) a  where  a.flowstate = '违章整改' and   to_date('{0}','yyyy-mm-dd hh24:mi:ss') > reformdeadline + 1", DateTime.Now);
                 var yqwzgDt = htbaseinfobll.GetGeneralQueryBySql(sql);
 
@@ -3066,45 +3066,48 @@ namespace ERCHTMS.AppSerivce.Controllers
                         string keyValue = row["id"].ToString();
                         //推送到整改人
                         pushcode = "WZ020";
-                        UserInfoEntity changUser = userbll.GetUserInfoEntity(row["reformpeopleid"].ToString()); //整改人对象
+                        List<UserInfoEntity> rulist = userbll.GetAllUserInfoList(row["reformpeopleid"].ToString()).ToList(); //整改人对象
 
                         IList<UserInfoEntity> userlist = new List<UserInfoEntity>();
 
-                        //取本部门负责人
-                        if ((changUser.RoleName.Contains("班组级") || changUser.RoleName.Contains("专业级") || changUser.RoleName.Contains("部门级")) && !changUser.RoleName.Contains("负责人"))
+                        foreach (UserInfoEntity changUser in rulist)
                         {
                             //取本部门负责人
-                            userlist = userbll.GetWFUserListByDeptRoleOrg(changUser.OrganizeId, changUser.DepartmentId, string.Empty, string.Empty, string.Empty, "负责人");
-                        }
-                        else if ((changUser.RoleName.Contains("班组级") || changUser.RoleName.Contains("专业级")) && changUser.RoleName.Contains("负责人"))
-                        {
-                            //取上级部门负责人
-                            userlist = userbll.GetWFUserListByDeptRoleOrg(changUser.OrganizeId, changUser.ParentId, string.Empty, string.Empty, string.Empty, "负责人");
-                        }
-                        //非厂级负责人
-                        else if (changUser.RoleName.Contains("部门级") && !changUser.RoleName.Contains("厂级") && changUser.RoleName.Contains("负责人"))
-                        {
-                            //取厂级负责人
-                            userlist = userbll.GetWFUserListByDeptRoleOrg(changUser.OrganizeId, string.Empty, string.Empty, string.Empty, string.Empty, "厂级部门用户&负责人");
-                        }
-                        //厂级负责人
-                        else if (changUser.RoleName.Contains("厂级") && changUser.RoleName.Contains("负责人"))
-                        {
-                            //取分管安全领导
-                            userlist = userbll.GetWFUserListByDeptRoleOrg(changUser.OrganizeId, string.Empty, string.Empty, string.Empty, string.Empty, "公司领导&安全管理员");
-                        }
-                        //公司级取自己
-                        else if (changUser.RoleName.Contains("公司级"))
-                        {
-                            userlist.Add(changUser);
-                        }
-                        //获取评估人所属的单位负责人及上级负责人
-                        foreach (UserInfoEntity userEntity in userlist)
-                        {
-                            if (!pushaccount.Contains(userEntity.Account + ","))
+                            if ((changUser.RoleName.Contains("班组级") || changUser.RoleName.Contains("专业级") || changUser.RoleName.Contains("部门级")) && !changUser.RoleName.Contains("负责人"))
                             {
-                                pushaccount += userEntity.Account + ",";
-                                pushname += userEntity.RealName + ",";
+                                //取本部门负责人
+                                userlist = userbll.GetWFUserListByDeptRoleOrg(changUser.OrganizeId, changUser.DepartmentId, string.Empty, string.Empty, string.Empty, "负责人");
+                            }
+                            else if ((changUser.RoleName.Contains("班组级") || changUser.RoleName.Contains("专业级")) && changUser.RoleName.Contains("负责人"))
+                            {
+                                //取上级部门负责人
+                                userlist = userbll.GetWFUserListByDeptRoleOrg(changUser.OrganizeId, changUser.ParentId, string.Empty, string.Empty, string.Empty, "负责人");
+                            }
+                            //非厂级负责人
+                            else if (changUser.RoleName.Contains("部门级") && !changUser.RoleName.Contains("厂级") && changUser.RoleName.Contains("负责人"))
+                            {
+                                //取厂级负责人
+                                userlist = userbll.GetWFUserListByDeptRoleOrg(changUser.OrganizeId, string.Empty, string.Empty, string.Empty, string.Empty, "厂级部门用户&负责人");
+                            }
+                            //厂级负责人
+                            else if (changUser.RoleName.Contains("厂级") && changUser.RoleName.Contains("负责人"))
+                            {
+                                //取分管安全领导
+                                userlist = userbll.GetWFUserListByDeptRoleOrg(changUser.OrganizeId, string.Empty, string.Empty, string.Empty, string.Empty, "公司领导&安全管理员");
+                            }
+                            //公司级取自己
+                            else if (changUser.RoleName.Contains("公司级"))
+                            {
+                                userlist.Add(changUser);
+                            }
+                            //获取评估人所属的单位负责人及上级负责人
+                            foreach (UserInfoEntity userEntity in userlist)
+                            {
+                                if (!pushaccount.Contains(userEntity.Account + ","))
+                                {
+                                    pushaccount += userEntity.Account + ",";
+                                    pushname += userEntity.RealName + ",";
+                                }
                             }
                         }
                         if (!string.IsNullOrEmpty(pushaccount)) { pushaccount = pushaccount.Substring(0, pushaccount.Length - 1); }

@@ -1,0 +1,563 @@
+@{;
+    ViewBag.Title = "列表页面";
+    Layout = "~/Views/Shared/_LayoutIndex.cshtml";
+}
+<script src="~/Content/adminDefault/index.js" type="text/javascript"></script>
+<script>
+    var curDeptId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().DeptId";
+    var curUserRole = "@ERCHTMS.Code.OperatorProvider.Provider.Current().RoleName";
+    var curUserId = "@ERCHTMS.Code.OperatorProvider.Provider.Current().UserId";
+    var _parentId = "";//item.Code;
+    var _isOrg = "";//item.Sort;
+    var _deptId = "";//item.id;
+    var mode = request("mode");
+    var special = "";
+    //违章默认登记列表页
+    $(function () {
+
+        //待办入口
+        if (mode == 3)
+        {
+            $("#add").css("display", "none");
+            $("#import").css("display", "none");
+            special = "dbsx";
+            if (curUserRole.indexOf("承包商") >= 0) {
+                mode = 1;
+            }
+            else
+            {
+                mode = 0;
+            }
+        }
+
+        InitialPage();
+        GetTree();
+        GetGrid();
+        GetJFGrid();
+    });
+    //初始化页面
+    function InitialPage() {
+
+        $('#layout').layout({
+            applyDemoStyles: true,
+            onresize: function () {
+                $(window).resize();
+            }
+        });
+
+        //resize重设布局;
+        $(window).resize(function (e) {
+            window.setTimeout(function () {
+                $('#gridTable').setGridWidth($(".center-Panel").width() * 0.99);
+                $('#gridTable').setGridHeight($(window).height() - 190);
+            }, 200);
+            e.stopPropagation();
+        });
+
+        //初始化数据
+        $.SetForm({
+            url: "../../LllegalManage/LllegalRegister/GetQueryConditionJson",
+            success: function (data) {
+                //违章类型
+                $("#lllegaltype").ComboBox({
+                    id: "ItemDetailId",
+                    text: "ItemName",
+                    description: "===全部===",
+                    allowSearch: false,
+                    data: data.LllegalType
+                });
+            }
+        });
+    }
+
+    //加载组织机构树
+    function GetTree() {
+        var json = JSON.stringify(
+            {
+                SelectMode: 0,
+                Mode: mode == 0 ? 28 : 29
+            }
+        );
+        var item = {
+            height: $(window).height() - 90,
+            url: "../../BaseManage/Department/GetDepartTreeJson?json=" + json,
+            onnodeclick: function (item) {
+                _parentId = item.Code;
+                _isOrg = item.Sort;
+                _deptId = item.id;
+                $('#btn_Search').trigger("click");
+            }
+        };
+        //初始化
+        $("#itemTree").treeview(item);
+    }
+
+
+    function resize() {
+        $("#gridTable").setGridWidth($(".center-Panel").width() * 0.99);
+        $("#gridTable").setGridHeight($(window).height() - 190);
+        $('#gridTable1').setGridWidth($(".center-Panel").width() * 0.99);
+        $("#gridTable1").setGridHeight($(window).height() - 190);
+        $("#itemTree").setTreeWidth($(window).width() * 0.15);
+        $("#itemTree").height($(window).height() - 90);
+        $('#gridTable').trigger('reloadGrid');
+        $('#gridTable1').trigger('reloadGrid');
+    }
+
+
+    function queryJson()
+    {
+        //违章基本信息
+        var queryJson = {
+            stdate: $("#stdate").val(), //创建开始时间
+            etdate: $("#etdate").val(),//创建结束时间
+            lllegaltype: $("#lllegaltype").attr("data-value"), //违章类型
+            lllegaldescribe: $("#lllegaldescribe").val(), //违章描述
+            keyword: $("#keyword").val(),
+            code: _parentId,  //部门编码
+            mode: mode,
+            special: special //待办事项，特殊处理
+        };
+        return JSON.stringify(queryJson);
+    }
+    //加载表格
+    function GetGrid() {
+        var selectedRowIndex = 0;
+        var $gridTable = $('#gridTable');
+        var bmlabel = mode > 0 ? "外协单位" : "部门"; //用以区分是外协和部门
+        $gridTable.jqGrid({
+            width: $(".center-Panel").width() * 0.99,
+            height: $(window).height() - 190,
+            url: "../../LllegalManage/LllegalDeductMarks/GetPageListJson",
+            postData: { queryJson: queryJson() },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'id', index: 'id', width: 100, align: 'center', hidden: true },
+                {
+                    label: '操作', name: 'oper', index: 'id', width: 120, align: 'center',
+                    formatter: function (cellvalue, options, rowObject) {
+                        var id = null != rowObject.id ? rowObject.id : "";
+                        var punishid = null != rowObject.punishid ? rowObject.punishid : "";
+                        var lllegalid = null != rowObject.lllegalid ? rowObject.lllegalid : "";
+                        var html = "<a href=javascript:view('" + id + "','" + punishid + "','" + rowObject.appsign + "')  title='查看'><i class='fa fa-eye'></i></a>";
+                        if ((curUserRole.indexOf("负责人") >= 0 || curUserRole.indexOf("副管用户") >= 0 || curUserRole.indexOf("安全管理员") >= 0)
+                            && ((rowObject.deptid == curDeptId && !rowObject.teamid) || rowObject.teamid == curDeptId) && parseInt(rowObject.appsign) > 0 && !rowObject.userid)
+                        {
+                            html += "&nbsp;&nbsp;<a href=javascript:edit('" + id + "','" + lllegalid + "','" + punishid + "','" + rowObject.appsign + "')  title='完善'><i class='fa fa-pencil-square-o'></i></a>";
+                        }
+                        if (parseInt(rowObject.appsign) >= 2 && (rowObject.createuserid == curUserId || curUserRole.indexOf("公司管理员") >= 0) ) {
+                            html += "&nbsp;&nbsp;&nbsp;<a href=javascript:remove('" + id+ "')  title='删除'><i class='fa fa-trash-o'></i></a>";
+                        }
+                       return html;
+                   }
+               },
+                { label: '姓名', name: 'username', index: 'username', width: 120, align: 'center' },
+                { label: bmlabel, name: 'deptname', index: 'deptname', width: 150, align: 'center', sortable: true },
+                { label: '专业/班组', name: 'teamname', index: 'teamname', width: 120, align: 'center', sortable: true },
+                { label: '岗位/职务', name: 'dutyname', index: 'dutyname', width: 120, align: 'center', sortable: true },
+                {
+                    label: '违章过程描述', name: 'lllegaldescribe', index: 'lllegaldescribe', width:350, align: 'center', sortable: true,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = "";
+                        if (!!cellvalue) {
+                            if (!!rowObject.lllegalid) {
+                                html = "<a href=javascript:viewdata('" + rowObject.lllegalid + "','" + rowObject.addtype + "','" + rowObject.flowstate + "')  title='查看'><span style=\"white-space:pre-wrap;color:blue;\">" + cellvalue + "</span></a>";
+                            }
+                            else
+                            {
+                                html = "<span style=\"white-space:pre-wrap;\">" + cellvalue + "</span>";
+                            }
+                        }
+                        return html;
+                    }
+                },
+
+                { label: '违章分类', name: 'lllegaltypename', index: 'lllegaltypename', width: 150, align: 'center', sortable: true },
+                {
+                    label: '处罚时间', name: 'punishdate', index: 'punishdate', width: 120, align: 'center', sortable: false,
+                    formatter: function (cellvalue, options, rowObject) {
+                        var html = formatDate(cellvalue, "yyyy-MM-dd");
+                        return html;
+                    }},
+                { label: '处罚结果(元)', name: 'punishresult', index: 'punishresult', width: 120, align: 'center', sortable: true },
+                { label: '扣除积分(分)', name: 'punishpoint', index: 'punishpoint', width: 120, align: 'center', sortable: true }
+            ],
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            pager: "#gridPager",
+            sortname: "nvl(punishdate,sysdate-10000) desc,nvl(createdate,sysdate -10000) desc,deptsort asc,sortcode asc,userid",
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: queryJson() }, page: 1
+            }).trigger('reloadGrid');
+
+            $(".ui-filter-list").css("display", "none");
+            $(".ui-filter-text ").removeClass("active");
+            $(".ui-filter-text ").removeAttr("style");
+        });
+
+    }
+
+    //加载表格
+    function GetJFGrid() {
+        var selectedRowIndex = 0;
+        var bmlabel = mode > 0 ? "外协单位" : "部门"; //用以区分是外协和部门
+        var $gridTable = $('#gridTable1');
+        $gridTable.jqGrid({
+            width: $(".center-Panel").width() * 0.99,
+            height: $(window).height() - 190,
+            url: "../../LllegalManage/LllegalDeductMarks/GetJfPageListJson",
+            postData: { queryJson: queryJson() },
+            datatype: "json",
+            colModel: [
+                { label: '主键', name: 'userid', index: 'userid', width: 100, align: 'center', hidden: true },
+                { label: '姓名', name: 'username', index: 'username', width: 120, align: 'center' },
+                { label: bmlabel, name: 'deptname', index: 'deptname', width: 150, align: 'center', sortable: true },
+                { label: '专业/班组', name: 'teamname', index: 'teamname', width: 120, align: 'center', sortable: true },
+                { label: '岗位/职务', name: 'dutyname', index: 'dutyname', width: 120, align: 'center', sortable: true },
+                { label: '违章原始积分(分)', name: 'initpoint', index: 'initpoint', width: 120, align: 'center', sortable: true },
+                { label: '扣除积分(分)', name: 'punishpoint', index: 'punishpoint', width: 120, align: 'center', sortable: true },
+                { label: '违章积分(分)', name: 'point', index: 'point', width: 120, align: 'center', sortable: true }
+            ],
+            viewrecords: true,
+            rowNum: 15,
+            rowList: [15, 30, 50, 100],
+            pager: "#gridPager1",
+            sortname: 'deptsort asc,sortcode asc,userid',
+            sortorder: 'desc',
+            rownumbers: true,
+            shrinkToFit: true,
+            gridview: true,
+            onSelectRow: function () {
+                selectedRowIndex = $("#" + this.id).getGridParam('selrow');
+            },
+            gridComplete: function () {
+                $("#" + this.id).setSelection(selectedRowIndex, false);
+            }
+        });
+
+        //查询事件
+        $("#btn_Search").click(function () {
+            $gridTable.jqGrid('setGridParam', {
+                postData: { queryJson: queryJson() }, page: 1
+            }).trigger('reloadGrid');
+
+            $(".ui-filter-list").css("display", "none");
+            $(".ui-filter-text ").removeClass("active");
+            $(".ui-filter-text ").removeAttr("style");
+        });
+
+    }
+
+
+    //新增违章扣分
+    function add() {
+        dialogOpen({
+            id: 'LllegalDeductMarksForm',
+            title: '新增违章扣分',
+            url: "/LllegalManage/LllegalDeductMarks/Form?keyValue=&mode=" + mode,
+            width: ($(top.window).width() / 2 + 100) + "px",
+            height: ($(top.window).height() / 2 + 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //删除违章扣分
+    function remove(obj) {
+        $.RemoveForm({
+            url: '../../LllegalManage/LllegalDeductMarks/RemoveForm',
+            param: { keyValue: obj },
+            success: function (data) {
+                $('#gridTable').trigger('reloadGrid');
+            }
+        });
+    }
+
+    //完善违章扣分
+    function edit(keyvalue, lllegalid, punishid, appsign) {
+        keyvalue = !!keyvalue ? keyvalue : "";
+        dialogOpen({
+            id: "LllegalDeductMarksForm",
+            title: "完善违章扣分",
+            url: "/LllegalManage/LllegalDeductMarks/Form?keyValue=" + keyvalue + "&punishid=" + punishid + "&appsign=" + appsign + "&actiontype=edit&mode=" + mode,
+            width: ($(top.window).width() / 2 + 100) + "px",
+            height: ($(top.window).height() / 2 + 100) + "px",
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            }
+        });
+    }
+
+    //查看违章扣分
+    function view(keyvalue, punishid, appsign) {
+        keyvalue = !!keyvalue ? keyvalue : "";
+        dialogOpen({
+            id: "LllegalDeductMarksForm",
+            title: "完善违章扣分",
+            url: "/LllegalManage/LllegalDeductMarks/Form?keyValue=" + keyvalue + "&punishid=" + punishid + "&appsign=" + appsign + "&actiontype=view&mode=" + mode,
+            width: ($(top.window).width() / 2 + 100) + "px",
+            height: ($(top.window).height() / 2 + 100) + "px",
+            btn: null
+        });
+    }
+
+    //查看视图
+    function viewdata(obj, atype, flowstate) {
+        var rqUrl = "";
+        var title = "";
+
+        //未整改隐患的查看页面
+        if (flowstate == "违章登记") {
+            title = "查看违章";
+            rqUrl = '/LllegalManage/LllegalRegister/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (flowstate == "违章核准") {
+            title = "查看违章";
+            rqUrl = '/LllegalManage/LllegalApprove/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (flowstate == "制定整改计划") {
+            title = "查看违章";
+            rqUrl = '/LllegalManage/LllegalPlanReform/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (flowstate == "违章整改") {
+            title = "查看违章";
+            rqUrl = '/LllegalManage/LllegalReform/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else if (flowstate == "违章验收") {
+            title = "查看违章";
+            rqUrl = '/LllegalManage/LllegalAccept/Form?keyValue=' + obj + '&actiontype=view';
+        }
+        else {
+            if (atype == "0") {
+                title = "查看违章";
+                rqUrl = '/LllegalManage/LllegalAccept/Form?keyValue=' + obj + '&actiontype=view';
+            }
+            else  //已整改的查看页面
+            {
+                title = "已整改违章查看";
+                rqUrl = '/LllegalManage/LllegalRegister/NewForm?keyValue=' + obj + '&actiontype=view';
+            }
+        }
+        dialogOpen({
+            id: 'LllegalForm',
+            title: title,
+            url: rqUrl,
+            width: ($(top.window).width() - 100) + "px",
+            height: ($(top.window).height() - 100) + "px",
+            btn: null
+        });
+    }
+
+    //导入模块
+    var idx;
+    var isImport = false;
+    function importdata() {
+        idx = dialogOpen({
+            id: "Import",
+            title: '导入信息',
+            url: '/LllegalManage/LllegalDeductMarks/Import?mode=' + mode,
+            width: "600px",
+            height: "450px",
+            btn: ["确认", "关闭"],
+            callBack: function (iframeId) {
+                top.document.getElementById(iframeId).contentWindow.AcceptClick();
+            },
+            cancel: function (index) {
+                if (isImport) {
+                    isImport = false;
+                }
+                $('#gridTable').jqGrid('setGridParam', {
+                    postData: { queryJson: queryJson() }, page: 1
+                }).trigger('reloadGrid');
+            }
+        });
+    }
+
+    //导出违章扣分
+    function exportkfdata()
+    {
+        window.location.href = "../../LllegalManage/LllegalDeductMarks/ExportExcel?queryJson=" + queryJson() + "&mode=" + mode;
+    }
+
+
+
+    //重置所有查询条件
+    function ResetCondition() {
+        //开始时间
+        $("#stdate").val("");
+        //结束时间
+        $("#etdate").val("");
+        //违章类型
+        $("#lllegaltype").attr("data-text", "===全部===");
+        $("#lllegaltype").attr("data-value", "");
+        $("#lllegaltype div:eq(0)").text("===全部===");
+
+        //违章描述
+        $("#lllegaldescribe").val("");
+        //关键字
+        $("#keyword").val("");
+    }
+
+</script>
+
+<div class="ui-layout" id="layout" style="height: 100%; width: 100%;">
+    <div class="ui-layout-west">
+        <input type="hidden" id="btnFromCondition" />
+        <div class="west-Panel">
+            <div class="panel-Title">
+                <div class="col-md-10">
+                    组织机构
+                </div>
+                <div class="col-md-2 text-right" style="padding-right:8px;">
+                </div>
+            </div>
+            <div id="itemTree">
+            </div>
+        </div>
+    </div>
+    <div class="ui-layout-center">
+        <div class="center-Panel">
+            <div class="titlePanel">
+                <div class="title-search">
+                    <table>
+                        <tr>
+                            <td>查询条件:</td>
+                            <td style="padding-left: 10px;">
+                                <div class="ui-filter" style="width: 400px;">
+                                    <div class="ui-filter-text">
+                                        请选择过滤条件
+                                    </div>
+                                    <div class="ui-filter-list" style="width: 400px; ">
+                                        <table class="form" id="filter-form">
+                                            <tr>
+                                                <th class="formTitle">处罚时间：</th>
+                                                <td class="formValue">
+                                                    <input id="Category" type="hidden" value="1" />
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="stdate" readonly type="text" value="" class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                    <div style="float: left; width: 10%; text-align: center;">至</div>
+                                                    <div style="float: left; width: 45%;">
+                                                        <input id="etdate" readonly type="text" class="form-control input-wdatepicker" onfocus="WdatePicker({maxDate:'%y-%M-%d'})">
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">违章类型：</td>
+                                                <td class="formValue">
+                                                    <div id="lllegaltype" type="select" class="ui-select" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">违章描述：</td>
+                                                <td class="formValue">
+                                                    <input id="lllegaldescribe" type="text" class="form-control" />
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="formTitle">关键字：</td>
+                                                <td class="formValue">
+                                                    <input id="keyword" type="text" placeholder="请输入姓名、部门(外协单位)、专业/班组、岗位" class="form-control" />
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <div class="ui-filter-list-bottom">
+                                            <a id="btn_Reset" class="btn btn-default" onclick="ResetCondition()">&nbsp;重&nbsp;&nbsp;置</a>
+                                            <a id="btn_Search" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="toolbar">
+                    <div class="btn-group">
+                        <a class="btn btn-default" onclick="reload()"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                        <a id="add" class="btn btn-default" onclick="add()"><i class="fa fa-plus"></i>&nbsp;新增</a>
+                        <a id="import" class="btn btn-default" onclick="importdata()"><i class="fa fa-file-excel-o"></i>&nbsp;导入</a>
+                        <a id="export" class="btn btn-default" onclick="exportkfdata()"><i class="fa fa-file-excel-o"></i>&nbsp;导出</a>
+                    </div>
+                </div>
+            </div>
+            <ul class="nav nav-tabs">
+                <li class="active"><a id="tab1" href="#div1" onclick="resize()" data-toggle="tab">违章扣分表</a></li>
+                <li><a id="tab2" href="#div2" onclick="resize()" data-toggle="tab">违章积分表</a></li>
+            </ul>
+            <div class="tab-content">
+                <div id="div1" class="tab-pane active">
+                    <div class="center-Panel">
+                        <div style="height:10px;"></div>
+                        <div class="gridPanel">
+                            <table id="gridTable"></table>
+                            <div id="gridPager"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="div2" class="tab-pane">
+                    <div class="center-Panel">
+                        <div  style="height:10px;">
+                            @*<div class="title-search"  style="display:none;">
+                                    <table>
+                                        <tr>
+                                            <td>查询条件:</td>
+                                            <td style="padding-left: 10px;">
+                                                <div class="ui-filter" style="width: 350px;">
+                                                    <div class="ui-filter-text">
+                                                        请选择过滤条件
+                                                    </div>
+                                                    <div class="ui-filter-list" style="width: 350px; ">
+                                                        <table class="form" id="filter-form">
+                                                            <tr>
+                                                                <td class="formTitle">搜索：</td>
+                                                                <td class="formValue">
+                                                                    <input id="keyword" type="text" class="form-control" />
+                                                                </td>
+                                                            </tr>
+                                                        </table>
+                                                        <div class="ui-filter-list-bottom">
+                                                            <a id="btn_Reset1" class="btn btn-default" onclick="ResetCondition(1)">&nbsp;重&nbsp;&nbsp;置</a>
+                                                            <a id="btn_Search1" class="btn btn-primary">&nbsp;查&nbsp;&nbsp;询</a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="toolbar">
+                                    <div class="btn-group">
+                                        <a class="btn btn-default" onclick="$('#gridTable1').trigger('reloadGrid')"><i class="fa fa-refresh"></i>&nbsp;刷新</a>
+                                    </div>
+                                </div>*@
+                        </div>
+                        <div class="gridPanel">
+                            <table id="gridTable1"></table>
+                            <div id="gridPager1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
