@@ -203,7 +203,7 @@ namespace ERCHTMS.IService.BaseManage
         /// <param name="account">账户值</param>
         /// <param name="keyValue">主键</param>
         /// <returns></returns>
-        bool ExistAccount(string account, string keyValue);
+        bool ExistAccount(string account, string keyValue, string mobile);
         /// <summary>
         /// 身份证不能重复
         /// </summary>
@@ -297,5 +297,6 @@ namespace ERCHTMS.IService.BaseManage
         /// <param name="isLeaving">是否离场审批中</param>
         /// <returns></returns>
         int UpdateUserLeaveState(string userid, string isLeaving);
+        bool ExistAccount(string account, string encode, string mobile, string keyValue);
     }
 }

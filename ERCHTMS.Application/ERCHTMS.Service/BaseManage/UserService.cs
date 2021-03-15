@@ -2138,5 +2138,15 @@ select c.id,c.userid,c.validttime,c.credentialsname,c.credentialscode,c.credenti
         {
             return this.BaseRepository().FindList(strSql, dbParameter);
         }
+
+        public bool ExistAccount(string account, string keyValue)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool ExistAccount(string account, string keyValue, string mobile)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

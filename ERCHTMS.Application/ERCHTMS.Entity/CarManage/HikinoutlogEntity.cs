@@ -144,7 +144,8 @@ namespace ERCHTMS.Entity.CarManage
         /// <returns></returns>
         [Column("DEVICEHIKID")]
         public string DeviceHikID { get; set; }
-        
+        public string HikPicSvr { get; set; }
+
         #endregion
 
         #region À©Õ¹²Ù×÷

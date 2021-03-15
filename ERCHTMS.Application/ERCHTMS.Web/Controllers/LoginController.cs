@@ -911,19 +911,19 @@ namespace ERCHTMS.Web.Controllers
         [AjaxOnly]
         public ActionResult CheckLogin(string username, string password, string verifycode, int autologin, string shapassword = "", string password1 = "")
         {
-            try
-            {
-                string pwd = BSFramework.Util.DESEncrypt.DecryptString(password1.ToUpper());
-                password1 = pwd;
-            }
-            catch
-            {
+            //try
+            //{
+            //    string pwd = BSFramework.Util.DESEncrypt.DecryptString(password1.ToUpper());
+            //    password1 = pwd;
+            //}
+            //catch
+            //{
 
-            }
-            if (password1.Length>16)
-            {
-                return Error("密码长度不能大于16位！");
-            }
+            //}
+            //if (password1.Length>16)
+            //{
+            //    return Error("密码长度不能大于16位！");
+            //}
             ////如果是广西华昇版本则进行其他处理
             //string isGxhs = new ERCHTMS.Busines.SystemManage.DataItemDetailBLL().GetItemValue("广西华昇版本");
             //if(!string.IsNullOrWhiteSpace(isGxhs))

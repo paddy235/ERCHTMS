@@ -2338,7 +2338,7 @@ namespace ERCHTMS.Service.HiddenTroubleManage
                                              where  a.senddeptid is not null  and a.deptcode like '{0}%'  ) ) and to_char(createdate,'yyyy') ='{1}'
                                           and  workstream = 'Òþ»¼Õû¸Ä'  and  sysdate > changedeadine + 1  group by hidrank
                                       ) e on a.itemdetailid =e.hidrank", deptcode, DateTime.Now.Year.ToString());
-
+               
 
             var dt = this.BaseRepository().FindTable(sql);
 
